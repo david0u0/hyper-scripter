@@ -1,10 +1,14 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{Script, ScriptName};
-use std::fs::{canonicalize, read_dir};
+use crate::history::ScriptHistory;
+use crate::script::{Script, ScriptName, ToScriptName};
+use std::collections::HashMap;
+use std::fs::{canonicalize, read_dir, File};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ANONYMOUS: &'static str = ".anonymous";
+const HISTORY: &'static str = ".flash_script_history.json";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(join_path(".", &get_sys_path()).unwrap());
@@ -63,7 +67,7 @@ pub fn open_anonymous_script(id: Option<u32>, read_only: bool) -> Result<Script>
         id
     } else {
         match (read_only, ids.into_iter().max()) {
-            (true, None) => return Err(Error::EmptyAnonymous),
+            (true, None) => return Err(Error::Empty),
             (true, Some(id)) => id,
             (_, t) => t.unwrap_or_default() + 1,
         }
@@ -73,25 +77,54 @@ pub fn open_anonymous_script(id: Option<u32>, read_only: bool) -> Result<Script>
     let path = join_path(dir, &name.to_cmd())?;
     let exist = path.exists();
     if read_only && !exist {
-        return Err(Error::NoSuchScript(path));
+        return Err(Error::FileNotFound(path));
     }
     Ok(Script { path, exist, name })
 }
-pub fn open_script(name: String, read_only: bool) -> Result<Script> {
-    match ScriptName::parse(name)? {
+
+pub fn open_script<T: ToScriptName>(name: T, read_only: bool) -> Result<Script> {
+    match name.to_script_name()? {
         ScriptName::Anonymous(id) => open_anonymous_script(Some(id), read_only),
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
             let path = join_path(get_path(), &name.to_cmd())?;
             let exist = path.exists();
             if read_only && !exist {
-                return Err(Error::NoSuchScript(path));
+                return Err(Error::FileNotFound(path));
             }
             Ok(Script { exist, path, name })
         }
     }
 }
+pub fn get_history() -> Result<HashMap<ScriptName, ScriptHistory>> {
+    let path = join_path(get_path(), HISTORY)?;
+    let mut map = HashMap::new();
+    let mut file = match File::open(&path) {
+        Ok(file) => file,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                return Ok(map);
+            } else {
+                return Err(e.into());
+            }
+        }
+    };
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    let histories: Vec<ScriptHistory> = serde_json::from_str(&content)?;
+    for h in histories.into_iter() {
+        map.insert(h.name.clone(), h);
+    }
+    Ok(map)
+}
 
+pub fn store_history<T>(history: HashMap<T, ScriptHistory>) -> Result<()> {
+    let path = join_path(get_path(), HISTORY)?;
+    let mut file = File::create(path)?;
+    let v: Vec<_> = history.into_iter().map(|(_, h)| h).collect();
+    file.write_all(serde_json::to_string(&v)?.as_bytes())?;
+    Ok(())
+}
 #[cfg(test)]
 mod test {
     use super::*;
@@ -126,7 +159,7 @@ mod test {
             join_path("./.test_flash_script/", "first.sh").unwrap()
         );
         match open_script("not-exist".to_owned(), true) {
-            Err(Error::NoSuchScript(name)) => assert_eq!(
+            Err(Error::FileNotFound(name)) => assert_eq!(
                 name,
                 join_path("./.test_flash_script/", "not-exist.sh").unwrap()
             ),

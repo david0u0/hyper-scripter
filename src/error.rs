@@ -9,9 +9,10 @@ pub enum Error {
     ),
     PathNotFound(PathBuf),
     PathNotSet,
-    NoSuchScript(PathBuf),
+    Operation(String),
+    FileNotFound(PathBuf),
     Format(String),
-    EmptyAnonymous,
+    Empty,
 }
 
 impl<T: 'static + Send + Sync + std::error::Error> From<T> for Error {

@@ -15,7 +15,7 @@ use util::{map_to_iter, run};
 #[derive(StructOpt, Debug)]
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
-    fs_path: Option<String>,
+    is_path: Option<String>,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
 }
@@ -25,13 +25,10 @@ enum Subs {
     Edit {
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
-        #[structopt(short, long, help = "Create and edit a new anonymous script")]
-        new: bool,
-        #[structopt(
-            help = "The script's name. Prefix `.` to specify anonymous scripts, such as `run .42`"
-        )]
         script_name: Option<String>,
     },
+    #[structopt(about = "Edit latest script. This is the default subcommand.")]
+    EditLatest,
     #[structopt(about = "Run the last script edited or run", alias = ".")]
     RunLast { args: Vec<String> },
     #[structopt(about = "Run the script", alias = "r")]
@@ -48,16 +45,6 @@ enum Subs {
     Move { origin: String, target: String },
 }
 
-impl Default for Subs {
-    fn default() -> Self {
-        Subs::Edit {
-            script_name: None,
-            hide: false,
-            new: false,
-        }
-    }
-}
-
 #[derive(StructOpt, Debug)]
 struct List {
     // TODO: 滿滿的其它排序/篩選選項
@@ -68,40 +55,22 @@ struct List {
 fn main() -> Result<()> {
     env_logger::init();
     let root = Root::from_args();
-    if let Some(fs_path) = root.fs_path {
-        path::set_path(fs_path)?;
+    if let Some(is_path) = root.is_path {
+        path::set_path(is_path)?;
     } else {
         path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
     }
 
-    let sub = root.subcmd.unwrap_or_default();
+    let sub = root.subcmd.unwrap_or(Subs::EditLatest);
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     let latest = hs.iter().max_by_key(|(_, h)| h.last_time());
     match sub {
-        Subs::Edit {
-            new,
-            script_name,
-            hide,
-        } => {
-            let script = if new {
-                if script_name.is_some() {
-                    return Err(Error::Operation(
-                        "The --new flag shouldn't be set when there is a script name.".to_owned(),
-                    ));
-                }
-                path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
-            } else if let Some(name) = script_name {
+        Subs::Edit { script_name, hide } => {
+            let script = if let Some(name) = script_name {
                 path::open_script(name.clone(), hide, false)
                     .context(format!("打開指定腳本失敗：{}", name))?
             } else {
-                log::info!("嘗試打開最新的腳本…");
-                if let Some((_, latest)) = latest {
-                    path::open_script(latest.name.clone(), hide, false)
-                        .context(format!("打開最新腳本失敗：{:?}", latest.name))?
-                } else {
-                    log::info!("沒有最近歷史，改為創建新的匿名腳本");
-                    path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
-                }
+                path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
             };
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
@@ -109,6 +78,23 @@ fn main() -> Result<()> {
                 .entry(script.name.clone())
                 .or_insert(ScriptMeta::new(script.name)?);
             h.hidden = hide;
+            h.edit_time = Utc::now();
+            path::store_history(map_to_iter(hs))?;
+        }
+        Subs::EditLatest => {
+            log::info!("嘗試打開最新的腳本…");
+            let script = if let Some((_, latest)) = latest {
+                path::open_script(latest.name.clone(), latest.hidden, false)
+                    .context(format!("打開最新腳本失敗：{:?}", latest.name))?
+            } else {
+                log::info!("沒有最近歷史，改為創建新的匿名腳本");
+                path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
+            };
+            let mut cmd = Command::new("vim");
+            cmd.args(&[script.path]).spawn()?.wait()?;
+            let h = hs
+                .get_mut(&script.name.clone())
+                .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }

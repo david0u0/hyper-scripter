@@ -28,10 +28,10 @@ impl PartialOrd for ScriptName {
     }
 }
 pub trait ToScriptName {
-    fn to_script_name(self, is_script: bool) -> Result<ScriptName>;
+    fn to_script_name(self) -> Result<ScriptName>;
 }
 impl ToScriptName for String {
-    fn to_script_name(self, is_script: bool) -> Result<ScriptName> {
+    fn to_script_name(self) -> Result<ScriptName> {
         let reg = Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(&self);
         if let Some(m) = m {
@@ -41,24 +41,21 @@ impl ToScriptName for String {
                 _ => return Err(Error::Format(self.to_owned())),
             }
         } else {
-            Ok(ScriptName::Named(if is_script {
-                format!("{}.sh", self)
-            } else {
-                self
-            }))
+            Ok(ScriptName::Named(self))
         }
     }
 }
 impl ToScriptName for ScriptName {
-    fn to_script_name(self, _is_script: bool) -> Result<ScriptName> {
+    fn to_script_name(self) -> Result<ScriptName> {
         Ok(self)
     }
 }
 impl ScriptName {
-    pub fn to_file_name(&self) -> String {
+    pub fn to_file_name(&self, ty: ScriptType) -> String {
+        let ext = ty.ext().map(|s| format!(".{}", s)).unwrap_or_default();
         match self {
-            ScriptName::Anonymous(id) => format!("{}.sh", id),
-            ScriptName::Named(name) => name.clone(),
+            ScriptName::Anonymous(id) => format!("{}{}", id, ext),
+            ScriptName::Named(name) => format!("{}{}", name, ext),
         }
     }
 }
@@ -69,6 +66,7 @@ pub struct ScriptMeta {
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
     pub name: ScriptName,
+    pub ty: ScriptType,
     pub last_edit_path: PathBuf,
 }
 
@@ -80,9 +78,10 @@ impl ScriptMeta {
             self.edit_time
         }
     }
-    pub fn new(name: ScriptName) -> Result<Self> {
+    pub fn new(name: ScriptName, ty: ScriptType) -> Result<Self> {
         Ok(ScriptMeta {
             name,
+            ty,
             last_edit_path: std::env::current_dir()?,
             edit_time: Utc::now(),
             exec_time: None,
@@ -93,7 +92,7 @@ impl ScriptMeta {
 
 macro_rules! script_type_enum {
     ($( $tag:expr => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
         pub enum ScriptType {
             $($name),*
         }
@@ -164,7 +163,7 @@ macro_rules! script_type_enum {
 script_type_enum! {
     "sh" => Shell("sh"): ("sh"),
     "screen" => Screen: ("screen", "-c"),
-    "plain" => Plain: (),
+    "txt" => Txt: (),
     "js" => Js("js"): ("node")
 }
 impl Default for ScriptType {
@@ -179,11 +178,11 @@ mod test {
     #[test]
     fn test_ext() {
         assert_eq!(Some("sh"), ScriptType::Shell.ext());
-        assert_eq!(None, ScriptType::Plain.ext());
+        assert_eq!(None, ScriptType::Screen.ext());
     }
     #[test]
     fn test_cmd() {
-        assert_eq!(Some(("sh".to_owned(), vec![])), ScriptType::Shell.cmd());
-        assert_eq!(None, ScriptType::Plain.cmd());
+        assert_eq!(Some(("node".to_owned(), vec![])), ScriptType::Js.cmd());
+        assert_eq!(None, ScriptType::Txt.cmd());
     }
 }

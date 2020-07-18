@@ -1,3 +1,4 @@
+use crate::script::ScriptType;
 use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Others {}
@@ -13,6 +14,10 @@ pub enum Error {
     GeneralFS(PathBuf, std::io::Error),
     PathNotSet,
     Operation(String),
+    TypeMismatch {
+        expect: ScriptType,
+        actual: ScriptType,
+    },
     Format(String),
     Empty,
 }

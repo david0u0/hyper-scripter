@@ -7,7 +7,7 @@ mod util;
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::{ScriptMeta, ScriptType};
+use script::{ScriptMeta, ScriptName, ScriptType, ToScriptName};
 use std::process::Command;
 use structopt::StructOpt;
 use util::{map_to_iter, run};
@@ -26,8 +26,8 @@ enum Subs {
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
         script_name: Option<String>,
-        #[structopt(short, long, default_value, parse(try_from_str))]
-        ty: ScriptType,
+        #[structopt(short, long, parse(try_from_str))]
+        ty: Option<ScriptType>,
     },
     #[structopt(about = "Edit latest script. This is the default subcommand.")]
     EditLatest,
@@ -72,17 +72,32 @@ fn main() -> Result<()> {
             hide,
             ty,
         } => {
+            let mut actual_ty = ty.unwrap_or_default();
             let script = if let Some(name) = script_name {
-                path::open_script(name.clone(), hide, false)
-                    .context(format!("打開指定腳本失敗：{}", name))?
+                let name = name.to_script_name()?;
+                if let Some(h) = hs.get(&name) {
+                    actual_ty = h.ty;
+                    if let Some(ty) = ty {
+                        log::warn!("已存在的腳本無需再指定類型");
+                        if ty != h.ty {
+                            return Err(Error::TypeMismatch {
+                                expect: ty,
+                                actual: h.ty,
+                            });
+                        }
+                    }
+                }
+                path::open_script(name.clone(), actual_ty, false)
+                    .context(format!("打開指定腳本失敗：{:?}", name))?
             } else {
-                path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
+                path::open_anonymous_script(None, actual_ty, false).context("打開新匿名腳本失敗")?
             };
-            let mut cmd = Command::new("vim");
-            cmd.args(&[script.path]).spawn()?.wait()?;
             let h = hs
                 .entry(script.name.clone())
-                .or_insert(ScriptMeta::new(script.name)?);
+                .or_insert(ScriptMeta::new(script.name, actual_ty)?);
+            // FIXME: 重覆的東西抽一抽啦
+            let mut cmd = Command::new("vim");
+            cmd.args(&[script.path]).spawn()?.wait()?;
             h.hidden = hide;
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
@@ -90,32 +105,34 @@ fn main() -> Result<()> {
         Subs::EditLatest => {
             log::info!("嘗試打開最新的腳本…");
             let script = if let Some((_, latest)) = latest {
-                path::open_script(latest.name.clone(), latest.hidden, false)
+                path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
                 log::info!("沒有最近歷史，改為創建新的匿名腳本");
-                path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
+                path::open_anonymous_script(None, Default::default(), false)
+                    .context("打開新匿名腳本失敗")?
             };
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
             let h = hs
-                .get_mut(&script.name.clone())
-                .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;
+                .entry(script.name.clone())
+                .or_insert(ScriptMeta::new(script.name, Default::default())?);
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }
         Subs::Run { script_name, args } => {
-            let script = path::open_script(script_name, false, true)?;
-            run(&script, args)?;
+            let name = script_name.to_script_name()?;
             let h = hs
-                .get_mut(&script.name.clone())
-                .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;
+                .get_mut(&name)
+                .ok_or(Error::Format(format!("Missing history: {:?}", &name)))?;
+            let script = path::open_script(name, h.ty, true)?;
+            run(&script, args)?;
             h.exec_time = Some(Utc::now());
             path::store_history(map_to_iter(hs))?;
         }
         Subs::RunLast { args } => {
             let script = if let Some((_, latest)) = latest {
-                path::open_script(latest.name.clone(), false, false)
+                path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
                 return Err(Error::Empty);

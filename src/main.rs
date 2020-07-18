@@ -65,6 +65,8 @@ fn main() -> Result<()> {
     let root = Root::from_args();
     if let Some(fs_path) = root.fs_path {
         path::set_path(fs_path)?;
+    } else {
+        path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
     }
 
     let sub = root.subcmd.unwrap_or_default();

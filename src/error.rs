@@ -8,9 +8,11 @@ pub enum Error {
         Option<Box<dyn 'static + Send + Sync + std::error::Error>>,
     ),
     PathNotFound(PathBuf),
+    PermissionDenied(PathBuf),
+    FileNotFound(PathBuf),
+    GeneralFS(PathBuf, std::io::Error),
     PathNotSet,
     Operation(String),
-    FileNotFound(PathBuf),
     Format(String),
     Empty,
 }
@@ -36,14 +38,26 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait Contextabl {
-    fn context<T: ToString>(self, s: T) -> Self;
+pub trait Contextabl<T> {
+    fn context<S: ToString>(self, s: S) -> Result<T>;
 }
-impl<T> Contextabl for Result<T> {
-    fn context<S: ToString>(self, s: S) -> Self {
+impl<T> Contextabl<T> for Result<T> {
+    fn context<S: ToString>(self, s: S) -> Result<T> {
         match self {
             Ok(t) => Ok(t),
             Err(e) => Err(e.context(s)),
+        }
+    }
+}
+
+impl<T, E: 'static + Send + Sync + std::error::Error> Contextabl<T> for std::result::Result<T, E> {
+    fn context<S: ToString>(self, s: S) -> Result<T> {
+        match self {
+            Ok(t) => Ok(t),
+            Err(e) => {
+                let e: Error = e.into();
+                Err(e.context(s))
+            }
         }
     }
 }

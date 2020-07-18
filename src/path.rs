@@ -1,7 +1,8 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{Script, ScriptMeta, ScriptName, ToScriptName};
+use crate::util::handle_fs_err;
 use std::collections::HashMap;
-use std::fs::{canonicalize, read_dir, File};
+use std::fs::{canonicalize, create_dir, read_dir, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -10,27 +11,30 @@ const ANONYMOUS: &'static str = ".anonymous";
 const META: &'static str = ".instant_script_meta.json";
 
 lazy_static::lazy_static! {
-    static ref PATH: Mutex<PathBuf> = Mutex::new(join_path(".", &get_sys_path()).unwrap());
+    static ref PATH: Mutex<PathBuf> = Mutex::new(PathBuf::new());
 }
 
-#[cfg(release)]
-fn get_sys_path() -> String {}
-#[cfg(all(not(release), not(test)))]
-fn get_sys_path() -> String {
-    "./.instant_script".to_string()
+#[cfg(feature = "release")]
+pub fn get_sys_path() -> Result<String> {
+    let p = match std::env::var("INSTANT_SCRIPT_PATH") {
+        Ok(p) => p,
+        Err(std::env::VarError::NotPresent) => return Err(Error::PathNotSet),
+        Err(e) => return Err(e.into()),
+    };
+    Ok(p)
 }
-#[cfg(test)]
-fn get_sys_path() -> String {
-    "./.test_instant_script".to_string()
+#[cfg(not(feature = "release"))]
+pub fn get_sys_path() -> Result<String> {
+    Ok("./.instant_script".to_string())
 }
 
-fn join_path<P: AsRef<Path>>(base: P, path: &str) -> Result<PathBuf> {
+pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
     let here = canonicalize(base)?;
-    Ok(here.join(Path::new(path)))
+    Ok(here.join(path))
 }
 
-pub fn set_path<T: AsRef<str>>(p: T) -> Result<()> {
-    let path = join_path(".", p.as_ref())?;
+pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
+    let path = join_path(".", p)?;
     if !path.exists() {
         return Err(Error::PathNotFound(path));
     }
@@ -41,10 +45,14 @@ pub fn get_path() -> PathBuf {
     PATH.lock().unwrap().clone()
 }
 
-pub fn get_anonymous_ids() -> Result<Vec<u32>> {
+fn get_anonymous_ids() -> Result<Vec<u32>> {
     let mut ids = vec![];
     let dir = get_path().join(ANONYMOUS);
-    for entry in read_dir(dir)? {
+    if !dir.exists() {
+        log::info!("找不到匿名腳本資料夾，創建之");
+        handle_fs_err(&dir, create_dir(&dir))?;
+    }
+    for entry in handle_fs_err(&dir, read_dir(&dir))? {
         let mut name = entry?
             .file_name()
             .to_str()
@@ -102,19 +110,20 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
         Ok(file) => file,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
+                log::info!("找不到歷史檔案，視為空歷史");
                 return Ok(map);
             } else {
-                return Err(e.into());
+                return handle_fs_err(&path, Err(e)).context("唯讀打開歷史檔案失敗");
             }
         }
     };
     let mut content = String::new();
-    file.read_to_string(&mut content)?;
+    handle_fs_err(&path, file.read_to_string(&mut content)).context("讀取歷史檔案失敗")?;
     let histories: Vec<ScriptMeta> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
         match open_script(h.name.clone(), true) {
             Err(e) => {
-                log::warn!("{:?} 腳本的歷史資料有誤：{:?}", h.name, e);
+                log::warn!("{:?} 腳本歷史資料有誤：{:?}", h.name, e);
                 continue;
             }
             _ => (),
@@ -126,22 +135,28 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
 
 pub fn store_history(history: impl IntoIterator<Item = ScriptMeta>) -> Result<()> {
     let path = join_path(get_path(), META)?;
-    let mut file = File::create(path)?;
+    let mut file = handle_fs_err(&path, File::create(&path)).context("唯讀打開歷史檔案失敗")?;
     let v: Vec<_> = history.into_iter().collect();
-    file.write_all(serde_json::to_string(&v)?.as_bytes())?;
+    handle_fs_err(&path, file.write_all(serde_json::to_string(&v)?.as_bytes()))
+        .context("寫入歷史檔案失敗")?;
     Ok(())
 }
 #[cfg(test)]
 mod test {
     use super::*;
+    fn setup() {
+        set_path(join_path(".", "./.test_instant_script").unwrap()).unwrap();
+    }
     #[test]
     fn test_anonymous_ids() {
+        setup();
         let mut ids = get_anonymous_ids().unwrap();
         ids.sort();
         assert_eq!(ids, vec![1, 2, 5]);
     }
     #[test]
     fn test_open_anonymous() {
+        setup();
         let s = open_anonymous_script(None, false).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
@@ -157,6 +172,7 @@ mod test {
     }
     #[test]
     fn test_open() {
+        setup();
         let s = open_script("first".to_owned(), false).unwrap();
         assert_eq!(s.name, ScriptName::Named("first".to_owned()));
         assert_eq!(s.exist, true);

@@ -1,6 +1,5 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::history::ScriptHistory;
-use crate::script::{Script, ScriptName, ToScriptName};
+use crate::script::{Script, ScriptMeta, ScriptName, ToScriptName};
 use std::collections::HashMap;
 use std::fs::{canonicalize, read_dir, File};
 use std::io::{Read, Write};
@@ -8,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ANONYMOUS: &'static str = ".anonymous";
-const HISTORY: &'static str = ".flash_script_history.json";
+const META: &'static str = ".flash_script_meta.json";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(join_path(".", &get_sys_path()).unwrap());
@@ -96,8 +95,8 @@ pub fn open_script<T: ToScriptName>(name: T, read_only: bool) -> Result<Script> 
         }
     }
 }
-pub fn get_history() -> Result<HashMap<ScriptName, ScriptHistory>> {
-    let path = join_path(get_path(), HISTORY)?;
+pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
+    let path = join_path(get_path(), META)?;
     let mut map = HashMap::new();
     let mut file = match File::open(&path) {
         Ok(file) => file,
@@ -111,17 +110,17 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptHistory>> {
     };
     let mut content = String::new();
     file.read_to_string(&mut content)?;
-    let histories: Vec<ScriptHistory> = serde_json::from_str(&content)?;
+    let histories: Vec<ScriptMeta> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
         map.insert(h.name.clone(), h);
     }
     Ok(map)
 }
 
-pub fn store_history<T>(history: HashMap<T, ScriptHistory>) -> Result<()> {
-    let path = join_path(get_path(), HISTORY)?;
+pub fn store_history(history: impl IntoIterator<Item = ScriptMeta>) -> Result<()> {
+    let path = join_path(get_path(), META)?;
     let mut file = File::create(path)?;
-    let v: Vec<_> = history.into_iter().map(|(_, h)| h).collect();
+    let v: Vec<_> = history.into_iter().collect();
     file.write_all(serde_json::to_string(&v)?.as_bytes())?;
     Ok(())
 }

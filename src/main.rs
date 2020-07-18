@@ -1,14 +1,16 @@
 mod error;
-mod history;
+mod list;
 mod path;
 mod script;
 mod util;
 
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
-use history::ScriptHistory;
+use list::{fmt_list, ListOptions};
+use script::ScriptMeta;
 use std::process::Command;
 use structopt::StructOpt;
+use util::{map_to_iter, run};
 
 #[derive(StructOpt, Debug)]
 struct Root {
@@ -55,8 +57,7 @@ impl Default for Subs {
 
 #[derive(StructOpt, Debug)]
 struct List {
-    #[structopt(short, long, help = "list all scripts")]
-    all: bool,
+    // TODO: 滿滿的其它排序/篩選選項
 }
 
 fn main() -> Result<()> {
@@ -94,18 +95,18 @@ fn main() -> Result<()> {
             cmd.args(&[script.path]).spawn()?.wait()?;
             let h = hs
                 .entry(script.name.clone())
-                .or_insert(ScriptHistory::new(script.name)?);
+                .or_insert(ScriptMeta::new(script.name)?);
             h.edit_time = Utc::now();
-            path::store_history(hs)?;
+            path::store_history(map_to_iter(hs))?;
         }
         Subs::Run { script_name, args } => {
             let script = path::open_script(script_name, true)?;
-            util::run(&script, args)?;
+            run(&script, args)?;
             let h = hs
                 .get_mut(&script.name.clone())
                 .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;
             h.exec_time = Some(Utc::now());
-            path::store_history(hs)?;
+            path::store_history(map_to_iter(hs))?;
         }
         Subs::RunLast { args } => {
             let script = if let Some((_, latest)) = latest {
@@ -114,12 +115,17 @@ fn main() -> Result<()> {
             } else {
                 return Err(Error::Empty);
             };
-            util::run(&script, args)?;
+            run(&script, args)?;
             let h = hs
                 .get_mut(&script.name.clone())
                 .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;
             h.exec_time = Some(Utc::now());
-            path::store_history(hs)?;
+            path::store_history(map_to_iter(hs))?;
+        }
+        Subs::List { .. } => {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            fmt_list(&mut handle, map_to_iter(hs), &ListOptions {})?;
         }
         _ => unimplemented!(),
     }

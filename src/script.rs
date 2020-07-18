@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -44,5 +45,31 @@ impl ScriptName {
             ScriptName::Anonymous(id) => format!("{}.sh", id),
             ScriptName::Named(name) => format!("{}.sh", name),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptMeta {
+    pub edit_time: DateTime<Utc>,
+    pub exec_time: Option<DateTime<Utc>>,
+    pub name: ScriptName,
+    pub last_edit_path: PathBuf,
+}
+
+impl ScriptMeta {
+    pub fn last_time(&self) -> DateTime<Utc> {
+        if let Some(exec_time) = self.exec_time {
+            std::cmp::max(self.edit_time, exec_time)
+        } else {
+            self.edit_time
+        }
+    }
+    pub fn new(name: ScriptName) -> Result<Self> {
+        Ok(ScriptMeta {
+            name,
+            last_edit_path: std::env::current_dir()?,
+            edit_time: Utc::now(),
+            exec_time: None,
+        })
     }
 }

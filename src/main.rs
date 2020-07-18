@@ -26,11 +26,11 @@ enum Subs {
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
         script_name: Option<String>,
-        #[structopt(short, long, parse(try_from_str))]
+        #[structopt(short, parse(try_from_str), help = "Type of the script, e.g. `sh`")]
         ty: Option<ScriptType>,
     },
-    #[structopt(about = "Edit latest script. This is the default subcommand.")]
-    EditLatest,
+    #[structopt(about = "Edit the last script. This is the default subcommand.")]
+    EditLast,
     #[structopt(about = "Run the last script edited or run", alias = ".")]
     RunLast { args: Vec<String> },
     #[structopt(about = "Run the script", alias = "r")]
@@ -41,7 +41,7 @@ enum Subs {
         script_name: String,
         args: Vec<String>,
     },
-    #[structopt(about = "List instant scripts", alias = "l")]
+    #[structopt(about = "List instant scripts", aliases = &["l", "ls"])]
     List(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
     Move { origin: String, target: String },
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
         path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
     }
 
-    let sub = root.subcmd.unwrap_or(Subs::EditLatest);
+    let sub = root.subcmd.unwrap_or(Subs::EditLast);
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     let latest = hs.iter().max_by_key(|(_, h)| h.last_time());
     match sub {
@@ -102,7 +102,7 @@ fn main() -> Result<()> {
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }
-        Subs::EditLatest => {
+        Subs::EditLast => {
             log::info!("嘗試打開最新的腳本…");
             let script = if let Some((_, latest)) = latest {
                 path::open_script(latest.name.clone(), latest.ty, false)
@@ -126,18 +126,22 @@ fn main() -> Result<()> {
                 .get_mut(&name)
                 .ok_or(Error::Format(format!("Missing history: {:?}", &name)))?;
             let script = path::open_script(name, h.ty, true)?;
-            run(&script, args)?;
+            run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());
             path::store_history(map_to_iter(hs))?;
         }
         Subs::RunLast { args } => {
-            let script = if let Some((_, latest)) = latest {
-                path::open_script(latest.name.clone(), latest.ty, false)
-                    .context(format!("打開最新腳本失敗：{:?}", latest.name))?
+            // FIXME: Script 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
+            let (script, ty) = if let Some((_, latest)) = latest {
+                (
+                    path::open_script(latest.name.clone(), latest.ty, false)
+                        .context(format!("打開最新腳本失敗：{:?}", latest.name))?,
+                    latest.ty,
+                )
             } else {
                 return Err(Error::Empty);
             };
-            run(&script, args)?;
+            run(&script, ty, &args)?;
             let h = hs
                 .get_mut(&script.name.clone())
                 .ok_or(Error::Format(format!("Missing history: {:?}", script.name)))?;

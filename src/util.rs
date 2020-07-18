@@ -1,13 +1,17 @@
 use crate::error::{Error, Result};
-use crate::script::Script;
+use crate::script::{Script, ScriptType};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn run(script: &Script, args: Vec<String>) -> Result<()> {
-    let mut cmd = Command::new("sh");
-    let mut full_args = vec![script.path.clone()];
-    full_args.extend(args.into_iter().map(|s| s.into()));
+pub fn run(script: &Script, ty: ScriptType, remaining: &[String]) -> Result<()> {
+    let (cmd, args) = ty
+        .cmd()
+        .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;
+    let mut cmd = Command::new(cmd);
+    let mut full_args: Vec<PathBuf> = args.into_iter().map(|s| s.into()).collect();
+    full_args.extend(remaining.into_iter().map(|s| s.into()));
+    full_args.push(script.path.clone());
     cmd.args(full_args).spawn()?.wait()?;
     Ok(())
 }

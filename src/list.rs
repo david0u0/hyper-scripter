@@ -28,7 +28,7 @@ pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Re
     } else {
         "Never".to_owned()
     };
-    write!(w, "\t{}\t{}\n", meta.edit_time, exex_time)?;
+    write!(w, "\t{}\t{}\t{}\n", meta.ty, meta.edit_time, exex_time)?;
     Ok(())
 }
 pub fn fmt_list<W: Write>(
@@ -39,7 +39,7 @@ pub fn fmt_list<W: Write>(
     let mut scripts: Vec<_> = scripts.into_iter().collect();
     scripts.sort_by_key(|m| m.name.clone());
     let mut anonymous_printed = false;
-    writeln!(w, "name\tlast edit time\tlast executed time")?;
+    writeln!(w, "name\ttype\tlast edit time\tlast execute time")?;
     for meta in scripts.iter() {
         if let (false, ScriptName::Anonymous(_)) = (anonymous_printed, &meta.name) {
             anonymous_printed = true;

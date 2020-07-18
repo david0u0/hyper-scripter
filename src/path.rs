@@ -112,6 +112,13 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
     file.read_to_string(&mut content)?;
     let histories: Vec<ScriptMeta> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
+        match open_script(h.name.clone(), true) {
+            Err(e) => {
+                log::warn!("{:?} 腳本的歷史資料有誤：{:?}", h.name, e);
+                continue;
+            }
+            _ => (),
+        }
         map.insert(h.name.clone(), h);
     }
     Ok(map)

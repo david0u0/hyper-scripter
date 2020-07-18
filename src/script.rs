@@ -2,6 +2,7 @@ use crate::error::{Error, Result};
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -11,10 +12,20 @@ pub struct Script {
     pub exist: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, Ord)]
 pub enum ScriptName {
     Anonymous(u32),
     Named(String),
+}
+impl PartialOrd for ScriptName {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (ScriptName::Named(n1), ScriptName::Named(n2)) => n1.partial_cmp(n2),
+            (ScriptName::Anonymous(i1), ScriptName::Anonymous(i2)) => i1.partial_cmp(i2),
+            (ScriptName::Named(_), ScriptName::Anonymous(_)) => Some(Ordering::Less),
+            (ScriptName::Anonymous(_), ScriptName::Named(_)) => Some(Ordering::Greater),
+        }
+    }
 }
 pub trait ToScriptName {
     fn to_script_name(self) -> Result<ScriptName>;
@@ -27,7 +38,7 @@ impl ToScriptName for String {
             let id_str = m.get(1).ok_or(Error::Format(self.clone()))?.as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(ScriptName::Anonymous(id)),
-                _ => return Err(Error::Format(self)),
+                _ => return Err(Error::Format(self.to_owned())),
             }
         } else {
             Ok(ScriptName::Named(self))

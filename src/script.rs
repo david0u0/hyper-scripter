@@ -90,3 +90,100 @@ impl ScriptMeta {
         })
     }
 }
+
+macro_rules! script_type_enum {
+    ($( $tag:expr => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub enum ScriptType {
+            $($name),*
+        }
+        #[allow(unreachable_code)]
+        impl ScriptType {
+            pub fn ext(&self) -> Option<&'static str> {
+                match self {
+                    $(
+                        ScriptType::$name => {
+                            $(return Some($ext);)?
+                            None
+                        }
+                    )*
+                }
+            }
+            pub fn cmd(&self) -> Option<(String, Vec<String>)> {
+                match self {
+                    $(
+                        ScriptType::$name => {
+                            let v: &[&str] = &[$($args),*];
+                            if v.len() > 0 {
+                                Some(
+                                    (
+                                        v[0].to_string(),
+                                        v[1..v.len()].into_iter().map(|s| s.to_string()).collect()
+                                    )
+                                )
+                            } else {
+                                None
+                            }
+                        }
+                    )*
+                }
+            }
+        }
+        impl std::str::FromStr for ScriptType {
+            type Err = String;
+            fn from_str(s: &str) -> std::result::Result<Self, String> {
+                match s {
+                    $(
+                        $tag => {
+                            Ok(ScriptType::$name)
+                        }
+                    )*
+                    _ => {
+                        let v = &[$($tag),*];
+                        let expected = v.join("/").to_string();
+                        Err(format!("Script type expected {}, get {}", expected, s))
+                    }
+                }
+            }
+        }
+        impl std::fmt::Display for ScriptType {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        ScriptType::$name => {
+                            write!(f, $tag)?;
+                        }
+                    )*
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+script_type_enum! {
+    "sh" => Shell("sh"): ("sh"),
+    "screen" => Screen: ("screen", "-c"),
+    "plain" => Plain: (),
+    "js" => Js("js"): ("node")
+}
+impl Default for ScriptType {
+    fn default() -> Self {
+        ScriptType::Shell
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_ext() {
+        assert_eq!(Some("sh"), ScriptType::Shell.ext());
+        assert_eq!(None, ScriptType::Plain.ext());
+    }
+    #[test]
+    fn test_cmd() {
+        assert_eq!(Some(("sh".to_owned(), vec![])), ScriptType::Shell.cmd());
+        assert_eq!(None, ScriptType::Plain.cmd());
+    }
+}

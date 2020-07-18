@@ -28,7 +28,7 @@ pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Re
     } else {
         "Never".to_owned()
     };
-    write!(w, "\t{}\t{}", meta.edit_time, exex_time)?;
+    write!(w, "\t{}\t{}\n", meta.edit_time, exex_time)?;
     Ok(())
 }
 pub fn fmt_list<W: Write>(
@@ -46,7 +46,6 @@ pub fn fmt_list<W: Write>(
             writeln!(w, "--- Anonymous ---")?;
         }
         fmt_meta(w, meta, opt)?;
-        write!(w, "\n")?;
     }
     Ok(())
 }

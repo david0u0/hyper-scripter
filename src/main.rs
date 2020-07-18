@@ -7,7 +7,7 @@ mod util;
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::ScriptMeta;
+use script::{ScriptMeta, ScriptType};
 use std::process::Command;
 use structopt::StructOpt;
 use util::{map_to_iter, run};
@@ -26,6 +26,8 @@ enum Subs {
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
         script_name: Option<String>,
+        #[structopt(short, long, default_value, parse(try_from_str))]
+        ty: ScriptType,
     },
     #[structopt(about = "Edit latest script. This is the default subcommand.")]
     EditLatest,
@@ -65,7 +67,11 @@ fn main() -> Result<()> {
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     let latest = hs.iter().max_by_key(|(_, h)| h.last_time());
     match sub {
-        Subs::Edit { script_name, hide } => {
+        Subs::Edit {
+            script_name,
+            hide,
+            ty,
+        } => {
             let script = if let Some(name) = script_name {
                 path::open_script(name.clone(), hide, false)
                     .context(format!("打開指定腳本失敗：{}", name))?

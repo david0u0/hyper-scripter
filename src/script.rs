@@ -28,10 +28,10 @@ impl PartialOrd for ScriptName {
     }
 }
 pub trait ToScriptName {
-    fn to_script_name(self) -> Result<ScriptName>;
+    fn to_script_name(self, is_script: bool) -> Result<ScriptName>;
 }
 impl ToScriptName for String {
-    fn to_script_name(self) -> Result<ScriptName> {
+    fn to_script_name(self, is_script: bool) -> Result<ScriptName> {
         let reg = Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(&self);
         if let Some(m) = m {
@@ -41,20 +41,24 @@ impl ToScriptName for String {
                 _ => return Err(Error::Format(self.to_owned())),
             }
         } else {
-            Ok(ScriptName::Named(self))
+            Ok(ScriptName::Named(if is_script {
+                format!("{}.sh", self)
+            } else {
+                self
+            }))
         }
     }
 }
 impl ToScriptName for ScriptName {
-    fn to_script_name(self) -> Result<ScriptName> {
+    fn to_script_name(self, _is_script: bool) -> Result<ScriptName> {
         Ok(self)
     }
 }
 impl ScriptName {
-    pub fn to_cmd(&self) -> String {
+    pub fn to_file_name(&self) -> String {
         match self {
             ScriptName::Anonymous(id) => format!("{}.sh", id),
-            ScriptName::Named(name) => format!("{}.sh", name),
+            ScriptName::Named(name) => name.clone(),
         }
     }
 }
@@ -63,6 +67,7 @@ impl ScriptName {
 pub struct ScriptMeta {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
+    pub hidden: bool,
     pub name: ScriptName,
     pub last_edit_path: PathBuf,
 }
@@ -81,6 +86,7 @@ impl ScriptMeta {
             last_edit_path: std::env::current_dir()?,
             edit_time: Utc::now(),
             exec_time: None,
+            hidden: false,
         })
     }
 }

@@ -81,7 +81,7 @@ pub fn open_anonymous_script(id: Option<u32>, read_only: bool) -> Result<Script>
     };
 
     let name = ScriptName::Anonymous(actual_id);
-    let path = join_path(dir, &name.to_cmd())?;
+    let path = join_path(dir, &name.to_file_name())?;
     let exist = path.exists();
     if read_only && !exist {
         return Err(Error::FileNotFound(path));
@@ -89,12 +89,20 @@ pub fn open_anonymous_script(id: Option<u32>, read_only: bool) -> Result<Script>
     Ok(Script { path, exist, name })
 }
 
-pub fn open_script<T: ToScriptName>(name: T, read_only: bool) -> Result<Script> {
-    match name.to_script_name()? {
-        ScriptName::Anonymous(id) => open_anonymous_script(Some(id), read_only),
+pub fn open_script<T: ToScriptName>(name: T, hidden: bool, read_only: bool) -> Result<Script> {
+    match name.to_script_name(!hidden)? {
+        ScriptName::Anonymous(id) => {
+            if hidden {
+                Err(Error::Operation(
+                    "Anonymous scripts could't be hidden.".to_owned(),
+                ))
+            } else {
+                open_anonymous_script(Some(id), read_only)
+            }
+        }
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
-            let path = join_path(get_path(), &name.to_cmd())?;
+            let path = join_path(get_path(), &name.to_file_name())?;
             let exist = path.exists();
             if read_only && !exist {
                 return Err(Error::FileNotFound(path));
@@ -121,7 +129,7 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
     handle_fs_err(&path, file.read_to_string(&mut content)).context("讀取歷史檔案失敗")?;
     let histories: Vec<ScriptMeta> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
-        match open_script(h.name.clone(), true) {
+        match open_script(h.name.clone(), h.hidden, true) {
             Err(e) => {
                 log::warn!("{:?} 腳本歷史資料有誤：{:?}", h.name, e);
                 continue;
@@ -173,17 +181,17 @@ mod test {
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first".to_owned(), false).unwrap();
-        assert_eq!(s.name, ScriptName::Named("first".to_owned()));
+        let s = open_script("first".to_owned(), false, false).unwrap();
+        assert_eq!(s.name, ScriptName::Named("first.sh".to_owned()));
         assert_eq!(s.exist, true);
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/", "first.sh").unwrap()
         );
-        match open_script("not-exist".to_owned(), true) {
+        match open_script("not-exist".to_owned(), true, true) {
             Err(Error::FileNotFound(name)) => assert_eq!(
                 name,
-                join_path("./.test_instant_script/", "not-exist.sh").unwrap()
+                join_path("./.test_instant_script/", "not-exist").unwrap()
             ),
             _ => unreachable!(),
         }

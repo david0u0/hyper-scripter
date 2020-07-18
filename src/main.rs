@@ -23,6 +23,8 @@ struct Root {
 enum Subs {
     #[structopt(about = "Edit instant script", alias = "e")]
     Edit {
+        #[structopt(short, long, help = "Hide the script in list")]
+        hide: bool,
         #[structopt(short, long, help = "Create and edit a new anonymous script")]
         new: bool,
         #[structopt(
@@ -50,6 +52,7 @@ impl Default for Subs {
     fn default() -> Self {
         Subs::Edit {
             script_name: None,
+            hide: false,
             new: false,
         }
     }
@@ -73,7 +76,11 @@ fn main() -> Result<()> {
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     let latest = hs.iter().max_by_key(|(_, h)| h.last_time());
     match sub {
-        Subs::Edit { new, script_name } => {
+        Subs::Edit {
+            new,
+            script_name,
+            hide,
+        } => {
             let script = if new {
                 if script_name.is_some() {
                     return Err(Error::Operation(
@@ -82,11 +89,12 @@ fn main() -> Result<()> {
                 }
                 path::open_anonymous_script(None, false).context("打開新匿名腳本失敗")?
             } else if let Some(name) = script_name {
-                path::open_script(name.clone(), false)
+                path::open_script(name.clone(), hide, false)
                     .context(format!("打開指定腳本失敗：{}", name))?
             } else {
+                log::info!("嘗試打開最新的腳本…");
                 if let Some((_, latest)) = latest {
-                    path::open_script(latest.name.clone(), false)
+                    path::open_script(latest.name.clone(), hide, false)
                         .context(format!("打開最新腳本失敗：{:?}", latest.name))?
                 } else {
                     log::info!("沒有最近歷史，改為創建新的匿名腳本");
@@ -98,11 +106,12 @@ fn main() -> Result<()> {
             let h = hs
                 .entry(script.name.clone())
                 .or_insert(ScriptMeta::new(script.name)?);
+            h.hidden = hide;
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }
         Subs::Run { script_name, args } => {
-            let script = path::open_script(script_name, true)?;
+            let script = path::open_script(script_name, false, true)?;
             run(&script, args)?;
             let h = hs
                 .get_mut(&script.name.clone())
@@ -112,7 +121,7 @@ fn main() -> Result<()> {
         }
         Subs::RunLast { args } => {
             let script = if let Some((_, latest)) = latest {
-                path::open_script(latest.name.clone(), false)
+                path::open_script(latest.name.clone(), false, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
                 return Err(Error::Empty);
@@ -127,7 +136,7 @@ fn main() -> Result<()> {
         Subs::List { .. } => {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
-            fmt_list(&mut handle, map_to_iter(hs), &ListOptions {})?;
+            fmt_list(&mut handle, map_to_iter(hs), &ListOptions::default())?;
         }
         _ => unimplemented!(),
     }

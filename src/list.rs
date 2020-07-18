@@ -2,7 +2,10 @@ use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptMeta, ScriptName};
 use std::io::Write;
 
-pub struct ListOptions {}
+#[derive(Default)]
+pub struct ListOptions {
+    pub show_hidden: bool,
+}
 
 pub fn list_str(
     scripts: impl IntoIterator<Item = ScriptMeta>,
@@ -13,6 +16,9 @@ pub fn list_str(
     Ok(std::str::from_utf8(&v)?.to_owned())
 }
 pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Result<()> {
+    if !opt.show_hidden && meta.hidden {
+        return Ok(());
+    }
     match &meta.name {
         ScriptName::Anonymous(id) => write!(w, ".{}", id)?,
         ScriptName::Named(name) => write!(w, "{}", name)?,

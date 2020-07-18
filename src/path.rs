@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ANONYMOUS: &'static str = ".anonymous";
-const META: &'static str = ".flash_script_meta.json";
+const META: &'static str = ".instant_script_meta.json";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(join_path(".", &get_sys_path()).unwrap());
@@ -17,11 +17,11 @@ lazy_static::lazy_static! {
 fn get_sys_path() -> String {}
 #[cfg(all(not(release), not(test)))]
 fn get_sys_path() -> String {
-    "./.flash_script".to_string()
+    "./.instant_script".to_string()
 }
 #[cfg(test)]
 fn get_sys_path() -> String {
-    "./.test_flash_script".to_string()
+    "./.test_instant_script".to_string()
 }
 
 fn join_path<P: AsRef<Path>>(base: P, path: &str) -> Result<PathBuf> {
@@ -146,13 +146,13 @@ mod test {
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
             s.path,
-            join_path("./.test_flash_script/.anonymous", "6.sh").unwrap()
+            join_path("./.test_instant_script/.anonymous", "6.sh").unwrap()
         );
         let s = open_anonymous_script(None, true).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(5));
         assert_eq!(
             s.path,
-            join_path("./.test_flash_script/.anonymous", "5.sh").unwrap()
+            join_path("./.test_instant_script/.anonymous", "5.sh").unwrap()
         );
     }
     #[test]
@@ -162,12 +162,12 @@ mod test {
         assert_eq!(s.exist, true);
         assert_eq!(
             s.path,
-            join_path("./.test_flash_script/", "first.sh").unwrap()
+            join_path("./.test_instant_script/", "first.sh").unwrap()
         );
         match open_script("not-exist".to_owned(), true) {
             Err(Error::FileNotFound(name)) => assert_eq!(
                 name,
-                join_path("./.test_flash_script/", "not-exist.sh").unwrap()
+                join_path("./.test_instant_script/", "not-exist.sh").unwrap()
             ),
             _ => unreachable!(),
         }

@@ -1,5 +1,5 @@
 [package]
-name = "flash-script"
+name = "instant-script"
 version = "0.1.0"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"

@@ -14,14 +14,14 @@ use util::{map_to_iter, run};
 
 #[derive(StructOpt, Debug)]
 struct Root {
-    #[structopt(short = "p", long, help = "Path to flash script root")]
+    #[structopt(short = "p", long, help = "Path to instant script root")]
     fs_path: Option<String>,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
 }
 #[derive(StructOpt, Debug)]
 enum Subs {
-    #[structopt(about = "Edit flash script", alias = "e")]
+    #[structopt(about = "Edit instant script", alias = "e")]
     Edit {
         #[structopt(short, long, help = "Create and edit a new anonymous script")]
         new: bool,
@@ -40,7 +40,7 @@ enum Subs {
         script_name: String,
         args: Vec<String>,
     },
-    #[structopt(about = "List flash scripts", alias = "l")]
+    #[structopt(about = "List instant scripts", alias = "l")]
     List(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
     Move { origin: String, target: String },

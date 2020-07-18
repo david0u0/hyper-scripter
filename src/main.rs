@@ -61,6 +61,8 @@ impl Default for Subs {
 #[derive(StructOpt, Debug)]
 struct List {
     // TODO: 滿滿的其它排序/篩選選項
+    #[structopt(short, long, help = "Show all files including hidden ones.")]
+    all: bool,
 }
 
 fn main() -> Result<()> {
@@ -133,10 +135,13 @@ fn main() -> Result<()> {
             h.exec_time = Some(Utc::now());
             path::store_history(map_to_iter(hs))?;
         }
-        Subs::List { .. } => {
+        Subs::List(list) => {
+            let opt = ListOptions {
+                show_hidden: list.all,
+            };
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
-            fmt_list(&mut handle, map_to_iter(hs), &ListOptions::default())?;
+            fmt_list(&mut handle, map_to_iter(hs), &opt)?;
         }
         _ => unimplemented!(),
     }

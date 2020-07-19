@@ -55,9 +55,38 @@ struct List {
     all: bool,
 }
 
+#[derive(StructOpt, Debug)]
+struct RootOnlyRun {
+    script_name: String,
+    args: Vec<String>,
+    #[structopt(short = "p", long, help = "Path to instant script root")]
+    is_path: Option<String>,
+}
+
 fn main() -> Result<()> {
     env_logger::init();
-    let root = Root::from_args();
+    match Root::from_iter_safe(std::env::args()) {
+        Ok(root) => main_inner(root)?,
+        Err(err) => {
+            if main_only_run().is_err() {
+                println!("{}", err);
+            }
+        }
+    };
+    Ok(())
+}
+fn main_only_run() -> Result<()> {
+    let only_run = RootOnlyRun::from_iter_safe(std::env::args())?;
+    let root = Root {
+        is_path: only_run.is_path,
+        subcmd: Some(Subs::Run {
+            args: only_run.args,
+            script_name: only_run.script_name,
+        }),
+    };
+    main_inner(root)
+}
+fn main_inner(root: Root) -> Result<()> {
     if let Some(is_path) = root.is_path {
         path::set_path(is_path)?;
     } else {

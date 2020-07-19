@@ -151,7 +151,7 @@ fn main_inner(root: Root) -> Result<()> {
             path::store_history(map_to_iter(hs))?;
         }
         Subs::Run { script_name, args } => {
-            let h = fuzzy::fuzz_mut(&script_name, &mut hs).ok_or(Error::NoMeta(script_name))?;
+            let h = fuzzy::fuzz_mut(&script_name, &mut hs)?.ok_or(Error::NoMeta(script_name))?;
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());

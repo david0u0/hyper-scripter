@@ -1,4 +1,4 @@
-use crate::script::ScriptType;
+use crate::script::{ScriptName, ScriptType};
 use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Others {}
@@ -19,6 +19,7 @@ pub enum Error {
         expect: ScriptType,
         actual: ScriptType,
     },
+    MultiFuzz(Vec<ScriptName>),
     Format(String),
     Empty,
 }

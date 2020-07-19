@@ -27,7 +27,7 @@ pub fn fuzz_mut<'a, 'b, T>(
         );
         if let Some(mut score) = score {
             log::trace!("將分數正交化：{} / {}", score * 100, choice_str.len());
-            score = score * 1000 / choice_str.len() as i64;
+            score = score * 100 / choice_str.len() as i64;
             if score > MIN_SCORE {
                 if score > ans.0 {
                     ans = (score, vec![(choice, data)]);

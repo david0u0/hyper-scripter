@@ -45,10 +45,10 @@ enum Subs {
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
-    #[structopt(about = "Run the script", alias = "r")]
+    #[structopt(about = "Run the script")]
     Run(Run),
-    #[structopt(about = "List instant scripts", aliases = &["l", "ls"])]
-    List(List),
+    #[structopt(about = "List instant scripts", alias = "l")]
+    LS(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
     Move { origin: String, target: String },
 }
@@ -58,6 +58,8 @@ struct List {
     // TODO: 滿滿的其它排序/篩選選項
     #[structopt(short, long, help = "Show all files including hidden ones.")]
     all: bool,
+    #[structopt(short, long, help = "Show verbose information.")]
+    long: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -185,13 +187,13 @@ fn main_inner(root: Root) -> Result<()> {
                 return Err(Error::Empty);
             };
         }
-        Subs::List(list) => {
+        Subs::LS(list) => {
             let opt = ListOptions {
                 show_hidden: list.all,
+                long: list.long,
             };
             let stdout = std::io::stdout();
-            let mut handle = stdout.lock();
-            fmt_list(&mut handle, map_to_iter(hs), &opt)?;
+            fmt_list(&mut stdout.lock(), map_to_iter(hs), &opt)?;
         }
         _ => unimplemented!(),
     }

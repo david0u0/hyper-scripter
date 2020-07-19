@@ -5,31 +5,28 @@ use std::io::Write;
 #[derive(Default)]
 pub struct ListOptions {
     pub show_hidden: bool,
+    pub long: bool,
 }
 
-pub fn list_str(
-    scripts: impl IntoIterator<Item = ScriptMeta>,
-    opt: &ListOptions,
-) -> Result<String> {
-    let mut v = Vec::<u8>::new();
-    fmt_list(&mut v, scripts, opt)?;
-    Ok(std::str::from_utf8(&v)?.to_owned())
-}
-pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Result<()> {
+pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Result<bool> {
     if !opt.show_hidden && meta.hidden {
-        return Ok(());
+        return Ok(false);
     }
-    let exex_time = if let Some(t) = &meta.exec_time {
-        t.to_string()
+    if opt.long {
+        let exex_time = if let Some(t) = &meta.exec_time {
+            t.to_string()
+        } else {
+            "Never".to_owned()
+        };
+        write!(
+            w,
+            "{}\t{}\t{}\t{}",
+            meta.ty, meta.name, meta.edit_time, exex_time
+        )?;
     } else {
-        "Never".to_owned()
-    };
-    write!(
-        w,
-        "{}\t{}\t{}\t{}\n",
-        meta.name, meta.ty, meta.edit_time, exex_time
-    )?;
-    Ok(())
+        write!(w, "{}\t{}", meta.ty, meta.name)?;
+    }
+    Ok(true)
 }
 pub fn fmt_list<W: Write>(
     w: &mut W,
@@ -39,13 +36,17 @@ pub fn fmt_list<W: Write>(
     let mut scripts: Vec<_> = scripts.into_iter().collect();
     scripts.sort_by_key(|m| m.name.clone());
     let mut anonymous_printed = false;
-    writeln!(w, "name\ttype\tlast edit time\tlast execute time")?;
+    if opt.long {
+        writeln!(w, "name\ttype\tlast edit time\tlast execute time")?;
+    }
     for meta in scripts.iter() {
         if let (false, ScriptName::Anonymous(_)) = (anonymous_printed, &meta.name) {
             anonymous_printed = true;
             writeln!(w, "--- Anonymous ---")?;
         }
-        fmt_meta(w, meta, opt)?;
+        if fmt_meta(w, meta, opt)? {
+            write!(w, "\n")?;
+        }
     }
     Ok(())
 }

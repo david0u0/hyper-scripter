@@ -20,7 +20,7 @@ pub enum Error {
         actual: ScriptType,
     },
     MultiFuzz(Vec<ScriptName>),
-    Format(String),
+    ScriptNameFormat(String),
     Empty,
 }
 

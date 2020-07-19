@@ -8,7 +8,7 @@ mod util;
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::{ScriptMeta, ScriptType};
+use script::{ScriptInfo, ScriptType};
 use std::process::Command;
 use structopt::clap::AppSettings::{
     AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
@@ -125,14 +125,17 @@ fn main_inner(root: Root) -> Result<()> {
                             });
                         }
                     }
-                    path::open_script(h.name.clone(), h.ty, false)
+                    log::debug!("打開既有指定腳本：{:?}", name);
+                    path::open_script(h.name.clone(), h.ty, true)
                         .context(format!("打開指定腳本失敗：{:?}", name))?
                 } else {
+                    log::debug!("打開新指定腳本：{:?}", name);
                     path::open_script(name.clone(), ty.unwrap_or_default(), false)
-                        .context(format!("打開指定腳本失敗：{:?}", name))?
+                        .context(format!("打開新指定腳本失敗：{:?}", name))?
                 }
             } else {
-                path::open_anonymous_script(None, ty.unwrap_or_default(), false)
+                log::debug!("打開新匿名腳本");
+                path::open_new_anonymous_script(ty.unwrap_or_default())
                     .context("打開新匿名腳本失敗")?
             };
 
@@ -142,7 +145,7 @@ fn main_inner(root: Root) -> Result<()> {
 
             let h = hs
                 .entry(script.name.clone())
-                .or_insert(ScriptMeta::new(script.name, ty.unwrap_or_default())?);
+                .or_insert(ScriptInfo::new(script.name, ty.unwrap_or_default())?);
             // FIXME: 重覆的東西抽一抽啦
             h.hidden = hide;
             h.edit_time = Utc::now();
@@ -155,14 +158,13 @@ fn main_inner(root: Root) -> Result<()> {
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
                 log::info!("沒有最近歷史，改為創建新的匿名腳本");
-                path::open_anonymous_script(None, Default::default(), false)
-                    .context("打開新匿名腳本失敗")?
+                path::open_new_anonymous_script(Default::default()).context("打開新匿名腳本失敗")?
             };
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
             let h = hs
                 .entry(script.name.clone())
-                .or_insert(ScriptMeta::new(script.name, Default::default())?);
+                .or_insert(ScriptInfo::new(script.name, Default::default())?);
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }
@@ -176,7 +178,7 @@ fn main_inner(root: Root) -> Result<()> {
             path::store_history(map_to_iter(hs))?;
         }
         Subs::RunLast { args } => {
-            // FIXME: Script 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
+            // FIXME: ScriptMeta 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
             if let Some((_, latest)) = latest {
                 let script = path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?;

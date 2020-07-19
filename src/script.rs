@@ -5,10 +5,9 @@ use std::cmp::Ordering;
 use std::path::PathBuf;
 
 #[derive(Debug)]
-pub struct Script {
+pub struct ScriptMeta {
     pub name: ScriptName,
     pub path: PathBuf,
-    pub exist: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, Ord)]
@@ -39,13 +38,17 @@ pub trait ToScriptName {
 }
 impl ToScriptName for String {
     fn to_script_name(self) -> Result<ScriptName> {
-        let reg = regex::Regex::new(r"^\.(\d+)$")?;
+        log::trace!("解析腳本名：{}", self);
+        let reg = regex::Regex::new(r"^\.(\w+)$")?;
         let m = reg.captures(&self);
         if let Some(m) = m {
-            let id_str = m.get(1).ok_or(Error::Format(self.clone()))?.as_str();
+            let id_str = m
+                .get(1)
+                .ok_or(Error::ScriptNameFormat(self.clone()))?
+                .as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(ScriptName::Anonymous(id)),
-                _ => return Err(Error::Format(self.to_owned())),
+                _ => return Err(Error::ScriptNameFormat(self.clone())),
             }
         } else {
             Ok(ScriptName::Named(self))
@@ -73,7 +76,7 @@ impl ScriptName {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ScriptMeta {
+pub struct ScriptInfo {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
@@ -82,7 +85,7 @@ pub struct ScriptMeta {
     pub last_edit_path: PathBuf,
 }
 
-impl ScriptMeta {
+impl ScriptInfo {
     pub fn last_time(&self) -> DateTime<Utc> {
         if let Some(exec_time) = self.exec_time {
             std::cmp::max(self.edit_time, exec_time)
@@ -91,7 +94,7 @@ impl ScriptMeta {
         }
     }
     pub fn new(name: ScriptName, ty: ScriptType) -> Result<Self> {
-        Ok(ScriptMeta {
+        Ok(ScriptInfo {
             name,
             ty,
             last_edit_path: std::env::current_dir()?,
@@ -152,7 +155,7 @@ macro_rules! script_type_enum {
                     _ => {
                         let v = &[$($tag),*];
                         let expected = v.join("/").to_string();
-                        Err(format!("Script type expected {}, get {}", expected, s))
+                        Err(format!("ScriptMeta type expected {}, get {}", expected, s))
                     }
                 }
             }

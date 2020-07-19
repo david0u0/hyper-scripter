@@ -1,5 +1,5 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{ScriptMeta, ScriptName};
+use crate::script::{ScriptInfo, ScriptName};
 use std::io::Write;
 
 #[derive(Default)]
@@ -8,7 +8,7 @@ pub struct ListOptions {
     pub long: bool,
 }
 
-pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Result<bool> {
+pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptInfo, opt: &ListOptions) -> Result<bool> {
     if !opt.show_hidden && meta.hidden {
         return Ok(false);
     }
@@ -30,7 +30,7 @@ pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Re
 }
 pub fn fmt_list<W: Write>(
     w: &mut W,
-    scripts: impl IntoIterator<Item = ScriptMeta>,
+    scripts: impl IntoIterator<Item = ScriptInfo>,
     opt: &ListOptions,
 ) -> Result<()> {
     let mut scripts: Vec<_> = scripts.into_iter().collect();

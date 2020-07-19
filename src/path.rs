@@ -1,5 +1,5 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{Script, ScriptMeta, ScriptName, ScriptType, ToScriptName};
+use crate::script::{ScriptInfo, ScriptMeta, ScriptName, ScriptType, ToScriptName};
 use crate::util::handle_fs_err;
 use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
@@ -53,7 +53,7 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
         handle_fs_err(&dir, create_dir(&dir))?;
     }
     for entry in handle_fs_err(&dir, read_dir(&dir))? {
-        let mut name = entry?
+        let name = entry?
             .file_name()
             .to_str()
             .ok_or(Error::msg("檔案實體為空...?"))?
@@ -62,49 +62,45 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
         let name = re.replace(&name, "");
         match name.parse::<u32>() {
             Ok(id) => ids.push(id),
-            _ => log::info!("匿名腳本名無法轉為整數：{}", name),
+            _ => log::warn!("匿名腳本名無法轉為整數：{}", name),
         }
     }
 
     Ok(ids)
 }
-pub fn open_anonymous_script(id: Option<u32>, ty: ScriptType, read_only: bool) -> Result<Script> {
+pub fn open_new_anonymous_script(ty: ScriptType) -> Result<ScriptMeta> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
+    let id = ids.into_iter().max().unwrap_or_default() + 1;
+    open_anonymous_script(id, ty, false)
+}
+pub fn open_anonymous_script(id: u32, ty: ScriptType, should_exist: bool) -> Result<ScriptMeta> {
     let dir = get_path().join(ANONYMOUS);
-    let actual_id = if let Some(id) = id {
-        id
-    } else {
-        match (read_only, ids.into_iter().max()) {
-            (true, None) => return Err(Error::Empty),
-            (true, Some(id)) => id,
-            (_, t) => t.unwrap_or_default() + 1,
-        }
-    };
-
-    let name = ScriptName::Anonymous(actual_id);
+    let name = ScriptName::Anonymous(id);
     let path = join_path(dir, &name.to_file_name(ty))?;
-    let exist = path.exists();
-    if read_only && !exist {
+    if should_exist && !path.exists() {
         return Err(Error::FileNotFound(path));
     }
-    Ok(Script { path, exist, name })
+    Ok(ScriptMeta { path, name })
 }
 
-pub fn open_script<T: ToScriptName>(name: T, ty: ScriptType, read_only: bool) -> Result<Script> {
+pub fn open_script<T: ToScriptName>(
+    name: T,
+    ty: ScriptType,
+    should_exist: bool,
+) -> Result<ScriptMeta> {
     match name.to_script_name()? {
-        ScriptName::Anonymous(id) => open_anonymous_script(Some(id), ty, read_only),
+        ScriptName::Anonymous(id) => open_anonymous_script(id, ty, should_exist),
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
             let path = join_path(get_path(), &name.to_file_name(ty))?;
-            let exist = path.exists();
-            if read_only && !exist {
+            if should_exist && !path.exists() {
                 return Err(Error::FileNotFound(path));
             }
-            Ok(Script { exist, path, name })
+            Ok(ScriptMeta { path, name })
         }
     }
 }
-pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
+pub fn get_history() -> Result<HashMap<ScriptName, ScriptInfo>> {
     let path = join_path(get_path(), META)?;
     let mut map = HashMap::new();
     let mut file = match File::open(&path) {
@@ -120,7 +116,7 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
     };
     let mut content = String::new();
     handle_fs_err(&path, file.read_to_string(&mut content)).context("讀取歷史檔案失敗")?;
-    let histories: Vec<ScriptMeta> = serde_json::from_str(&content)?;
+    let histories: Vec<ScriptInfo> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
         match open_script(h.name.clone(), h.ty, true) {
             Err(e) => {
@@ -134,9 +130,9 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptMeta>> {
     Ok(map)
 }
 
-pub fn store_history(history: impl IntoIterator<Item = ScriptMeta>) -> Result<()> {
+pub fn store_history(history: impl IntoIterator<Item = ScriptInfo>) -> Result<()> {
     let path = join_path(get_path(), META)?;
-    let mut file = handle_fs_err(&path, File::create(&path)).context("唯讀打開歷史檔案失敗")?;
+    let mut file = handle_fs_err(&path, File::create(&path)).context("唯寫打開歷史檔案失敗")?;
     let v: Vec<_> = history.into_iter().collect();
     handle_fs_err(&path, file.write_all(serde_json::to_string(&v)?.as_bytes()))
         .context("寫入歷史檔案失敗")?;
@@ -158,13 +154,13 @@ mod test {
     #[test]
     fn test_open_anonymous() {
         setup();
-        let s = open_anonymous_script(None, ScriptType::Shell, false).unwrap();
+        let s = open_new_anonymous_script(ScriptType::Shell).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/.anonymous", "6.sh").unwrap()
         );
-        let s = open_anonymous_script(None, ScriptType::Js, true).unwrap();
+        let s = open_anonymous_script(5, ScriptType::Js, true).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(5));
         assert_eq!(
             s.path,
@@ -176,7 +172,6 @@ mod test {
         setup();
         let s = open_script("first".to_owned(), ScriptType::Txt, false).unwrap();
         assert_eq!(s.name, ScriptName::Named("first".to_owned()));
-        assert_eq!(s.exist, true);
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/", "first").unwrap()

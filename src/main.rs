@@ -33,13 +33,17 @@ enum Subs {
     #[structopt(about = "Edit the last script. This is the default subcommand.")]
     EditLast,
     #[structopt(about = "Run the last script edited or run", alias = ".")]
-    RunLast { args: Vec<String> },
+    RunLast {
+        #[structopt(help = "Command line args to pass to the script.")]
+        args: Vec<String>,
+    },
     #[structopt(about = "Run the script", alias = "r")]
     Run {
         #[structopt(
             help = "The script's name. Prefix `.` to specify anonymous scripts, such as `run .42`"
         )]
         script_name: String,
+        #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
     #[structopt(about = "List instant scripts", aliases = &["l", "ls"])]
@@ -58,6 +62,7 @@ struct List {
 #[derive(StructOpt, Debug)]
 struct RootOnlyRun {
     script_name: String,
+    #[structopt(help = "Command line args to pass to the script.")]
     args: Vec<String>,
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
@@ -66,17 +71,15 @@ struct RootOnlyRun {
 fn main() -> Result<()> {
     env_logger::init();
     match Root::from_iter_safe(std::env::args()) {
-        Ok(root) => main_inner(root)?,
-        Err(err) => {
-            if main_only_run().is_err() {
-                println!("{}", err);
-            }
+        Ok(root) => main_inner(root),
+        Err(_) => {
+            log::info!("純執行模式");
+            main_only_run()
         }
-    };
-    Ok(())
+    }
 }
 fn main_only_run() -> Result<()> {
-    let only_run = RootOnlyRun::from_iter_safe(std::env::args())?;
+    let only_run = RootOnlyRun::from_iter(std::env::args());
     let root = Root {
         is_path: only_run.is_path,
         subcmd: Some(Subs::Run {
@@ -152,6 +155,7 @@ fn main_inner(root: Root) -> Result<()> {
         }
         Subs::Run { script_name, args } => {
             let h = fuzzy::fuzz_mut(&script_name, &mut hs)?.ok_or(Error::NoMeta(script_name))?;
+            log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());

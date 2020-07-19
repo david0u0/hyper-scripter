@@ -15,7 +15,7 @@ lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(PathBuf::new());
 }
 
-#[cfg(feature = "release")]
+#[cfg(not(debug_assertions))]
 pub fn get_sys_path() -> Result<String> {
     let p = match std::env::var("INSTANT_SCRIPT_PATH") {
         Ok(p) => p,
@@ -24,7 +24,7 @@ pub fn get_sys_path() -> Result<String> {
     };
     Ok(p)
 }
-#[cfg(not(feature = "release"))]
+#[cfg(debug_assertions)]
 pub fn get_sys_path() -> Result<String> {
     Ok("./.instant_script".to_string())
 }

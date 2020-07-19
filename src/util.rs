@@ -10,8 +10,8 @@ pub fn run(script: &Script, ty: ScriptType, remaining: &[String]) -> Result<()> 
         .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;
     let mut cmd = Command::new(cmd);
     let mut full_args: Vec<PathBuf> = args.into_iter().map(|s| s.into()).collect();
-    full_args.extend(remaining.into_iter().map(|s| s.into()));
     full_args.push(script.path.clone());
+    full_args.extend(remaining.into_iter().map(|s| s.into()));
     cmd.args(full_args).spawn()?.wait()?;
     Ok(())
 }

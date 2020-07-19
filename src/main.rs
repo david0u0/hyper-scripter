@@ -8,7 +8,7 @@ mod util;
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::{ScriptMeta, ScriptType, ToScriptName};
+use script::{ScriptMeta, ScriptType};
 use std::process::Command;
 use structopt::StructOpt;
 use util::{map_to_iter, run};
@@ -74,9 +74,15 @@ fn main() -> Result<()> {
     env_logger::init();
     match Root::from_iter_safe(std::env::args()) {
         Ok(root) => main_inner(root),
-        Err(_) => {
-            log::info!("純執行模式");
-            main_only_run()
+        Err(e) => {
+            use structopt::clap::ErrorKind::*;
+            if e.kind == UnknownArgument || e.kind == InvalidSubcommand {
+                log::info!("純執行模式");
+                main_only_run()
+            } else {
+                println!("{}", e);
+                return Ok(());
+            }
         }
     }
 }

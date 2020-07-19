@@ -1,7 +1,6 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{Script, ScriptMeta, ScriptName, ScriptType, ToScriptName};
 use crate::util::handle_fs_err;
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
 use std::io::{Read, Write};

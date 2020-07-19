@@ -10,6 +10,9 @@ use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
 use script::{ScriptMeta, ScriptType};
 use std::process::Command;
+use structopt::clap::AppSettings::{
+    AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
+};
 use structopt::StructOpt;
 use util::{map_to_iter, run};
 
@@ -34,20 +37,16 @@ enum Subs {
     },
     #[structopt(about = "Edit the last script. This is the default subcommand.")]
     EditLast,
-    #[structopt(about = "Run the last script edited or run", alias = ".")]
+    #[structopt(
+        alias = ".",
+        about = "Run the last script edited or run",
+        settings = &[AllowLeadingHyphen,DisableHelpFlags, DisableHelpSubcommand, DisableVersion])]
     RunLast {
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
     #[structopt(about = "Run the script", alias = "r")]
-    Run {
-        #[structopt(
-            help = "The script's name. Prefix `.` to specify anonymous scripts, such as `run .42`"
-        )]
-        script_name: String,
-        #[structopt(help = "Command line args to pass to the script.")]
-        args: Vec<String>,
-    },
+    Run(Run),
     #[structopt(about = "List instant scripts", aliases = &["l", "ls"])]
     List(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
@@ -62,12 +61,11 @@ struct List {
 }
 
 #[derive(StructOpt, Debug)]
-struct RootOnlyRun {
+#[structopt(settings = &[AllowLeadingHyphen,DisableHelpFlags, DisableHelpSubcommand, DisableVersion])]
+struct Run {
     script_name: String,
     #[structopt(help = "Command line args to pass to the script.")]
     args: Vec<String>,
-    #[structopt(short = "p", long, help = "Path to instant script root")]
-    is_path: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -87,13 +85,13 @@ fn main() -> Result<()> {
     }
 }
 fn main_only_run() -> Result<()> {
-    let only_run = RootOnlyRun::from_iter(std::env::args());
+    let only_run = Run::from_iter(std::env::args());
     let root = Root {
-        is_path: only_run.is_path,
-        subcmd: Some(Subs::Run {
+        is_path: None,
+        subcmd: Some(Subs::Run(Run {
             args: only_run.args,
             script_name: only_run.script_name,
-        }),
+        })),
     };
     main_inner(root)
 }
@@ -166,7 +164,7 @@ fn main_inner(root: Root) -> Result<()> {
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
         }
-        Subs::Run { script_name, args } => {
+        Subs::Run(Run { script_name, args }) => {
             let h =
                 fuzzy::fuzz_mut(&script_name, &mut hs, false)?.ok_or(Error::NoMeta(script_name))?;
             log::info!("執行 {:?}", h.name);

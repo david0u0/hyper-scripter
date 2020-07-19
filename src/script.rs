@@ -173,7 +173,7 @@ macro_rules! script_type_enum {
 }
 
 script_type_enum! {
-    "sh" => Shell("sh"): ("sh"),
+    "sh" => Shell("sh"): ("bash"),
     "screen" => Screen: ("screen", "-c"),
     "txt" => Txt: (),
     "js" => Js("js"): ("node")

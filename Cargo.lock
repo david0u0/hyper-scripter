@@ -88,6 +88,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuzzy-matcher"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cda28c4acb13182d935e0ab6bc12329d1d22134d69801d0836d1ae4b47054f2a"
+dependencies = [
+ "thread_local",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -120,6 +129,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "env_logger",
+ "fuzzy-matcher",
  "lazy_static",
  "log",
  "regex",

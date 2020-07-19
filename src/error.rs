@@ -12,6 +12,7 @@ pub enum Error {
     PermissionDenied(PathBuf),
     FileNotFound(PathBuf),
     GeneralFS(PathBuf, std::io::Error),
+    NoMeta(String),
     PathNotSet,
     Operation(String),
     TypeMismatch {

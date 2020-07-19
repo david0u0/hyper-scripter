@@ -19,16 +19,16 @@ pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptMeta, opt: &ListOptions) -> Re
     if !opt.show_hidden && meta.hidden {
         return Ok(());
     }
-    match &meta.name {
-        ScriptName::Anonymous(id) => write!(w, ".{}", id)?,
-        ScriptName::Named(name) => write!(w, "{}", name)?,
-    }
     let exex_time = if let Some(t) = &meta.exec_time {
         t.to_string()
     } else {
         "Never".to_owned()
     };
-    write!(w, "\t{}\t{}\t{}\n", meta.ty, meta.edit_time, exex_time)?;
+    write!(
+        w,
+        "{}\t{}\t{}\t{}\n",
+        meta.name, meta.ty, meta.edit_time, exex_time
+    )?;
     Ok(())
 }
 pub fn fmt_list<W: Write>(

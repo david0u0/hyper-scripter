@@ -1,6 +1,5 @@
 use crate::error::{Error, Result};
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -17,6 +16,14 @@ pub enum ScriptName {
     Anonymous(u32),
     Named(String),
 }
+impl std::fmt::Display for ScriptName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptName::Anonymous(id) => write!(f, ".{}", id),
+            ScriptName::Named(name) => write!(f, "{}", name),
+        }
+    }
+}
 impl PartialOrd for ScriptName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
@@ -32,7 +39,7 @@ pub trait ToScriptName {
 }
 impl ToScriptName for String {
     fn to_script_name(self) -> Result<ScriptName> {
-        let reg = Regex::new(r"^\.(\d+)$")?;
+        let reg = regex::Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(&self);
         if let Some(m) = m {
             let id_str = m.get(1).ok_or(Error::Format(self.clone()))?.as_str();
@@ -43,6 +50,11 @@ impl ToScriptName for String {
         } else {
             Ok(ScriptName::Named(self))
         }
+    }
+}
+impl<'a> ToScriptName for &'a ScriptName {
+    fn to_script_name(self) -> Result<ScriptName> {
+        Ok(self.clone())
     }
 }
 impl ToScriptName for ScriptName {

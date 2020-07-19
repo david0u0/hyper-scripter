@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::script::ScriptName;
+use crate::script::{ScriptName, ToScriptName};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::collections::HashMap;
 
@@ -8,7 +8,12 @@ const MIN_SCORE: i64 = 10; // TODO: 好好決定這個魔法數字
 pub fn fuzz_mut<'a, 'b, T>(
     name: &'a str,
     map: &'b mut HashMap<ScriptName, T>,
+    exact: bool,
 ) -> Result<Option<&'b mut T>> {
+    if exact {
+        let name = name.to_owned().to_script_name()?;
+        return Ok(map.get_mut(&name));
+    }
     let matcher = SkimMatcherV2::default();
     let mut ans = (0, Vec::<(&ScriptName, &mut T)>::new());
     for (choice, data) in map.iter_mut() {
@@ -52,16 +57,16 @@ mod test {
         map.insert(ScriptName::Named("測試腳本2".to_owned()), 111);
         map.insert(ScriptName::Anonymous(42), 222);
 
-        let res = fuzz_mut("測試1", &mut map).unwrap();
+        let res = fuzz_mut("測試1", &mut map, true).unwrap();
         assert_eq!(res, Some(&mut 111));
 
-        let res = fuzz_mut("42", &mut map).unwrap();
+        let res = fuzz_mut("42", &mut map, true).unwrap();
         assert_eq!(res, Some(&mut 222));
 
-        let res = fuzz_mut("找不到", &mut map).unwrap();
+        let res = fuzz_mut("找不到", &mut map, true).unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz_mut("測試", &mut map).unwrap_err();
+        let err = fuzz_mut("測試", &mut map, true).unwrap_err();
         let mut v = if let Error::MultiFuzz(v) = err {
             v
         } else {

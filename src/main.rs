@@ -24,6 +24,8 @@ struct Root {
 enum Subs {
     #[structopt(about = "Edit instant script", alias = "e")]
     Edit {
+        #[structopt(short, long, help = "Don't do fuzzy search")]
+        exact: bool,
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
         script_name: Option<String>,
@@ -104,12 +106,10 @@ fn main_inner(root: Root) -> Result<()> {
             script_name,
             hide,
             ty,
+            exact,
         } => {
-            let mut actual_ty = ty.unwrap_or_default();
             let script = if let Some(name) = script_name {
-                let name = name.to_script_name()?;
-                if let Some(h) = hs.get(&name) {
-                    actual_ty = h.ty;
+                if let Some(h) = fuzzy::fuzz_mut(&name, &mut hs, exact)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
                         if ty != h.ty {
@@ -119,18 +119,25 @@ fn main_inner(root: Root) -> Result<()> {
                             });
                         }
                     }
+                    path::open_script(h.name.clone(), h.ty, false)
+                        .context(format!("打開指定腳本失敗：{:?}", name))?
+                } else {
+                    path::open_script(name.clone(), ty.unwrap_or_default(), false)
+                        .context(format!("打開指定腳本失敗：{:?}", name))?
                 }
-                path::open_script(name.clone(), actual_ty, false)
-                    .context(format!("打開指定腳本失敗：{:?}", name))?
             } else {
-                path::open_anonymous_script(None, actual_ty, false).context("打開新匿名腳本失敗")?
+                path::open_anonymous_script(None, ty.unwrap_or_default(), false)
+                    .context("打開新匿名腳本失敗")?
             };
-            let h = hs
-                .entry(script.name.clone())
-                .or_insert(ScriptMeta::new(script.name, actual_ty)?);
-            // FIXME: 重覆的東西抽一抽啦
+
+            log::info!("編輯 {:?}", script.name);
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
+
+            let h = hs
+                .entry(script.name.clone())
+                .or_insert(ScriptMeta::new(script.name, ty.unwrap_or_default())?);
+            // FIXME: 重覆的東西抽一抽啦
             h.hidden = hide;
             h.edit_time = Utc::now();
             path::store_history(map_to_iter(hs))?;
@@ -154,7 +161,8 @@ fn main_inner(root: Root) -> Result<()> {
             path::store_history(map_to_iter(hs))?;
         }
         Subs::Run { script_name, args } => {
-            let h = fuzzy::fuzz_mut(&script_name, &mut hs)?.ok_or(Error::NoMeta(script_name))?;
+            let h =
+                fuzzy::fuzz_mut(&script_name, &mut hs, false)?.ok_or(Error::NoMeta(script_name))?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;

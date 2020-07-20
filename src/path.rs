@@ -1,9 +1,9 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{CommandType, ScriptInfo, ScriptMeta, ScriptName, ToScriptName, ANONYMOUS};
-use crate::util::handle_fs_err;
+use crate::util::{handle_fs_err, read_file};
 use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -100,19 +100,14 @@ pub fn open_script<T: ToScriptName>(
 pub fn get_history() -> Result<HashMap<ScriptName, ScriptInfo>> {
     let path = join_path(get_path(), META)?;
     let mut map = HashMap::new();
-    let mut file = match File::open(&path) {
-        Ok(file) => file,
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                log::info!("找不到歷史檔案，視為空歷史");
-                return Ok(map);
-            } else {
-                return handle_fs_err(&path, Err(e)).context("唯讀打開歷史檔案失敗");
-            }
+    let content = match read_file(&path) {
+        Ok(s) => s,
+        Err(Error::FileNotFound(_)) => {
+            log::info!("找不到歷史檔案，視為空歷史");
+            return Ok(map);
         }
+        Err(e) => return Err(e).context("打開歷史檔案失敗"),
     };
-    let mut content = String::new();
-    handle_fs_err(&path, file.read_to_string(&mut content)).context("讀取歷史檔案失敗")?;
     let histories: Vec<ScriptInfo> = serde_json::from_str(&content)?;
     for h in histories.into_iter() {
         match open_script(h.name.clone(), h.ty, true) {

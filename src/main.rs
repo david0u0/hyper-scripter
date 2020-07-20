@@ -47,11 +47,13 @@ enum Subs {
     },
     #[structopt(about = "Run the script")]
     Run(Run),
+    #[structopt(about = "Print the script to standard output.")]
+    Cat { script_name: Option<String> },
     #[structopt(about = "Remove the script")]
     RM {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
-        #[structopt(required = true, min_values = 2)]
+        #[structopt(required = true, min_values = 1)]
         scripts: Vec<String>,
     },
     #[structopt(about = "List instant scripts", alias = "l")]
@@ -113,7 +115,10 @@ fn main_inner(root: Root) -> Result<()> {
 
     let sub = root.subcmd.unwrap_or(Subs::EditLast);
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
-    let latest = hs.iter_mut().max_by_key(|(_, h)| h.last_time());
+    let latest = hs
+        .iter_mut()
+        .max_by_key(|(_, h)| h.last_time())
+        .map(|h| h.1);
     match sub {
         Subs::Edit {
             script_name,
@@ -161,7 +166,7 @@ fn main_inner(root: Root) -> Result<()> {
         }
         Subs::EditLast => {
             log::info!("嘗試打開最新的腳本…");
-            let script = if let Some((_, latest)) = latest {
+            let script = if let Some(latest) = latest {
                 path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
@@ -185,7 +190,7 @@ fn main_inner(root: Root) -> Result<()> {
         }
         Subs::RunLast { args } => {
             // FIXME: ScriptMeta 跟 CommandType 分兩個地方太瞎了，早晚要合回去
-            if let Some((_, latest)) = latest {
+            if let Some(latest) = latest {
                 let script = path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?;
                 run(&script, latest.ty, &args)?;
@@ -193,6 +198,20 @@ fn main_inner(root: Root) -> Result<()> {
             } else {
                 return Err(Error::Empty);
             };
+        }
+        Subs::Cat { script_name } => {
+            let script = if let Some(name) = script_name {
+                let h = fuzzy::fuzz_mut(&name, &mut hs, false)?
+                    .ok_or(Error::NoMeta(name.to_owned()))?;
+                path::open_script(&h.name, h.ty, true)?
+            } else if let Some(latest) = latest {
+                path::open_script(&latest.name, latest.ty, true)?
+            } else {
+                return Err(Error::Empty);
+            };
+            log::info!("打印 {:?}", script.name);
+            let content = util::read_file(&script.path)?;
+            println!("{}", content);
         }
         Subs::LS(list) => {
             let opt = ListOptions {

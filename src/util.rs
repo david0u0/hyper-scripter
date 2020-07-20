@@ -1,6 +1,7 @@
-use crate::error::{Error, Result};
+use crate::error::{Contextabl, Error, Result};
 use crate::script::{CommandType, ScriptMeta};
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -14,6 +15,12 @@ pub fn run(script: &ScriptMeta, ty: CommandType, remaining: &[String]) -> Result
     full_args.extend(remaining.into_iter().map(|s| s.into()));
     cmd.args(full_args).spawn()?.wait()?;
     Ok(())
+}
+pub fn read_file(path: &PathBuf) -> Result<String> {
+    let mut file = handle_fs_err(path, std::fs::File::open(path)).context("唯讀開啟檔案失敗")?;
+    let mut content = String::new();
+    handle_fs_err(path, file.read_to_string(&mut content)).context("讀取檔案失敗")?;
+    Ok(content)
 }
 
 pub fn remove(script: &ScriptMeta) -> Result<()> {

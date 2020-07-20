@@ -1,6 +1,6 @@
-use crate::error::{Contextabl, Error, Result};
+use crate::error::Result;
 use crate::script::{ScriptInfo, ScriptName};
-use colored::{Color, ColoredString, Colorize};
+use colored::{Color, Colorize};
 use std::io::Write;
 
 #[derive(Default)]
@@ -15,7 +15,6 @@ pub fn fmt_meta<W: Write>(
     is_last: bool,
     opt: &ListOptions,
 ) -> Result<()> {
-    let color = meta.ty.color();
     if opt.long {
         if is_last {
             write!(w, "{}", " *".color(Color::Yellow).bold())?;

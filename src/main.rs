@@ -11,20 +11,33 @@ use list::{fmt_list, ListOptions};
 use script::{CommandType, ScriptInfo};
 use std::process::Command;
 use structopt::clap::AppSettings::{
-    AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
+    self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
+    TrailingVarArg,
 };
 use structopt::StructOpt;
 use util::{map_to_iter, run};
+
+const NO_FLAG_SETTINGS: &[AppSettings] = &[
+    AllowLeadingHyphen,
+    DisableHelpFlags,
+    TrailingVarArg,
+    DisableHelpSubcommand,
+    DisableVersion,
+];
 
 #[derive(StructOpt, Debug)]
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
+    #[structopt(short, long)]
+    tags: Option<String>,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
 }
 #[derive(StructOpt, Debug)]
 enum Subs {
+    #[structopt(external_subcommand)]
+    Other(Vec<String>),
     #[structopt(about = "Edit instant script", alias = "e")]
     Edit {
         #[structopt(short, long, help = "Don't do fuzzy search")]
@@ -37,16 +50,17 @@ enum Subs {
     },
     #[structopt(about = "Edit the last script. This is the default subcommand.")]
     EditLast,
-    #[structopt(
-        alias = ".",
-        about = "Run the last script edited or run",
-        settings = &[AllowLeadingHyphen,DisableHelpFlags, DisableHelpSubcommand, DisableVersion])]
+    #[structopt( alias = ".", about = "Run the last script edited or run", settings = NO_FLAG_SETTINGS)]
     RunLast {
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
-    #[structopt(about = "Run the script")]
-    Run(Run),
+    #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
+    Run {
+        script_name: String,
+        #[structopt(help = "Command line args to pass to the script.")]
+        args: Vec<String>,
+    },
     #[structopt(about = "Print the script to standard output.")]
     Cat { script_name: Option<String> },
     #[structopt(about = "Remove the script")]
@@ -59,7 +73,7 @@ enum Subs {
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
-    Move { origin: String, target: String },
+    MV { origin: String, target: String },
 }
 
 #[derive(StructOpt, Debug)]
@@ -71,55 +85,37 @@ struct List {
     long: bool,
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(settings = &[AllowLeadingHyphen,DisableHelpFlags, DisableHelpSubcommand, DisableVersion])]
-struct Run {
-    script_name: String,
-    #[structopt(help = "Command line args to pass to the script.")]
-    args: Vec<String>,
-}
-
 fn main() -> Result<()> {
     env_logger::init();
-    match Root::from_iter_safe(std::env::args()) {
-        Ok(root) => main_inner(root),
-        Err(e) => {
-            use structopt::clap::ErrorKind::*;
-            if e.kind == UnknownArgument || e.kind == InvalidSubcommand {
-                log::info!("純執行模式");
-                main_only_run()
-            } else {
-                println!("{}", e);
-                return Ok(());
-            }
-        }
-    }
+    let mut root = Root::from_args();
+    main_inner(&mut root)
 }
-fn main_only_run() -> Result<()> {
-    let only_run = Run::from_iter(std::env::args());
-    let root = Root {
-        is_path: None,
-        subcmd: Some(Subs::Run(Run {
-            args: only_run.args,
-            script_name: only_run.script_name,
-        })),
-    };
-    main_inner(root)
-}
-fn main_inner(root: Root) -> Result<()> {
-    if let Some(is_path) = root.is_path {
+fn main_inner(root: &mut Root) -> Result<()> {
+    log::debug!("命令行物件：{:?}", root);
+    if let Some(is_path) = &root.is_path {
         path::set_path(is_path)?;
     } else {
         path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
     }
 
-    let sub = root.subcmd.unwrap_or(Subs::EditLast);
+    let edit_last = Subs::EditLast;
+    let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
+
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     let latest = hs
         .iter_mut()
         .max_by_key(|(_, h)| h.last_time())
         .map(|h| h.1);
     match sub {
+        Subs::Other(cmds) => {
+            log::info!("純執行模式");
+            let run = Subs::Run {
+                script_name: cmds[0].clone(),
+                args: cmds[1..cmds.len()].iter().map(|s| s.clone()).collect(),
+            };
+            root.subcmd = Some(run);
+            return main_inner(root);
+        }
         Subs::Edit {
             script_name,
             hide,
@@ -133,9 +129,9 @@ fn main_inner(root: Root) -> Result<()> {
                 if let Some(h) = fuzzy::fuzz_mut(&name, &mut hs, exact)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
-                        if ty != h.ty {
+                        if ty != &h.ty {
                             return Err(Error::TypeMismatch {
-                                expect: ty,
+                                expect: *ty,
                                 actual: h.ty,
                             });
                         }
@@ -161,7 +157,7 @@ fn main_inner(root: Root) -> Result<()> {
                 .entry(script.name.clone())
                 .or_insert(ScriptInfo::new(script.name, ty.unwrap_or_default())?);
             // FIXME: 重覆的東西抽一抽啦
-            h.hidden = hide;
+            h.hidden = *hide;
             h.edit_time = Utc::now();
         }
         Subs::EditLast => {
@@ -180,9 +176,9 @@ fn main_inner(root: Root) -> Result<()> {
                 .or_insert(ScriptInfo::new(script.name, Default::default())?);
             h.edit_time = Utc::now();
         }
-        Subs::Run(Run { script_name, args }) => {
-            let h =
-                fuzzy::fuzz_mut(&script_name, &mut hs, false)?.ok_or(Error::NoMeta(script_name))?;
+        Subs::Run { script_name, args } => {
+            let h = fuzzy::fuzz_mut(&script_name, &mut hs, false)?
+                .ok_or(Error::NoMeta(script_name.clone()))?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
@@ -224,8 +220,8 @@ fn main_inner(root: Root) -> Result<()> {
         }
         Subs::RM { scripts, exact } => {
             for script_name in scripts.into_iter() {
-                let h = fuzzy::fuzz_mut(&script_name, &mut hs, exact)?
-                    .ok_or(Error::NoMeta(script_name))?;
+                let h = fuzzy::fuzz_mut(&script_name, &mut hs, *exact)?
+                    .ok_or(Error::NoMeta(script_name.clone()))?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 util::remove(&script)?;

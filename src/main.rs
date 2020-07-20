@@ -8,7 +8,7 @@ mod util;
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::{ScriptInfo, ScriptType};
+use script::{CommandType, ScriptInfo};
 use std::process::Command;
 use structopt::clap::AppSettings::{
     AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
@@ -33,7 +33,7 @@ enum Subs {
         hide: bool,
         script_name: Option<String>,
         #[structopt(short, parse(try_from_str), help = "Type of the script, e.g. `sh`")]
-        ty: Option<ScriptType>,
+        command_type: Option<CommandType>,
     },
     #[structopt(about = "Edit the last script. This is the default subcommand.")]
     EditLast,
@@ -51,7 +51,8 @@ enum Subs {
     RM {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
-        script_name: String,
+        #[structopt(required = true, min_values = 2)]
+        scripts: Vec<String>,
     },
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
@@ -117,9 +118,12 @@ fn main_inner(root: Root) -> Result<()> {
         Subs::Edit {
             script_name,
             hide,
-            ty,
-            exact,
+            command_type: ty,
+            mut exact,
         } => {
+            if ty.is_some() {
+                exact = true;
+            }
             let script = if let Some(name) = script_name {
                 if let Some(h) = fuzzy::fuzz_mut(&name, &mut hs, exact)? {
                     if let Some(ty) = ty {
@@ -141,8 +145,7 @@ fn main_inner(root: Root) -> Result<()> {
                 }
             } else {
                 log::debug!("打開新匿名腳本");
-                path::open_new_anonymous_script(ty.unwrap_or_default())
-                    .context("打開新匿名腳本失敗")?
+                path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
             };
 
             log::info!("編輯 {:?}", script.name);
@@ -163,7 +166,7 @@ fn main_inner(root: Root) -> Result<()> {
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?
             } else {
                 log::info!("沒有最近歷史，改為創建新的匿名腳本");
-                path::open_new_anonymous_script(Default::default()).context("打開新匿名腳本失敗")?
+                path::open_new_anonymous(Default::default()).context("打開新匿名腳本失敗")?
             };
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
@@ -181,7 +184,7 @@ fn main_inner(root: Root) -> Result<()> {
             h.exec_time = Some(Utc::now());
         }
         Subs::RunLast { args } => {
-            // FIXME: ScriptMeta 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
+            // FIXME: ScriptMeta 跟 CommandType 分兩個地方太瞎了，早晚要合回去
             if let Some((_, latest)) = latest {
                 let script = path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?;
@@ -200,13 +203,15 @@ fn main_inner(root: Root) -> Result<()> {
             fmt_list(&mut stdout.lock(), map_to_iter(hs), &opt)?;
             return Ok(());
         }
-        Subs::RM { script_name, exact } => {
-            let h =
-                fuzzy::fuzz_mut(&script_name, &mut hs, exact)?.ok_or(Error::NoMeta(script_name))?;
-            // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
-            let script = path::open_script(&h.name, h.ty, true)?;
-            util::remove(&script)?;
-            hs.remove(&script.name);
+        Subs::RM { scripts, exact } => {
+            for script_name in scripts.into_iter() {
+                let h = fuzzy::fuzz_mut(&script_name, &mut hs, exact)?
+                    .ok_or(Error::NoMeta(script_name))?;
+                // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
+                let script = path::open_script(&h.name, h.ty, true)?;
+                util::remove(&script)?;
+                hs.remove(&script.name);
+            }
         }
         _ => unimplemented!(),
     }

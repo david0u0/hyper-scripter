@@ -1,4 +1,4 @@
-use crate::script::{ScriptName, ScriptType};
+use crate::script::{CommandType, ScriptName};
 use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Others {}
@@ -16,8 +16,8 @@ pub enum Error {
     PathNotSet,
     Operation(String),
     TypeMismatch {
-        expect: ScriptType,
-        actual: ScriptType,
+        expect: CommandType,
+        actual: CommandType,
     },
     MultiFuzz(Vec<ScriptName>),
     ScriptNameFormat(String),

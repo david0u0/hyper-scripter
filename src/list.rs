@@ -1,5 +1,6 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptInfo, ScriptName};
+use colored::{Color, ColoredString, Colorize};
 use std::io::Write;
 
 #[derive(Default)]
@@ -8,8 +9,20 @@ pub struct ListOptions {
     pub long: bool,
 }
 
-pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptInfo, opt: &ListOptions) -> Result<()> {
+pub fn fmt_meta<W: Write>(
+    w: &mut W,
+    meta: &ScriptInfo,
+    is_last: bool,
+    opt: &ListOptions,
+) -> Result<()> {
+    let color = meta.ty.color();
     if opt.long {
+        if is_last {
+            write!(w, "{}", " *".color(Color::Yellow).bold())?;
+        } else {
+            write!(w, "  ")?;
+        }
+
         let exex_time = if let Some(t) = &meta.exec_time {
             t.to_string()
         } else {
@@ -17,11 +30,19 @@ pub fn fmt_meta<W: Write>(w: &mut W, meta: &ScriptInfo, opt: &ListOptions) -> Re
         };
         write!(
             w,
-            "{}\t{}\t{}\t{}",
-            meta.ty, meta.name, meta.edit_time, exex_time
+            "{}\t{}\t{}\t{}\n",
+            meta.ty.to_string().color(meta.ty.color()).bold(),
+            meta.name,
+            meta.edit_time,
+            exex_time
         )?;
     } else {
-        write!(w, "{}\t{}", meta.ty, meta.name)?;
+        let msg = if is_last {
+            meta.file_name().underline()
+        } else {
+            meta.file_name().normal()
+        };
+        write!(w, "{}", msg.bold().color(meta.ty.color()))?;
     }
     Ok(())
 }
@@ -44,22 +65,20 @@ pub fn fmt_list<W: Write>(
         None => return Ok(()),
     };
 
-    let mut anonymous_printed = false;
+    let mut anonymous_printed = !opt.long;
     if opt.long {
-        writeln!(w, "name\ttype\tlast edit time\tlast execute time")?;
+        writeln!(w, "type\tname\tlast edit time\tlast execute time")?;
     }
     for (i, meta) in scripts.iter().enumerate() {
+        if i != 0 && !opt.long {
+            write!(w, "  ")?;
+        }
         if let (false, ScriptName::Anonymous(_)) = (anonymous_printed, &meta.name) {
             anonymous_printed = true;
             writeln!(w, "--- Anonymous ---")?;
         }
-        if i == last_index {
-            write!(w, " *")?;
-        } else {
-            write!(w, "  ")?;
-        }
-        fmt_meta(w, meta, opt)?;
-        write!(w, "\n")?;
+        fmt_meta(w, meta, last_index == i, opt)?;
     }
+    writeln!(w, "")?;
     Ok(())
 }

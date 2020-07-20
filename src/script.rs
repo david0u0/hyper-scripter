@@ -1,8 +1,11 @@
 use crate::error::{Error, Result};
 use chrono::{DateTime, Utc};
+use colored::Color;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::PathBuf;
+
+pub const ANONYMOUS: &'static str = ".anonymous";
 
 #[derive(Debug)]
 pub struct ScriptMeta {
@@ -66,10 +69,10 @@ impl ToScriptName for ScriptName {
     }
 }
 impl ScriptName {
-    pub fn to_file_name(&self, ty: ScriptType) -> String {
+    pub fn to_file_name(&self, ty: CommandType) -> String {
         let ext = ty.ext().map(|s| format!(".{}", s)).unwrap_or_default();
         match self {
-            ScriptName::Anonymous(id) => format!("{}{}", id, ext),
+            ScriptName::Anonymous(id) => format!("{}/{}{}", ANONYMOUS, id, ext),
             ScriptName::Named(name) => format!("{}{}", name, ext),
         }
     }
@@ -81,7 +84,7 @@ pub struct ScriptInfo {
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
     pub name: ScriptName,
-    pub ty: ScriptType,
+    pub ty: CommandType,
     pub last_edit_path: PathBuf,
 }
 
@@ -93,7 +96,10 @@ impl ScriptInfo {
             self.edit_time
         }
     }
-    pub fn new(name: ScriptName, ty: ScriptType) -> Result<Self> {
+    pub fn file_name(&self) -> String {
+        self.name.to_file_name(self.ty)
+    }
+    pub fn new(name: ScriptName, ty: CommandType) -> Result<Self> {
         Ok(ScriptInfo {
             name,
             ty,
@@ -106,19 +112,28 @@ impl ScriptInfo {
 }
 
 macro_rules! script_type_enum {
-    ($( $tag:expr => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
+    ($( [$tag:expr, $color:expr] => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
         #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-        pub enum ScriptType {
+        pub enum CommandType {
             $($name),*
         }
         #[allow(unreachable_code)]
-        impl ScriptType {
+        impl CommandType {
             pub fn ext(&self) -> Option<&'static str> {
                 match self {
                     $(
-                        ScriptType::$name => {
+                        CommandType::$name => {
                             $(return Some($ext);)?
                             None
+                        }
+                    )*
+                }
+            }
+            pub fn color(&self) -> Color {
+                match self {
+                    $(
+                        CommandType::$name => {
+                            $color
                         }
                     )*
                 }
@@ -126,7 +141,7 @@ macro_rules! script_type_enum {
             pub fn cmd(&self) -> Option<(String, Vec<String>)> {
                 match self {
                     $(
-                        ScriptType::$name => {
+                        CommandType::$name => {
                             let v: &[&str] = &[$($args),*];
                             if v.len() > 0 {
                                 Some(
@@ -143,13 +158,13 @@ macro_rules! script_type_enum {
                 }
             }
         }
-        impl std::str::FromStr for ScriptType {
+        impl std::str::FromStr for CommandType {
             type Err = String;
             fn from_str(s: &str) -> std::result::Result<Self, String> {
                 match s {
                     $(
                         $tag => {
-                            Ok(ScriptType::$name)
+                            Ok(CommandType::$name)
                         }
                     )*
                     _ => {
@@ -160,11 +175,11 @@ macro_rules! script_type_enum {
                 }
             }
         }
-        impl std::fmt::Display for ScriptType {
+        impl std::fmt::Display for CommandType {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     $(
-                        ScriptType::$name => {
+                        CommandType::$name => {
                             write!(f, $tag)?;
                         }
                     )*
@@ -176,14 +191,15 @@ macro_rules! script_type_enum {
 }
 
 script_type_enum! {
-    "sh" => Shell("sh"): ("bash"),
-    "screen" => Screen: ("screen", "-c"),
-    "txt" => Txt: (),
-    "js" => Js("js"): ("node")
+    ["sh", Color::Green] => Shell("sh"): ("bash"),
+    ["screen", Color::White] => Screen: ("screen", "-c"),
+    ["txt", Color::BrightBlack] => Txt: (),
+    ["js", Color::BrightCyan] => Js("js"): ("node"),
+    ["rb", Color::BrightRed] => Rb("rb"): ("ruby")
 }
-impl Default for ScriptType {
+impl Default for CommandType {
     fn default() -> Self {
-        ScriptType::Shell
+        CommandType::Shell
     }
 }
 
@@ -192,12 +208,12 @@ mod test {
     use super::*;
     #[test]
     fn test_ext() {
-        assert_eq!(Some("sh"), ScriptType::Shell.ext());
-        assert_eq!(None, ScriptType::Screen.ext());
+        assert_eq!(Some("sh"), CommandType::Shell.ext());
+        assert_eq!(None, CommandType::Screen.ext());
     }
     #[test]
     fn test_cmd() {
-        assert_eq!(Some(("node".to_owned(), vec![])), ScriptType::Js.cmd());
-        assert_eq!(None, ScriptType::Txt.cmd());
+        assert_eq!(Some(("node".to_owned(), vec![])), CommandType::Js.cmd());
+        assert_eq!(None, CommandType::Txt.cmd());
     }
 }

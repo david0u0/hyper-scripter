@@ -1,5 +1,5 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{ScriptInfo, ScriptMeta, ScriptName, ScriptType, ToScriptName};
+use crate::script::{CommandType, ScriptInfo, ScriptMeta, ScriptName, ToScriptName, ANONYMOUS};
 use crate::util::handle_fs_err;
 use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
@@ -7,7 +7,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const ANONYMOUS: &'static str = ".anonymous";
 const META: &'static str = ".instant_script_info.json";
 
 lazy_static::lazy_static! {
@@ -68,36 +67,34 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous_script(ty: ScriptType) -> Result<ScriptMeta> {
+pub fn open_new_anonymous(ty: CommandType) -> Result<ScriptMeta> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
-    open_anonymous_script(id, ty, false)
+    open_anonymous(id, ty)
 }
-pub fn open_anonymous_script(id: u32, ty: ScriptType, should_exist: bool) -> Result<ScriptMeta> {
-    let dir = get_path().join(ANONYMOUS);
+pub fn open_anonymous(id: u32, ty: CommandType) -> Result<ScriptMeta> {
     let name = ScriptName::Anonymous(id);
-    let path = join_path(dir, &name.to_file_name(ty))?;
-    if should_exist && !path.exists() {
-        return Err(Error::FileNotFound(path));
-    }
+    let path = get_path().join(name.to_file_name(ty));
     Ok(ScriptMeta { path, name })
 }
 
 pub fn open_script<T: ToScriptName>(
     name: T,
-    ty: ScriptType,
+    ty: CommandType,
     should_exist: bool,
 ) -> Result<ScriptMeta> {
-    match name.to_script_name()? {
-        ScriptName::Anonymous(id) => open_anonymous_script(id, ty, should_exist),
+    let script = match name.to_script_name()? {
+        ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
-            let path = join_path(get_path(), &name.to_file_name(ty))?;
-            if should_exist && !path.exists() {
-                return Err(Error::FileNotFound(path));
-            }
-            Ok(ScriptMeta { path, name })
+            let path = get_path().join(name.to_file_name(ty));
+            ScriptMeta { path, name }
         }
+    };
+    if should_exist && !script.path.exists() {
+        Err(Error::FileNotFound(script.path))
+    } else {
+        Ok(script)
     }
 }
 pub fn get_history() -> Result<HashMap<ScriptName, ScriptInfo>> {
@@ -154,13 +151,13 @@ mod test {
     #[test]
     fn test_open_anonymous() {
         setup();
-        let s = open_new_anonymous_script(ScriptType::Shell).unwrap();
+        let s = open_new_anonymous(CommandType::Shell).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/.anonymous", "6.sh").unwrap()
         );
-        let s = open_anonymous_script(5, ScriptType::Js, true).unwrap();
+        let s = open_anonymous(5, CommandType::Js).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(5));
         assert_eq!(
             s.path,
@@ -170,13 +167,17 @@ mod test {
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first".to_owned(), ScriptType::Txt, false).unwrap();
+        let s = open_script("first".to_owned(), CommandType::Txt, false).unwrap();
         assert_eq!(s.name, ScriptName::Named("first".to_owned()));
+
+        let s = open_script(".1".to_owned(), CommandType::Rb, false).unwrap();
+        assert_eq!(s.name, ScriptName::Anonymous(1));
         assert_eq!(
             s.path,
-            join_path("./.test_instant_script/", "first").unwrap()
+            join_path("./.test_instant_script/.anonymous", "1.rb").unwrap()
         );
-        match open_script("not-exist".to_owned(), ScriptType::Shell, true) {
+
+        match open_script("not-exist".to_owned(), CommandType::Shell, true) {
             Err(Error::FileNotFound(name)) => assert_eq!(
                 name,
                 join_path("./.test_instant_script/", "not-exist.sh").unwrap()

@@ -61,7 +61,7 @@ mod test {
     }
     #[test]
     fn test_fuzz() {
-        env_logger::init();
+        let _ = env_logger::try_init();
         let mut map = HashMap::new();
         map.insert(ScriptName::Named("測試腳本1".to_owned()), 111);
         map.insert(ScriptName::Named("測試腳本2".to_owned()), 222);
@@ -93,7 +93,7 @@ mod test {
     }
     #[test]
     fn test_fuzz_with_len() {
-        env_logger::init();
+        let _ = env_logger::try_init();
         let mut map = HashMap::new();
         map.insert(ScriptName::Named("測試腳本1".to_owned()), 111);
         map.insert(ScriptName::Named("測試腳本234".to_owned()), 222);

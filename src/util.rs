@@ -1,10 +1,10 @@
 use crate::error::{Error, Result};
-use crate::script::{ScriptMeta, ScriptType};
+use crate::script::{CommandType, ScriptMeta};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn run(script: &ScriptMeta, ty: ScriptType, remaining: &[String]) -> Result<()> {
+pub fn run(script: &ScriptMeta, ty: CommandType, remaining: &[String]) -> Result<()> {
     let (cmd, args) = ty
         .cmd()
         .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;

@@ -16,6 +16,9 @@ pub fn run(script: &ScriptMeta, ty: ScriptType, remaining: &[String]) -> Result<
     Ok(())
 }
 
+pub fn remove(script: &ScriptMeta) -> Result<()> {
+    handle_fs_err(&script.path, std::fs::remove_file(&script.path))
+}
 pub fn map_to_iter<K, V>(map: HashMap<K, V>) -> impl IntoIterator<Item = V> {
     map.into_iter().map(|(_, v)| v)
 }

@@ -47,6 +47,12 @@ enum Subs {
     },
     #[structopt(about = "Run the script")]
     Run(Run),
+    #[structopt(about = "Remove the script")]
+    RM {
+        #[structopt(short, long, help = "Don't do fuzzy search")]
+        exact: bool,
+        script_name: String,
+    },
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
@@ -149,7 +155,6 @@ fn main_inner(root: Root) -> Result<()> {
             // FIXME: 重覆的東西抽一抽啦
             h.hidden = hide;
             h.edit_time = Utc::now();
-            path::store_history(map_to_iter(hs))?;
         }
         Subs::EditLast => {
             log::info!("嘗試打開最新的腳本…");
@@ -166,7 +171,6 @@ fn main_inner(root: Root) -> Result<()> {
                 .entry(script.name.clone())
                 .or_insert(ScriptInfo::new(script.name, Default::default())?);
             h.edit_time = Utc::now();
-            path::store_history(map_to_iter(hs))?;
         }
         Subs::Run(Run { script_name, args }) => {
             let h =
@@ -175,7 +179,6 @@ fn main_inner(root: Root) -> Result<()> {
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());
-            path::store_history(map_to_iter(hs))?;
         }
         Subs::RunLast { args } => {
             // FIXME: ScriptMeta 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
@@ -184,7 +187,6 @@ fn main_inner(root: Root) -> Result<()> {
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?;
                 run(&script, latest.ty, &args)?;
                 latest.exec_time = Some(Utc::now());
-                path::store_history(map_to_iter(hs))?;
             } else {
                 return Err(Error::Empty);
             };
@@ -196,8 +198,18 @@ fn main_inner(root: Root) -> Result<()> {
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), map_to_iter(hs), &opt)?;
+            return Ok(());
+        }
+        Subs::RM { script_name, exact } => {
+            let h =
+                fuzzy::fuzz_mut(&script_name, &mut hs, exact)?.ok_or(Error::NoMeta(script_name))?;
+            // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
+            let script = path::open_script(&h.name, h.ty, true)?;
+            util::remove(&script)?;
+            hs.remove(&script.name);
         }
         _ => unimplemented!(),
     }
+    path::store_history(map_to_iter(hs))?;
     Ok(())
 }

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ANONYMOUS: &'static str = ".anonymous";
-const META: &'static str = ".instant_script_meta.json";
+const META: &'static str = ".instant_script_info.json";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(PathBuf::new());

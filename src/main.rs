@@ -56,13 +56,6 @@ enum Subs {
         )]
         executable: Option<ScriptType>,
     },
-    #[structopt(about = "Edit the last script. This is the default subcommand.")]
-    EditLast,
-    #[structopt( alias = "-", about = "Run the last script edited or run", settings = NO_FLAG_SETTINGS)]
-    RunLast {
-        #[structopt(help = "Command line args to pass to the script.")]
-        args: Vec<String>,
-    },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
         script_name: String,
@@ -70,7 +63,10 @@ enum Subs {
         args: Vec<String>,
     },
     #[structopt(about = "Print the script to standard output.")]
-    Cat { script_name: Option<String> },
+    Cat {
+        #[structopt(default_value = "-")]
+        script_name: String,
+    },
     #[structopt(about = "Remove the script")]
     RM {
         #[structopt(short, long, help = "Don't do fuzzy search")]
@@ -118,6 +114,33 @@ fn main() -> Result<()> {
     let mut root = Root::from_args();
     main_inner(&mut root)
 }
+macro_rules! get_info_mut {
+    (@ALLOW_MISS $name:expr, $history:expr, $latest:expr, $exact:expr) => {{
+        log::trace!("開始尋找 `{}`, exact={}", $name, $exact);
+        if $name == "-" {
+            log::trace!("找最新腳本");
+            if $latest.is_some() {
+                Ok($latest)
+            } else {
+                Err(Error::Empty)
+            }
+        } else if $exact {
+            $name
+                .clone()
+                .to_script_name()
+                .map(|name| $history.get_mut(&name))
+        } else {
+            fuzzy::fuzz_mut($name, &mut $history)
+        }
+    }};
+    ($name:expr, $history:expr, $latest:expr, $exact:expr) => {{
+        match get_info_mut!(@ALLOW_MISS $name, $history, $latest, $exact) {
+            Err(e) => Err(e),
+            Ok(None) => Err(Error::NoInfo($name.to_owned())),
+            Ok(Some(h)) => Ok(h),
+        }
+    }};
+}
 fn main_inner(root: &mut Root) -> Result<()> {
     log::debug!("命令行物件：{:?}", root);
     if let Some(is_path) = &root.is_path {
@@ -126,7 +149,12 @@ fn main_inner(root: &mut Root) -> Result<()> {
         path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
     }
 
-    let edit_last = Subs::EditLast;
+    let edit_last = Subs::Edit {
+        script_name: Some("-".to_owned()),
+        exact: false,
+        hide: false,
+        executable: None,
+    };
     let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
@@ -148,13 +176,10 @@ fn main_inner(root: &mut Root) -> Result<()> {
             script_name,
             hide,
             executable: ty,
-            mut exact,
+            exact,
         } => {
-            if ty.is_some() {
-                exact = true;
-            }
             let script = if let Some(name) = script_name {
-                if let Some(h) = fuzzy::fuzz_mut(&name, &mut hs, exact)? {
+                if let Some(h) = get_info_mut!(@ALLOW_MISS name, hs, latest, *exact)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
                         if ty != &h.ty {
@@ -164,13 +189,13 @@ fn main_inner(root: &mut Root) -> Result<()> {
                             });
                         }
                     }
-                    log::debug!("打開既有指定腳本：{:?}", name);
+                    log::debug!("打開既有命名腳本：{:?}", name);
                     path::open_script(h.name.clone(), h.ty, true)
-                        .context(format!("打開指定腳本失敗：{:?}", name))?
+                        .context(format!("打開命名腳本失敗：{:?}", name))?
                 } else {
-                    log::debug!("打開新指定腳本：{:?}", name);
+                    log::debug!("打開新命名腳本：{:?}", name);
                     path::open_script(name.clone(), ty.unwrap_or_default(), false)
-                        .context(format!("打開新指定腳本失敗：{:?}", name))?
+                        .context(format!("打開新命名腳本失敗：{:?}", name))?
                 }
             } else {
                 log::debug!("打開新匿名腳本");
@@ -188,51 +213,16 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.hidden = *hide;
             h.edit_time = Utc::now();
         }
-        Subs::EditLast => {
-            log::info!("嘗試打開最新的腳本…");
-            let script = if let Some(latest) = latest {
-                path::open_script(latest.name.clone(), latest.ty, false)
-                    .context(format!("打開最新腳本失敗：{:?}", latest.name))?
-            } else {
-                log::info!("沒有最近歷史，改為創建新的匿名腳本");
-                path::open_new_anonymous(Default::default()).context("打開新匿名腳本失敗")?
-            };
-            let mut cmd = Command::new("vim");
-            cmd.args(&[script.path]).spawn()?.wait()?;
-            let h = hs
-                .entry(script.name.clone())
-                .or_insert(ScriptInfo::new(script.name, Default::default())?);
-            h.edit_time = Utc::now();
-        }
         Subs::Run { script_name, args } => {
-            let h = fuzzy::fuzz_mut(&script_name, &mut hs, false)?
-                .ok_or(Error::NoInfo(script_name.clone()))?;
+            let h = get_info_mut!(script_name, hs, latest, false)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());
         }
-        Subs::RunLast { args } => {
-            // FIXME: ScriptMeta 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
-            if let Some(latest) = latest {
-                let script = path::open_script(latest.name.clone(), latest.ty, false)
-                    .context(format!("打開最新腳本失敗：{:?}", latest.name))?;
-                run(&script, latest.ty, &args)?;
-                latest.exec_time = Some(Utc::now());
-            } else {
-                return Err(Error::Empty);
-            };
-        }
         Subs::Cat { script_name } => {
-            let script = if let Some(name) = script_name {
-                let h = fuzzy::fuzz_mut(&name, &mut hs, false)?
-                    .ok_or(Error::NoInfo(name.to_owned()))?;
-                path::open_script(&h.name, h.ty, true)?
-            } else if let Some(latest) = latest {
-                path::open_script(&latest.name, latest.ty, true)?
-            } else {
-                return Err(Error::Empty);
-            };
+            let h = get_info_mut!(script_name, hs, latest, false)?;
+            let script = path::open_script(&h.name, h.ty, true)?;
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
             println!("{}", content);
@@ -247,9 +237,10 @@ fn main_inner(root: &mut Root) -> Result<()> {
             return Ok(());
         }
         Subs::RM { scripts, exact } => {
+            // let mut scripts_to_remove = vec![];
+            let mut latest = latest.map(|info| info.clone());
             for script_name in scripts.into_iter() {
-                let h = fuzzy::fuzz_mut(script_name, &mut hs, *exact)?
-                    .ok_or(Error::NoInfo(script_name.clone()))?;
+                let h = get_info_mut!(script_name, hs, latest.as_mut(), *exact)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 util::remove(&script)?;
@@ -257,8 +248,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             }
         }
         Subs::CP { exact, origin, new } => {
-            let h =
-                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoInfo(origin.clone()))?;
+            let h = get_info_mut!(origin, hs, latest, *exact)?;
             let new_name = new.clone().to_script_name()?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_script = path::open_script(&new_name, h.ty, false)?;
@@ -279,8 +269,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             new,
             executable: ty,
         } => {
-            let h =
-                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoInfo(origin.clone()))?;
+            let h = get_info_mut!(origin, hs, latest, *exact)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
             let new_name = new.clone().to_script_name()?;

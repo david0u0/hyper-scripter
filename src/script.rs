@@ -41,7 +41,7 @@ pub trait ToScriptName {
 }
 impl ToScriptName for String {
     fn to_script_name(self) -> Result<ScriptName> {
-        log::trace!("解析腳本名：{}", self);
+        log::debug!("解析腳本名：{}", self);
         let reg = regex::Regex::new(r"^\.(\w+)$")?;
         let m = reg.captures(&self);
         if let Some(m) = m {
@@ -51,9 +51,12 @@ impl ToScriptName for String {
                 .as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(ScriptName::Anonymous(id)),
-                _ => return Err(Error::ScriptNameFormat(self.clone())),
+                Err(e) => return Err(Error::ScriptNameFormat(self.clone()).context(e)),
             }
         } else {
+            if self.find(".").is_some() || self.find(" ").is_some() {
+                return Err(Error::ScriptNameFormat(self.clone()).context("解析命名腳本失敗"));
+            }
             Ok(ScriptName::Named(self))
         }
     }

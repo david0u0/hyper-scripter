@@ -8,12 +8,7 @@ const MIN_SCORE: i64 = 200; // TODO: 好好決定這個魔法數字
 pub fn fuzz_mut<'a, 'b, T>(
     name: &'a str,
     map: &'b mut HashMap<ScriptName, T>,
-    exact: bool,
 ) -> Result<Option<&'b mut T>> {
-    if exact {
-        let name = name.to_owned().to_script_name()?;
-        return Ok(map.get_mut(&name));
-    }
     let matcher = SkimMatcherV2::default();
     let mut ans = (0, Vec::<(&ScriptName, &mut T)>::new());
     for (choice, data) in map.iter_mut() {

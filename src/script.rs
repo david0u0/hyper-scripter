@@ -78,14 +78,13 @@ impl ScriptName {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScriptInfo {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
     pub name: ScriptName,
     pub ty: ScriptType,
-    pub last_edit_path: PathBuf,
 }
 
 impl ScriptInfo {
@@ -103,7 +102,6 @@ impl ScriptInfo {
         Ok(ScriptInfo {
             name,
             ty,
-            last_edit_path: std::env::current_dir()?,
             edit_time: Utc::now(),
             exec_time: None,
             hidden: false,

@@ -11,10 +11,11 @@ pub enum Error {
     SysPathNotFound(&'static str),
 
     PermissionDenied(Vec<PathBuf>),
-    PathNotFound(Vec<PathBuf>),
+    PathNotFound(PathBuf),
+    PathExist(PathBuf),
     GeneralFS(Vec<PathBuf>, std::io::Error),
 
-    NoMeta(String),
+    NoInfo(String),
     Operation(String),
     TypeMismatch {
         expect: ScriptType,

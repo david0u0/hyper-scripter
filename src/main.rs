@@ -81,6 +81,12 @@ enum Subs {
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
+    CP {
+        #[structopt(short, long, help = "Don't do fuzzy search")]
+        exact: bool,
+        origin: String,
+        new: String,
+    },
     MV {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
@@ -200,7 +206,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
         }
         Subs::Run { script_name, args } => {
             let h = fuzzy::fuzz_mut(&script_name, &mut hs, false)?
-                .ok_or(Error::NoMeta(script_name.clone()))?;
+                .ok_or(Error::NoInfo(script_name.clone()))?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             run(&script, h.ty, &args)?;
@@ -220,7 +226,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
         Subs::Cat { script_name } => {
             let script = if let Some(name) = script_name {
                 let h = fuzzy::fuzz_mut(&name, &mut hs, false)?
-                    .ok_or(Error::NoMeta(name.to_owned()))?;
+                    .ok_or(Error::NoInfo(name.to_owned()))?;
                 path::open_script(&h.name, h.ty, true)?
             } else if let Some(latest) = latest {
                 path::open_script(&latest.name, latest.ty, true)?
@@ -243,12 +249,29 @@ fn main_inner(root: &mut Root) -> Result<()> {
         Subs::RM { scripts, exact } => {
             for script_name in scripts.into_iter() {
                 let h = fuzzy::fuzz_mut(script_name, &mut hs, *exact)?
-                    .ok_or(Error::NoMeta(script_name.clone()))?;
+                    .ok_or(Error::NoInfo(script_name.clone()))?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 util::remove(&script)?;
                 hs.remove(&script.name);
             }
+        }
+        Subs::CP { exact, origin, new } => {
+            let h =
+                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoInfo(origin.clone()))?;
+            let new_name = new.clone().to_script_name()?;
+            let og_script = path::open_script(&h.name, h.ty, true)?;
+            let new_script = path::open_script(&new_name, h.ty, false)?;
+            if new_script.path.exists() {
+                return Err(Error::PathExist(new_script.path));
+            }
+            util::cp(&og_script, &new_script)?;
+            let new_info = ScriptInfo {
+                name: new_name.clone(),
+                edit_time: Utc::now(),
+                ..h.clone()
+            };
+            hs.insert(new_name, new_info);
         }
         Subs::MV {
             exact,
@@ -257,7 +280,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             executable: ty,
         } => {
             let h =
-                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoMeta(origin.clone()))?;
+                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoInfo(origin.clone()))?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
             let new_name = new.clone().to_script_name()?;

@@ -100,7 +100,7 @@ pub fn open_script<T: ToScriptName>(
         }
     };
     if check_sxist && !script.path.exists() {
-        Err(Error::PathNotFound(vec![script.path]))
+        Err(Error::PathNotFound(script.path))
     } else {
         Ok(script)
     }
@@ -186,7 +186,7 @@ mod test {
         match open_script("not-exist".to_owned(), ScriptType::Shell, true) {
             Err(Error::PathNotFound(name)) => assert_eq!(
                 name,
-                vec![join_path("./.test_instant_script/", "not-exist.sh").unwrap()]
+                join_path("./.test_instant_script/", "not-exist.sh").unwrap()
             ),
             _ => unreachable!(),
         }

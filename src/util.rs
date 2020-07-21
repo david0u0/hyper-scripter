@@ -1,11 +1,13 @@
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{ScriptMeta, ScriptType};
-use std::collections::HashMap;
+use crate::script::{ScriptInfo, ScriptMeta};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn run(script: &ScriptMeta, ty: ScriptType, remaining: &[String]) -> Result<()> {
+const IS_BIRTH_PLACE: &'static str = "IS_BIRTH_PLACE";
+
+pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Result<()> {
+    let ty = info.ty;
     let (cmd_str, args) = ty
         .cmd()
         .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;
@@ -13,7 +15,8 @@ pub fn run(script: &ScriptMeta, ty: ScriptType, remaining: &[String]) -> Result<
     let mut full_args: Vec<PathBuf> = args.into_iter().map(|s| s.into()).collect();
     full_args.push(script.path.clone());
     full_args.extend(remaining.into_iter().map(|s| s.into()));
-    let mut child = handle_fs_err(&[&cmd_str], cmd.args(full_args).spawn())?;
+    cmd.args(full_args).env(IS_BIRTH_PLACE, &info.birthplace);
+    let mut child = handle_fs_err(&[&cmd_str], cmd.spawn())?;
     // TODO: 看要不要把執行狀態傳回去？
     let stat = handle_fs_err(&[&cmd_str], child.wait())?;
     log::info!("程式執行結果：{:?}", stat);

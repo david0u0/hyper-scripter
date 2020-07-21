@@ -210,10 +210,12 @@ fn main_inner(root: &mut Root) -> Result<()> {
             let mut cmd = Command::new("vim");
             cmd.args(&[script.path]).spawn()?.wait()?;
 
-            let h = hs
-                .entry(script.name.clone())
-                .or_insert(ScriptInfo::new(script.name, ty.unwrap_or_default())?);
-            // FIXME: 重覆的東西抽一抽啦
+            let dir = util::handle_fs_err(&["."], std::env::current_dir())?;
+            let h = hs.entry(script.name.clone()).or_insert(ScriptInfo::new(
+                script.name,
+                ty.unwrap_or_default(),
+                dir,
+            )?);
             h.hidden = *hide;
             h.edit_time = Utc::now();
         }
@@ -221,7 +223,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             let h = get_info_mut_strict(script_name, &mut hs, false)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
-            util::run(&script, h.ty, &args)?;
+            util::run(&script, &h, &args)?;
             h.exec_time = Some(Utc::now());
         }
         Subs::Cat { script_name } => {
@@ -260,6 +262,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {
                 name: new_name,
+                birthplace: util::handle_fs_err(&["."], std::env::current_dir())?,
                 edit_time: Utc::now(),
                 ..h.clone()
             };
@@ -281,6 +284,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.edit_time = Utc::now();
             h.name = new_name;
             h.ty = new_ty;
+            h.birthplace = util::handle_fs_err(&["."], std::env::current_dir())?;
         }
     }
     path::store_history(hs.into_iter())?;

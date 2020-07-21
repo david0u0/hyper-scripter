@@ -93,6 +93,7 @@ pub struct ScriptInfo {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
+    pub birthplace: PathBuf, // 腳本被創建的目錄
     pub name: ScriptName,
     pub ty: ScriptType,
 }
@@ -121,10 +122,11 @@ impl ScriptInfo {
     pub fn file_name(&self) -> String {
         self.name.to_file_name(self.ty)
     }
-    pub fn new(name: ScriptName, ty: ScriptType) -> Result<Self> {
+    pub fn new(name: ScriptName, ty: ScriptType, birthplace: PathBuf) -> Result<Self> {
         Ok(ScriptInfo {
             name,
             ty,
+            birthplace,
             edit_time: Utc::now(),
             exec_time: None,
             hidden: false,

@@ -8,7 +8,7 @@ mod util;
 
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
-use list::{fmt_list, ListOptions};
+use list::{fmt_list, ListOptions, ListPattern};
 use script::{ScriptInfo, ScriptType, ToScriptName};
 use std::process::Command;
 use structopt::clap::AppSettings::{
@@ -103,6 +103,8 @@ struct List {
     all: bool,
     #[structopt(short, long, help = "Show verbose information.")]
     long: bool,
+    #[structopt(parse(try_from_str))]
+    pattern: Option<ListPattern>,
 }
 
 fn main() -> Result<()> {
@@ -231,8 +233,8 @@ fn main_inner(root: &mut Root) -> Result<()> {
         }
         Subs::LS(list) => {
             let opt = ListOptions {
-                show_hidden: list.all,
                 long: list.long,
+                pattern: &list.pattern,
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), map_to_iter(hs), &opt)?;

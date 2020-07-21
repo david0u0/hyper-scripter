@@ -46,7 +46,7 @@ pub fn handle_fs_err<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
             let p = path.iter().map(|p| p.as_ref().to_owned()).collect();
             match e.kind() {
                 std::io::ErrorKind::PermissionDenied => Err(Error::PermissionDenied(p)),
-                std::io::ErrorKind::NotFound => Err(Error::FileNotFound(p)),
+                std::io::ErrorKind::NotFound => Err(Error::PathNotFound(p)),
                 _ => Err(Error::GeneralFS(p, e)),
             }
         }

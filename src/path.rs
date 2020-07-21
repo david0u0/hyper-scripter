@@ -7,24 +7,31 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const META: &'static str = ".instant_script_info.json";
+const META: &'static str = ".instant_scripter_info.json";
+const ROOT_PATH: &'static str = "instant_scripter";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<PathBuf> = Mutex::new(PathBuf::new());
 }
 
 #[cfg(not(debug_assertions))]
-pub fn get_sys_path() -> Result<String> {
+pub fn get_sys_path() -> Result<PathBuf> {
     let p = match std::env::var("INSTANT_SCRIPT_PATH") {
-        Ok(p) => p,
-        Err(std::env::VarError::NotPresent) => return Err(Error::RootPathNotSet),
+        Ok(p) => {
+            log::debug!("使用環境變數路徑：{}", p);
+            p.into()
+        }
+        Err(std::env::VarError::NotPresent) => dirs::config_dir()
+            .ok_or(Error::SysPathNotFound("config"))?
+            .join(ROOT_PATH),
         Err(e) => return Err(e.into()),
     };
+    log::debug!("使用路徑：{:?}", p);
     Ok(p)
 }
 #[cfg(debug_assertions)]
-pub fn get_sys_path() -> Result<String> {
-    Ok("./.instant_script".to_string())
+pub fn get_sys_path() -> Result<PathBuf> {
+    Ok("./.instant_script".into())
 }
 
 pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
@@ -35,7 +42,8 @@ pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<Pat
 pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
     let path = join_path(".", p)?;
     if !path.exists() {
-        return Err(Error::RootPathNotFound(path));
+        log::info!("路徑 {:?} 不存在，嘗試創建之", path);
+        handle_fs_err(&[&path], create_dir(&path))?;
     }
     *PATH.lock().unwrap() = path;
     Ok(())
@@ -92,7 +100,7 @@ pub fn open_script<T: ToScriptName>(
         }
     };
     if check_sxist && !script.path.exists() {
-        Err(Error::FileNotFound(vec![script.path]))
+        Err(Error::PathNotFound(vec![script.path]))
     } else {
         Ok(script)
     }
@@ -102,7 +110,7 @@ pub fn get_history() -> Result<HashMap<ScriptName, ScriptInfo>> {
     let mut map = HashMap::new();
     let content = match read_file(&path) {
         Ok(s) => s,
-        Err(Error::FileNotFound(_)) => {
+        Err(Error::PathNotFound(_)) => {
             log::info!("找不到歷史檔案，視為空歷史");
             return Ok(map);
         }
@@ -176,7 +184,7 @@ mod test {
         );
 
         match open_script("not-exist".to_owned(), ScriptType::Shell, true) {
-            Err(Error::FileNotFound(name)) => assert_eq!(
+            Err(Error::PathNotFound(name)) => assert_eq!(
                 name,
                 vec![join_path("./.test_instant_script/", "not-exist.sh").unwrap()]
             ),

@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::script::{ScriptInfo, ScriptName};
+use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
 use std::io::Write;
 

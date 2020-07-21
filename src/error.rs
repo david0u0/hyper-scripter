@@ -8,11 +8,10 @@ pub enum Error {
         Vec<String>,
         Option<Box<dyn 'static + Send + Sync + std::error::Error>>,
     ),
-    RootPathNotFound(PathBuf),
-    RootPathNotSet,
+    SysPathNotFound(&'static str),
 
     PermissionDenied(Vec<PathBuf>),
-    FileNotFound(Vec<PathBuf>),
+    PathNotFound(Vec<PathBuf>),
     GeneralFS(Vec<PathBuf>, std::io::Error),
 
     NoMeta(String),

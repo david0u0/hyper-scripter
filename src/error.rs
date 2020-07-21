@@ -1,4 +1,4 @@
-use crate::script::{CommandType, ScriptName};
+use crate::script::{ScriptName, ScriptType};
 use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Others {}
@@ -8,16 +8,18 @@ pub enum Error {
         Vec<String>,
         Option<Box<dyn 'static + Send + Sync + std::error::Error>>,
     ),
-    PathNotFound(PathBuf),
-    PermissionDenied(PathBuf),
-    FileNotFound(PathBuf),
-    GeneralFS(PathBuf, std::io::Error),
+    RootPathNotFound(PathBuf),
+    RootPathNotSet,
+
+    PermissionDenied(Vec<PathBuf>),
+    FileNotFound(Vec<PathBuf>),
+    GeneralFS(Vec<PathBuf>, std::io::Error),
+
     NoMeta(String),
-    PathNotSet,
     Operation(String),
     TypeMismatch {
-        expect: CommandType,
-        actual: CommandType,
+        expect: ScriptType,
+        actual: ScriptType,
     },
     MultiFuzz(Vec<ScriptName>),
     ScriptNameFormat(String),

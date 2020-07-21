@@ -3,18 +3,20 @@ mod fuzzy;
 mod list;
 mod path;
 mod script;
+mod tag;
 mod util;
 
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use list::{fmt_list, ListOptions};
-use script::{CommandType, ScriptInfo};
+use script::{ScriptInfo, ScriptType, ToScriptName};
 use std::process::Command;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
 };
 use structopt::StructOpt;
+use tag::TagFilters;
 use util::{map_to_iter, run};
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
@@ -26,11 +28,12 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 ];
 
 #[derive(StructOpt, Debug)]
+#[structopt(setting = AllowLeadingHyphen)]
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
-    #[structopt(short, long)]
-    tags: Option<String>,
+    #[structopt(short, long, parse(try_from_str), default_value = "g,-h")]
+    tags: TagFilters,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
 }
@@ -45,12 +48,17 @@ enum Subs {
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
         script_name: Option<String>,
-        #[structopt(short, parse(try_from_str), help = "Type of the script, e.g. `sh`")]
-        command_type: Option<CommandType>,
+        #[structopt(
+            long,
+            short = "x",
+            parse(try_from_str),
+            help = "Executable type of the script, e.g. `sh`"
+        )]
+        executable: Option<ScriptType>,
     },
     #[structopt(about = "Edit the last script. This is the default subcommand.")]
     EditLast,
-    #[structopt( alias = ".", about = "Run the last script edited or run", settings = NO_FLAG_SETTINGS)]
+    #[structopt( alias = "-", about = "Run the last script edited or run", settings = NO_FLAG_SETTINGS)]
     RunLast {
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
@@ -73,7 +81,19 @@ enum Subs {
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Move the script to another one", alias = "mv")]
-    MV { origin: String, target: String },
+    MV {
+        #[structopt(short, long, help = "Don't do fuzzy search")]
+        exact: bool,
+        #[structopt(
+            long,
+            short = "x",
+            parse(try_from_str),
+            help = "Executable type of the script, e.g. `sh`"
+        )]
+        executable: Option<ScriptType>,
+        origin: String,
+        new: String,
+    },
 }
 
 #[derive(StructOpt, Debug)]
@@ -119,7 +139,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
         Subs::Edit {
             script_name,
             hide,
-            command_type: ty,
+            executable: ty,
             mut exact,
         } => {
             if ty.is_some() {
@@ -185,7 +205,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.exec_time = Some(Utc::now());
         }
         Subs::RunLast { args } => {
-            // FIXME: ScriptMeta 跟 CommandType 分兩個地方太瞎了，早晚要合回去
+            // FIXME: ScriptMeta 跟 ScriptType 分兩個地方太瞎了，早晚要合回去
             if let Some(latest) = latest {
                 let script = path::open_script(latest.name.clone(), latest.ty, false)
                     .context(format!("打開最新腳本失敗：{:?}", latest.name))?;
@@ -220,7 +240,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
         }
         Subs::RM { scripts, exact } => {
             for script_name in scripts.into_iter() {
-                let h = fuzzy::fuzz_mut(&script_name, &mut hs, *exact)?
+                let h = fuzzy::fuzz_mut(script_name, &mut hs, *exact)?
                     .ok_or(Error::NoMeta(script_name.clone()))?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
@@ -228,7 +248,24 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 hs.remove(&script.name);
             }
         }
-        _ => unimplemented!(),
+        Subs::MV {
+            exact,
+            origin,
+            new,
+            executable: ty,
+        } => {
+            let h =
+                fuzzy::fuzz_mut(origin, &mut hs, *exact)?.ok_or(Error::NoMeta(origin.clone()))?;
+            let og_script = path::open_script(&h.name, h.ty, true)?;
+            let new_ty = ty.unwrap_or(h.ty);
+            let new_name = new.clone().to_script_name()?;
+            let new_script = path::open_script(&new_name, new_ty, false)?;
+            util::mv(&og_script, &new_script)?;
+
+            h.edit_time = Utc::now();
+            h.name = new_name;
+            h.ty = new_ty;
+        }
     }
     path::store_history(map_to_iter(hs))?;
     Ok(())

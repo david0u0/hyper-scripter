@@ -69,7 +69,7 @@ impl ToScriptName for ScriptName {
     }
 }
 impl ScriptName {
-    pub fn to_file_name(&self, ty: CommandType) -> String {
+    pub fn to_file_name(&self, ty: ScriptType) -> String {
         let ext = ty.ext().map(|s| format!(".{}", s)).unwrap_or_default();
         match self {
             ScriptName::Anonymous(id) => format!("{}/{}{}", ANONYMOUS, id, ext),
@@ -84,7 +84,7 @@ pub struct ScriptInfo {
     pub exec_time: Option<DateTime<Utc>>,
     pub hidden: bool,
     pub name: ScriptName,
-    pub ty: CommandType,
+    pub ty: ScriptType,
     pub last_edit_path: PathBuf,
 }
 
@@ -99,7 +99,7 @@ impl ScriptInfo {
     pub fn file_name(&self) -> String {
         self.name.to_file_name(self.ty)
     }
-    pub fn new(name: ScriptName, ty: CommandType) -> Result<Self> {
+    pub fn new(name: ScriptName, ty: ScriptType) -> Result<Self> {
         Ok(ScriptInfo {
             name,
             ty,
@@ -114,15 +114,15 @@ impl ScriptInfo {
 macro_rules! script_type_enum {
     ($( [$tag:expr, $color:expr] => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
         #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-        pub enum CommandType {
+        pub enum ScriptType {
             $($name),*
         }
         #[allow(unreachable_code)]
-        impl CommandType {
+        impl ScriptType {
             pub fn ext(&self) -> Option<&'static str> {
                 match self {
                     $(
-                        CommandType::$name => {
+                        ScriptType::$name => {
                             $(return Some($ext);)?
                             None
                         }
@@ -132,7 +132,7 @@ macro_rules! script_type_enum {
             pub fn color(&self) -> Color {
                 match self {
                     $(
-                        CommandType::$name => {
+                        ScriptType::$name => {
                             $color
                         }
                     )*
@@ -141,7 +141,7 @@ macro_rules! script_type_enum {
             pub fn cmd(&self) -> Option<(String, Vec<String>)> {
                 match self {
                     $(
-                        CommandType::$name => {
+                        ScriptType::$name => {
                             let v: &[&str] = &[$($args),*];
                             if v.len() > 0 {
                                 Some(
@@ -158,13 +158,13 @@ macro_rules! script_type_enum {
                 }
             }
         }
-        impl std::str::FromStr for CommandType {
+        impl std::str::FromStr for ScriptType {
             type Err = String;
             fn from_str(s: &str) -> std::result::Result<Self, String> {
                 match s {
                     $(
                         $tag => {
-                            Ok(CommandType::$name)
+                            Ok(ScriptType::$name)
                         }
                     )*
                     _ => {
@@ -175,11 +175,11 @@ macro_rules! script_type_enum {
                 }
             }
         }
-        impl std::fmt::Display for CommandType {
+        impl std::fmt::Display for ScriptType {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     $(
-                        CommandType::$name => {
+                        ScriptType::$name => {
                             write!(f, $tag)?;
                         }
                     )*
@@ -197,9 +197,9 @@ script_type_enum! {
     ["js", Color::BrightCyan] => Js("js"): ("node"),
     ["rb", Color::BrightRed] => Rb("rb"): ("ruby")
 }
-impl Default for CommandType {
+impl Default for ScriptType {
     fn default() -> Self {
-        CommandType::Shell
+        ScriptType::Shell
     }
 }
 
@@ -208,12 +208,12 @@ mod test {
     use super::*;
     #[test]
     fn test_ext() {
-        assert_eq!(Some("sh"), CommandType::Shell.ext());
-        assert_eq!(None, CommandType::Screen.ext());
+        assert_eq!(Some("sh"), ScriptType::Shell.ext());
+        assert_eq!(None, ScriptType::Screen.ext());
     }
     #[test]
     fn test_cmd() {
-        assert_eq!(Some(("node".to_owned(), vec![])), CommandType::Js.cmd());
-        assert_eq!(None, CommandType::Txt.cmd());
+        assert_eq!(Some(("node".to_owned(), vec![])), ScriptType::Js.cmd());
+        assert_eq!(None, ScriptType::Txt.cmd());
     }
 }

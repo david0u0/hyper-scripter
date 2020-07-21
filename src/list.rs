@@ -29,9 +29,10 @@ pub fn fmt_meta<W: Write>(
         };
         write!(
             w,
-            "{}\t{}\t{}\t{}\n",
-            meta.ty.to_string().color(meta.ty.color()).bold(),
-            meta.name,
+            "{}\t{}\t{}\n",
+            format!("{}\t{}", meta.ty, meta.name)
+                .color(meta.ty.color())
+                .bold(),
             meta.edit_time,
             exex_time
         )?;
@@ -64,17 +65,12 @@ pub fn fmt_list<W: Write>(
         None => return Ok(()),
     };
 
-    let mut anonymous_printed = !opt.long;
     if opt.long {
         writeln!(w, "type\tname\tlast edit time\tlast execute time")?;
     }
     for (i, meta) in scripts.iter().enumerate() {
         if i != 0 && !opt.long {
             write!(w, "  ")?;
-        }
-        if let (false, ScriptName::Anonymous(_)) = (anonymous_printed, &meta.name) {
-            anonymous_printed = true;
-            writeln!(w, "--- Anonymous ---")?;
         }
         fmt_meta(w, meta, last_index == i, opt)?;
     }

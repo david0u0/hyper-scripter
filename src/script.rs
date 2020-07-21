@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::fuzzy::FuzzKey;
 use chrono::{DateTime, Utc};
 use colored::Color;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,12 @@ impl PartialOrd for ScriptName {
 }
 pub trait ToScriptName {
     fn to_script_name(self) -> Result<ScriptName>;
+}
+impl<'a> ToScriptName for &'a str {
+    fn to_script_name(self) -> Result<ScriptName> {
+        // TODO: 用 Cow 之類的方法讓 &str 不用複製
+        self.to_owned().to_script_name()
+    }
 }
 impl ToScriptName for String {
     fn to_script_name(self) -> Result<ScriptName> {
@@ -89,13 +96,26 @@ pub struct ScriptInfo {
     pub name: ScriptName,
     pub ty: ScriptType,
 }
+use std::borrow::Cow;
+impl FuzzKey for ScriptName {
+    fn fuzz_key(&self) -> Cow<'_, str> {
+        match self {
+            ScriptName::Anonymous(id) => Cow::Owned(format!(".{}", id)),
+            ScriptName::Named(s) => Cow::Borrowed(&*s),
+        }
+    }
+}
+impl FuzzKey for ScriptInfo {
+    fn fuzz_key(&self) -> Cow<'_, str> {
+        self.name.fuzz_key()
+    }
+}
 
 impl ScriptInfo {
     pub fn last_time(&self) -> DateTime<Utc> {
-        if let Some(exec_time) = self.exec_time {
-            std::cmp::max(self.edit_time, exec_time)
-        } else {
-            self.edit_time
+        match self.exec_time {
+            Some(exec_time) => std::cmp::max(self.edit_time, exec_time),
+            _ => self.edit_time,
         }
     }
     pub fn file_name(&self) -> String {

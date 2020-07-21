@@ -1,33 +1,36 @@
 use crate::error::{Error, Result};
-use crate::script::{ScriptName, ToScriptName};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use std::collections::HashMap;
+use std::borrow::Cow;
 
 const MIN_SCORE: i64 = 200; // TODO: 好好決定這個魔法數字
 
-pub fn fuzz_mut<'a, 'b, T>(
-    name: &'a str,
-    map: &'b mut HashMap<ScriptName, T>,
-) -> Result<Option<&'b mut T>> {
+pub trait FuzzKey {
+    fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
+}
+pub fn fuzz<'a, T: FuzzKey + 'a>(
+    name: &str,
+    mut iter: impl Iterator<Item = &'a mut T>,
+) -> Result<Option<&'a mut T>> {
     let matcher = SkimMatcherV2::default();
-    let mut ans = (0, Vec::<(&ScriptName, &mut T)>::new());
-    for (choice, data) in map.iter_mut() {
-        let choice_str = choice.to_string();
-        let score = matcher.fuzzy_match(&choice_str, name);
+    let mut ans = (0, Vec::<&mut T>::new());
+    for data in iter {
+        let key_tmp = data.fuzz_key();
+        let key = key_tmp.as_ref();
+        let score = matcher.fuzzy_match(&key, name);
         log::trace!(
-            "模糊搜尋，輸入：{}，候選人：{:?}，分數：{:?}",
+            "模糊搜尋，輸入：{}，候選人：{}，分數：{:?}",
             name,
-            choice,
+            key,
             score
         );
         if let Some(mut score) = score {
-            log::trace!("將分數正交化：{} / {}", score * 100, choice_str.len());
-            score = score * 100 / choice_str.len() as i64;
+            log::trace!("將分數正交化：{} / {}", score * 100, key.len());
+            score = score * 100 / key.len() as i64;
             if score > MIN_SCORE {
                 if score > ans.0 {
-                    ans = (score, vec![(choice, data)]);
+                    ans = (score, vec![data]);
                 } else if score == ans.0 {
-                    ans.1.push((choice, data));
+                    ans.1.push(data);
                 }
             }
         }
@@ -35,12 +38,15 @@ pub fn fuzz_mut<'a, 'b, T>(
     if ans.1.len() == 0 {
         Ok(None)
     } else if ans.1.len() == 1 {
-        // SAFETY: 不會再用到這個向量了啦
-        let first = unsafe { std::ptr::read(&ans.1[0].1) };
+        // SAFETY: 不會再用到這個向量了，而且 &mut 也沒有 Drop 特徵，安啦
+        let first = unsafe { std::ptr::read(&ans.1[0]) };
         Ok(Some(first))
     } else {
         Err(Error::MultiFuzz(
-            ans.1.into_iter().map(|(name, _)| name.clone()).collect(),
+            ans.1
+                .into_iter()
+                .map(|data| data.fuzz_key().as_ref().to_owned())
+                .collect(),
         ))
     }
 }
@@ -48,51 +54,39 @@ pub fn fuzz_mut<'a, 'b, T>(
 #[cfg(test)]
 mod test {
     use super::*;
-    fn fuzz<'a, 'b>(
-        s: &'a str,
-        map: &'b mut HashMap<ScriptName, i32>,
-    ) -> Result<Option<&'b mut i32>> {
-        fuzz_mut(s, map, false)
-    }
+    use crate::script::ScriptName;
     #[test]
     fn test_fuzz() {
         let _ = env_logger::try_init();
-        let mut map = HashMap::new();
-        map.insert(ScriptName::Named("測試腳本1".to_owned()), 111);
-        map.insert(ScriptName::Named("測試腳本2".to_owned()), 222);
-        map.insert(ScriptName::Anonymous(42), 333);
+        let mut t1 = ScriptName::Named("測試腳本1".to_owned());
+        let t2 = ScriptName::Named("測試腳本2".to_owned());
+        let mut t3 = ScriptName::Anonymous(42);
+        let mut vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz_mut("測試1", &mut map, false).unwrap();
-        assert_eq!(res, Some(&mut 111));
+        let res = fuzz("測試1", vec.iter_mut()).unwrap();
+        assert_eq!(res, Some(&mut t1));
 
-        let res = fuzz("42", &mut map).unwrap();
-        assert_eq!(res, Some(&mut 333));
+        let res = fuzz("42", vec.iter_mut()).unwrap();
+        assert_eq!(res, Some(&mut t3));
 
-        let res = fuzz("找不到", &mut map).unwrap();
+        let res = fuzz("找不到", vec.iter_mut()).unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz("測試", &mut map).unwrap_err();
-        let mut v = if let Error::MultiFuzz(v) = err {
-            v
-        } else {
-            unreachable!()
+        let err = fuzz("測試", vec.iter_mut()).unwrap_err();
+        let mut v = match err {
+            Error::MultiFuzz(v) => v,
+            _ => unreachable!(),
         };
         v.sort();
-        assert_eq!(
-            v,
-            vec![
-                ScriptName::Named("測試腳本1".to_owned()),
-                ScriptName::Named("測試腳本2".to_owned()),
-            ]
-        );
+        assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
     }
     #[test]
     fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
-        let mut map = HashMap::new();
-        map.insert(ScriptName::Named("測試腳本1".to_owned()), 111);
-        map.insert(ScriptName::Named("測試腳本234".to_owned()), 222);
-        let res = fuzz("測試", &mut map).unwrap();
-        assert_eq!(res, Some(&mut 111), "模糊搜尋無法找出較短者");
+        let mut t1 = ScriptName::Named("測試腳本1".to_owned());
+        let t2 = ScriptName::Named("測試腳本234".to_owned());
+        let mut vec = vec![t1.clone(), t2];
+        let res = fuzz("測試", vec.iter_mut()).unwrap();
+        assert_eq!(res, Some(&mut t1), "模糊搜尋無法找出較短者");
     }
 }

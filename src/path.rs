@@ -1,4 +1,5 @@
 use crate::error::{Contextabl, Error, Result};
+use crate::history::History;
 use crate::script::{ScriptInfo, ScriptMeta, ScriptName, ScriptType, ToScriptName, ANONYMOUS};
 use crate::util::{handle_fs_err, read_file};
 use std::collections::HashMap;
@@ -105,35 +106,36 @@ pub fn open_script<T: ToScriptName>(
         Ok(script)
     }
 }
-pub fn get_history() -> Result<HashMap<ScriptName, ScriptInfo>> {
+pub fn get_history() -> Result<History> {
     let path = join_path(get_path(), META)?;
-    let mut map = HashMap::new();
     let content = match read_file(&path) {
         Ok(s) => s,
         Err(Error::PathNotFound(_)) => {
             log::info!("找不到歷史檔案，視為空歷史");
-            return Ok(map);
+            return Ok(Default::default());
         }
         Err(e) => return Err(e).context("打開歷史檔案失敗"),
     };
-    let histories: Vec<ScriptInfo> = serde_json::from_str(&content)?;
-    for h in histories.into_iter() {
-        match open_script(h.name.clone(), h.ty, true) {
-            Err(e) => {
-                log::warn!("{:?} 腳本歷史資料有誤：{:?}", h.name, e);
-                continue;
-            }
-            _ => (),
-        }
-        map.insert(h.name.clone(), h);
-    }
-    Ok(map)
+    let history: Vec<ScriptInfo> = serde_json::from_str(&content)?;
+    let history =
+        History::new(
+            history
+                .into_iter()
+                .filter(|s| match open_script(&s.name, s.ty, true) {
+                    Err(e) => {
+                        log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
+                        false
+                    }
+                    _ => true,
+                }),
+        );
+    Ok(history)
 }
 
-pub fn store_history(history: impl IntoIterator<Item = ScriptInfo>) -> Result<()> {
+pub fn store_history(history: impl Iterator<Item = ScriptInfo>) -> Result<()> {
     let path = join_path(get_path(), META)?;
     let mut file = handle_fs_err(&[&path], File::create(&path)).context("唯寫打開歷史檔案失敗")?;
-    let v: Vec<_> = history.into_iter().collect();
+    let v: Vec<_> = history.collect();
     handle_fs_err(
         &[&path],
         file.write_all(serde_json::to_string(&v)?.as_bytes()),

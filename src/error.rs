@@ -21,7 +21,7 @@ pub enum Error {
         expect: ScriptType,
         actual: ScriptType,
     },
-    MultiFuzz(Vec<ScriptName>),
+    MultiFuzz(Vec<String>),
     ScriptNameFormat(String),
     Empty,
 }

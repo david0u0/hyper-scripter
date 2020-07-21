@@ -1,5 +1,6 @@
 mod error;
 mod fuzzy;
+mod history;
 mod list;
 mod path;
 mod script;
@@ -8,6 +9,7 @@ mod util;
 
 use chrono::Utc;
 use error::{Contextabl, Error, Result};
+use history::History;
 use list::{fmt_list, ListOptions, ListPattern};
 use script::{ScriptInfo, ScriptType, ToScriptName};
 use std::process::Command;
@@ -17,7 +19,6 @@ use structopt::clap::AppSettings::{
 };
 use structopt::StructOpt;
 use tag::TagFilters;
-use util::{map_to_iter, run};
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
@@ -58,6 +59,7 @@ enum Subs {
     },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
+        #[structopt(default_value = "-")]
         script_name: String,
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
@@ -114,39 +116,45 @@ fn main() -> Result<()> {
     let mut root = Root::from_args();
     main_inner(&mut root)
 }
-macro_rules! get_info_mut {
-    (@ALLOW_MISS $name:expr, $history:expr, $latest:expr, $exact:expr) => {{
-        log::trace!("開始尋找 `{}`, exact={}", $name, $exact);
-        if $name == "-" {
-            log::trace!("找最新腳本");
-            if $latest.is_some() {
-                Ok($latest)
-            } else {
-                Err(Error::Empty)
-            }
-        } else if $exact {
-            $name
-                .clone()
-                .to_script_name()
-                .map(|name| $history.get_mut(&name))
+fn get_info_mut<'a>(
+    name: &str,
+    history: &'a mut History,
+    exact: bool,
+) -> Result<Option<&'a mut ScriptInfo>> {
+    log::trace!("開始尋找 `{}`, exact={}", name, exact);
+    if name == "-" {
+        log::trace!("找最新腳本");
+        let latest = history.latest_mut();
+        if latest.is_some() {
+            Ok(latest)
         } else {
-            fuzzy::fuzz_mut($name, &mut $history)
+            Err(Error::Empty)
         }
-    }};
-    ($name:expr, $history:expr, $latest:expr, $exact:expr) => {{
-        match get_info_mut!(@ALLOW_MISS $name, $history, $latest, $exact) {
-            Err(e) => Err(e),
-            Ok(None) => Err(Error::NoInfo($name.to_owned())),
-            Ok(Some(h)) => Ok(h),
-        }
-    }};
+    } else if exact {
+        let name = name
+            .clone() // TODO: Cow 優化
+            .to_script_name()?;
+        Ok(history.get_mut(&name))
+    } else {
+        fuzzy::fuzz(name, history.iter_mut())
+    }
+}
+fn get_info_mut_strict<'a>(
+    name: &str,
+    history: &'a mut History,
+    exact: bool,
+) -> Result<&'a mut ScriptInfo> {
+    match get_info_mut(name, history, exact) {
+        Err(e) => Err(e),
+        Ok(None) => Err(Error::NoInfo(name.to_owned())),
+        Ok(Some(info)) => Ok(info),
+    }
 }
 fn main_inner(root: &mut Root) -> Result<()> {
     log::debug!("命令行物件：{:?}", root);
-    if let Some(is_path) = &root.is_path {
-        path::set_path(is_path)?;
-    } else {
-        path::set_path(path::join_path(".", &path::get_sys_path()?)?)?;
+    match &root.is_path {
+        Some(is_path) => path::set_path(is_path)?,
+        None => path::set_path(path::join_path(".", &path::get_sys_path()?)?)?,
     }
 
     let edit_last = Subs::Edit {
@@ -158,10 +166,6 @@ fn main_inner(root: &mut Root) -> Result<()> {
     let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
-    let latest = hs
-        .iter_mut()
-        .max_by_key(|(_, h)| h.last_time())
-        .map(|h| h.1);
     match sub {
         Subs::Other(cmds) => {
             log::info!("純執行模式");
@@ -179,7 +183,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             exact,
         } => {
             let script = if let Some(name) = script_name {
-                if let Some(h) = get_info_mut!(@ALLOW_MISS name, hs, latest, *exact)? {
+                if let Some(h) = get_info_mut(name, &mut hs, *exact)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
                         if ty != &h.ty {
@@ -214,14 +218,14 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.edit_time = Utc::now();
         }
         Subs::Run { script_name, args } => {
-            let h = get_info_mut!(script_name, hs, latest, false)?;
+            let h = get_info_mut_strict(script_name, &mut hs, false)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
-            run(&script, h.ty, &args)?;
+            util::run(&script, h.ty, &args)?;
             h.exec_time = Some(Utc::now());
         }
         Subs::Cat { script_name } => {
-            let h = get_info_mut!(script_name, hs, latest, false)?;
+            let h = get_info_mut_strict(script_name, &mut hs, false)?;
             let script = path::open_script(&h.name, h.ty, true)?;
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
@@ -233,14 +237,12 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 pattern: &list.pattern,
             };
             let stdout = std::io::stdout();
-            fmt_list(&mut stdout.lock(), map_to_iter(hs), &opt)?;
+            fmt_list(&mut stdout.lock(), hs.into_iter(), &opt)?;
             return Ok(());
         }
         Subs::RM { scripts, exact } => {
-            // let mut scripts_to_remove = vec![];
-            let mut latest = latest.map(|info| info.clone());
             for script_name in scripts.into_iter() {
-                let h = get_info_mut!(script_name, hs, latest.as_mut(), *exact)?;
+                let h = get_info_mut_strict(script_name, &mut hs, *exact)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 util::remove(&script)?;
@@ -248,7 +250,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             }
         }
         Subs::CP { exact, origin, new } => {
-            let h = get_info_mut!(origin, hs, latest, *exact)?;
+            let h = get_info_mut_strict(origin, &mut hs, *exact)?;
             let new_name = new.clone().to_script_name()?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_script = path::open_script(&new_name, h.ty, false)?;
@@ -257,11 +259,11 @@ fn main_inner(root: &mut Root) -> Result<()> {
             }
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {
-                name: new_name.clone(),
+                name: new_name,
                 edit_time: Utc::now(),
                 ..h.clone()
             };
-            hs.insert(new_name, new_info);
+            hs.insert(new_info);
         }
         Subs::MV {
             exact,
@@ -269,7 +271,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             new,
             executable: ty,
         } => {
-            let h = get_info_mut!(origin, hs, latest, *exact)?;
+            let h = get_info_mut_strict(origin, &mut hs, *exact)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
             let new_name = new.clone().to_script_name()?;
@@ -281,6 +283,6 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.ty = new_ty;
         }
     }
-    path::store_history(map_to_iter(hs))?;
+    path::store_history(hs.into_iter())?;
     Ok(())
 }

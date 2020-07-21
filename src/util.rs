@@ -42,9 +42,6 @@ pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
     )?;
     Ok(())
 }
-pub fn map_to_iter<K, V>(map: HashMap<K, V>) -> impl IntoIterator<Item = V> {
-    map.into_iter().map(|(_, v)| v)
-}
 
 pub fn handle_fs_err<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> Result<T> {
     match res {
@@ -54,7 +51,7 @@ pub fn handle_fs_err<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
             match e.kind() {
                 std::io::ErrorKind::PermissionDenied => Err(Error::PermissionDenied(p)),
                 std::io::ErrorKind::NotFound => {
-                    Err(Error::PathNotFound(unsafe { std::ptr::read(&p[0]) }))
+                    Err(Error::PathNotFound(path[0].as_ref().to_owned()))
                 }
                 _ => Err(Error::GeneralFS(p, e)),
             }

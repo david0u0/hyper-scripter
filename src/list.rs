@@ -22,10 +22,9 @@ pub struct ListOptions<'a> {
 }
 impl<'a> ListOptions<'a> {
     fn filter(&self, script: &ScriptInfo) -> bool {
-        if let Some(ListPattern(re)) = &self.pattern {
-            re.is_match(&script.name.to_string())
-        } else {
-            true
+        match &self.pattern {
+            Some(ListPattern(re)) => re.is_match(&script.name.to_string()),
+            _ => true,
         }
     }
 }
@@ -43,10 +42,9 @@ pub fn fmt_meta<W: Write>(
             write!(w, "  ")?;
         }
 
-        let exex_time = if let Some(t) = &script.exec_time {
-            t.to_string()
-        } else {
-            "Never".to_owned()
+        let exex_time = match &script.exec_time {
+            Some(t) => t.to_string(),
+            None => "Never".to_owned(),
         };
         write!(
             w,

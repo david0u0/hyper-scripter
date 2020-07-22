@@ -54,13 +54,13 @@ pub fn fuzz<'a, T: FuzzKey + 'a>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::ScriptName;
+    use crate::script::AsScriptName;
     #[test]
     fn test_fuzz() {
         let _ = env_logger::try_init();
-        let mut t1 = ScriptName::Named("測試腳本1".to_owned());
-        let t2 = ScriptName::Named("測試腳本2".to_owned());
-        let mut t3 = ScriptName::Anonymous(42);
+        let mut t1 = "測試腳本1".as_script_name().unwrap();
+        let t2 = "測試腳本2".as_script_name().unwrap();
+        let mut t3 = ".42".as_script_name().unwrap();
         let mut vec = vec![t1.clone(), t2, t3.clone()];
 
         let res = fuzz("測試1", vec.iter_mut()).unwrap();
@@ -83,8 +83,8 @@ mod test {
     #[test]
     fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
-        let mut t1 = ScriptName::Named("測試腳本1".to_owned());
-        let t2 = ScriptName::Named("測試腳本234".to_owned());
+        let mut t1 = "測試腳本1".as_script_name().unwrap();
+        let t2 = "測試腳本234".as_script_name().unwrap();
         let mut vec = vec![t1.clone(), t2];
         let res = fuzz("測試", vec.iter_mut()).unwrap();
         assert_eq!(res, Some(&mut t1), "模糊搜尋無法找出較短者");

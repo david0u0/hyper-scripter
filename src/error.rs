@@ -1,4 +1,4 @@
-use crate::script::{ScriptName, ScriptType};
+use crate::script::ScriptType;
 use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Others {}

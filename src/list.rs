@@ -65,9 +65,9 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-pub fn fmt_list<W: Write>(
+pub fn fmt_list<'a, W: Write>(
     w: &mut W,
-    scripts: impl IntoIterator<Item = ScriptInfo>,
+    scripts: impl IntoIterator<Item = ScriptInfo<'a>>,
     opt: &ListOptions,
 ) -> Result<()> {
     let mut scripts: Vec<_> = scripts.into_iter().filter(|s| opt.filter(s)).collect();

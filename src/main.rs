@@ -96,7 +96,7 @@ enum Subs {
         new: Option<String>,
     },
     #[structopt(
-        about = "Manage script tags. If a list of tag is given, set them as default, otherwise show tag information."
+        about = "Manage script tags. If a list of tag is given, set it as default, otherwise show tag information."
     )]
     Tags { tags: Option<TagFilters> },
 }
@@ -128,7 +128,16 @@ struct List {
 fn main() -> Result<()> {
     env_logger::init();
     let mut root = Root::from_args();
-    main_inner(&mut root)
+    log::debug!("命令行物件：{:?}", root);
+    match &root.is_path {
+        Some(is_path) => path::set_path(is_path)?,
+        None => path::set_path_from_sys()?,
+    }
+    let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
+    if !root.all() {
+        hs.filter_by_group(&root.tags);
+    }
+    main_inner(&mut root, hs)
 }
 fn get_info_mut<'b, 'a>(
     name: &str,
@@ -166,15 +175,7 @@ fn get_info_mut_strict<'b, 'a>(
         Ok(Some(info)) => Ok(info),
     }
 }
-fn main_inner(root: &mut Root) -> Result<()> {
-    log::debug!("命令行物件：{:?}", root);
-    let all = root.all();
-
-    match &root.is_path {
-        Some(is_path) => path::set_path(is_path)?,
-        None => path::set_path_from_sys()?,
-    }
-
+fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
     let edit_last = Subs::Edit {
         script_name: Some("-".to_owned()),
         exact: false,
@@ -184,11 +185,6 @@ fn main_inner(root: &mut Root) -> Result<()> {
     let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
 
     let tags = root.tags.clone();
-    let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
-
-    if !all {
-        hs.filter_by_group(&tags);
-    }
 
     match sub {
         Subs::Other(cmds) => {
@@ -198,7 +194,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 args: cmds[1..cmds.len()].iter().map(|s| s.clone()).collect(),
             };
             root.subcmd = Some(run);
-            return main_inner(root);
+            return main_inner(root, hs);
         }
         Subs::Edit {
             script_name,
@@ -317,7 +313,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 let new_name = new.as_script_name()?;
                 let new_script = path::open_script(&new_name, new_ty, false)?;
                 util::mv(&og_script, &new_script)?;
-                h.name = new_name;
+                h.name = new_name.into_static();
             }
 
             h.edit_time = Utc::now();

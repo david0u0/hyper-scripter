@@ -1,4 +1,5 @@
 use crate::script::{ScriptInfo, ScriptName};
+use crate::tag::TagFilters;
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Default, Debug)]
@@ -57,5 +58,14 @@ impl<'a> History<'a> {
     }
     pub fn entry(&mut self, name: &ScriptName) -> Entry<'_, String, ScriptInfo<'a>> {
         self.map.entry(name.key().into_owned())
+    }
+    pub fn filter_by_group(&mut self, filter: &TagFilters) {
+        // TODO: 優化
+        let map: HashMap<_, _> = self
+            .map
+            .drain()
+            .filter(|(_, info)| filter.filter(&info.tags))
+            .collect();
+        self.map = map;
     }
 }

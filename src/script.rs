@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use crate::fuzzy::FuzzKey;
+use crate::tag::Tag;
 use chrono::{DateTime, Utc};
 use colored::Color;
 use serde::{Deserialize, Serialize};
@@ -66,9 +67,9 @@ impl FuzzKey for ScriptName<'_> {
 pub struct ScriptInfo<'a> {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
-    pub hidden: bool,
     pub birthplace: PathBuf, // 腳本被創建的目錄
     pub name: ScriptName<'a>,
+    pub tags: Vec<Tag>,
     pub ty: ScriptType,
 }
 impl FuzzKey for ScriptInfo<'_> {
@@ -91,14 +92,15 @@ impl ScriptInfo<'_> {
         name: ScriptName<'a>,
         ty: ScriptType,
         birthplace: PathBuf,
+        tags: impl Iterator<Item = Tag>,
     ) -> Result<ScriptInfo<'a>> {
         Ok(ScriptInfo {
             name,
             ty,
+            tags: tags.collect(),
             birthplace,
             edit_time: Utc::now(),
             exec_time: None,
-            hidden: false,
         })
     }
 }

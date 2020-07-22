@@ -1,46 +1,39 @@
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TagFilters(Vec<TagFilter>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TagFilter {
-    is_black_list: bool,
-    tag_name: String,
+    allow: bool,
+    tag: Tag,
 }
-#[derive(Debug)]
-pub enum TagControl {
-    Literal(String),
-    Local,
-    Parents,
-}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Tag(String);
 
 impl FromStr for TagFilter {
     type Err = String;
-    fn from_str(mut s: &str) -> std::result::Result<Self, String> {
-        // TODO: 檢查白名單黑名單
-        let is_black_list;
-        if s.starts_with("-") {
-            is_black_list = true;
+    fn from_str(tag: &str) -> std::result::Result<Self, String> {
+        let mut s = tag;
+        // TODO: 檢查格式
+        let allow = if s.starts_with("-") {
             s = &s[1..s.len()];
+            false
         } else if s.starts_with("+") {
-            is_black_list = false;
             s = &s[1..s.len()];
+            true
         } else {
-            is_black_list = false;
-        }
-        let control = match s {
-            "%L" => TagControl::Local,
-            "%P" => TagControl::Parents,
-            _ => {
-                // TODO: 檢查合法性
-                TagControl::Literal(s.to_owned())
-            }
+            true
         };
-        Ok(TagFilter {
-            is_black_list,
-            tag_name: s.to_owned(),
-        })
+        if s.len() == 0 {
+            Err(format!("Wrong tag format: {}", tag))
+        } else {
+            Ok(TagFilter {
+                allow,
+                tag: Tag(s.to_owned()),
+            })
+        }
     }
 }
 impl FromStr for TagFilters {
@@ -53,5 +46,23 @@ impl FromStr for TagFilters {
             }
         }
         Ok(TagFilters(inner))
+    }
+}
+
+impl TagFilters {
+    pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
+        self.0
+            .into_iter()
+            .filter_map(|f| if f.allow { Some(f.tag) } else { None })
+    }
+    pub fn filter(&self, tags: &[Tag]) -> bool {
+        let mut pass = false;
+        for filter in self.0.iter() {
+            // TODO: 優化
+            if tags.contains(&filter.tag) {
+                pass = filter.allow;
+            }
+        }
+        pass
     }
 }

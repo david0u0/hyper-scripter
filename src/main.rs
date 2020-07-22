@@ -38,8 +38,6 @@ enum Subs {
     Edit {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
-        #[structopt(short, long, help = "Hide the script in list")]
-        hide: bool,
         #[structopt(short, long, help = "The content for your script.")]
         content: Option<String>,
         script_name: Option<String>,
@@ -94,10 +92,20 @@ enum Subs {
     },
 }
 
+impl Subs {
+    fn all(&self) -> bool {
+        if let Subs::LS(List { all, .. }) = self {
+            *all
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(StructOpt, Debug)]
 struct List {
     // TODO: 滿滿的其它排序/篩選選項
-    #[structopt(short, long, help = "Show all files including hidden ones.")]
+    #[structopt(short, long, help = "Show all scripts.")]
     all: bool,
     #[structopt(short, long, help = "Show verbose information.")]
     long: bool,
@@ -156,13 +164,18 @@ fn main_inner(root: &mut Root) -> Result<()> {
     let edit_last = Subs::Edit {
         script_name: Some("-".to_owned()),
         exact: false,
-        hide: false,
         executable: None,
         content: None,
     };
     let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
 
+    let tags = root.tags.clone();
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
+
+    if !sub.all() {
+        hs.filter_by_group(&tags);
+    }
+
     match sub {
         Subs::Other(cmds) => {
             log::info!("純執行模式");
@@ -175,7 +188,6 @@ fn main_inner(root: &mut Root) -> Result<()> {
         }
         Subs::Edit {
             script_name,
-            hide,
             executable: ty,
             exact,
             content,
@@ -218,10 +230,12 @@ fn main_inner(root: &mut Root) -> Result<()> {
 
             let dir = util::handle_fs_err(&["."], std::env::current_dir())?;
             let name = script.name.into_static();
-            let h = hs
-                .entry(&name)
-                .or_insert(ScriptInfo::new(name, ty.unwrap_or_default(), dir)?);
-            h.hidden = *hide;
+            let h = hs.entry(&name).or_insert(ScriptInfo::new(
+                name,
+                ty.unwrap_or_default(),
+                dir,
+                tags.into_allowed_iter(),
+            )?);
             h.edit_time = Utc::now();
         }
         Subs::Run { script_name, args } => {

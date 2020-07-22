@@ -46,16 +46,16 @@ impl<'a> History<'a> {
             latest_name: None,
         }
     }
-    pub fn get_mut(&mut self, name: &ScriptName<'a>) -> Option<&mut ScriptInfo<'a>> {
+    pub fn get_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {
         self.map.get_mut(&*name.key())
     }
-    pub fn remove(&mut self, name: &ScriptName<'a>) {
+    pub fn remove(&mut self, name: &ScriptName) {
         self.map.remove(&*name.key());
     }
     pub fn insert(&mut self, info: ScriptInfo<'a>) {
         self.map.insert(info.name.key().into_owned(), info);
     }
-    pub fn entry(&mut self, name: &ScriptName<'a>) -> Entry<'_, String, ScriptInfo<'a>> {
+    pub fn entry(&mut self, name: &ScriptName) -> Entry<'_, String, ScriptInfo<'a>> {
         self.map.entry(name.key().into_owned())
     }
 }

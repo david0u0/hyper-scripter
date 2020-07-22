@@ -34,6 +34,12 @@ impl ScriptName<'_> {
             ScriptName::Named(name) => format!("{}{}", name, ext),
         }
     }
+    pub fn into_static(self) -> ScriptName<'static> {
+        match self {
+            ScriptName::Anonymous(id) => ScriptName::Anonymous(id),
+            ScriptName::Named(name) => ScriptName::Named(Cow::Owned(name.into_owned())),
+        }
+    }
 }
 impl PartialOrd for ScriptName<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

@@ -11,7 +11,7 @@ use chrono::Utc;
 use error::{Contextabl, Error, Result};
 use history::History;
 use list::{fmt_list, ListOptions, ListPattern};
-use script::{ScriptInfo, ScriptType, ToScriptName};
+use script::{AsScriptName, ScriptInfo, ScriptType};
 use std::process::Command;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
@@ -116,11 +116,11 @@ fn main() -> Result<()> {
     let mut root = Root::from_args();
     main_inner(&mut root)
 }
-fn get_info_mut<'a>(
+fn get_info_mut<'b, 'a>(
     name: &str,
-    history: &'a mut History,
+    history: &'b mut History<'a>,
     exact: bool,
-) -> Result<Option<&'a mut ScriptInfo>> {
+) -> Result<Option<&'b mut ScriptInfo<'a>>> {
     log::trace!("開始尋找 `{}`, exact={}", name, exact);
     if name == "-" {
         log::trace!("找最新腳本");
@@ -133,17 +133,17 @@ fn get_info_mut<'a>(
     } else if exact {
         let name = name
             .clone() // TODO: Cow 優化
-            .to_script_name()?;
+            .as_script_name()?;
         Ok(history.get_mut(&name))
     } else {
         fuzzy::fuzz(name, history.iter_mut())
     }
 }
-fn get_info_mut_strict<'a>(
+fn get_info_mut_strict<'b, 'a>(
     name: &str,
-    history: &'a mut History,
+    history: &'b mut History<'a>,
     exact: bool,
-) -> Result<&'a mut ScriptInfo> {
+) -> Result<&'b mut ScriptInfo<'a>> {
     match get_info_mut(name, history, exact) {
         Err(e) => Err(e),
         Ok(None) => Err(Error::NoInfo(name.to_owned())),
@@ -194,11 +194,11 @@ fn main_inner(root: &mut Root) -> Result<()> {
                         }
                     }
                     log::debug!("打開既有命名腳本：{:?}", name);
-                    path::open_script(h.name.clone(), h.ty, true)
+                    path::open_script(&h.name, h.ty, true)
                         .context(format!("打開命名腳本失敗：{:?}", name))?
                 } else {
                     log::debug!("打開新命名腳本：{:?}", name);
-                    path::open_script(name.clone(), ty.unwrap_or_default(), false)
+                    path::open_script(AsRef::<str>::as_ref(name), ty.unwrap_or_default(), false)
                         .context(format!("打開新命名腳本失敗：{:?}", name))?
                 }
             } else {
@@ -211,11 +211,10 @@ fn main_inner(root: &mut Root) -> Result<()> {
             cmd.args(&[script.path]).spawn()?.wait()?;
 
             let dir = util::handle_fs_err(&["."], std::env::current_dir())?;
-            let h = hs.entry(script.name.clone()).or_insert(ScriptInfo::new(
-                script.name,
-                ty.unwrap_or_default(),
-                dir,
-            )?);
+            let name = script.name.into_static();
+            let h = hs
+                .entry(&name)
+                .or_insert(ScriptInfo::new(name, ty.unwrap_or_default(), dir)?);
             h.hidden = *hide;
             h.edit_time = Utc::now();
         }
@@ -248,12 +247,13 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 util::remove(&script)?;
-                hs.remove(&script.name);
+                let name = script.name.into_static();
+                hs.remove(&name);
             }
         }
         Subs::CP { exact, origin, new } => {
             let h = get_info_mut_strict(origin, &mut hs, *exact)?;
-            let new_name = new.clone().to_script_name()?;
+            let new_name = new.as_script_name()?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_script = path::open_script(&new_name, h.ty, false)?;
             if new_script.path.exists() {
@@ -261,7 +261,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             }
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {
-                name: new_name,
+                name: new_name.into_static(),
                 birthplace: util::handle_fs_err(&["."], std::env::current_dir())?,
                 edit_time: Utc::now(),
                 ..h.clone()
@@ -277,7 +277,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             let h = get_info_mut_strict(origin, &mut hs, *exact)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
-            let new_name = new.clone().to_script_name()?;
+            let new_name = new.as_script_name()?;
             let new_script = path::open_script(&new_name, new_ty, false)?;
             util::mv(&og_script, &new_script)?;
 

@@ -1,6 +1,6 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::history::History;
-use crate::script::{ScriptInfo, ScriptMeta, ScriptName, ScriptType, ToScriptName, ANONYMOUS};
+use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ScriptType, ANONYMOUS};
 use crate::util::{handle_fs_err, read_file};
 use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
@@ -76,23 +76,23 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous(ty: ScriptType) -> Result<ScriptMeta> {
+pub fn open_new_anonymous(ty: ScriptType) -> Result<ScriptMeta<'static>> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
     open_anonymous(id, ty)
 }
-pub fn open_anonymous(id: u32, ty: ScriptType) -> Result<ScriptMeta> {
+pub fn open_anonymous(id: u32, ty: ScriptType) -> Result<ScriptMeta<'static>> {
     let name = ScriptName::Anonymous(id);
     let path = get_path().join(name.to_file_name(ty));
     Ok(ScriptMeta { path, name })
 }
 
-pub fn open_script<T: ToScriptName>(
-    name: T,
+pub fn open_script<'a, T: ?Sized + AsScriptName>(
+    name: &'a T,
     ty: ScriptType,
     check_sxist: bool,
-) -> Result<ScriptMeta> {
-    let script = match name.to_script_name()? {
+) -> Result<ScriptMeta<'a>> {
+    let script = match name.as_script_name()? {
         ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
@@ -106,7 +106,7 @@ pub fn open_script<T: ToScriptName>(
         Ok(script)
     }
 }
-pub fn get_history() -> Result<History> {
+pub fn get_history() -> Result<History<'static>> {
     let path = join_path(get_path(), META)?;
     let content = match read_file(&path) {
         Ok(s) => s,
@@ -132,7 +132,7 @@ pub fn get_history() -> Result<History> {
     Ok(history)
 }
 
-pub fn store_history(history: impl Iterator<Item = ScriptInfo>) -> Result<()> {
+pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
     let path = join_path(get_path(), META)?;
     let mut file = handle_fs_err(&[&path], File::create(&path)).context("唯寫打開歷史檔案失敗")?;
     let v: Vec<_> = history.collect();
@@ -175,21 +175,27 @@ mod test {
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first".to_owned(), ScriptType::Txt, false).unwrap();
-        assert_eq!(s.name, ScriptName::Named("first".to_owned()));
+        let s = open_script("first", ScriptType::Txt, true).unwrap();
+        assert_eq!(s.name, "first".as_script_name().unwrap());
 
-        let s = open_script(".1".to_owned(), ScriptType::Rb, false).unwrap();
+        let second = "second".to_owned();
+        let second_name = second.as_script_name().unwrap();
+        let s = open_script(&second_name, ScriptType::Rb, false).unwrap();
+        assert_eq!(s.name, second_name);
+        assert_eq!(
+            s.path,
+            get_path().join("second.rb") // join_path("./.test_instant_script/", "second.rb").unwrap()
+        );
+
+        let s = open_script(".1", ScriptType::Shell, true).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(1));
         assert_eq!(
             s.path,
-            join_path("./.test_instant_script/.anonymous", "1.rb").unwrap()
+            join_path("./.test_instant_script/.anonymous", "1.sh").unwrap()
         );
 
-        match open_script("not-exist".to_owned(), ScriptType::Shell, true) {
-            Err(Error::PathNotFound(name)) => assert_eq!(
-                name,
-                join_path("./.test_instant_script/", "not-exist.sh").unwrap()
-            ),
+        match open_script("not-exist", ScriptType::Shell, true).unwrap_err() {
+            Error::PathNotFound(name) => assert_eq!(name, get_path().join("not-exist.sh")),
             _ => unreachable!(),
         }
     }

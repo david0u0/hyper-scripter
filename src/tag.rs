@@ -11,11 +11,7 @@ pub struct TagFilter {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tag(String);
-impl Tag {
-    pub fn match_all(&self) -> bool {
-        &self.0 == "all"
-    }
-}
+
 impl FromStr for Tag {
     type Err = String;
     fn from_str(s: &str) -> std::result::Result<Self, String> {
@@ -69,7 +65,7 @@ impl TagFilters {
         let mut pass = false;
         for filter in self.0.iter() {
             // TODO: 優化
-            if filter.tag.match_all() || tags.contains(&filter.tag) {
+            if tags.contains(&filter.tag) {
                 pass = filter.allow;
             }
         }

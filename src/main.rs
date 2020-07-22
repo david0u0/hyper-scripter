@@ -27,6 +27,8 @@ struct Root {
     is_path: Option<String>,
     #[structopt(short, long, parse(try_from_str), default_value = "g")]
     tags: TagFilters,
+    #[structopt(short, long, help = "Ignore any filter.")]
+    all: bool,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
 }
@@ -93,12 +95,19 @@ enum Subs {
         origin: String,
         new: Option<String>,
     },
+    #[structopt(
+        about = "Manage script tags. If a list of tag is given, set them as default, otherwise show tag information."
+    )]
+    Tags { tags: Option<TagFilters> },
 }
 
-impl Subs {
+impl Root {
     fn all(&self) -> bool {
-        if let Subs::LS(List { all, .. }) = self {
-            *all
+        if self.all {
+            return true;
+        }
+        if let Some(Subs::LS(List { all, .. })) = self.subcmd {
+            all
         } else {
             false
         }
@@ -159,6 +168,8 @@ fn get_info_mut_strict<'b, 'a>(
 }
 fn main_inner(root: &mut Root) -> Result<()> {
     log::debug!("命令行物件：{:?}", root);
+    let all = root.all();
+
     match &root.is_path {
         Some(is_path) => path::set_path(is_path)?,
         None => path::set_path_from_sys()?,
@@ -175,7 +186,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
     let tags = root.tags.clone();
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
 
-    if !sub.all() {
+    if !all {
         hs.filter_by_group(&tags);
     }
 
@@ -315,6 +326,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 h.tags = tags.clone().into_allowed_iter().collect();
             }
         }
+        _ => unimplemented!(),
     }
     path::store_history(hs.into_iter_all())?;
     Ok(())

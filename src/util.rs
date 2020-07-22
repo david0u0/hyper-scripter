@@ -21,7 +21,11 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     // TODO: 看要不要把執行狀態傳回去？
     let stat = handle_fs_err(&[&cmd_str], child.wait())?;
     log::info!("程式執行結果：{:?}", stat);
-    Ok(())
+    if !stat.success() {
+        Err(Error::ScriptError(stat.to_string()))
+    } else {
+        Ok(())
+    }
 }
 pub fn read_file(path: &PathBuf) -> Result<String> {
     let mut file = handle_fs_err(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;

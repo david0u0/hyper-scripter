@@ -1,8 +1,10 @@
 use instant_scripter::path;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn setup() {
+    let _ = env_logger::try_init();
     path::set_path_from_sys().unwrap();
     std::fs::remove_dir_all(path::get_path()).unwrap();
 }
@@ -27,14 +29,12 @@ fn run(args: &[&str]) -> Result<String, i32> {
     }
 }
 
-#[test]
-fn test_main() {
-    env_logger::init();
+const MSG: &'static str = "你好，腳本管理員！";
+const MSG_JS: &'static str = "你好，腳本管理員！.js";
+fn test_create_and_run() {
     setup();
-    let msg = "你好，腳本狂！";
-    let msg_js = "你好，腳本狂！.js";
-    run(&["e", "-c", &format!("echo \"{}\"", msg)]).unwrap();
-    assert_eq!(msg, run(&["-"]).unwrap());
+    run(&["e", "-c", &format!("echo \"{}\"", MSG)]).unwrap();
+    assert_eq!(MSG, run(&["-"]).unwrap());
 
     run(&[
         "-t",
@@ -44,11 +44,34 @@ fn test_main() {
         "-x",
         "js",
         "-c",
-        &format!("console.log(\"{}\")", msg_js),
+        &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
     run(&["tesjs"]).expect_err("標籤沒有篩選掉不該出現的腳本！");
-    assert_eq!(msg_js, run(&["-t", "super_tag", "-"]).unwrap());
+    assert_eq!(MSG_JS, run(&["-t", "super_tag", "-"]).unwrap());
 
-    assert_eq!(msg, run(&[".1"]).unwrap());
+    assert_eq!(MSG, run(&[".1"]).expect("標籤篩選把舊的腳本搞爛了！"));
+}
+
+fn test_mv() {
+    setup();
+    run(&["e", "-x", "js", "-c", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
+
+    run(&["mv", ".1", "-x", "sh"]).unwrap();
+    assert_eq!(MSG, run(&["-"]).unwrap());
+    assert!(
+        path::get_path().join(".anonymous/1.sh").exists(),
+        "改腳本類型失敗"
+    );
+    assert!(
+        !path::get_path().join(".anonymous/1.js").exists(),
+        "改了腳本類型舊檔案還留著？"
+    );
+}
+
+#[test]
+fn test_main() {
+    test_create_and_run();
+    test_mv();
 }

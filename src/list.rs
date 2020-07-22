@@ -56,6 +56,9 @@ pub fn fmt_meta<W: Write>(
             exex_time
         )?;
     } else {
+        if is_last {
+            write!(w, "{}", "*".color(Color::Yellow).bold())?;
+        }
         let mut msg = format!("{}({})", script.name, script.ty).normal();
         if is_last {
             msg = msg.underline()

@@ -276,6 +276,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
                 let h = get_info_mut_strict(script_name, &mut hs, *exact)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
+                log::info!("刪除 {:?}", script);
                 util::remove(&script)?;
                 let name = script.name.into_static();
                 hs.remove(&name);
@@ -308,14 +309,14 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             let h = get_info_mut_strict(origin, &mut hs, *exact)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
+            let new_name = match new {
+                Some(s) => s.as_script_name()?,
+                None => h.name.clone(),
+            };
+            let new_script = path::open_script(&new_name, new_ty, false)?;
+            util::mv(&og_script, &new_script)?;
 
-            if let Some(new) = new {
-                let new_name = new.as_script_name()?;
-                let new_script = path::open_script(&new_name, new_ty, false)?;
-                util::mv(&og_script, &new_script)?;
-                h.name = new_name.into_static();
-            }
-
+            h.name = new_name.into_static();
             h.edit_time = Utc::now();
             h.ty = new_ty;
             if let Some(tags) = tags {

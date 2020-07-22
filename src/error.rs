@@ -23,6 +23,7 @@ pub enum Error {
     },
     MultiFuzz(Vec<String>),
     ScriptNameFormat(String),
+    ScriptError(String),
     Empty,
 }
 

@@ -11,12 +11,26 @@ pub struct TagFilter {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tag(String);
-
+impl Tag {
+    pub fn match_all(&self) -> bool {
+        &self.0 == "all"
+    }
+}
+impl FromStr for Tag {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, String> {
+        // TODO: 檢查格式
+        if s.len() == 0 {
+            Err(format!("Wrong tag format: {}", s))
+        } else {
+            Ok(Tag(s.to_owned()))
+        }
+    }
+}
 impl FromStr for TagFilter {
     type Err = String;
     fn from_str(tag: &str) -> std::result::Result<Self, String> {
         let mut s = tag;
-        // TODO: 檢查格式
         let allow = if s.starts_with("-") {
             s = &s[1..s.len()];
             false
@@ -26,14 +40,10 @@ impl FromStr for TagFilter {
         } else {
             true
         };
-        if s.len() == 0 {
-            Err(format!("Wrong tag format: {}", tag))
-        } else {
-            Ok(TagFilter {
-                allow,
-                tag: Tag(s.to_owned()),
-            })
-        }
+        Ok(TagFilter {
+            tag: Tag::from_str(s)?,
+            allow,
+        })
     }
 }
 impl FromStr for TagFilters {
@@ -59,7 +69,7 @@ impl TagFilters {
         let mut pass = false;
         for filter in self.0.iter() {
             // TODO: 優化
-            if tags.contains(&filter.tag) {
+            if filter.tag.match_all() || tags.contains(&filter.tag) {
                 pass = filter.allow;
             }
         }

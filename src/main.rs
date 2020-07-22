@@ -70,13 +70,14 @@ enum Subs {
     },
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
-    #[structopt(about = "Move the script to another one", alias = "mv")]
+    #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
         origin: String,
         new: String,
     },
+    #[structopt(about = "Move the script to another one")]
     MV {
         #[structopt(short, long, help = "Don't do fuzzy search")]
         exact: bool,
@@ -87,8 +88,10 @@ enum Subs {
             help = "Executable type of the script, e.g. `sh`"
         )]
         executable: Option<ScriptType>,
+        #[structopt(short, long)]
+        tags: Option<TagFilters>,
         origin: String,
-        new: String,
+        new: Option<String>,
     },
 }
 
@@ -292,19 +295,25 @@ fn main_inner(root: &mut Root) -> Result<()> {
             exact,
             origin,
             new,
+            tags,
             executable: ty,
         } => {
             let h = get_info_mut_strict(origin, &mut hs, *exact)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
-            let new_name = new.as_script_name()?;
-            let new_script = path::open_script(&new_name, new_ty, false)?;
-            util::mv(&og_script, &new_script)?;
+
+            if let Some(new) = new {
+                let new_name = new.as_script_name()?;
+                let new_script = path::open_script(&new_name, new_ty, false)?;
+                util::mv(&og_script, &new_script)?;
+                h.name = new_name;
+            }
 
             h.edit_time = Utc::now();
-            h.name = new_name;
             h.ty = new_ty;
-            h.birthplace = util::handle_fs_err(&["."], std::env::current_dir())?;
+            if let Some(tags) = tags {
+                h.tags = tags.clone().into_allowed_iter().collect();
+            }
         }
     }
     path::store_history(hs.into_iter_all())?;

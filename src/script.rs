@@ -218,7 +218,7 @@ impl AsScriptName for str {
             }
         } else {
             if self.find(".").is_some() || self.find(" ").is_some() {
-                return Err(Error::ScriptNameFormat(self.to_owned()).context("解析命名腳本失敗"));
+                return Err(Error::ScriptNameFormat(self.to_owned()).context("命名腳本格式有誤"));
             }
             Ok(ScriptName::Named(Cow::Borrowed(self)))
         }

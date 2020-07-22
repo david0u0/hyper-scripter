@@ -2,7 +2,6 @@ use crate::error::{Contextabl, Error, Result};
 use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ScriptType, ANONYMOUS};
 use crate::util::{handle_fs_err, read_file};
-use std::collections::HashMap;
 use std::fs::{canonicalize, create_dir, read_dir, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -16,7 +15,7 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(not(debug_assertions))]
-pub fn get_sys_path() -> Result<PathBuf> {
+fn get_sys_path() -> Result<PathBuf> {
     let p = match std::env::var("INSTANT_SCRIPT_PATH") {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
@@ -30,9 +29,13 @@ pub fn get_sys_path() -> Result<PathBuf> {
     log::debug!("使用路徑：{:?}", p);
     Ok(p)
 }
-#[cfg(debug_assertions)]
-pub fn get_sys_path() -> Result<PathBuf> {
+#[cfg(all(debug_assertions, not(test)))]
+fn get_sys_path() -> Result<PathBuf> {
     Ok("./.instant_script".into())
+}
+#[cfg(all(debug_assertions, test))]
+fn get_sys_path() -> Result<PathBuf> {
+    Ok("./.test_instant_script".into())
 }
 
 pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
@@ -40,6 +43,9 @@ pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<Pat
     Ok(here.join(path))
 }
 
+pub fn set_path_from_sys() -> Result<()> {
+    set_path(get_sys_path()?)
+}
 pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
     let path = join_path(".", p)?;
     if !path.exists() {
@@ -147,7 +153,7 @@ pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Resul
 mod test {
     use super::*;
     fn setup() {
-        set_path(join_path(".", "./.test_instant_script").unwrap()).unwrap();
+        set_path_from_sys().unwrap();
     }
     #[test]
     fn test_anonymous_ids() {

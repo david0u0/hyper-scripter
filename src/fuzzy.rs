@@ -7,7 +7,7 @@ const MIN_SCORE: i64 = 200; // TODO: 好好決定這個魔法數字
 pub trait FuzzKey {
     fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
 }
-pub fn fuzz<'a, T: FuzzKey + 'a>(
+pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
     name: &str,
     mut iter: impl Iterator<Item = &'a mut T>,
 ) -> Result<Option<&'a mut T>> {
@@ -63,16 +63,16 @@ mod test {
         let mut t3 = ".42".as_script_name().unwrap();
         let mut vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz("測試1", vec.iter_mut()).unwrap();
+        let res = fuzz_mut("測試1", vec.iter_mut()).unwrap();
         assert_eq!(res, Some(&mut t1));
 
-        let res = fuzz("42", vec.iter_mut()).unwrap();
+        let res = fuzz_mut("42", vec.iter_mut()).unwrap();
         assert_eq!(res, Some(&mut t3));
 
-        let res = fuzz("找不到", vec.iter_mut()).unwrap();
+        let res = fuzz_mut("找不到", vec.iter_mut()).unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz("測試", vec.iter_mut()).unwrap_err();
+        let err = fuzz_mut("測試", vec.iter_mut()).unwrap_err();
         let mut v = match err {
             Error::MultiFuzz(v) => v,
             _ => unreachable!(),
@@ -86,7 +86,7 @@ mod test {
         let mut t1 = "測試腳本1".as_script_name().unwrap();
         let t2 = "測試腳本234".as_script_name().unwrap();
         let mut vec = vec![t1.clone(), t2];
-        let res = fuzz("測試", vec.iter_mut()).unwrap();
+        let res = fuzz_mut("測試", vec.iter_mut()).unwrap();
         assert_eq!(res, Some(&mut t1), "模糊搜尋無法找出較短者");
     }
 }

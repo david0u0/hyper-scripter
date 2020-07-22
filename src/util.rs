@@ -1,6 +1,7 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptInfo, ScriptMeta};
-use std::io::Read;
+use std::fs::{remove_file, rename, File};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -23,20 +24,21 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     Ok(())
 }
 pub fn read_file(path: &PathBuf) -> Result<String> {
-    let mut file = handle_fs_err(&[path], std::fs::File::open(path)).context("唯讀開啟檔案失敗")?;
+    let mut file = handle_fs_err(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;
     let mut content = String::new();
     handle_fs_err(&[path], file.read_to_string(&mut content)).context("讀取檔案失敗")?;
     Ok(content)
 }
 
+pub fn fast_write_script(script: &ScriptMeta, content: &str) -> Result<()> {
+    let mut file = handle_fs_err(&[&script.path], File::create(&script.path))?;
+    handle_fs_err(&[&script.path], file.write_all(content.as_bytes()))
+}
 pub fn remove(script: &ScriptMeta) -> Result<()> {
-    handle_fs_err(&[&script.path], std::fs::remove_file(&script.path))
+    handle_fs_err(&[&script.path], remove_file(&script.path))
 }
 pub fn mv(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
-    handle_fs_err(
-        &[&origin.path, &new.path],
-        std::fs::rename(&origin.path, &new.path),
-    )
+    handle_fs_err(&[&origin.path, &new.path], rename(&origin.path, &new.path))
 }
 pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
     let _copied = handle_fs_err(

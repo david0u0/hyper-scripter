@@ -1,24 +1,16 @@
-mod error;
-mod fuzzy;
-mod history;
-mod list;
-mod path;
-mod script;
-mod tag;
-mod util;
-
 use chrono::Utc;
-use error::{Contextabl, Error, Result};
-use history::History;
-use list::{fmt_list, ListOptions, ListPattern};
-use script::{AsScriptName, ScriptInfo, ScriptType};
+use instant_scripter::error::{Contextabl, Error, Result};
+use instant_scripter::history::History;
+use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
+use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
+use instant_scripter::tag::TagFilters;
+use instant_scripter::{fuzzy, path, util};
 use std::process::Command;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
 };
 use structopt::StructOpt;
-use tag::TagFilters;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
@@ -48,6 +40,8 @@ enum Subs {
         exact: bool,
         #[structopt(short, long, help = "Hide the script in list")]
         hide: bool,
+        #[structopt(short, long, help = "The content for your script.")]
+        content: Option<String>,
         script_name: Option<String>,
         #[structopt(
             long,
@@ -130,13 +124,15 @@ fn get_info_mut<'b, 'a>(
         } else {
             Err(Error::Empty)
         }
+    } else if name.starts_with("-") {
+        return Err(Error::ScriptNameFormat(name.to_owned()));
     } else if exact {
         let name = name
             .clone() // TODO: Cow 優化
             .as_script_name()?;
         Ok(history.get_mut(&name))
     } else {
-        fuzzy::fuzz(name, history.iter_mut())
+        fuzzy::fuzz_mut(name, history.iter_mut())
     }
 }
 fn get_info_mut_strict<'b, 'a>(
@@ -154,7 +150,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
     log::debug!("命令行物件：{:?}", root);
     match &root.is_path {
         Some(is_path) => path::set_path(is_path)?,
-        None => path::set_path(path::join_path(".", &path::get_sys_path()?)?)?,
+        None => path::set_path_from_sys()?,
     }
 
     let edit_last = Subs::Edit {
@@ -162,6 +158,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
         exact: false,
         hide: false,
         executable: None,
+        content: None,
     };
     let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
 
@@ -181,6 +178,7 @@ fn main_inner(root: &mut Root) -> Result<()> {
             hide,
             executable: ty,
             exact,
+            content,
         } => {
             let script = if let Some(name) = script_name {
                 if let Some(h) = get_info_mut(name, &mut hs, *exact)? {
@@ -206,9 +204,17 @@ fn main_inner(root: &mut Root) -> Result<()> {
                 path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
             };
 
-            log::info!("編輯 {:?}", script.name);
-            let mut cmd = Command::new("vim");
-            cmd.args(&[script.path]).spawn()?.wait()?;
+            if let Some(content) = content {
+                log::info!("快速編輯 {:?}", script.name);
+                if script.path.exists() {
+                    return Err(Error::PathExist(script.path));
+                }
+                util::fast_write_script(&script, content)?;
+            } else {
+                log::info!("編輯 {:?}", script.name);
+                let mut cmd = Command::new("vim");
+                cmd.args(&[script.path]).spawn()?.wait()?;
+            }
 
             let dir = util::handle_fs_err(&["."], std::env::current_dir())?;
             let name = script.name.into_static();

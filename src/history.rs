@@ -5,7 +5,11 @@ use std::collections::{hash_map::Entry, HashMap};
 #[derive(Default, Debug)]
 pub struct History<'a> {
     map: HashMap<String, ScriptInfo<'a>>,
+    hidden_map: HashMap<String, ScriptInfo<'a>>,
     latest_name: Option<String>,
+}
+fn m(t: (String, ScriptInfo)) -> ScriptInfo {
+    t.1
 }
 
 impl<'a> History<'a> {
@@ -16,7 +20,13 @@ impl<'a> History<'a> {
         self.map.iter_mut().map(|(_, info)| info)
     }
     pub fn into_iter(self) -> impl Iterator<Item = ScriptInfo<'a>> {
-        self.map.into_iter().map(|(_, info)| info)
+        self.map.into_iter().map(m)
+    }
+    pub fn into_iter_all(self) -> impl Iterator<Item = ScriptInfo<'a>> {
+        self.map
+            .into_iter()
+            .map(m)
+            .chain(self.hidden_map.into_iter().map(m))
     }
     fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
         let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());
@@ -44,6 +54,7 @@ impl<'a> History<'a> {
         }
         History {
             map,
+            hidden_map: Default::default(),
             latest_name: None,
         }
     }
@@ -61,11 +72,18 @@ impl<'a> History<'a> {
     }
     pub fn filter_by_group(&mut self, filter: &TagFilters) {
         // TODO: 優化
-        let map: HashMap<_, _> = self
-            .map
-            .drain()
-            .filter(|(_, info)| filter.filter(&info.tags))
-            .collect();
+        log::debug!("根據群組 {:?} 進行篩選", filter);
+        let drain = self.map.drain();
+        let mut map = HashMap::new();
+        for (key, info) in drain {
+            if filter.filter(&info.tags) {
+                log::trace!("腳本 {:?} 通過篩選", info.name);
+                map.insert(key, info);
+            } else {
+                log::trace!("掰掰，{:?}", info.name);
+                self.hidden_map.insert(key, info);
+            }
+        }
         self.map = map;
     }
 }

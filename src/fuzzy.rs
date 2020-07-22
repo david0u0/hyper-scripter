@@ -9,7 +9,7 @@ pub trait FuzzKey {
 }
 pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
     name: &str,
-    mut iter: impl Iterator<Item = &'a mut T>,
+    iter: impl Iterator<Item = &'a mut T>,
 ) -> Result<Option<&'a mut T>> {
     let matcher = SkimMatcherV2::default();
     let mut ans = (0, Vec::<&mut T>::new());

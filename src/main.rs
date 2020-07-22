@@ -25,7 +25,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
-    #[structopt(short, long, parse(try_from_str), default_value = "g,-h")]
+    #[structopt(short, long, parse(try_from_str), default_value = "g")]
     tags: TagFilters,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
@@ -307,6 +307,6 @@ fn main_inner(root: &mut Root) -> Result<()> {
             h.birthplace = util::handle_fs_err(&["."], std::env::current_dir())?;
         }
     }
-    path::store_history(hs.into_iter())?;
+    path::store_history(hs.into_iter_all())?;
     Ok(())
 }

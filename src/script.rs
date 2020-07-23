@@ -216,10 +216,14 @@ impl AsScriptName for str {
                 Err(e) => return Err(Error::ScriptNameFormat(self.to_owned()).context(e)),
             }
         } else {
-            if self.find(".").is_some() || self.find(" ").is_some() {
-                return Err(Error::ScriptNameFormat(self.to_owned()).context("命名腳本格式有誤"));
+            let s = match self.starts_with("=") {
+                true => &self[1..self.len()],
+                false => self,
+            };
+            if s.starts_with("-") || s.find(".").is_some() || s.find(" ").is_some() {
+                return Err(Error::ScriptNameFormat(s.to_owned()).context("命名腳本格式有誤"));
             }
-            Ok(ScriptName::Named(Cow::Borrowed(self)))
+            Ok(ScriptName::Named(Cow::Borrowed(s)))
         }
     }
 }

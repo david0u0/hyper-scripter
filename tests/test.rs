@@ -18,6 +18,7 @@ fn run(args: &[&str]) -> Result<String, i32> {
         .lines()
         .filter_map(|line| line.ok())
         .for_each(|line| {
+            println!("{}", line);
             out_str.push(line);
         });
 
@@ -86,9 +87,17 @@ fn test_args() {
         run(&["-", TALKER, APPEND]).unwrap()
     );
 }
+fn test_exact() {
+    setup();
+    run(&["e", "test-exact", "-c", "echo 'test exact!'"]).unwrap();
+    run(&["tesct"]).expect("模糊搜不到東西！");
+    run(&["=tesct"]).expect_err("打錯名字卻還搜得到！");
+    run(&["=test-exact"]).expect("打完整名字卻搜不到！");
+}
 #[test]
 fn test_main() {
     test_create_and_run();
     test_mv();
     test_args();
+    test_exact();
 }

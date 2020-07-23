@@ -1,6 +1,5 @@
 use instant_scripter::path;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn setup() {

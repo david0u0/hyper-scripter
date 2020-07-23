@@ -26,7 +26,6 @@ fn get_sys_path() -> Result<PathBuf> {
             .join(ROOT_PATH),
         Err(e) => return Err(e.into()),
     };
-    log::debug!("使用路徑：{:?}", p);
     Ok(p)
 }
 #[cfg(all(debug_assertions, not(test)))]
@@ -48,6 +47,7 @@ pub fn set_path_from_sys() -> Result<()> {
 }
 pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
     let path = join_path(".", p)?;
+    log::debug!("使用路徑：{:?}", path);
     if !path.exists() {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
         handle_fs_res(&[&path], create_dir(&path))?;

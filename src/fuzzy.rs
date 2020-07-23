@@ -2,7 +2,7 @@ use crate::error::{Error, Result};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
 
-const MIN_SCORE: i64 = 200; // TODO: 好好決定這個魔法數字
+const MIN_SCORE: i64 = 400; // TODO: 好好決定這個魔法數字
 
 pub trait FuzzKey {
     fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
@@ -24,8 +24,9 @@ pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
             score
         );
         if let Some(mut score) = score {
-            log::trace!("將分數正交化：{} / {}", score * 100, key.len());
-            score = score * 100 / key.len() as i64;
+            let len = key.chars().count();
+            log::trace!("將分數正交化：{} / {}", score * 100, len);
+            score = score * 100 / len as i64;
             if score > MIN_SCORE {
                 if score > ans.0 {
                     ans = (score, vec![data]);

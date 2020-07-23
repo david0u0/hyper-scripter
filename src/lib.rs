@@ -5,4 +5,5 @@ pub mod list;
 pub mod path;
 pub mod script;
 pub mod tag;
+pub mod templates;
 pub mod util;

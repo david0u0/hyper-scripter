@@ -202,6 +202,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             exact,
             content,
         } => {
+            let final_ty: ScriptType;
             let script = if let Some(name) = script_name {
                 if let Some(h) = get_info_mut(name, &mut hs, *exact)? {
                     if let Some(ty) = ty {
@@ -213,15 +214,18 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
                             });
                         }
                     }
+                    final_ty = h.ty;
                     log::debug!("打開既有命名腳本：{:?}", name);
                     path::open_script(&h.name, h.ty, true)
                         .context(format!("打開命名腳本失敗：{:?}", name))?
                 } else {
+                    final_ty = ty.unwrap_or_default();
                     log::debug!("打開新命名腳本：{:?}", name);
                     path::open_script(AsRef::<str>::as_ref(name), ty.unwrap_or_default(), false)
                         .context(format!("打開新命名腳本失敗：{:?}", name))?
                 }
             } else {
+                final_ty = ty.unwrap_or_default();
                 log::debug!("打開新匿名腳本");
                 path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
             };
@@ -234,17 +238,16 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
                 util::fast_write_script(&script, content)?;
             } else {
                 log::info!("編輯 {:?}", script.name);
+                util::prepare_script(&script.path, final_ty)?;
                 let cmd = util::create_cmd("vim", &[script.path]);
                 let stat = util::run_cmd("vim", cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
             }
 
-            let dir = util::handle_fs_err(&["."], std::env::current_dir())?;
             let name = script.name.into_static();
             let h = hs.entry(&name).or_insert(ScriptInfo::new(
                 name,
-                ty.unwrap_or_default(),
-                dir,
+                final_ty,
                 tags.into_allowed_iter(),
             )?);
             h.edit_time = Utc::now();
@@ -298,7 +301,6 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {
                 name: new_name.into_static(),
-                birthplace: util::handle_fs_err(&["."], std::env::current_dir())?,
                 edit_time: Utc::now(),
                 ..h.clone()
             };

@@ -67,7 +67,6 @@ impl FuzzKey for ScriptName<'_> {
 pub struct ScriptInfo<'a> {
     pub edit_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
-    pub birthplace: PathBuf, // 腳本被創建的目錄
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,
     pub ty: ScriptType,
@@ -91,14 +90,12 @@ impl ScriptInfo<'_> {
     pub fn new<'a>(
         name: ScriptName<'a>,
         ty: ScriptType,
-        birthplace: PathBuf,
         tags: impl Iterator<Item = Tag>,
     ) -> Result<ScriptInfo<'a>> {
         Ok(ScriptInfo {
             name,
             ty,
             tags: tags.collect(),
-            birthplace,
             edit_time: Utc::now(),
             exec_time: None,
         })

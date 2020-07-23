@@ -1,7 +1,7 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ScriptType, ANONYMOUS};
-use crate::util::{handle_fs_err, read_file};
+use crate::util::{handle_fs_res, read_file};
 use std::fs::{canonicalize, create_dir, read_dir, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -50,7 +50,7 @@ pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
     let path = join_path(".", p)?;
     if !path.exists() {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
-        handle_fs_err(&[&path], create_dir(&path))?;
+        handle_fs_res(&[&path], create_dir(&path))?;
     }
     *PATH.lock().unwrap() = path;
     Ok(())
@@ -64,9 +64,9 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
     let dir = get_path().join(ANONYMOUS);
     if !dir.exists() {
         log::info!("找不到匿名腳本資料夾，創建之");
-        handle_fs_err(&[&dir], create_dir(&dir))?;
+        handle_fs_res(&[&dir], create_dir(&dir))?;
     }
-    for entry in handle_fs_err(&[&dir], read_dir(&dir))? {
+    for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
         let name = entry?
             .file_name()
             .to_str()
@@ -140,9 +140,9 @@ pub fn get_history() -> Result<History<'static>> {
 
 pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
     let path = join_path(get_path(), META)?;
-    let mut file = handle_fs_err(&[&path], File::create(&path)).context("唯寫打開歷史檔案失敗")?;
+    let mut file = handle_fs_res(&[&path], File::create(&path)).context("唯寫打開歷史檔案失敗")?;
     let v: Vec<_> = history.collect();
-    handle_fs_err(
+    handle_fs_res(
         &[&path],
         file.write_all(serde_json::to_string(&v)?.as_bytes()),
     )

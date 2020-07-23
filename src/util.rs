@@ -1,7 +1,7 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptInfo, ScriptMeta, ScriptType};
 use crate::templates;
-use mustache::{compile_str, MapBuilder};
+use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
 use std::fs::{remove_file, rename, File};
 use std::io::{Read, Write};
@@ -100,24 +100,36 @@ pub fn prepare_script(path: &Path, ty: ScriptType) -> Result<()> {
         return Ok(());
     }
     log::debug!("開始準備 {} 腳本內容……", ty);
-    let mut file = handle_fs_res(&[path], File::create(&path))?;
     let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
     let birthplace = birthplace.to_str().unwrap_or_default();
-    let data = MapBuilder::new()
-        .insert_str("birthplace", birthplace)
-        .build();
+    let file = handle_fs_res(&[path], File::create(&path))?;
+    handle_fs_res(&[path], write_prepare_script(file, ty, birthplace))
+}
+fn write_prepare_script<W: Write>(w: W, ty: ScriptType, birthplace: &str) -> std::io::Result<()> {
     // TODO: 依 ty 不同給不同訊息
     let template = match ty {
         ScriptType::Shell => templates::SHELL_WELCOME_MSG,
         ScriptType::Js => templates::JS_WELCOME_MSG,
         _ => return Ok(()),
     };
-    compile_str(template)
-        .unwrap()
-        .render_data(&mut file, &data)
-        .map_err(|e| match e {
-            mustache::Error::Io(e) => handle_fs_err(&[path], e),
-            mustache::Error::Parser(e) => panic!("模版解析失敗 {}", e),
-            _ => e.into(),
+    let reg = Handlebars::new();
+    reg.render_template_to_write(template, &json!({ "birthplace": birthplace }), w)
+        .map_err(|err| match err {
+            TemplateRenderError::IOError(err, ..) => err,
+            e => panic!("解析模版錯誤：{}", e),
         })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_prepare() {
+        use ScriptType::*;
+        let test = &[Js, Shell, Screen, Txt, Rb];
+        for ty in test {
+            let mut w = Vec::<u8>::new();
+            write_prepare_script(&mut w, *ty, "test_dir").expect("寫到 Vec<u8> 也能出事？");
+        }
+    }
 }

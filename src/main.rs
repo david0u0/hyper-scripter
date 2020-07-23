@@ -175,6 +175,7 @@ fn get_info_mut_strict<'b, 'a>(
     }
 }
 fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
+    let mut res: Result<()> = Ok(());
     let edit_last = Subs::Edit {
         script_name: Some("-".to_owned()),
         exact: false,
@@ -252,7 +253,11 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             let h = get_info_mut_strict(script_name, &mut hs, false)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
-            util::run(&script, &h, &args)?;
+            match util::run(&script, &h, &args) {
+                Err(e @ Error::ScriptError(_)) => res = Err(e),
+                Err(e) => return Err(e),
+                Ok(_) => (),
+            }
             h.exec_time = Some(Utc::now());
         }
         Subs::Cat { script_name } => {
@@ -326,5 +331,5 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
         _ => unimplemented!(),
     }
     path::store_history(hs.into_iter_all())?;
-    Ok(())
+    res
 }

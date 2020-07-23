@@ -58,7 +58,7 @@ fn test_mv() {
     run(&["e", "-x", "js", "-c", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
-    run(&["mv", ".1", "-x", "sh"]).unwrap();
+    run(&["mv", "-", "-x", "sh"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
     assert!(
         path::get_path().join(".anonymous/1.sh").exists(),
@@ -70,8 +70,25 @@ fn test_mv() {
     );
 }
 
+const TALKER: &'static str = "--腳本小子";
+const APPEND: &'static str = "第二行";
+fn test_args() {
+    setup();
+    run(&[
+        "e",
+        "test-with-args",
+        "-c",
+        &format!("echo -e \"$1：{}\n$2\"", MSG),
+    ])
+    .unwrap();
+    assert_eq!(
+        format!("{}：{}\n{}", TALKER, MSG, APPEND),
+        run(&["-", TALKER, APPEND]).unwrap()
+    );
+}
 #[test]
 fn test_main() {
     test_create_and_run();
     test_mv();
+    test_args();
 }

@@ -12,6 +12,12 @@ pub struct TagFilter {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tag(String);
 
+impl Tag {
+    pub fn match_all(&self) -> bool {
+        // TODO: loop invariant 優化
+        &self.0 == "all"
+    }
+}
 impl FromStr for Tag {
     type Err = String;
     fn from_str(s: &str) -> std::result::Result<Self, String> {
@@ -57,15 +63,20 @@ impl FromStr for TagFilters {
 
 impl TagFilters {
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
-        self.0
-            .into_iter()
-            .filter_map(|f| if f.allow { Some(f.tag) } else { None })
+        self.0.into_iter().filter_map(|f| {
+            // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣
+            if f.allow && !f.tag.match_all() {
+                Some(f.tag)
+            } else {
+                None
+            }
+        })
     }
     pub fn filter(&self, tags: &[Tag]) -> bool {
         let mut pass = false;
         for filter in self.0.iter() {
             // TODO: 優化
-            if tags.contains(&filter.tag) {
+            if filter.tag.match_all() || tags.contains(&filter.tag) {
                 pass = filter.allow;
             }
         }

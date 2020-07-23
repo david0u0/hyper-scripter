@@ -24,9 +24,9 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
-    #[structopt(short, long, parse(try_from_str), default_value = "g")]
+    #[structopt(short, long, parse(try_from_str), default_value = "all,-hide")]
     tags: TagFilters,
-    #[structopt(short, long, help = "Ignore any filter.")]
+    #[structopt(short, long, help = "Shorthand for `-t=all`")]
     all: bool,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,

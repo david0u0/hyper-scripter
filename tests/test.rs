@@ -38,7 +38,7 @@ fn test_create_and_run() {
 
     run(&[
         "-t",
-        "super_tag",
+        "super_tag,hide",
         "e",
         "test_js",
         "-x",
@@ -58,7 +58,7 @@ fn test_mv() {
     run(&["e", "-x", "js", "-c", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
-    run(&["mv", "-", "-x", "sh"]).unwrap();
+    run(&["mv", "1", "-x", "sh"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
     assert!(
         path::get_path().join(".anonymous/1.sh").exists(),

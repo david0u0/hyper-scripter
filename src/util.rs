@@ -1,9 +1,10 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptInfo, ScriptMeta};
+use std::ffi::OsStr;
 use std::fs::{remove_file, rename, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 
 const IS_BIRTH_PLACE: &'static str = "IS_BIRTH_PLACE";
 
@@ -12,14 +13,14 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     let (cmd_str, args) = ty
         .cmd()
         .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;
-    let mut cmd = Command::new(&cmd_str);
-    let mut full_args: Vec<PathBuf> = args.into_iter().map(|s| s.into()).collect();
-    full_args.push(script.path.clone());
-    full_args.extend(remaining.into_iter().map(|s| s.into()));
-    cmd.args(full_args).env(IS_BIRTH_PLACE, &info.birthplace);
-    let mut child = handle_fs_err(&[&cmd_str], cmd.spawn())?;
+    let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
+
+    full_args.push(script.path.as_ref());
+    full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
     // TODO: 看要不要把執行狀態傳回去？
-    let stat = handle_fs_err(&[&cmd_str], child.wait())?;
+    let mut cmd = create_cmd(&cmd_str, &full_args);
+    cmd.env(IS_BIRTH_PLACE, &info.birthplace);
+    let stat = run_cmd(&cmd_str, cmd)?;
     log::info!("程式執行結果：{:?}", stat);
     if !stat.success() {
         Err(Error::ScriptError(stat.to_string()))
@@ -27,6 +28,33 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
         Ok(())
     }
 }
+#[cfg(not(target_os = "linux"))]
+pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
+    let output = handle_fs_err(&[&cmd_str], cmd.output())?;
+    println!("{}", std::str::from_utf8(&output.stdout)?);
+    Ok(output.status)
+}
+#[cfg(target_os = "linux")]
+pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
+    let mut child = handle_fs_err(&[&cmd_str], cmd.spawn())?;
+    handle_fs_err(&[&cmd_str], child.wait())
+}
+#[cfg(not(target_os = "linux"))]
+pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
+    log::debug!("在非 linux 上執行，用 sh -c 包一層");
+    let args: Vec<&str> = args.iter().map(|s| s.as_ref().to_str().unwrap()).collect();
+    let arg = format!("{} {}", cmd_str, args.join(" ")).replace("/", "//");
+    let mut cmd = Command::new("sh");
+    cmd.args(&["-c", &arg]);
+    cmd
+}
+#[cfg(target_os = "linux")]
+pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
+    let mut cmd = Command::new(&cmd_str);
+    cmd.args(args);
+    cmd
+}
+
 pub fn read_file(path: &PathBuf) -> Result<String> {
     let mut file = handle_fs_err(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;
     let mut content = String::new();

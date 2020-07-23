@@ -5,7 +5,6 @@ use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
 use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
 use instant_scripter::tag::TagFilters;
 use instant_scripter::{fuzzy, path, util};
-use std::process::Command;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
@@ -234,8 +233,9 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
                 util::fast_write_script(&script, content)?;
             } else {
                 log::info!("編輯 {:?}", script.name);
-                let mut cmd = Command::new("vim");
-                cmd.args(&[script.path]).spawn()?.wait()?;
+                let cmd = util::create_cmd("vim", &[script.path]);
+                let stat = util::run_cmd("vim", cmd)?;
+                log::debug!("編輯器返回：{:?}", stat);
             }
 
             let dir = util::handle_fs_err(&["."], std::env::current_dir())?;

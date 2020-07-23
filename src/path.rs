@@ -31,11 +31,11 @@ fn get_sys_path() -> Result<PathBuf> {
 }
 #[cfg(all(debug_assertions, not(test)))]
 fn get_sys_path() -> Result<PathBuf> {
-    Ok("./.instant_script".into())
+    Ok(".instant_script".into())
 }
 #[cfg(all(debug_assertions, test))]
 fn get_sys_path() -> Result<PathBuf> {
-    Ok("./.test_instant_script".into())
+    Ok(".test_instant_script".into())
 }
 
 pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {

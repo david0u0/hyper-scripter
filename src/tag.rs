@@ -9,9 +9,13 @@ pub struct TagFilter {
     allow: bool,
     tag: Tag,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag(String);
-
+impl AsRef<str> for Tag {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 impl Tag {
     pub fn match_all(&self) -> bool {
         // TODO: loop invariant 優化

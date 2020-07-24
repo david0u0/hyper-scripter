@@ -259,7 +259,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
                 pattern: &list.pattern,
             };
             let stdout = std::io::stdout();
-            fmt_list(&mut stdout.lock(), hs.into_iter(), &opt)?;
+            fmt_list(&mut stdout.lock(), hs, &opt)?;
             return Ok(());
         }
         Subs::RM { scripts } => {

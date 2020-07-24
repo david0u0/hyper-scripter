@@ -49,7 +49,8 @@ impl<'a> History<'a> {
     }
     pub fn new<I: Iterator<Item = ScriptInfo<'a>>>(iter: I) -> Self {
         let mut map = HashMap::new();
-        for s in iter {
+        for mut s in iter {
+            s.tags.sort();
             map.insert(s.name.key().into_owned(), s);
         }
         History {

@@ -1,8 +1,52 @@
 use crate::error::Result;
+use crate::history::History;
 use crate::script::ScriptInfo;
+use crate::tag::Tag;
 use colored::{Color, Colorize};
 use regex::Regex;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::io::Write;
+
+#[derive(PartialEq, Eq)]
+struct TagsKey(Vec<Tag>);
+impl Hash for TagsKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let s: Vec<&str> = self.0.iter().map(|t| t.as_ref()).collect();
+        s.join("+").hash(state);
+    }
+}
+impl std::fmt::Display for TagsKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        let mut first = true;
+        for tag in &self.0 {
+            if !first {
+                write!(f, " ")?;
+            }
+            first = false;
+            write!(f, "#{}", AsRef::<str>::as_ref(tag))?;
+        }
+        write!(f, "]")?;
+        Ok(())
+    }
+}
+impl TagsKey {
+    fn partial_cmp(&self, other: &TagsKey) -> Option<std::cmp::Ordering> {
+        if other.0.len() != self.0.len() {
+            return self.0.len().partial_cmp(&other.0.len());
+        }
+        for (t1, t2) in self.0.iter().zip(other.0.iter()) {
+            if t1 != t2 {
+                return t1.partial_cmp(t2);
+            }
+        }
+        Some(std::cmp::Ordering::Equal)
+    }
+    fn cmp(&self, other: &TagsKey) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
 
 #[derive(Debug)]
 pub struct ListPattern(Regex);
@@ -67,31 +111,39 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-pub fn fmt_list<'a, W: Write>(
-    w: &mut W,
-    scripts: impl IntoIterator<Item = ScriptInfo<'a>>,
-    opt: &ListOptions,
-) -> Result<()> {
-    let mut scripts: Vec<_> = scripts.into_iter().filter(|s| opt.filter(s)).collect();
-    scripts.sort_by_key(|m| m.name.clone());
-    let last_index = match scripts
-        .iter()
-        .enumerate()
-        .max_by_key(|(_, s)| s.last_time())
-    {
-        Some((i, _)) => i,
+pub fn fmt_list<'a, W: Write>(w: &mut W, mut history: History, opt: &ListOptions) -> Result<()> {
+    let mut scripts: HashMap<TagsKey, Vec<ScriptInfo>> = HashMap::default();
+    let latest_script_name = match history.latest_mut() {
+        Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
+    for script in history.into_iter() {
+        if !opt.filter(&script) {
+            continue;
+        }
+        let key = TagsKey(script.tags.clone());
+        let v = scripts.entry(key).or_default();
+        v.push(script);
+    }
 
     if opt.long {
         writeln!(w, "type\tname\tlast edit time\tlast execute time")?;
     }
-    for (i, script) in scripts.iter().enumerate() {
-        if i != 0 && !opt.long {
-            write!(w, "  ")?;
+    let mut scripts: Vec<_> = scripts.into_iter().collect();
+    scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
+    for (tags, scripts) in scripts.iter() {
+        // TODO: print tags
+        if tags.0.len() > 0 {
+            write!(w, "{}\n", tags)?;
         }
-        fmt_meta(w, script, last_index == i, opt)?;
+        for script in scripts {
+            if !opt.long {
+                write!(w, "  ")?;
+            }
+            let is_latest = script.name == latest_script_name;
+            fmt_meta(w, script, is_latest, opt)?;
+        }
+        write!(w, "\n")?;
     }
-    writeln!(w, "")?;
     Ok(())
 }

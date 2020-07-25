@@ -3,16 +3,16 @@ use crate::script::{AsScriptName, ScriptName};
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub enum ScriptArg {
+pub enum ScriptQuery {
     Fuzz(String),
     Exact(ScriptName<'static>),
     Prev(usize),
 }
-impl AsScriptName for ScriptArg {
+impl AsScriptName for ScriptQuery {
     fn as_script_name(&self) -> Result<ScriptName> {
         match self {
-            ScriptArg::Fuzz(s) => s.as_script_name(),
-            ScriptArg::Exact(name) => name.as_script_name(),
+            ScriptQuery::Fuzz(s) => s.as_script_name(),
+            ScriptQuery::Exact(name) => name.as_script_name(),
             _ => panic!("歷史查詢沒有名字"),
         }
     }
@@ -43,20 +43,20 @@ fn parse_prev(s: &str) -> Result<usize> {
     }
     Err(Error::Format(s.to_owned()))
 }
-impl FromStr for ScriptArg {
+impl FromStr for ScriptQuery {
     type Err = Error;
     fn from_str(mut s: &str) -> Result<Self> {
         if s.starts_with('=') {
             s = &s[1..s.len()];
             let name = s.as_script_name()?.into_static();
-            Ok(ScriptArg::Exact(name))
+            Ok(ScriptQuery::Exact(name))
         } else if s == "-" {
-            Ok(ScriptArg::Prev(1))
+            Ok(ScriptQuery::Prev(1))
         } else if s.starts_with('^') {
-            Ok(ScriptArg::Prev(parse_prev(s)?))
+            Ok(ScriptQuery::Prev(parse_prev(s)?))
         } else {
             s.as_script_name()?; // NOTE: 單純檢查用
-            Ok(ScriptArg::Fuzz(s.to_owned()))
+            Ok(ScriptQuery::Fuzz(s.to_owned()))
         }
     }
 }

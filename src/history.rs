@@ -70,6 +70,9 @@ impl<'a> History<'a> {
     pub fn get_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {
         self.map.get_mut(&*name.key())
     }
+    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {
+        self.hidden_map.get_mut(&*name.key())
+    }
     pub fn remove(&mut self, name: &ScriptName) {
         self.map.remove(&*name.key());
     }

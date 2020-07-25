@@ -11,11 +11,12 @@ pub enum Error {
     SysPathNotFound(&'static str),
 
     PermissionDenied(Vec<PathBuf>),
+    // NOTE: PathNotFound 比 ScriptNotFound 更嚴重，代表歷史記錄中有這支腳本，實際要找卻找不到
     PathNotFound(PathBuf),
-    PathExist(PathBuf),
     GeneralFS(Vec<PathBuf>, std::io::Error),
 
-    NoInfo(String),
+    ScriptExist(String),
+    ScriptNotFound(String),
     Operation(String),
     TypeMismatch {
         expect: ScriptType,

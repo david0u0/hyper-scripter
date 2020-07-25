@@ -1,10 +1,10 @@
 use chrono::Utc;
-use instant_scripter::arg::ScriptArg;
 use instant_scripter::config::Config;
 use instant_scripter::error::{Contextabl, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
 use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
+use instant_scripter::script_query::ScriptQuery;
 use instant_scripter::tag::TagFilters;
 use instant_scripter::{fuzzy, path, util};
 use structopt::clap::AppSettings::{
@@ -42,7 +42,7 @@ enum Subs {
         #[structopt(short, long, help = "The content for your script.")]
         content: Option<String>,
         #[structopt(parse(try_from_str))]
-        script_name: Option<ScriptArg>,
+        script_query: Option<ScriptQuery>,
         #[structopt(
             long,
             short = "x",
@@ -54,26 +54,26 @@ enum Subs {
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
         #[structopt(default_value = "-", parse(try_from_str))]
-        script_name: ScriptArg,
+        script_query: ScriptQuery,
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
     #[structopt(about = "Print the script to standard output.")]
     Cat {
         #[structopt(default_value = "-", parse(try_from_str))]
-        script_name: ScriptArg,
+        script_query: ScriptQuery,
     },
     #[structopt(about = "Remove the script")]
     RM {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
-        scripts: Vec<ScriptArg>,
+        script_queries: Vec<ScriptQuery>,
     },
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(parse(try_from_str))]
-        origin: ScriptArg,
+        origin: ScriptQuery,
         new: String,
     },
     #[structopt(about = "Move the script to another one")]
@@ -88,7 +88,7 @@ enum Subs {
         #[structopt(short, long)]
         tags: Option<TagFilters>,
         #[structopt(parse(try_from_str))]
-        origin: ScriptArg,
+        origin: ScriptQuery,
         new: Option<String>,
     },
     #[structopt(
@@ -154,7 +154,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
     match root.subcmd {
         None => {
             root.subcmd = Some(Subs::Edit {
-                script_name: Some(ScriptArg::Prev(1)),
+                script_query: Some(ScriptQuery::Prev(1)),
                 executable: None,
                 content: None,
             });
@@ -162,7 +162,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         Some(Subs::Other(args)) => {
             log::info!("執行模式");
             let run = Subs::Run {
-                script_name: std::str::FromStr::from_str(&args[0])?,
+                script_query: std::str::FromStr::from_str(&args[0])?,
                 args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
             };
             root.subcmd = Some(run);
@@ -175,12 +175,12 @@ fn main_err_handle() -> Result<Vec<Error>> {
     Ok(res)
 }
 fn get_info_mut<'b, 'a>(
-    script_name: &ScriptArg,
+    script_query: &ScriptQuery,
     history: &'b mut History<'a>,
 ) -> Result<Option<&'b mut ScriptInfo<'a>>> {
-    log::debug!("開始尋找 `{:?}`", script_name);
-    match script_name {
-        ScriptArg::Prev(prev) => {
+    log::debug!("開始尋找 `{:?}`", script_query);
+    match script_query {
+        ScriptQuery::Prev(prev) => {
             let latest = history.latest_mut(*prev);
             log::trace!("找最新腳本");
             return if latest.is_some() {
@@ -189,17 +189,19 @@ fn get_info_mut<'b, 'a>(
                 Err(Error::Empty)
             };
         }
-        ScriptArg::Exact(name) => Ok(history.get_mut(name)),
-        ScriptArg::Fuzz(name) => fuzzy::fuzz_mut(name, history.iter_mut()),
+        ScriptQuery::Exact(name) => Ok(history.get_mut(name)),
+        ScriptQuery::Fuzz(name) => fuzzy::fuzz_mut(name, history.iter_mut()),
     }
 }
 fn get_info_mut_strict<'b, 'a>(
-    script_name: &ScriptArg,
+    script_query: &ScriptQuery,
     history: &'b mut History<'a>,
 ) -> Result<&'b mut ScriptInfo<'a>> {
-    match get_info_mut(script_name, history) {
+    match get_info_mut(script_query, history) {
         Err(e) => Err(e),
-        Ok(None) => Err(Error::NoInfo(script_name.as_script_name()?.to_string())),
+        Ok(None) => Err(Error::ScriptNotFound(
+            script_query.as_script_name()?.to_string(),
+        )),
         Ok(Some(info)) => Ok(info),
     }
 }
@@ -209,13 +211,13 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
 
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
-            script_name,
+            script_query,
             executable: ty,
             content,
         } => {
             let final_ty: ScriptType;
-            let script = if let Some(name) = script_name {
-                if let Some(h) = get_info_mut(name, hs)? {
+            let script = if let Some(query) = script_query {
+                if let Some(h) = get_info_mut(query, hs)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
                         if ty != &h.ty {
@@ -226,14 +228,17 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                         }
                     }
                     final_ty = h.ty;
-                    log::debug!("打開既有命名腳本：{:?}", name);
+                    log::debug!("打開既有命名腳本：{:?}", h.name);
                     path::open_script(&h.name, h.ty, true)
-                        .context(format!("打開命名腳本失敗：{:?}", name))?
+                        .context(format!("打開命名腳本失敗：{:?}", h.name))?
                 } else {
                     final_ty = ty.unwrap_or_default();
-                    log::debug!("打開新命名腳本：{:?}", name);
-                    path::open_script(name, ty.unwrap_or_default(), false)
-                        .context(format!("打開新命名腳本失敗：{:?}", name))?
+                    if hs.get_hidden_mut(&query.as_script_name()?).is_some() {
+                        return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
+                    }
+                    log::debug!("打開新命名腳本：{:?}", query);
+                    path::open_script(query, ty.unwrap_or_default(), false)
+                        .context(format!("打開新命名腳本失敗：{:?}", query))?
                 }
             } else {
                 final_ty = ty.unwrap_or_default();
@@ -244,7 +249,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             if let Some(content) = content {
                 log::info!("快速編輯 {:?}", script.name);
                 if script.path.exists() {
-                    return Err(Error::PathExist(script.path));
+                    return Err(Error::ScriptExist(script.name.to_string()));
                 }
                 util::fast_write_script(&script, content)?;
             } else {
@@ -263,8 +268,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             )?);
             h.read();
         }
-        Subs::Run { script_name, args } => {
-            let h = get_info_mut_strict(script_name, hs)?;
+        Subs::Run { script_query, args } => {
+            let h = get_info_mut_strict(script_query, hs)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             match util::run(&script, &h, &args) {
@@ -274,8 +279,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             }
             h.exec();
         }
-        Subs::Cat { script_name } => {
-            let h = get_info_mut_strict(script_name, hs)?;
+        Subs::Cat { script_query } => {
+            let h = get_info_mut_strict(script_query, hs)?;
             let script = path::open_script(&h.name, h.ty, true)?;
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
@@ -290,9 +295,9 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), hs, &opt)?;
         }
-        Subs::RM { scripts } => {
-            for script_name in scripts.into_iter() {
-                let h = get_info_mut_strict(script_name, hs)?;
+        Subs::RM { script_queries } => {
+            for query in script_queries.into_iter() {
+                let h = get_info_mut_strict(query, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 log::info!("刪除 {:?}", script);
@@ -307,7 +312,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_script = path::open_script(&new_name, h.ty, false)?;
             if new_script.path.exists() {
-                return Err(Error::PathExist(new_script.path));
+                return Err(Error::ScriptExist(new.clone()));
             }
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {

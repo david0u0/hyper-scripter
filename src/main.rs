@@ -154,7 +154,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
     match root.subcmd {
         None => {
             root.subcmd = Some(Subs::Edit {
-                script_name: Some(ScriptArg::Prev(0)),
+                script_name: Some(ScriptArg::Prev(1)),
                 executable: None,
                 content: None,
             });

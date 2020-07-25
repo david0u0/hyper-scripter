@@ -1,4 +1,4 @@
 /target
 **/.instant_script_info.json
-config.*
+config.toml
 .instant_script

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use instant_scripter::arg::ScriptArg;
 use instant_scripter::config::Config;
 use instant_scripter::error::{Contextabl, Error, Result};
 use instant_scripter::history::History;
@@ -40,7 +41,8 @@ enum Subs {
     Edit {
         #[structopt(short, long, help = "The content for your script.")]
         content: Option<String>,
-        script_name: Option<String>,
+        #[structopt(parse(try_from_str))]
+        script_name: Option<ScriptArg>,
         #[structopt(
             long,
             short = "x",
@@ -51,25 +53,29 @@ enum Subs {
     },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
-        #[structopt(default_value = "-")]
-        script_name: String,
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_name: ScriptArg,
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
     #[structopt(about = "Print the script to standard output.")]
     Cat {
-        #[structopt(default_value = "-")]
-        script_name: String,
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_name: ScriptArg,
     },
     #[structopt(about = "Remove the script")]
     RM {
-        #[structopt(required = true, min_values = 1)]
-        scripts: Vec<String>,
+        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        scripts: Vec<ScriptArg>,
     },
     #[structopt(about = "List instant scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Copy the script to another one")]
-    CP { origin: String, new: String },
+    CP {
+        #[structopt(parse(try_from_str))]
+        origin: ScriptArg,
+        new: String,
+    },
     #[structopt(about = "Move the script to another one")]
     MV {
         #[structopt(
@@ -81,7 +87,8 @@ enum Subs {
         executable: Option<ScriptType>,
         #[structopt(short, long)]
         tags: Option<TagFilters>,
-        origin: String,
+        #[structopt(parse(try_from_str))]
+        origin: ScriptArg,
         new: Option<String>,
     },
     #[structopt(
@@ -147,15 +154,15 @@ fn main_err_handle() -> Result<Vec<Error>> {
     match root.subcmd {
         None => {
             root.subcmd = Some(Subs::Edit {
-                script_name: Some("-".to_owned()),
+                script_name: Some(ScriptArg::Prev(0)),
                 executable: None,
                 content: None,
             });
         }
         Some(Subs::Other(args)) => {
-            log::debug!("純執行模式");
+            log::info!("執行模式");
             let run = Subs::Run {
-                script_name: args[0].clone(),
+                script_name: std::str::FromStr::from_str(&args[0])?,
                 args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
             };
             root.subcmd = Some(run);
@@ -168,34 +175,31 @@ fn main_err_handle() -> Result<Vec<Error>> {
     Ok(res)
 }
 fn get_info_mut<'b, 'a>(
-    name: &str,
+    script_name: &ScriptArg,
     history: &'b mut History<'a>,
 ) -> Result<Option<&'b mut ScriptInfo<'a>>> {
-    log::trace!("開始尋找 `{}`", name);
-    if name == "-" {
-        log::trace!("找最新腳本");
-        let latest = history.latest_mut();
-        return if latest.is_some() {
-            Ok(latest)
-        } else {
-            Err(Error::Empty)
-        };
-    }
-    // TODO: 更多格式檢查
-    let script_name = name.as_script_name()?; // NOTE: 順便檢查一下合法性
-    if name.starts_with("=") {
-        Ok(history.get_mut(&script_name))
-    } else {
-        fuzzy::fuzz_mut(name, history.iter_mut())
+    log::debug!("開始尋找 `{:?}`", script_name);
+    match script_name {
+        ScriptArg::Prev(prev) => {
+            let latest = history.latest_mut();
+            log::trace!("找最新腳本");
+            return if latest.is_some() {
+                Ok(latest)
+            } else {
+                Err(Error::Empty)
+            };
+        }
+        ScriptArg::Exact(name) => Ok(history.get_mut(name)),
+        ScriptArg::Fuzz(name) => fuzzy::fuzz_mut(name, history.iter_mut()),
     }
 }
 fn get_info_mut_strict<'b, 'a>(
-    name: &str,
+    script_name: &ScriptArg,
     history: &'b mut History<'a>,
 ) -> Result<&'b mut ScriptInfo<'a>> {
-    match get_info_mut(name, history) {
+    match get_info_mut(script_name, history) {
         Err(e) => Err(e),
-        Ok(None) => Err(Error::NoInfo(name.to_owned())),
+        Ok(None) => Err(Error::NoInfo(script_name.as_script_name()?.to_string())),
         Ok(Some(info)) => Ok(info),
     }
 }
@@ -228,7 +232,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 } else {
                     final_ty = ty.unwrap_or_default();
                     log::debug!("打開新命名腳本：{:?}", name);
-                    path::open_script(AsRef::<str>::as_ref(name), ty.unwrap_or_default(), false)
+                    path::open_script(name, ty.unwrap_or_default(), false)
                         .context(format!("打開新命名腳本失敗：{:?}", name))?
                 }
             } else {

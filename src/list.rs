@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::history::History;
 use crate::script::ScriptInfo;
 use crate::tag::Tag;
@@ -52,12 +52,15 @@ impl TagsKey {
 #[derive(Debug)]
 pub struct ListPattern(Regex);
 impl std::str::FromStr for ListPattern {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Error> {
         // TODO: 好好檢查
         let s = s.replace(".", "\\.");
         let s = s.replace("*", ".*");
-        let re = Regex::new(&format!("^{}$", s)).map_err(|e| e.to_string())?;
+        let re = Regex::new(&format!("^{}$", s)).map_err(|e| {
+            log::error!("正規表達式錯誤：{}", e);
+            Error::Format(s)
+        })?;
         Ok(ListPattern(re))
     }
 }

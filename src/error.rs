@@ -22,9 +22,15 @@ pub enum Error {
         actual: ScriptType,
     },
     MultiFuzz(Vec<String>),
-    ScriptNameFormat(String),
+    Format(String),
     ScriptError(String),
     Empty,
+}
+impl std::fmt::Display for Error {
+    // TODO: 好好實作它！
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl<T: 'static + Send + Sync + std::error::Error> From<T> for Error {

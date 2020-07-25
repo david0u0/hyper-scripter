@@ -150,8 +150,8 @@ macro_rules! script_type_enum {
             }
         }
         impl std::str::FromStr for ScriptType {
-            type Err = String;
-            fn from_str(s: &str) -> std::result::Result<Self, String> {
+            type Err = Error;
+            fn from_str(s: &str) -> std::result::Result<Self, Error> {
                 match s {
                     $(
                         $tag => {
@@ -161,7 +161,8 @@ macro_rules! script_type_enum {
                     _ => {
                         let v = &[$($tag),*];
                         let expected = v.join("/").to_string();
-                        Err(format!("ScriptMeta type expected {}, get {}", expected, s))
+                        // TODO: 用正確的方式
+                        Err(Error::Format(format!("ScriptMeta type expected {}, get {}", expected, s)))
                     }
                 }
             }
@@ -213,17 +214,13 @@ impl AsScriptName for str {
             let id_str = m.get(1).unwrap().as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(ScriptName::Anonymous(id)),
-                Err(e) => return Err(Error::ScriptNameFormat(self.to_owned()).context(e)),
+                Err(e) => return Err(Error::Format(self.to_owned()).context(e)),
             }
         } else {
-            let s = match self.starts_with("=") {
-                true => &self[1..self.len()],
-                false => self,
-            };
-            if s.starts_with("-") || s.find(".").is_some() || s.find(" ").is_some() {
-                return Err(Error::ScriptNameFormat(s.to_owned()).context("命名腳本格式有誤"));
+            if self.starts_with("-") || self.find(".").is_some() || self.find(" ").is_some() {
+                return Err(Error::Format(self.to_owned()).context("命名腳本格式有誤"));
             }
-            Ok(ScriptName::Named(Cow::Borrowed(s)))
+            Ok(ScriptName::Named(Cow::Borrowed(self)))
         }
     }
 }

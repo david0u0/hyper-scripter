@@ -1,3 +1,4 @@
+use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -23,19 +24,19 @@ impl Tag {
     }
 }
 impl FromStr for Tag {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, String> {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Error> {
         // TODO: 檢查格式
         if s.len() == 0 {
-            Err(format!("Wrong tag format: {}", s))
+            Err(Error::Format(s.to_owned()))
         } else {
             Ok(Tag(s.to_owned()))
         }
     }
 }
 impl FromStr for TagFilter {
-    type Err = String;
-    fn from_str(tag: &str) -> std::result::Result<Self, String> {
+    type Err = Error;
+    fn from_str(tag: &str) -> std::result::Result<Self, Error> {
         let mut s = tag;
         let allow = if s.starts_with("-") {
             s = &s[1..s.len()];
@@ -53,8 +54,8 @@ impl FromStr for TagFilter {
     }
 }
 impl FromStr for TagFilters {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, String> {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Error> {
         let mut inner = vec![];
         for filter in s.split(",") {
             if filter.len() > 0 {

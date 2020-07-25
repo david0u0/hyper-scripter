@@ -1,4 +1,5 @@
 use chrono::Utc;
+use instant_scripter::config::Config;
 use instant_scripter::error::{Contextabl, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
@@ -19,13 +20,17 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
     DisableVersion,
 ];
 
+fn default_tag_filter() -> String {
+    Config::load().unwrap().tag_filters.to_string()
+}
+
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AllowLeadingHyphen)]
 struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
-    #[structopt(short, long, parse(try_from_str), default_value = "all,-hide")]
-    tags: TagFilters,
+    #[structopt(short, long, parse(try_from_str))]
+    tags: Option<TagFilters>,
     #[structopt(short, long, help = "Shorthand for `-t=all`")]
     all: bool,
     #[structopt(subcommand)]
@@ -113,19 +118,58 @@ struct List {
     pattern: Option<ListPattern>,
 }
 
-fn main() -> Result<()> {
+fn main() -> std::result::Result<(), Vec<Error>> {
     env_logger::init();
+    match main_err_handle() {
+        Err(e) => Err(vec![e]),
+        Ok(v) => {
+            if v.len() == 0 {
+                Ok(())
+            } else {
+                Err(v)
+            }
+        }
+    }
+}
+fn main_err_handle() -> Result<Vec<Error>> {
     let mut root = Root::from_args();
     log::debug!("命令行物件：{:?}", root);
     match &root.is_path {
         Some(is_path) => path::set_path(is_path)?,
         None => path::set_path_from_sys()?,
     }
+    let mut conf = Config::load()?;
+
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
-    if !root.all() {
-        hs.filter_by_group(&root.tags);
+    if root.tags.is_none() {
+        root.tags = Some(conf.tag_filters.clone());
     }
-    main_inner(&mut root, hs)
+    if !root.all() {
+        hs.filter_by_group(root.tags.as_ref().unwrap());
+    }
+
+    match root.subcmd {
+        None => {
+            root.subcmd = Some(Subs::Edit {
+                script_name: Some("-".to_owned()),
+                executable: None,
+                content: None,
+            });
+        }
+        Some(Subs::Other(args)) => {
+            log::debug!("純執行模式");
+            let run = Subs::Run {
+                script_name: args[0].clone(),
+                args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
+            };
+            root.subcmd = Some(run);
+        }
+        _ => (),
+    }
+    let res = main_inner(&root, &mut hs, &mut conf)?;
+    conf.store()?;
+    path::store_history(hs.into_iter_all())?;
+    Ok(res)
 }
 fn get_info_mut<'b, 'a>(
     name: &str,
@@ -159,27 +203,11 @@ fn get_info_mut_strict<'b, 'a>(
         Ok(Some(info)) => Ok(info),
     }
 }
-fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
-    let mut res: Result<()> = Ok(());
-    let edit_last = Subs::Edit {
-        script_name: Some("-".to_owned()),
-        executable: None,
-        content: None,
-    };
-    let sub = root.subcmd.as_ref().unwrap_or(&edit_last);
+fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Result<Vec<Error>> {
+    let mut res = Vec::<Error>::new();
+    let tags = root.tags.clone().unwrap();
 
-    let tags = root.tags.clone();
-
-    match sub {
-        Subs::Other(cmds) => {
-            log::info!("純執行模式");
-            let run = Subs::Run {
-                script_name: cmds[0].clone(),
-                args: cmds[1..cmds.len()].iter().map(|s| s.clone()).collect(),
-            };
-            root.subcmd = Some(run);
-            return main_inner(root, hs);
-        }
+    match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
             script_name,
             executable: ty,
@@ -187,7 +215,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
         } => {
             let final_ty: ScriptType;
             let script = if let Some(name) = script_name {
-                if let Some(h) = get_info_mut(name, &mut hs)? {
+                if let Some(h) = get_info_mut(name, hs)? {
                     if let Some(ty) = ty {
                         log::warn!("已存在的腳本無需再指定類型");
                         if ty != &h.ty {
@@ -236,18 +264,18 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             h.edit_time = Utc::now();
         }
         Subs::Run { script_name, args } => {
-            let h = get_info_mut_strict(script_name, &mut hs)?;
+            let h = get_info_mut_strict(script_name, hs)?;
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, h.ty, true)?;
             match util::run(&script, &h, &args) {
-                Err(e @ Error::ScriptError(_)) => res = Err(e),
+                Err(e @ Error::ScriptError(_)) => res.push(e),
                 Err(e) => return Err(e),
                 Ok(_) => (),
             }
             h.exec_time = Some(Utc::now());
         }
         Subs::Cat { script_name } => {
-            let h = get_info_mut_strict(script_name, &mut hs)?;
+            let h = get_info_mut_strict(script_name, hs)?;
             let script = path::open_script(&h.name, h.ty, true)?;
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
@@ -260,11 +288,10 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), hs, &opt)?;
-            return Ok(());
         }
         Subs::RM { scripts } => {
             for script_name in scripts.into_iter() {
-                let h = get_info_mut_strict(script_name, &mut hs)?;
+                let h = get_info_mut_strict(script_name, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, h.ty, true)?;
                 log::info!("刪除 {:?}", script);
@@ -274,7 +301,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             }
         }
         Subs::CP { origin, new } => {
-            let h = get_info_mut_strict(origin, &mut hs)?;
+            let h = get_info_mut_strict(origin, hs)?;
             let new_name = new.as_script_name()?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_script = path::open_script(&new_name, h.ty, false)?;
@@ -295,7 +322,7 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
             tags,
             executable: ty,
         } => {
-            let h = get_info_mut_strict(origin, &mut hs)?;
+            let h = get_info_mut_strict(origin, hs)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;
             let new_ty = ty.unwrap_or(h.ty);
             let new_name = match new {
@@ -314,6 +341,5 @@ fn main_inner<'a>(root: &mut Root, mut hs: History<'a>) -> Result<()> {
         }
         _ => unimplemented!(),
     }
-    path::store_history(hs.into_iter_all())?;
-    res
+    Ok(res)
 }

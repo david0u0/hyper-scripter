@@ -112,13 +112,13 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-pub fn fmt_list<'a, W: Write>(w: &mut W, mut history: History, opt: &ListOptions) -> Result<()> {
-    let mut scripts: HashMap<TagsKey, Vec<ScriptInfo>> = HashMap::default();
+pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOptions) -> Result<()> {
+    let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
     let latest_script_name = match history.latest_mut() {
         Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
-    for script in history.into_iter() {
+    for script in history.iter() {
         if !opt.filter(&script) {
             continue;
         }

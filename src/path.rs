@@ -10,7 +10,7 @@ const META: &'static str = ".instant_scripter_info.json";
 const ROOT_PATH: &'static str = "instant_scripter";
 
 lazy_static::lazy_static! {
-    static ref PATH: Mutex<PathBuf> = Mutex::new(PathBuf::new());
+    static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 }
 
 #[cfg(not(debug_assertions))]
@@ -51,11 +51,14 @@ pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
         handle_fs_res(&[&path], create_dir(&path))?;
     }
-    *PATH.lock().unwrap() = path;
+    *PATH.lock().unwrap() = Some(path);
     Ok(())
 }
 pub fn get_path() -> PathBuf {
-    PATH.lock().unwrap().clone()
+    PATH.lock()
+        .unwrap()
+        .clone()
+        .expect("還沒設定路徑就取路徑，錯誤實作！")
 }
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {

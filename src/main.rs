@@ -20,10 +20,6 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
     DisableVersion,
 ];
 
-fn default_tag_filter() -> String {
-    Config::load().unwrap().tag_filters.to_string()
-}
-
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AllowLeadingHyphen)]
 struct Root {
@@ -337,6 +333,13 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             h.ty = new_ty;
             if let Some(tags) = tags {
                 h.tags = tags.clone().into_allowed_iter().collect();
+            }
+        }
+        Subs::Tags { tags } => {
+            if let Some(tags) = tags {
+                conf.tag_filters = tags.clone();
+            } else {
+                println!("current tag filter = [{}]", conf.tag_filters);
             }
         }
         _ => unimplemented!(),

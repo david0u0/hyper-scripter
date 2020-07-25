@@ -67,11 +67,16 @@ impl FromStr for TagFilters {
 
 impl std::fmt::Display for TagFilters {
     fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut first = true;
         for f in &self.0 {
+            if !first {
+                write!(w, ",")?;
+            }
+            first = false;
             if !f.allow {
                 write!(w, "-")?;
             }
-            write!(w, "{},", f.tag.0)?;
+            write!(w, "{}", f.tag.0)?;
         }
         Ok(())
     }

@@ -19,6 +19,10 @@ impl Hash for TagsKey {
 }
 impl std::fmt::Display for TagsKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.len() == 0 {
+            write!(f, "(no tag)")?;
+            return Ok(());
+        }
         write!(f, "[")?;
         let mut first = true;
         for tag in &self.0 {
@@ -136,10 +140,7 @@ pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOption
     let mut scripts: Vec<_> = scripts.into_iter().collect();
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
     for (tags, scripts) in scripts.iter() {
-        // TODO: print tags
-        if tags.0.len() > 0 {
-            write!(w, "{}\n", tags)?;
-        }
+        write!(w, "{}\n", tags.to_string().dimmed().italic())?;
         for script in scripts {
             if !opt.long {
                 write!(w, "  ")?;

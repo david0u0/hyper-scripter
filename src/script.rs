@@ -189,7 +189,7 @@ macro_rules! script_type_enum {
 }
 
 script_type_enum! {
-    ["sh", Color::Green] => Shell("sh"): ("bash"),
+    ["sh", Color::BrightMagenta] => Shell("sh"): ("bash"),
     ["screen", Color::White] => Screen: ("screen", "-c"),
     ["txt", Color::BrightBlack] => Txt: (),
     ["js", Color::BrightCyan] => Js("js"): ("node"),

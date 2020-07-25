@@ -65,7 +65,7 @@ impl FuzzKey for ScriptName<'_> {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScriptInfo<'a> {
-    pub edit_time: DateTime<Utc>,
+    pub read_time: DateTime<Utc>,
     pub exec_time: Option<DateTime<Utc>>,
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,
@@ -80,8 +80,8 @@ impl FuzzKey for ScriptInfo<'_> {
 impl ScriptInfo<'_> {
     pub fn last_time(&self) -> DateTime<Utc> {
         match self.exec_time {
-            Some(exec_time) => std::cmp::max(self.edit_time, exec_time),
-            _ => self.edit_time,
+            Some(exec_time) => std::cmp::max(self.read_time, exec_time),
+            _ => self.read_time,
         }
     }
     pub fn file_name(&self) -> String {
@@ -96,9 +96,15 @@ impl ScriptInfo<'_> {
             name,
             ty,
             tags: tags.collect(),
-            edit_time: Utc::now(),
+            read_time: Utc::now(),
             exec_time: None,
         })
+    }
+    pub fn read(&mut self) {
+        self.read_time = Utc::now();
+    }
+    pub fn exec(&mut self) {
+        self.exec_time = Some(Utc::now());
     }
 }
 

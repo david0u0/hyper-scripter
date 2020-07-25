@@ -181,7 +181,7 @@ fn get_info_mut<'b, 'a>(
     log::debug!("開始尋找 `{:?}`", script_name);
     match script_name {
         ScriptArg::Prev(prev) => {
-            let latest = history.latest_mut();
+            let latest = history.latest_mut(*prev);
             log::trace!("找最新腳本");
             return if latest.is_some() {
                 Ok(latest)
@@ -261,7 +261,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 final_ty,
                 tags.into_allowed_iter(),
             )?);
-            h.edit_time = Utc::now();
+            h.read();
         }
         Subs::Run { script_name, args } => {
             let h = get_info_mut_strict(script_name, hs)?;
@@ -272,7 +272,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 Err(e) => return Err(e),
                 Ok(_) => (),
             }
-            h.exec_time = Some(Utc::now());
+            h.exec();
         }
         Subs::Cat { script_name } => {
             let h = get_info_mut_strict(script_name, hs)?;
@@ -280,6 +280,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
             println!("{}", content);
+            h.read();
         }
         Subs::LS(list) => {
             let opt = ListOptions {
@@ -311,7 +312,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             util::cp(&og_script, &new_script)?;
             let new_info = ScriptInfo {
                 name: new_name.into_static(),
-                edit_time: Utc::now(),
+                read_time: Utc::now(),
                 ..h.clone()
             };
             hs.insert(new_info);
@@ -333,7 +334,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             util::mv(&og_script, &new_script)?;
 
             h.name = new_name.into_static();
-            h.edit_time = Utc::now();
+            h.read();
             h.ty = new_ty;
             if let Some(tags) = tags {
                 h.tags = tags.clone().into_allowed_iter().collect();

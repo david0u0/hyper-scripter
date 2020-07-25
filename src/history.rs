@@ -6,7 +6,7 @@ use std::collections::{hash_map::Entry, HashMap};
 pub struct History<'a> {
     map: HashMap<String, ScriptInfo<'a>>,
     hidden_map: HashMap<String, ScriptInfo<'a>>,
-    latest_name: Option<String>,
+    // latest_name: Option<String>,
 }
 fn m(t: (String, ScriptInfo)) -> ScriptInfo {
     t.1
@@ -28,24 +28,32 @@ impl<'a> History<'a> {
             .map(m)
             .chain(self.hidden_map.into_iter().map(m))
     }
-    fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
-        let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());
-        if let Some((name, info)) = latest {
-            self.latest_name = Some(name.clone());
-            Some(info)
+    // fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
+    //     let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());
+    //     if let Some((name, info)) = latest {
+    //         self.latest_name = Some(name.clone());
+    //         Some(info)
+    //     } else {
+    //         None
+    //     }
+    // }
+    pub fn latest_mut(&mut self, n: usize) -> Option<&mut ScriptInfo<'a>> {
+        // if let Some(name) = &self.latest_name {
+        //     // FIXME: 一旦 rust nll 進化就修掉這段
+        //     if self.map.contains_key(name) {
+        //         return self.map.get_mut(name);
+        //     }
+        //     log::warn!("快取住的最新資訊已經不見了…？重找一次");
+        // }
+        // self.latest_mut_no_cache()
+        let mut v: Vec<_> = self.map.iter_mut().map(|(_, s)| s).collect();
+        v.sort_by_key(|s| s.last_time());
+        if v.len() >= n {
+            // SAFETY: 從向量中讀一個可變指針安啦
+            Some(unsafe { std::ptr::read(&v[v.len() - n]) })
         } else {
             None
         }
-    }
-    pub fn latest_mut(&mut self) -> Option<&mut ScriptInfo<'a>> {
-        if let Some(name) = &self.latest_name {
-            // FIXME: 一旦 rust nll 進化就修掉這段
-            if self.map.contains_key(name) {
-                return self.map.get_mut(name);
-            }
-            log::warn!("快取住的最新資訊已經不見了…？重找一次");
-        }
-        self.latest_mut_no_cache()
     }
     pub fn new<I: Iterator<Item = ScriptInfo<'a>>>(iter: I) -> Self {
         let mut map = HashMap::new();
@@ -56,7 +64,7 @@ impl<'a> History<'a> {
         History {
             map,
             hidden_map: Default::default(),
-            latest_name: None,
+            // latest_name: None,
         }
     }
     pub fn get_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {

@@ -100,7 +100,7 @@ pub fn fmt_meta<W: Write>(
             format!("{}\t{}", script.ty, script.name)
                 .color(script.ty.color())
                 .bold(),
-            script.edit_time,
+            script.read_time,
             exex_time
         )?;
     } else {
@@ -117,7 +117,7 @@ pub fn fmt_meta<W: Write>(
 }
 pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOptions) -> Result<()> {
     let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
-    let latest_script_name = match history.latest_mut() {
+    let latest_script_name = match history.latest_mut(1) {
         Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
@@ -131,7 +131,7 @@ pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOption
     }
 
     if opt.long {
-        writeln!(w, "type\tname\tlast edit time\tlast execute time")?;
+        writeln!(w, "type\tname\tlast read time\tlast execute time")?;
     }
     let mut scripts: Vec<_> = scripts.into_iter().collect();
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));

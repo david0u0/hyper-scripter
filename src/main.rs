@@ -234,6 +234,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 } else {
                     final_ty = ty.unwrap_or_default();
                     if hs.get_hidden_mut(&query.as_script_name()?).is_some() {
+                        log::error!("與被篩掉的腳本撞名");
                         return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
                     }
                     log::debug!("打開新命名腳本：{:?}", query);
@@ -249,6 +250,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             if let Some(content) = content {
                 log::info!("快速編輯 {:?}", script.name);
                 if script.path.exists() {
+                    log::error!("不允許快速編輯已存在的腳本");
                     return Err(Error::ScriptExist(script.name.to_string()));
                 }
                 util::fast_write_script(&script, content)?;

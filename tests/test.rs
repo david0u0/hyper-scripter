@@ -46,8 +46,8 @@ fn run(args: &[&str]) -> Result<String, i32> {
     }
 }
 
-const MSG: &'static str = "你好，腳本管理員！";
-const MSG_JS: &'static str = "你好，腳本管理員！.js";
+const MSG: &'static str = "你好，腳本人！";
+const MSG_JS: &'static str = "你好，腳本人！.js";
 #[test]
 fn test_tags() {
     let _g = setup();
@@ -138,4 +138,22 @@ fn test_prev() {
     );
 
     run(&["^^^^"]).expect_err("明明只有三個腳本，跟我說有第四新的？");
+}
+
+#[test]
+fn test_edit_same_name() {
+    let _g = setup();
+    run(&[
+        "-t",
+        "hide",
+        "e",
+        "i-am-hidden",
+        "-c",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
+    run(&["-"]).expect_err("執行了隱藏的腳本？？");
+    run(&["e", "i-am-hidden", "-c", "yo"]).expect_err("竟然能編輯撞名的腳本？");
+    run(&["tags", "hide"]).unwrap();
+    assert_eq!(MSG, run(&["-"]).unwrap(), "腳本被撞名的編輯搞爛了？");
 }

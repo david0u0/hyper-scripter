@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(not(debug_assertions))]
-fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_path() -> Result<PathBuf> {
     let p = match std::env::var("INSTANT_SCRIPT_PATH") {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
@@ -28,11 +28,11 @@ fn get_sys_path() -> Result<PathBuf> {
     Ok(p)
 }
 #[cfg(all(debug_assertions, not(test)))]
-fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_path() -> Result<PathBuf> {
     Ok(".instant_script".into())
 }
 #[cfg(all(debug_assertions, test))]
-fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_path() -> Result<PathBuf> {
     Ok(".test_instant_script".into())
 }
 

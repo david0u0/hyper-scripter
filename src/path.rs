@@ -1,9 +1,8 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ScriptType, ANONYMOUS};
-use crate::util::{handle_fs_res, read_file};
-use std::fs::{canonicalize, create_dir, read_dir, File};
-use std::io::Write;
+use crate::util::{handle_fs_res, read_file, write_file};
+use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -140,13 +139,8 @@ pub fn get_history() -> Result<History<'static>> {
 
 pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
     let path = join_path(get_path(), META)?;
-    let mut file = handle_fs_res(&[&path], File::create(&path)).context("唯寫打開歷史檔案失敗")?;
     let v: Vec<_> = history.collect();
-    handle_fs_res(
-        &[&path],
-        file.write_all(serde_json::to_string(&v)?.as_bytes()),
-    )
-    .context("寫入歷史檔案失敗")?;
+    write_file(&path, &serde_json::to_string(&v)?).context("寫入歷史檔案失敗")?;
     Ok(())
 }
 #[cfg(test)]

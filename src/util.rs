@@ -61,9 +61,12 @@ pub fn read_file(path: &PathBuf) -> Result<String> {
     Ok(content)
 }
 
+pub fn write_file(path: &PathBuf, content: &str) -> Result<()> {
+    let mut file = handle_fs_res(&[path], File::create(path))?;
+    handle_fs_res(&[path], file.write_all(content.as_bytes()))
+}
 pub fn fast_write_script(script: &ScriptMeta, content: &str) -> Result<()> {
-    let mut file = handle_fs_res(&[&script.path], File::create(&script.path))?;
-    handle_fs_res(&[&script.path], file.write_all(content.as_bytes()))
+    write_file(&script.path, content)
 }
 pub fn remove(script: &ScriptMeta) -> Result<()> {
     handle_fs_res(&[&script.path], remove_file(&script.path))

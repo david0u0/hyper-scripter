@@ -12,8 +12,9 @@ use std::io::Write;
 struct TagsKey(Vec<Tag>);
 impl Hash for TagsKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let s: Vec<&str> = self.0.iter().map(|t| t.as_ref()).collect();
-        s.join("+").hash(state);
+        for tag in self.0.iter() {
+            tag.as_ref().hash(state);
+        }
     }
 }
 impl std::fmt::Display for TagsKey {

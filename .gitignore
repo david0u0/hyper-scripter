@@ -1,3 +1,4 @@
 /target
 **/.instant_script_info.json
 .instant_script
+config.*

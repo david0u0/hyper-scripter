@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagFilters(Vec<TagFilter>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagFilter {
     allow: bool,
     tag: Tag,
@@ -65,6 +65,17 @@ impl FromStr for TagFilters {
     }
 }
 
+impl std::fmt::Display for TagFilters {
+    fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for f in &self.0 {
+            if !f.allow {
+                write!(w, "-")?;
+            }
+            write!(w, "{},", f.tag.0)?;
+        }
+        Ok(())
+    }
+}
 impl TagFilters {
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
         self.0.into_iter().filter_map(|f| {

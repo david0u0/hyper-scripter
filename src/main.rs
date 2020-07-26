@@ -246,21 +246,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 log::debug!("打開新匿名腳本");
                 path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
             };
-
-            if let Some(content) = content {
-                log::info!("快速編輯 {:?}", script.name);
-                if script.path.exists() {
-                    log::error!("不允許快速編輯已存在的腳本");
-                    return Err(Error::ScriptExist(script.name.to_string()));
-                }
-                util::fast_write_script(&script, content)?;
-            } else {
-                log::info!("編輯 {:?}", script.name);
-                util::prepare_script(&script.path, final_ty)?;
-                let cmd = util::create_cmd("vim", &[script.path]);
-                let stat = util::run_cmd("vim", cmd)?;
-                log::debug!("編輯器返回：{:?}", stat);
-            }
+            let path = script.path;
+            log::info!("編輯 {:?}", script.name);
 
             let name = script.name.into_static();
             let h = hs.entry(&name).or_insert(ScriptInfo::new(
@@ -268,6 +255,20 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 final_ty,
                 tags.into_allowed_iter(),
             )?);
+
+            if let Some(content) = content {
+                log::info!("快速編輯 {:?}", h.name);
+                if path.exists() {
+                    log::error!("不允許快速編輯已存在的腳本");
+                    return Err(Error::ScriptExist(h.name.to_string()));
+                }
+                util::fast_write_script(&path, content)?;
+            } else {
+                util::prepare_script(&path, h)?;
+                let cmd = util::create_cmd("vim", &[path]);
+                let stat = util::run_cmd("vim", cmd)?;
+                log::debug!("編輯器返回：{:?}", stat);
+            }
             h.read();
         }
         Subs::Run { script_query, args } => {

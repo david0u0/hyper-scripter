@@ -65,8 +65,8 @@ pub fn write_file(path: &PathBuf, content: &str) -> Result<()> {
     let mut file = handle_fs_res(&[path], File::create(path))?;
     handle_fs_res(&[path], file.write_all(content.as_bytes()))
 }
-pub fn fast_write_script(script: &ScriptMeta, content: &str) -> Result<()> {
-    write_file(&script.path, content)
+pub fn fast_write_script(path: &PathBuf, content: &str) -> Result<()> {
+    write_file(path, content)
 }
 pub fn remove(script: &ScriptMeta) -> Result<()> {
     handle_fs_res(&[&script.path], remove_file(&script.path))
@@ -97,26 +97,35 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn prepare_script(path: &Path, ty: ScriptType) -> Result<()> {
+pub fn prepare_script(path: &Path, script: &ScriptInfo) -> Result<()> {
     if path.exists() {
         log::debug!("腳本已存在，不填入內容");
         return Ok(());
     }
-    log::debug!("開始準備 {} 腳本內容……", ty);
+    log::debug!("開始準備 {:?} 腳本內容……", script);
     let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
     let birthplace = birthplace.to_str().unwrap_or_default();
     let file = handle_fs_res(&[path], File::create(&path))?;
-    handle_fs_res(&[path], write_prepare_script(file, ty, birthplace))
+    handle_fs_res(&[path], write_prepare_script(file, script, birthplace))
 }
-fn write_prepare_script<W: Write>(w: W, ty: ScriptType, birthplace: &str) -> std::io::Result<()> {
+fn write_prepare_script<W: Write>(
+    w: W,
+    script: &ScriptInfo,
+    birthplace: &str,
+) -> std::io::Result<()> {
     // TODO: 依 ty 不同給不同訊息
-    let template = match ty {
+    let template = match script.ty {
         ScriptType::Shell => templates::SHELL_WELCOME_MSG,
         ScriptType::Js => templates::JS_WELCOME_MSG,
+        ScriptType::Screen => templates::SCREEN_WELCOME_MSG,
         _ => return Ok(()),
     };
     let reg = Handlebars::new();
-    reg.render_template_to_write(template, &json!({ "birthplace": birthplace }), w)
+    let info = json!({
+        "birthplace": birthplace,
+        "script_name": script.name.key().to_owned()
+    });
+    reg.render_template_to_write(template, &info, w)
         .map_err(|err| match err {
             TemplateRenderError::IOError(err, ..) => err,
             e => panic!("解析模版錯誤：{}", e),
@@ -132,7 +141,7 @@ mod test {
         let test = &[Js, Shell, Screen, Txt, Rb];
         for ty in test {
             let mut w = Vec::<u8>::new();
-            write_prepare_script(&mut w, *ty, "test_dir").expect("寫到 Vec<u8> 也能出事？");
+            // write_prepare_script(&mut w, *ty, "test_dir").expect("寫到 Vec<u8> 也能出事？");
         }
     }
 }

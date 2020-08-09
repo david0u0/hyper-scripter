@@ -10,5 +10,6 @@ pub const JS_WELCOME_MSG: &str = "// Hello, scripter!
 const birthplace = \"{{birthplace}}\"
 ";
 
-pub const SCREEN_WELCOME_MSG: &str = "screen bash -c \"cd {{birthplace}};\"
+pub const SCREEN_WELCOME_MSG: &str = "layout new
+screen bash -c \"cd {{birthplace}};\"
 ";

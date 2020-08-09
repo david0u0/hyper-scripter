@@ -12,4 +12,5 @@ const birthplace = \"{{birthplace}}\"
 
 pub const SCREEN_WELCOME_MSG: &str = "layout new
 screen bash -c \"cd {{birthplace}};\"
+split -v
 ";

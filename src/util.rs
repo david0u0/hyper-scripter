@@ -1,6 +1,7 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::script::{ScriptInfo, ScriptMeta, ScriptType};
 use crate::templates;
+use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
 use std::fs::{remove_file, rename, File};
@@ -97,16 +98,17 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn prepare_script(path: &Path, script: &ScriptInfo) -> Result<()> {
+pub fn prepare_script(path: &Path, script: &ScriptInfo) -> Result<Option<DateTime<Utc>>> {
     if path.exists() {
         log::debug!("腳本已存在，不填入內容");
-        return Ok(());
+        return Ok(None);
     }
     log::debug!("開始準備 {:?} 腳本內容……", script);
     let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
     let birthplace = birthplace.to_str().unwrap_or_default();
     let file = handle_fs_res(&[path], File::create(&path))?;
-    handle_fs_res(&[path], write_prepare_script(file, script, birthplace))
+    handle_fs_res(&[path], write_prepare_script(file, script, birthplace))?;
+    Ok(Some(Utc::now()))
 }
 fn write_prepare_script<W: Write>(
     w: W,
@@ -130,6 +132,22 @@ fn write_prepare_script<W: Write>(
             TemplateRenderError::IOError(err, ..) => err,
             e => panic!("解析模版錯誤：{}", e),
         })
+}
+pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<()> {
+    if let Some(created) = created {
+        let meta = handle_fs_res(&[path], std::fs::metadata(path))?;
+        let modified = handle_fs_res(&[path], meta.modified())?;
+        let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+        if created.timestamp() >= modified as i64 {
+            log::info!("腳本未變動，刪除之");
+            handle_fs_res(&[path], remove_file(path))
+        } else {
+            Ok(())
+        }
+    } else {
+        log::debug!("既存腳本，不執行後處理");
+        Ok(())
+    }
 }
 
 #[cfg(test)]

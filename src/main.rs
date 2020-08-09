@@ -264,10 +264,11 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 }
                 util::fast_write_script(&path, content)?;
             } else {
-                util::prepare_script(&path, h)?;
-                let cmd = util::create_cmd("vim", &[path]);
+                let created = util::prepare_script(&path, h)?;
+                let cmd = util::create_cmd("vim", &[&path]);
                 let stat = util::run_cmd("vim", cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
+                util::after_script(&path, created)?;
             }
             h.read();
         }

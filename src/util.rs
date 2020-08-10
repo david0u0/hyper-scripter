@@ -98,22 +98,36 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn prepare_script(path: &Path, script: &ScriptInfo) -> Result<Option<DateTime<Utc>>> {
-    if path.exists() {
-        log::debug!("腳本已存在，不填入內容");
-        return Ok(None);
+pub fn prepare_script(
+    path: &Path,
+    script: &ScriptInfo,
+    content: Option<&str>,
+) -> Result<Option<DateTime<Utc>>> {
+    log::info!("開始準備 {:?} 腳本內容……", script);
+    let mut is_new = if path.exists() {
+        log::debug!("腳本已存在，不填入預設訊息");
+        false
+    } else {
+        let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
+        let birthplace = birthplace.to_str().unwrap_or_default();
+        let file = handle_fs_res(&[path], File::create(&path))?;
+        let info = json!({
+            "birthplace": birthplace,
+            "script_name": script.name.key().to_owned(),
+            "content": content.unwrap_or_default()
+        });
+        handle_fs_res(&[path], write_prepare_script(file, script, &info))?;
+        true
+    };
+    if content.is_some() {
+        is_new = false;
     }
-    log::debug!("開始準備 {:?} 腳本內容……", script);
-    let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
-    let birthplace = birthplace.to_str().unwrap_or_default();
-    let file = handle_fs_res(&[path], File::create(&path))?;
-    handle_fs_res(&[path], write_prepare_script(file, script, birthplace))?;
-    Ok(Some(Utc::now()))
+    Ok(if is_new { Some(Utc::now()) } else { None })
 }
 fn write_prepare_script<W: Write>(
     w: W,
     script: &ScriptInfo,
-    birthplace: &str,
+    info: &serde_json::Value,
 ) -> std::io::Result<()> {
     // TODO: 依 ty 不同給不同訊息
     let template = match script.ty {
@@ -123,10 +137,6 @@ fn write_prepare_script<W: Write>(
         _ => return Ok(()),
     };
     let reg = Handlebars::new();
-    let info = json!({
-        "birthplace": birthplace,
-        "script_name": script.name.key().to_owned()
-    });
     reg.render_template_to_write(template, &info, w)
         .map_err(|err| match err {
             TemplateRenderError::IOError(err, ..) => err,

@@ -7,6 +7,7 @@ use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
 use instant_scripter::script_query::ScriptQuery;
 use instant_scripter::tag::TagFilters;
 use instant_scripter::{fuzzy, path, util};
+use std::path::PathBuf;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
@@ -34,15 +35,24 @@ struct Root {
     subcmd: Option<Subs>,
 }
 #[derive(StructOpt, Debug)]
+enum WithContent {
+    #[structopt(about = "with content", settings = NO_FLAG_SETTINGS)]
+    With {
+        #[structopt(required = true, min_values = 1)]
+        content: Vec<String>,
+    },
+    #[structopt(about = "create script without invoking the editor", settings = NO_FLAG_SETTINGS)]
+    Fast {
+        #[structopt(required = true, min_values = 1)]
+        content: Vec<String>,
+    },
+}
+#[derive(StructOpt, Debug)]
 enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
     #[structopt(about = "Edit instant script", alias = "e")]
     Edit {
-        #[structopt(short, long, help = "The content for your script.")]
-        content: Option<String>,
-        #[structopt(parse(try_from_str))]
-        script_query: Option<ScriptQuery>,
         #[structopt(
             long,
             short = "x",
@@ -50,6 +60,10 @@ enum Subs {
             help = "Executable type of the script, e.g. `sh`"
         )]
         executable: Option<ScriptType>,
+        #[structopt(parse(try_from_str))]
+        script_query: ScriptQuery,
+        #[structopt(subcommand)]
+        subcmd: Option<WithContent>,
     },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
@@ -154,9 +168,9 @@ fn main_err_handle() -> Result<Vec<Error>> {
     match root.subcmd {
         None => {
             root.subcmd = Some(Subs::Edit {
-                script_query: Some(ScriptQuery::Prev(1)),
+                script_query: ScriptQuery::Prev(1),
                 executable: None,
-                content: None,
+                subcmd: None,
             });
         }
         Some(Subs::Other(args)) => {
@@ -213,64 +227,31 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         Subs::Edit {
             script_query,
             executable: ty,
-            content,
+            subcmd,
         } => {
-            let final_ty: ScriptType;
-            let script = if let Some(query) = script_query {
-                if let Some(h) = get_info_mut(query, hs)? {
-                    if let Some(ty) = ty {
-                        log::warn!("已存在的腳本無需再指定類型");
-                        if ty != &h.ty {
-                            return Err(Error::TypeMismatch {
-                                expect: *ty,
-                                actual: h.ty,
-                            });
-                        }
-                    }
-                    final_ty = h.ty;
-                    log::debug!("打開既有命名腳本：{:?}", h.name);
-                    path::open_script(&h.name, h.ty, true)
-                        .context(format!("打開命名腳本失敗：{:?}", h.name))?
-                } else {
-                    final_ty = ty.unwrap_or_default();
-                    if hs.get_hidden_mut(&query.as_script_name()?).is_some() {
-                        log::error!("與被篩掉的腳本撞名");
-                        return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
-                    }
-                    log::debug!("打開新命名腳本：{:?}", query);
-                    path::open_script(query, ty.unwrap_or_default(), false)
-                        .context(format!("打開新命名腳本失敗：{:?}", query))?
-                }
-            } else {
-                final_ty = ty.unwrap_or_default();
-                log::debug!("打開新匿名腳本");
-                path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
+            let (path, script) = edit_or_create(Some(script_query), hs, *ty, tags)?;
+            let (fast, content) = match subcmd {
+                Some(WithContent::Fast { content }) => (true, Some(content)),
+                Some(WithContent::With { content }) => (false, Some(content)),
+                _ => (false, None),
             };
-            let path = script.path;
-            log::info!("編輯 {:?}", script.name);
-
-            let name = script.name.into_static();
-            let h = hs.entry(&name).or_insert(ScriptInfo::new(
-                name,
-                final_ty,
-                tags.into_allowed_iter(),
-            )?);
-
-            if let Some(content) = content {
-                log::info!("快速編輯 {:?}", h.name);
+            if fast {
+                log::info!("快速編輯 {:?}", script.name);
                 if path.exists() {
                     log::error!("不允許快速編輯已存在的腳本");
-                    return Err(Error::ScriptExist(h.name.to_string()));
+                    return Err(Error::ScriptExist(script.name.to_string()));
                 }
-                util::fast_write_script(&path, content)?;
+                util::fast_write_script(&path, &*content.unwrap().join(" "))?;
             } else {
-                let created = util::prepare_script(&path, h)?;
+                let content = content.map(|c| c.join(" "));
+                let created =
+                    util::prepare_script(&path, script, content.as_ref().map(|s| s.as_str()))?;
                 let cmd = util::create_cmd("vim", &[&path]);
                 let stat = util::run_cmd("vim", cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
                 util::after_script(&path, created)?;
             }
-            h.read();
+            script.read();
         }
         Subs::Run { script_query, args } => {
             let h = get_info_mut_strict(script_query, hs)?;
@@ -359,4 +340,52 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         _ => unimplemented!(),
     }
     Ok(res)
+}
+
+fn edit_or_create<'a, 'b>(
+    script_query: Option<&'b ScriptQuery>,
+    history: &'b mut History<'a>,
+    ty: Option<ScriptType>,
+    tags: TagFilters,
+) -> Result<(PathBuf, &'b mut ScriptInfo<'a>)> {
+    let final_ty: ScriptType;
+    let script = if let Some(query) = script_query {
+        if let Some(h) = get_info_mut(query, history)? {
+            if let Some(ty) = ty {
+                log::warn!("已存在的腳本無需再指定類型");
+                if ty != h.ty {
+                    return Err(Error::TypeMismatch {
+                        expect: ty,
+                        actual: h.ty,
+                    });
+                }
+            }
+            final_ty = h.ty;
+            log::debug!("打開既有命名腳本：{:?}", h.name);
+            path::open_script(&h.name, h.ty, true)
+                .context(format!("打開命名腳本失敗：{:?}", h.name))?
+        } else {
+            final_ty = ty.unwrap_or_default();
+            if history.get_hidden_mut(&query.as_script_name()?).is_some() {
+                log::error!("與被篩掉的腳本撞名");
+                return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
+            }
+            log::debug!("打開新命名腳本：{:?}", query);
+            path::open_script(query, ty.unwrap_or_default(), false)
+                .context(format!("打開新命名腳本失敗：{:?}", query))?
+        }
+    } else {
+        final_ty = ty.unwrap_or_default();
+        log::debug!("打開新匿名腳本");
+        path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
+    };
+    let path = script.path;
+    log::info!("編輯 {:?}", script.name);
+
+    let name = script.name.into_static();
+    let h =
+        history
+            .entry(&name)
+            .or_insert(ScriptInfo::new(name, final_ty, tags.into_allowed_iter())?);
+    Ok((path, h))
 }

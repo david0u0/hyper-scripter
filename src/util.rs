@@ -119,7 +119,7 @@ fn write_prepare_script<W: Write>(
     let template = match script.ty {
         ScriptType::Shell => templates::SHELL_WELCOME_MSG,
         ScriptType::Js => templates::JS_WELCOME_MSG,
-        ScriptType::Screen => templates::SCREEN_WELCOME_MSG,
+        ScriptType::Tmux => templates::TMUX_WELCOME_MSG,
         _ => return Ok(()),
     };
     let reg = Handlebars::new();
@@ -156,7 +156,7 @@ mod test {
     #[test]
     fn test_prepare() {
         use ScriptType::*;
-        let test = &[Js, Shell, Screen, Txt, Rb];
+        let test = &[Js, Shell, Tmux, Txt, Rb];
         for ty in test {
             let mut w = Vec::<u8>::new();
             // write_prepare_script(&mut w, *ty, "test_dir").expect("寫到 Vec<u8> 也能出事？");

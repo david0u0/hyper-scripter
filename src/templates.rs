@@ -10,7 +10,8 @@ pub const JS_WELCOME_MSG: &str = "// Hello, scripter!
 const birthplace = \"{{birthplace}}\"
 ";
 
-pub const SCREEN_WELCOME_MSG: &str = "layout new
-screen bash -c \"cd {{birthplace}};\"
-split -v
+pub const TMUX_WELCOME_MSG: &str = "cd {{birthplace}}
+tmux new-session -d ''
+tmux split-window -v ''
+tmux -2 attach-session -d
 ";

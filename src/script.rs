@@ -190,7 +190,7 @@ macro_rules! script_type_enum {
 
 script_type_enum! {
     ["sh", Color::BrightMagenta] => Shell("sh"): ("bash"),
-    ["screen", Color::White] => Screen: ("screen", "-c"),
+    ["tmux", Color::White] => Tmux("sh"): ("bash"),
     ["txt", Color::BrightBlack] => Txt: (),
     ["js", Color::BrightCyan] => Js("js"): ("node"),
     ["rb", Color::BrightRed] => Rb("rb"): ("ruby")
@@ -245,7 +245,6 @@ mod test {
     #[test]
     fn test_ext() {
         assert_eq!(Some("sh"), ScriptType::Shell.ext());
-        assert_eq!(None, ScriptType::Screen.ext());
     }
     #[test]
     fn test_cmd() {

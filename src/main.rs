@@ -4,7 +4,7 @@ use instant_scripter::error::{Contextabl, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
 use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
-use instant_scripter::script_query::ScriptQuery;
+use instant_scripter::script_query::{EditQuery, ScriptQuery};
 use instant_scripter::tag::TagFilters;
 use instant_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
@@ -60,8 +60,8 @@ enum Subs {
             help = "Executable type of the script, e.g. `sh`"
         )]
         executable: Option<ScriptType>,
-        #[structopt(parse(try_from_str))]
-        script_query: ScriptQuery,
+        #[structopt(parse(try_from_str), default_value = ".")]
+        edit_query: EditQuery,
         #[structopt(subcommand)]
         subcmd: Option<WithContent>,
     },
@@ -168,7 +168,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
     match root.subcmd {
         None => {
             root.subcmd = Some(Subs::Edit {
-                script_query: ScriptQuery::Prev(1),
+                edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
                 executable: None,
                 subcmd: None,
             });
@@ -225,11 +225,11 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
 
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
-            script_query,
+            edit_query,
             executable: ty,
             subcmd,
         } => {
-            let (path, script) = edit_or_create(Some(script_query), hs, *ty, tags)?;
+            let (path, script) = edit_or_create(edit_query, hs, *ty, tags)?;
             let (fast, content) = match subcmd {
                 Some(WithContent::Fast { content }) => (true, Some(content)),
                 Some(WithContent::With { content }) => (false, Some(content)),
@@ -343,13 +343,13 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
 }
 
 fn edit_or_create<'a, 'b>(
-    script_query: Option<&'b ScriptQuery>,
+    edit_query: &'b EditQuery,
     history: &'b mut History<'a>,
     ty: Option<ScriptType>,
     tags: TagFilters,
 ) -> Result<(PathBuf, &'b mut ScriptInfo<'a>)> {
     let final_ty: ScriptType;
-    let script = if let Some(query) = script_query {
+    let script = if let EditQuery::Query(query) = edit_query {
         if let Some(h) = get_info_mut(query, history)? {
             if let Some(ty) = ty {
                 log::warn!("已存在的腳本無需再指定類型");

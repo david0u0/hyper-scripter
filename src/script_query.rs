@@ -3,6 +3,21 @@ use crate::script::{AsScriptName, ScriptName};
 use std::str::FromStr;
 
 #[derive(Debug)]
+pub enum EditQuery {
+    NewAnonimous,
+    Query(ScriptQuery),
+}
+impl FromStr for EditQuery {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(if s == "." {
+            EditQuery::NewAnonimous
+        } else {
+            EditQuery::Query(ScriptQuery::from_str(s)?)
+        })
+    }
+}
+#[derive(Debug)]
 pub enum ScriptQuery {
     Fuzz(String),
     Exact(ScriptName<'static>),

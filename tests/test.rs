@@ -78,7 +78,7 @@ fn test_tags() {
 #[test]
 fn test_mv() {
     let _g = setup();
-    run(&["e", "-x", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", ".", "-x", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
     run(&["mv", "1", "-x", "sh"]).unwrap();

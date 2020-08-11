@@ -113,7 +113,7 @@ pub fn prepare_script(
         let file = handle_fs_res(&[path], File::create(&path))?;
         let info = json!({
             "birthplace": birthplace,
-            "script_name": script.name.key().to_owned(),
+            "name": script.name.key().to_owned(),
             "content": content.unwrap_or_default()
         });
         handle_fs_res(&[path], write_prepare_script(file, script, &info))?;

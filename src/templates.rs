@@ -13,8 +13,8 @@ const birthplace = \"{{birthplace}}\"
 ";
 
 pub const TMUX_WELCOME_MSG: &str = "cd {{birthplace}}
-tmux new-session -d ''
-tmux split-window -v ''
+tmux new-session -s {{name}} -d ' '
+tmux split-window -v ' '
 tmux -2 attach-session -d
 {{content}}
 ";

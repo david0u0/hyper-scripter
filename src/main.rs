@@ -36,7 +36,7 @@ struct Root {
 }
 #[derive(StructOpt, Debug)]
 enum WithContent {
-    #[structopt(about = "with content", settings = NO_FLAG_SETTINGS)]
+    #[structopt(about = "create script with content", settings = NO_FLAG_SETTINGS)]
     With {
         #[structopt(required = true, min_values = 1)]
         content: Vec<String>,

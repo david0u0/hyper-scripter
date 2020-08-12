@@ -14,7 +14,7 @@ cd {{birthplace}}
 const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
-process.cwd(\"{{birthplace}}\");
+process.chdir(\"{{birthplace}}\");
 {{content}}
 ";
 
@@ -99,6 +99,16 @@ impl ScriptTypeConfig {
                 template: JS_WELCOME_MSG.to_owned(),
                 cmd: Some("node".to_owned()),
                 args: vec!["{{path}}".to_owned()],
+            },
+        );
+        ret.insert(
+            "js-i".into(),
+            ScriptTypeConfig {
+                ext: Some("js".to_owned()),
+                color: "bright cyan".to_owned(),
+                template: JS_WELCOME_MSG.to_owned(),
+                cmd: Some("node".to_owned()),
+                args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
             },
         );
         ret.insert(

@@ -20,6 +20,7 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
 
     let info = json!({
         "path": script.path,
+        "content": read_file(&script.path)?,
     });
     let args = script_conf.args(&info)?;
     let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();

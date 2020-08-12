@@ -3,8 +3,9 @@ use instant_scripter::config::Config;
 use instant_scripter::error::{Contextabl, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
-use instant_scripter::script::{AsScriptName, ScriptInfo, ScriptType};
+use instant_scripter::script::{AsScriptName, ScriptInfo};
 use instant_scripter::script_query::{EditQuery, ScriptQuery};
+use instant_scripter::script_type::ScriptType;
 use instant_scripter::tag::TagFilters;
 use instant_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
@@ -155,7 +156,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         Some(is_path) => path::set_path(is_path)?,
         None => path::set_path_from_sys()?,
     }
-    let mut conf = Config::load()?;
+    let mut conf = Config::get().clone();
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     if root.tags.is_none() {
@@ -229,7 +230,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             category: ty,
             subcmd,
         } => {
-            let (path, script) = edit_or_create(edit_query, hs, *ty, tags)?;
+            let (path, script) = edit_or_create(edit_query, hs, ty.clone(), tags)?;
             let (fast, content) = match subcmd {
                 Some(WithContent::Fast { content }) => (true, Some(content)),
                 Some(WithContent::With { content }) => (false, Some(content)),
@@ -256,7 +257,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         Subs::Run { script_query, args } => {
             let h = get_info_mut_strict(script_query, hs)?;
             log::info!("執行 {:?}", h.name);
-            let script = path::open_script(&h.name, h.ty, true)?;
+            let script = path::open_script(&h.name, &h.ty, true)?;
             match util::run(&script, &h, &args) {
                 Err(e @ Error::ScriptError(_)) => res.push(e),
                 Err(e) => return Err(e),
@@ -266,7 +267,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         }
         Subs::Cat { script_query } => {
             let h = get_info_mut_strict(script_query, hs)?;
-            let script = path::open_script(&h.name, h.ty, true)?;
+            let script = path::open_script(&h.name, &h.ty, true)?;
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
             println!("{}", content);
@@ -284,7 +285,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             for query in script_queries.into_iter() {
                 let h = get_info_mut_strict(query, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
-                let script = path::open_script(&h.name, h.ty, true)?;
+                let script = path::open_script(&h.name, &h.ty, true)?;
                 log::info!("刪除 {:?}", script);
                 util::remove(&script)?;
                 let name = script.name.into_static();
@@ -294,8 +295,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         Subs::CP { origin, new } => {
             let h = get_info_mut_strict(origin, hs)?;
             let new_name = new.as_script_name()?;
-            let og_script = path::open_script(&h.name, h.ty, true)?;
-            let new_script = path::open_script(&new_name, h.ty, false)?;
+            let og_script = path::open_script(&h.name, &h.ty, true)?;
+            let new_script = path::open_script(&new_name, &h.ty, false)?;
             if new_script.path.exists() {
                 return Err(Error::ScriptExist(new.clone()));
             }
@@ -314,18 +315,19 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             category: ty,
         } => {
             let h = get_info_mut_strict(origin, hs)?;
-            let og_script = path::open_script(&h.name, h.ty, true)?;
-            let new_ty = ty.unwrap_or(h.ty);
+            let og_script = path::open_script(&h.name, &h.ty, true)?;
+            if let Some(ty) = ty {
+                h.ty = ty.clone();
+            }
             let new_name = match new {
                 Some(s) => s.as_script_name()?,
                 None => h.name.clone(),
             };
-            let new_script = path::open_script(&new_name, new_ty, false)?;
+            let new_script = path::open_script(&new_name, &h.ty, false)?;
             util::mv(&og_script, &new_script)?;
 
             h.name = new_name.into_static();
             h.read();
-            h.ty = new_ty;
             if let Some(tags) = tags {
                 h.tags = tags.clone().into_allowed_iter().collect();
             }
@@ -355,14 +357,14 @@ fn edit_or_create<'a, 'b>(
                 log::warn!("已存在的腳本無需再指定類型");
                 if ty != h.ty {
                     return Err(Error::TypeMismatch {
-                        expect: ty,
-                        actual: h.ty,
+                        expect: ty.clone(),
+                        actual: h.ty.clone(),
                     });
                 }
             }
-            final_ty = h.ty;
+            final_ty = h.ty.clone();
             log::debug!("打開既有命名腳本：{:?}", h.name);
-            path::open_script(&h.name, h.ty, true)
+            path::open_script(&h.name, &h.ty, true)
                 .context(format!("打開命名腳本失敗：{:?}", h.name))?
         } else {
             final_ty = ty.unwrap_or_default();
@@ -371,13 +373,13 @@ fn edit_or_create<'a, 'b>(
                 return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
             }
             log::debug!("打開新命名腳本：{:?}", query);
-            path::open_script(query, ty.unwrap_or_default(), false)
+            path::open_script(query, &final_ty, false)
                 .context(format!("打開新命名腳本失敗：{:?}", query))?
         }
     } else {
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");
-        path::open_new_anonymous(ty.unwrap_or_default()).context("打開新匿名腳本失敗")?
+        path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?
     };
     let path = script.path;
     log::info!("編輯 {:?}", script.name);

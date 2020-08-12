@@ -1,6 +1,6 @@
+use crate::config::Config;
 use crate::error::{Contextabl, Error, Result};
-use crate::script::{ScriptInfo, ScriptMeta, ScriptType};
-use crate::templates;
+use crate::script::{ScriptInfo, ScriptMeta};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
@@ -10,14 +10,21 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Result<()> {
-    let ty = info.ty;
-    let (cmd_str, args) = ty
-        .cmd()
-        .ok_or(Error::Operation(format!("{} is not runnable", ty)))?;
-    let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
+    let ty = &info.ty;
+    let script_conf = Config::get().get_script_conf(ty)?;
+    let cmd_str = if let Some(cmd) = &script_conf.cmd {
+        cmd
+    } else {
+        return Err(Error::Operation(format!("{} is not runnable", ty)));
+    };
 
-    full_args.push(script.path.as_ref());
+    let info = json!({
+        "path": script.path,
+    });
+    let args = script_conf.args(&info)?;
+    let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
     full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
+
     // TODO: 看要不要把執行狀態傳回去？
     let cmd = create_cmd(&cmd_str, &full_args);
     let stat = run_cmd(&cmd_str, cmd)?;
@@ -129,13 +136,13 @@ fn write_prepare_script<W: Write>(
     script: &ScriptInfo,
     info: &serde_json::Value,
 ) -> std::io::Result<()> {
-    // TODO: 依 ty 不同給不同訊息
-    let template = match script.ty {
-        ScriptType::Shell => templates::SHELL_WELCOME_MSG,
-        ScriptType::Js => templates::JS_WELCOME_MSG,
-        ScriptType::Tmux => templates::TMUX_WELCOME_MSG,
-        _ => return Ok(()),
-    };
+    let template = "";
+    // let template = match script.ty {
+    //     ScriptType::Shell => templates::SHELL_WELCOME_MSG,
+    //     ScriptType::Js => templates::JS_WELCOME_MSG,
+    //     ScriptType::Tmux => templates::TMUX_WELCOME_MSG,
+    //     _ => return Ok(()),
+    // };
     let reg = Handlebars::new();
     reg.render_template_to_write(template, &info, w)
         .map_err(|err| match err {
@@ -157,19 +164,5 @@ pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<()> {
     } else {
         log::debug!("既存腳本，不執行後處理");
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_prepare() {
-        use ScriptType::*;
-        let test = &[Js, Shell, Tmux, Txt, Rb];
-        for ty in test {
-            let mut w = Vec::<u8>::new();
-            // write_prepare_script(&mut w, *ty, "test_dir").expect("寫到 Vec<u8> 也能出事？");
-        }
     }
 }

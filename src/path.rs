@@ -1,6 +1,7 @@
 use crate::error::{Contextabl, Error, Result};
 use crate::history::History;
-use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ScriptType, ANONYMOUS};
+use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
+use crate::script_type::ScriptType;
 use crate::util::{handle_fs_res, read_file, write_file};
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
@@ -21,7 +22,7 @@ pub fn get_sys_path() -> Result<PathBuf> {
             p.into()
         }
         Err(std::env::VarError::NotPresent) => dirs::config_dir()
-            .ok_or(Error::SysPathNotFound("config"))?
+            .ok_or(Error::SysPathNotFound("config dir"))?
             .join(ROOT_PATH),
         Err(e) => return Err(e.into()),
     };
@@ -84,27 +85,27 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous(ty: ScriptType) -> Result<ScriptMeta<'static>> {
+pub fn open_new_anonymous(ty: &ScriptType) -> Result<ScriptMeta<'static>> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
     open_anonymous(id, ty)
 }
-pub fn open_anonymous(id: u32, ty: ScriptType) -> Result<ScriptMeta<'static>> {
+pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<ScriptMeta<'static>> {
     let name = ScriptName::Anonymous(id);
-    let path = get_path().join(name.to_file_name(ty));
+    let path = get_path().join(name.to_file_name(ty)?);
     Ok(ScriptMeta { path, name })
 }
 
 pub fn open_script<'a, T: ?Sized + AsScriptName>(
     name: &'a T,
-    ty: ScriptType,
+    ty: &ScriptType,
     check_sxist: bool,
 ) -> Result<ScriptMeta<'a>> {
     let script = match name.as_script_name()? {
         ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
-            let path = get_path().join(name.to_file_name(ty));
+            let path = get_path().join(name.to_file_name(ty)?);
             ScriptMeta { path, name }
         }
     };
@@ -129,7 +130,7 @@ pub fn get_history() -> Result<History<'static>> {
         History::new(
             history
                 .into_iter()
-                .filter(|s| match open_script(&s.name, s.ty, true) {
+                .filter(|s| match open_script(&s.name, &s.ty, true) {
                     Err(e) => {
                         log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
                         false
@@ -162,13 +163,13 @@ mod test {
     #[test]
     fn test_open_anonymous() {
         setup();
-        let s = open_new_anonymous(ScriptType::Shell).unwrap();
+        let s = open_new_anonymous(&"sh".into()).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/.anonymous", "6.sh").unwrap()
         );
-        let s = open_anonymous(5, ScriptType::Js).unwrap();
+        let s = open_anonymous(5, &"js".into()).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(5));
         assert_eq!(
             s.path,
@@ -178,26 +179,23 @@ mod test {
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first", ScriptType::Txt, true).unwrap();
+        let s = open_script("first", &"txt".into(), true).unwrap();
         assert_eq!(s.name, "first".as_script_name().unwrap());
 
         let second = "second".to_owned();
         let second_name = second.as_script_name().unwrap();
-        let s = open_script(&second_name, ScriptType::Rb, false).unwrap();
+        let s = open_script(&second_name, &"rb".into(), false).unwrap();
         assert_eq!(s.name, second_name);
-        assert_eq!(
-            s.path,
-            get_path().join("second.rb") // join_path("./.test_instant_script/", "second.rb").unwrap()
-        );
+        assert_eq!(s.path, get_path().join("second.rb"));
 
-        let s = open_script(".1", ScriptType::Shell, true).unwrap();
+        let s = open_script(".1", &"sh".into(), true).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(1));
         assert_eq!(
             s.path,
             join_path("./.test_instant_script/.anonymous", "1.sh").unwrap()
         );
 
-        match open_script("not-exist", ScriptType::Shell, true).unwrap_err() {
+        match open_script("not-exist", &"sh".into(), true).unwrap_err() {
             Error::PathNotFound(name) => assert_eq!(name, get_path().join("not-exist.sh")),
             _ => unreachable!(),
         }

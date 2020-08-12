@@ -3,6 +3,7 @@ use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{Tag, TagFilters};
 use crate::util;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -38,6 +39,8 @@ pub struct Config {
     pub tag_filters: TagFilters,
     pub tags: Vec<Tag>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
+    #[serde(skip_serializing, default = "Utc::now")]
+    pub open_time: DateTime<Utc>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -45,6 +48,7 @@ impl Default for Config {
             tag_filters: FromStr::from_str("all,-hide").unwrap(),
             tags: vec![FromStr::from_str("hide").unwrap()],
             categories: ScriptTypeConfig::default_script_types(),
+            open_time: Utc::now(),
         }
     }
 }
@@ -62,7 +66,16 @@ impl Config {
         }
     }
     pub fn store(&self) -> Result<()> {
-        util::write_file(&config_file(), &toml::to_string(self)?)
+        log::info!("寫入腳本…");
+        let path = config_file();
+        let meta = util::handle_fs_res(&[&path], std::fs::metadata(&path))?;
+        let modified = util::handle_fs_res(&[&path], meta.modified())?;
+        let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+        if self.open_time.timestamp() < modified as i64 {
+            log::info!("腳本已被修改，不寫入");
+            return Ok(());
+        }
+        util::write_file(&path, &toml::to_string(self)?)
     }
     pub fn get() -> &'static Config {
         &CONFIG
@@ -87,8 +100,8 @@ mod test {
             ..Default::default()
         };
         let s = to_string(&c1).unwrap();
-        println!("{}", s);
-        let c2: Config = from_str(&s).unwrap();
+        let mut c2: Config = from_str(&s).unwrap();
+        c2.open_time = c1.open_time;
         assert_eq!(c1, c2);
 
         c2.store().unwrap();

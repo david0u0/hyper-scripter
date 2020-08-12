@@ -50,9 +50,14 @@ impl Default for Config {
 }
 impl Config {
     fn load() -> Result<Self> {
-        match util::read_file(&config_file()) {
+        let path = config_file();
+        log::info!("載入設定檔：{:?}", path);
+        match util::read_file(&path) {
             Ok(s) => toml::from_str(&s).map_err(|e| e.into()),
-            Err(Error::PathNotFound(_)) => Ok(Default::default()),
+            Err(Error::PathNotFound(_)) => {
+                log::debug!("找不到設定檔，使用預設值");
+                Ok(Default::default())
+            }
             Err(e) => Err(e),
         }
     }

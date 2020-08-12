@@ -55,11 +55,11 @@ enum Subs {
     Edit {
         #[structopt(
             long,
-            short = "x",
+            short,
             parse(try_from_str),
-            help = "Executable type of the script, e.g. `sh`"
+            help = "Category of the script, e.g. `sh`"
         )]
-        executable: Option<ScriptType>,
+        category: Option<ScriptType>,
         #[structopt(parse(try_from_str), default_value = ".")]
         edit_query: EditQuery,
         #[structopt(subcommand)]
@@ -94,11 +94,11 @@ enum Subs {
     MV {
         #[structopt(
             long,
-            short = "x",
+            short,
             parse(try_from_str),
-            help = "Executable type of the script, e.g. `sh`"
+            help = "Category type of the script, e.g. `sh`"
         )]
-        executable: Option<ScriptType>,
+        category: Option<ScriptType>,
         #[structopt(short, long)]
         tags: Option<TagFilters>,
         #[structopt(parse(try_from_str))]
@@ -169,7 +169,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         None => {
             root.subcmd = Some(Subs::Edit {
                 edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
-                executable: None,
+                category: None,
                 subcmd: None,
             });
         }
@@ -226,7 +226,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
             edit_query,
-            executable: ty,
+            category: ty,
             subcmd,
         } => {
             let (path, script) = edit_or_create(edit_query, hs, *ty, tags)?;
@@ -311,7 +311,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             origin,
             new,
             tags,
-            executable: ty,
+            category: ty,
         } => {
             let h = get_info_mut_strict(origin, hs)?;
             let og_script = path::open_script(&h.name, h.ty, true)?;

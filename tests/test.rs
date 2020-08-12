@@ -59,7 +59,7 @@ fn test_tags() {
         "super_tag,hide",
         "e",
         "test_js",
-        "-x",
+        "-c",
         "js",
         "fast",
         &format!("console.log(\"{}\")", MSG_JS),
@@ -78,10 +78,10 @@ fn test_tags() {
 #[test]
 fn test_mv() {
     let _g = setup();
-    run(&["e", ".", "-x", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", ".", "-c", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
-    run(&["mv", "1", "-x", "sh"]).unwrap();
+    run(&["mv", "1", "-c", "sh"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
     assert!(check_exist(".anonymous/1.sh"), "改腳本類型失敗");
     assert!(

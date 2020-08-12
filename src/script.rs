@@ -1,8 +1,9 @@
+use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::fuzzy::FuzzKey;
+use crate::script_type::ScriptType;
 use crate::tag::Tag;
 use chrono::{DateTime, Utc};
-use colored::Color;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -28,12 +29,15 @@ impl ScriptName<'_> {
             ScriptName::Named(s) => Cow::Borrowed(&*s),
         }
     }
-    pub fn to_file_name(&self, ty: ScriptType) -> String {
-        let ext = ty.ext().map(|s| format!(".{}", s)).unwrap_or_default();
-        match self {
-            ScriptName::Anonymous(id) => format!("{}/{}{}", ANONYMOUS, id, ext),
-            ScriptName::Named(name) => format!("{}{}", name, ext),
+    pub fn to_file_name(&self, ty: &ScriptType) -> Result<String> {
+        let mut name = match self {
+            ScriptName::Anonymous(id) => format!("{}/{}", ANONYMOUS, id),
+            ScriptName::Named(name) => name.as_ref().to_owned(),
+        };
+        if let Some(ext) = &Config::get().get_script_conf(ty)?.ext {
+            name = format!("{}.{}", name, ext)
         }
+        Ok(name)
     }
     pub fn into_static(self) -> ScriptName<'static> {
         match self {
@@ -84,8 +88,8 @@ impl ScriptInfo<'_> {
             _ => self.read_time,
         }
     }
-    pub fn file_name(&self) -> String {
-        self.name.to_file_name(self.ty)
+    pub fn file_name(&self) -> Result<String> {
+        self.name.to_file_name(&self.ty)
     }
     pub fn new<'a>(
         name: ScriptName<'a>,
@@ -105,99 +109,6 @@ impl ScriptInfo<'_> {
     }
     pub fn exec(&mut self) {
         self.exec_time = Some(Utc::now());
-    }
-}
-
-macro_rules! script_type_enum {
-    ($( [$tag:expr, $color:expr] => $name:ident$(($ext:expr))?: ( $($args:expr),* ) ),*) => {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-        pub enum ScriptType {
-            $($name),*
-        }
-        #[allow(unreachable_code)]
-        impl ScriptType {
-            pub fn ext(&self) -> Option<&'static str> {
-                match self {
-                    $(
-                        ScriptType::$name => {
-                            $(return Some($ext);)?
-                            None
-                        }
-                    )*
-                }
-            }
-            pub fn color(&self) -> Color {
-                match self {
-                    $(
-                        ScriptType::$name => {
-                            $color
-                        }
-                    )*
-                }
-            }
-            pub fn cmd(&self) -> Option<(String, Vec<String>)> {
-                match self {
-                    $(
-                        ScriptType::$name => {
-                            let v: &[&str] = &[$($args),*];
-                            if v.len() > 0 {
-                                Some(
-                                    (
-                                        v[0].to_string(),
-                                        v[1..v.len()].into_iter().map(|s| s.to_string()).collect()
-                                    )
-                                )
-                            } else {
-                                None
-                            }
-                        }
-                    )*
-                }
-            }
-        }
-        impl std::str::FromStr for ScriptType {
-            type Err = Error;
-            fn from_str(s: &str) -> std::result::Result<Self, Error> {
-                match s {
-                    $(
-                        $tag => {
-                            Ok(ScriptType::$name)
-                        }
-                    )*
-                    _ => {
-                        let v = &[$($tag),*];
-                        let expected = v.join("/").to_string();
-                        // TODO: 用正確的方式
-                        Err(Error::Format(format!("ScriptMeta type expected {}, get {}", expected, s)))
-                    }
-                }
-            }
-        }
-        impl std::fmt::Display for ScriptType {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    $(
-                        ScriptType::$name => {
-                            write!(f, $tag)?;
-                        }
-                    )*
-                }
-                Ok(())
-            }
-        }
-    };
-}
-
-script_type_enum! {
-    ["sh", Color::BrightMagenta] => Shell("sh"): ("bash"),
-    ["tmux", Color::White] => Tmux("sh"): ("bash"),
-    ["txt", Color::BrightBlack] => Txt: (),
-    ["js", Color::BrightCyan] => Js("js"): ("node"),
-    ["rb", Color::BrightRed] => Rb("rb"): ("ruby")
-}
-impl Default for ScriptType {
-    fn default() -> Self {
-        ScriptType::Shell
     }
 }
 
@@ -236,19 +147,5 @@ impl AsScriptName for ScriptName<'_> {
             ScriptName::Anonymous(id) => ScriptName::Anonymous(*id),
             ScriptName::Named(s) => ScriptName::Named(Cow::Borrowed(&*s)),
         })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_ext() {
-        assert_eq!(Some("sh"), ScriptType::Shell.ext());
-    }
-    #[test]
-    fn test_cmd() {
-        assert_eq!(Some(("node".to_owned(), vec![])), ScriptType::Js.cmd());
-        assert_eq!(None, ScriptType::Txt.cmd());
     }
 }

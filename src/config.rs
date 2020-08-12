@@ -1,12 +1,17 @@
 use crate::error::{Error, Result};
 use crate::path;
+use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{Tag, TagFilters};
 use crate::util;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 const CONFIG_FILE: &'static str = "config.toml";
+lazy_static::lazy_static! {
+    static ref CONFIG: Config = Config::load().unwrap();
+}
 
 fn config_file() -> PathBuf {
     path::get_path().join(CONFIG_FILE)
@@ -26,23 +31,25 @@ where
     let filters = TagFilters::from_str(s).unwrap();
     Ok(filters)
 }
-#[derive(Deserialize, Serialize, PartialEq, Eq, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
     #[serde(serialize_with = "ser_tag_filters")]
     #[serde(deserialize_with = "de_tag_filters")]
     pub tag_filters: TagFilters,
     pub tags: Vec<Tag>,
+    pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
 impl Default for Config {
     fn default() -> Self {
         Config {
             tag_filters: FromStr::from_str("all,-hide").unwrap(),
             tags: vec![FromStr::from_str("hide").unwrap()],
+            categories: ScriptTypeConfig::default_script_types(),
         }
     }
 }
 impl Config {
-    pub fn load() -> Result<Self> {
+    fn load() -> Result<Self> {
         match util::read_file(&config_file()) {
             Ok(s) => toml::from_str(&s).map_err(|e| e.into()),
             Err(Error::PathNotFound(_)) => Ok(Default::default()),
@@ -51,6 +58,14 @@ impl Config {
     }
     pub fn store(&self) -> Result<()> {
         util::write_file(&config_file(), &toml::to_string(self)?)
+    }
+    pub fn get() -> &'static Config {
+        &CONFIG
+    }
+    pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
+        self.categories
+            .get(ty)
+            .ok_or(Error::UnknownCategory(ty.to_string()))
     }
 }
 
@@ -64,8 +79,10 @@ mod test {
         let c1 = Config {
             tags: vec![FromStr::from_str("測試標籤").unwrap()],
             tag_filters: FromStr::from_str("a,-b,c").unwrap(),
+            ..Default::default()
         };
         let s = to_string(&c1).unwrap();
+        println!("{}", s);
         let c2: Config = from_str(&s).unwrap();
         assert_eq!(c1, c2);
 

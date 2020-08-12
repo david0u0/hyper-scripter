@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::history::History;
 use crate::script::ScriptInfo;
@@ -87,6 +88,7 @@ pub fn fmt_meta<W: Write>(
     is_last: bool,
     opt: &ListOptions,
 ) -> Result<()> {
+    let color = Config::get().get_script_conf(&script.ty)?.color.as_str();
     if opt.long {
         if is_last {
             write!(w, "{}", " *".color(Color::Yellow).bold())?;
@@ -102,7 +104,7 @@ pub fn fmt_meta<W: Write>(
             w,
             "{}\t{}\t{}\n",
             format!("{}\t{}", script.ty, script.name)
-                .color(script.ty.color())
+                .color(color)
                 .bold(),
             script.read_time,
             exex_time
@@ -115,7 +117,7 @@ pub fn fmt_meta<W: Write>(
         if is_last {
             msg = msg.underline()
         };
-        write!(w, "{}", msg.bold().color(script.ty.color()))?;
+        write!(w, "{}", msg.bold().color(color))?;
     }
     Ok(())
 }

@@ -7,14 +7,14 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 # Here are some usefule commands to begin with:
 
-cd {{birthplace}}mut
+cd {{birthplace}}
 {{content}}
 ";
 
 const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
-const birthplace = \"{{birthplace}}\"
+process.cwd(\"{{birthplace}}\");
 {{content}}
 ";
 
@@ -75,7 +75,7 @@ impl ScriptTypeConfig {
             "sh".into(),
             ScriptTypeConfig {
                 ext: Some("sh".to_owned()),
-                color: "white".to_owned(),
+                color: "bright magenta".to_owned(),
                 template: SHELL_WELCOME_MSG.to_owned(),
                 cmd: Some("bash".to_owned()),
                 args: vec!["{{path}}".to_owned()],
@@ -85,7 +85,7 @@ impl ScriptTypeConfig {
             "tmux".into(),
             ScriptTypeConfig {
                 ext: Some("sh".to_owned()),
-                color: "bright magenta".to_owned(),
+                color: "white".to_owned(),
                 template: TMUX_WELCOME_MSG.to_owned(),
                 cmd: Some("sh".to_owned()),
                 args: vec!["{{path}}".to_owned()],

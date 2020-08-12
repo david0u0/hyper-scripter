@@ -123,7 +123,8 @@ pub fn prepare_script(
             "name": script.name.key().to_owned(),
             "content": content.unwrap_or_default()
         });
-        handle_fs_res(&[path], write_prepare_script(file, script, &info))?;
+        let template = &Config::get().get_script_conf(&script.ty)?.template;
+        handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
         true
     };
     if content.is_some() {
@@ -133,16 +134,9 @@ pub fn prepare_script(
 }
 fn write_prepare_script<W: Write>(
     w: W,
-    script: &ScriptInfo,
+    template: &str,
     info: &serde_json::Value,
 ) -> std::io::Result<()> {
-    let template = "";
-    // let template = match script.ty {
-    //     ScriptType::Shell => templates::SHELL_WELCOME_MSG,
-    //     ScriptType::Js => templates::JS_WELCOME_MSG,
-    //     ScriptType::Tmux => templates::TMUX_WELCOME_MSG,
-    //     _ => return Ok(()),
-    // };
     let reg = Handlebars::new();
     reg.render_template_to_write(template, &info, w)
         .map_err(|err| match err {

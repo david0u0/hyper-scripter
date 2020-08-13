@@ -111,7 +111,7 @@ pub fn prepare_script(
     script: &ScriptInfo,
     content: Option<&str>,
 ) -> Result<Option<DateTime<Utc>>> {
-    log::info!("開始準備 {:?} 腳本內容……", script);
+    log::info!("開始準備 {} 腳本內容……", script.name);
     let mut is_new = if path.exists() {
         log::debug!("腳本已存在，不填入預設訊息");
         false

@@ -68,12 +68,19 @@ impl Config {
     pub fn store(&self) -> Result<()> {
         log::info!("寫入設定檔…");
         let path = config_file();
-        let meta = util::handle_fs_res(&[&path], std::fs::metadata(&path))?;
-        let modified = util::handle_fs_res(&[&path], meta.modified())?;
-        let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
-        if self.open_time.timestamp() < modified as i64 {
-            log::info!("設定檔已被修改，不寫入");
-            return Ok(());
+        match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
+            Ok(meta) => {
+                let modified = util::handle_fs_res(&[&path], meta.modified())?;
+                let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+                if self.open_time.timestamp() < modified as i64 {
+                    log::info!("設定檔已被修改，不寫入");
+                    return Ok(());
+                }
+            }
+            Err(Error::PathNotFound(_)) => {
+                log::debug!("設定檔不存在，寫就對了");
+            }
+            Err(err) => return Err(err),
         }
         util::write_file(&path, &toml::to_string(self)?)
     }

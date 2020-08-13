@@ -123,9 +123,9 @@ impl ScriptTypeConfig {
         );
 
         ret.insert(
-            "txt".into(),
+            "md".into(),
             ScriptTypeConfig {
-                ext: None,
+                ext: Some("md".to_owned()),
                 color: "bright black".to_owned(),
                 template: "".to_owned(),
                 cmd: None,

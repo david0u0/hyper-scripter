@@ -179,7 +179,7 @@ mod test {
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first", &"txt".into(), true).unwrap();
+        let s = open_script("first", &"md".into(), true).unwrap();
         assert_eq!(s.name, "first".as_script_name().unwrap());
 
         let second = "second".to_owned();

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
-# Here are some usefule commands to begin with:
+# Here are some useful commands to begin with:
 
 cd {{birthplace}}
 {{content}}

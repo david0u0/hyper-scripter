@@ -7,7 +7,9 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 # Here are some useful commands to begin with:
 
+export VAR=\"${VAR:-default}\"
 cd {{birthplace}}
+
 {{content}}
 ";
 
@@ -15,6 +17,7 @@ const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
 process.chdir(\"{{birthplace}}\");
+
 {{content}}
 ";
 
@@ -22,6 +25,7 @@ const TMUX_WELCOME_MSG: &str = "cd {{birthplace}}
 tmux new-session -s {{name}} -d ' '
 tmux split-window -v ' '
 tmux -2 attach-session -d
+
 {{content}}
 ";
 

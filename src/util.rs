@@ -19,26 +19,30 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     };
 
     let info: serde_json::Value;
-    #[cfg(not(target_os = "linux"))]
-    {
-        let p = script
-            .path
-            .to_str()
-            .unwrap()
-            .to_string()
-            .replace(r"\", r"\\\\");
-        info = json!({
-            "path": p,
-            "content": read_file(&script.path)?,
-        });
-    }
-    #[cfg(target_os = "linux")]
-    {
-        info = json!({
-            "path": script.path,
-            "content": read_file(&script.path)?,
-        });
-    }
+    // #[cfg(not(target_os = "linux"))]
+    // {
+    //     let p = script
+    //         .path
+    //         .to_str()
+    //         .unwrap()
+    //         .to_string()
+    //         .replace(r"\", r"\\\\");
+    //     info = json!({
+    //         "path": p,
+    //         "content": read_file(&script.path)?,
+    //     });
+    // }
+    // #[cfg(target_os = "linux")]
+    // {
+    //     info = json!({
+    //         "path": script.path,
+    //         "content": read_file(&script.path)?,
+    //     });
+    // }
+    info = json!({
+        "path": script.path,
+        "content": read_file(&script.path)?,
+    });
     let args = script_conf.args(&info)?;
     let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
     full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
@@ -60,8 +64,17 @@ pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
 #[cfg(not(target_os = "linux"))]
 pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
     log::debug!("在非 linux 上執行，用 sh -c 包一層");
-    let args: Vec<&str> = args.iter().map(|s| s.as_ref().to_str().unwrap()).collect();
-    let arg = format!("{} {}", cmd_str, args.join(" ")).replace("/", "//");
+    let args: Vec<_> = args
+        .iter()
+        .map(|s| {
+            s.as_ref()
+                .to_str()
+                .unwrap()
+                .to_string()
+                .replace(r"\", r"\\\\")
+        })
+        .collect();
+    let arg = format!("{} {}", cmd_str, args.join(" "));
     let mut cmd = Command::new("sh");
     cmd.args(&["-c", &arg]);
     cmd

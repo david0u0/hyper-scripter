@@ -21,8 +21,12 @@ fn setup<'a>() -> MutexGuard<'a, ()> {
     }
     guard
 }
-fn check_exist(p: &str) -> bool {
-    path::get_path().join(p).exists()
+fn check_exist(p: &[&str]) -> bool {
+    let mut file = path::get_path();
+    for p in p.iter() {
+        file = file.join(p);
+    }
+    file.exists()
 }
 fn run(args: &[&str]) -> Result<String, i32> {
     let mut cmd = Command::new("./target/debug/instant_scripter");
@@ -83,9 +87,9 @@ fn test_mv() {
 
     run(&["mv", "1", "-c", "sh"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
-    assert!(check_exist(".anonymous/1.sh"), "改腳本類型失敗");
+    assert!(check_exist(&[".anonymous", "1.sh"]), "改腳本類型失敗");
     assert!(
-        !check_exist(".anonymous/1.js"),
+        !check_exist(&[".anonymous", "1.js"]),
         "改了腳本類型舊檔案還留著？"
     );
 

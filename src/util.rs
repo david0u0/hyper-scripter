@@ -18,10 +18,27 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
         return Err(Error::Operation(format!("{} is not runnable", ty)));
     };
 
-    let info = json!({
-        "path": script.path,
-        "content": read_file(&script.path)?,
-    });
+    let info: serde_json::Value;
+    #[cfg(not(target_os = "linux"))]
+    {
+        let p = script
+            .path
+            .to_str()
+            .unwrap()
+            .to_string()
+            .replace(r"\", r"\\\\");
+        info = json!({
+            "path": p,
+            "content": read_file(&script.path)?,
+        });
+    }
+    #[cfg(target_os = "linux")]
+    {
+        info = json!({
+            "path": script.path,
+            "content": read_file(&script.path)?,
+        });
+    }
     let args = script_conf.args(&info)?;
     let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
     full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
@@ -36,13 +53,6 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
         Ok(())
     }
 }
-#[cfg(not(target_os = "linux"))]
-pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
-    let output = handle_fs_res(&[&cmd_str], cmd.output())?;
-    println!("{}", std::str::from_utf8(&output.stdout)?);
-    Ok(output.status)
-}
-#[cfg(target_os = "linux")]
 pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
     let mut child = handle_fs_res(&[&cmd_str], cmd.spawn())?;
     handle_fs_res(&[&cmd_str], child.wait())

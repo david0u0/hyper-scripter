@@ -29,15 +29,27 @@ impl ScriptName<'_> {
             ScriptName::Named(s) => Cow::Borrowed(&*s),
         }
     }
-    pub fn to_file_name(&self, ty: &ScriptType) -> Result<String> {
-        let mut name = match self {
-            ScriptName::Anonymous(id) => format!("{}/{}", ANONYMOUS, id),
-            ScriptName::Named(name) => name.as_ref().to_owned(),
+    pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
+        let mut file_name: String;
+        let add_ext = |name: &mut String| -> Result<()> {
+            if let Some(ext) = &Config::get().get_script_conf(ty)?.ext {
+                *name = format!("{}.{}", name, ext);
+            }
+            Ok(())
         };
-        if let Some(ext) = &Config::get().get_script_conf(ty)?.ext {
-            name = format!("{}.{}", name, ext)
+        match self {
+            ScriptName::Anonymous(id) => {
+                file_name = id.to_string();
+                let dir: PathBuf = ANONYMOUS.into();
+                add_ext(&mut file_name)?;
+                Ok(dir.join(file_name))
+            }
+            ScriptName::Named(name) => {
+                file_name = name.to_string();
+                add_ext(&mut file_name)?;
+                Ok(file_name.into())
+            }
         }
-        Ok(name)
     }
     pub fn into_static(self) -> ScriptName<'static> {
         match self {
@@ -88,8 +100,8 @@ impl ScriptInfo<'_> {
             _ => self.read_time,
         }
     }
-    pub fn file_name(&self) -> Result<String> {
-        self.name.to_file_name(&self.ty)
+    pub fn file_path(&self) -> Result<PathBuf> {
+        self.name.to_file_path(&self.ty)
     }
     pub fn new<'a>(
         name: ScriptName<'a>,

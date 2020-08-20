@@ -92,7 +92,7 @@ pub fn open_new_anonymous(ty: &ScriptType) -> Result<ScriptMeta<'static>> {
 }
 pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<ScriptMeta<'static>> {
     let name = ScriptName::Anonymous(id);
-    let path = get_path().join(name.to_file_name(ty)?);
+    let path = get_path().join(name.to_file_path(ty)?);
     Ok(ScriptMeta { path, name })
 }
 
@@ -105,7 +105,7 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
         ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
-            let path = get_path().join(name.to_file_name(ty)?);
+            let path = get_path().join(name.to_file_path(ty)?);
             ScriptMeta { path, name }
         }
     };

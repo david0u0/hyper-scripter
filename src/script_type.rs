@@ -7,26 +7,30 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 # Here are some useful commands to begin with:
 
+export DIR=$(pwd $0)
+export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd '{{birthplace}}'
 
-{{content}}
+{{{content}}}
 ";
 
 const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
-process.chdir(\"{{birthplace}}\");
+const dir = __dirname;
+const name = '{{name}}';
+process.chdir('{{birthplace}}');
 
-{{content}}
+{{{content}}}
 ";
 
 const TMUX_WELCOME_MSG: &str = "cd '{{birthplace}}'
-tmux new-session -s {{name}} -d ' '
-tmux split-window -v ' '
+tmux new-session -s {{name}} -d \" \"
+tmux split-window -v \" \"
 tmux -2 attach-session -d
 
-{{content}}
+{{{content}}}
 ";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]

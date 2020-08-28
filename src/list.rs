@@ -140,8 +140,10 @@ pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOption
         writeln!(w, "type\tname\tlast read time\tlast execute time")?;
     }
     let mut scripts: Vec<_> = scripts.into_iter().collect();
+
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
-    for (tags, scripts) in scripts.iter() {
+    for (tags, mut scripts) in scripts.into_iter() {
+        scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
         write!(w, "{}\n", tags.to_string().dimmed().italic())?;
         for script in scripts {
             if !opt.long {

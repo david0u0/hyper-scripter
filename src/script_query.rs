@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{Contextable, Error, Result};
 use crate::script::{AsScriptName, ScriptName};
 use std::str::FromStr;
 
@@ -70,7 +70,7 @@ impl FromStr for ScriptQuery {
         } else if s.starts_with('^') {
             Ok(ScriptQuery::Prev(parse_prev(s)?))
         } else {
-            s.as_script_name()?; // NOTE: 單純檢查用
+            s.as_script_name().context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
             Ok(ScriptQuery::Fuzz(s.to_owned()))
         }
     }

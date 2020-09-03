@@ -1,4 +1,4 @@
-use instant_scripter::path;
+use instant_scripter::{config, path};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
@@ -19,7 +19,16 @@ fn setup<'a>() -> MutexGuard<'a, ()> {
             }
         }
     }
+
     guard
+}
+fn clear_config() {
+    run(&["ls"]).unwrap(); // 用這指令創建資料夾…
+    let mut conf = config::Config::default();
+    for (_, category) in conf.categories.iter_mut() {
+        category.template = "{{{content}}}".to_owned();
+    }
+    conf.store().unwrap();
 }
 fn check_exist(p: &[&str]) -> bool {
     let mut file = path::get_path();
@@ -82,6 +91,8 @@ fn test_tags() {
 #[test]
 fn test_mv() {
     let _g = setup();
+
+    clear_config();
     run(&["e", ".", "-c", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
@@ -127,6 +138,8 @@ fn test_exact() {
 #[test]
 fn test_prev() {
     let _g = setup();
+    clear_config();
+
     run(&["e", "test-prev1", "fast", "echo 'test prev 1'"]).unwrap();
     run(&["e", "test-prev2", "fast", "echo 'test prev 2'"]).unwrap();
     run(&["e", "test-prev3", "fast", "echo 'test prev 3'"]).unwrap();

@@ -1,6 +1,6 @@
 use chrono::Utc;
 use instant_scripter::config::Config;
-use instant_scripter::error::{Contextabl, Error, Result};
+use instant_scripter::error::{Contextable, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
 use instant_scripter::script::{AsScriptName, ScriptInfo};
@@ -238,22 +238,22 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 Some(WithContent::With { content }) => (false, Some(content)),
                 _ => (false, None),
             };
-            if fast {
-                log::info!("快速編輯 {:?}", script.name);
+            if content.is_some() {
+                log::info!("帶內容編輯 {:?}", script.name);
                 if path.exists() {
-                    log::error!("不允許快速編輯已存在的腳本");
+                    log::error!("不允許帶內容編輯已存在的腳本");
                     return Err(Error::ScriptExist(script.name.to_string()));
                 }
-                util::fast_write_script(&path, &*content.unwrap().join(" "))?;
-            } else {
-                let content = content.map(|c| c.join(" "));
-                let created =
-                    util::prepare_script(&path, script, content.as_ref().map(|s| s.as_str()))?;
+            }
+            let content = content.map(|c| c.join(" "));
+            let created =
+                util::prepare_script(&path, script, content.as_ref().map(|s| s.as_str()))?;
+            if !fast {
                 let cmd = util::create_cmd("vim", &[&path]);
                 let stat = util::run_cmd("vim", cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
-                util::after_script(&path, created)?;
             }
+            util::after_script(&path, created)?;
             script.read();
         }
         Subs::Run { script_query, args } => {

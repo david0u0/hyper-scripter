@@ -1,4 +1,4 @@
-use crate::error::{Contextabl, Error, Result};
+use crate::error::{Contextable, Error, Result};
 use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;

@@ -54,12 +54,12 @@ impl Error {
     }
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T = ()> = std::result::Result<T, Error>;
 
-pub trait Contextabl<T> {
+pub trait Contextable<T> {
     fn context<S: ToString>(self, s: S) -> Result<T>;
 }
-impl<T> Contextabl<T> for Result<T> {
+impl<T> Contextable<T> for Result<T> {
     fn context<S: ToString>(self, s: S) -> Result<T> {
         match self {
             Ok(t) => Ok(t),
@@ -68,7 +68,7 @@ impl<T> Contextabl<T> for Result<T> {
     }
 }
 
-impl<T, E: 'static + Send + Sync + std::error::Error> Contextabl<T> for std::result::Result<T, E> {
+impl<T, E: 'static + Send + Sync + std::error::Error> Contextable<T> for std::result::Result<T, E> {
     fn context<S: ToString>(self, s: S) -> Result<T> {
         match self {
             Ok(t) => Ok(t),

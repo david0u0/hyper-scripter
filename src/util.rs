@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::{Contextabl, Error, Result};
+use crate::error::{Contextable, Error, Result};
 use crate::script::{ScriptInfo, ScriptMeta};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
@@ -97,13 +97,11 @@ pub fn write_file(path: &PathBuf, content: &str) -> Result<()> {
     let mut file = handle_fs_res(&[path], File::create(path))?;
     handle_fs_res(&[path], file.write_all(content.as_bytes()))
 }
-pub fn fast_write_script(path: &PathBuf, content: &str) -> Result<()> {
-    write_file(path, content)
-}
 pub fn remove(script: &ScriptMeta) -> Result<()> {
     handle_fs_res(&[&script.path], remove_file(&script.path))
 }
 pub fn mv(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
+    log::info!("修改 {:?} 為 {:?}", origin.path, new.path);
     handle_fs_res(&[&origin.path, &new.path], rename(&origin.path, &new.path))
 }
 pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {

@@ -164,7 +164,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
     if root.tags.is_none() {
-        root.tags = Some(conf.tag_filters.clone());
+        root.tags = Some(conf.get_tag_filters());
     }
     if !root.all() {
         hs.filter_by_group(root.tags.as_ref().unwrap());
@@ -348,7 +348,11 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             if let Some(tags) = tags {
                 conf.tag_filters = tags.clone();
             } else {
-                println!("current tag filter = [{}]", conf.tag_filters);
+                println!("current tag filter:");
+                for (name, filter) in conf.named_tag_filters.iter() {
+                    println!("  {}=[{}]", name, filter);
+                }
+                println!("  (anonymous)=[{}]", conf.tag_filters);
             }
         }
         _ => unimplemented!(),

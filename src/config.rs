@@ -1,10 +1,10 @@
 use crate::error::{Error, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
-use crate::tag::{Tag, TagFilters};
+use crate::tag::TagFilters;
 use crate::util;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -18,35 +18,21 @@ fn config_file() -> PathBuf {
     path::get_path().join(CONFIG_FILE)
 }
 
-fn ser_tag_filters<S>(x: &TagFilters, s: S) -> std::result::Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    s.serialize_str(&x.to_string())
-}
-fn de_tag_filters<'de, D>(deserializer: D) -> std::result::Result<TagFilters, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &str = Deserialize::deserialize(deserializer)?;
-    let filters = TagFilters::from_str(s).unwrap();
-    Ok(filters)
-}
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
-    #[serde(serialize_with = "ser_tag_filters")]
-    #[serde(deserialize_with = "de_tag_filters")]
     pub tag_filters: TagFilters,
-    pub tags: Vec<Tag>,
+    pub named_tag_filters: HashMap<String, TagFilters>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(skip_serializing, default = "Utc::now")]
     pub open_time: DateTime<Utc>,
 }
 impl Default for Config {
     fn default() -> Self {
+        let mut named_tag_filters = HashMap::new();
+        named_tag_filters.insert("pin".to_owned(), FromStr::from_str("pin").unwrap());
         Config {
+            named_tag_filters,
             tag_filters: FromStr::from_str("all,-hide").unwrap(),
-            tags: vec![FromStr::from_str("hide").unwrap()],
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }
@@ -92,6 +78,13 @@ impl Config {
             .get(ty)
             .ok_or(Error::UnknownCategory(ty.to_string()))
     }
+    pub fn get_tag_filters(&self) -> TagFilters {
+        let mut filters = self.tag_filters.clone();
+        for (_, f) in self.named_tag_filters.iter() {
+            filters.merge(f.clone());
+        }
+        filters
+    }
 }
 
 #[cfg(test)]
@@ -102,7 +95,6 @@ mod test {
     fn test_config_serde() {
         path::set_path_from_sys().unwrap();
         let c1 = Config {
-            tags: vec![FromStr::from_str("測試標籤").unwrap()],
             tag_filters: FromStr::from_str("a,-b,c").unwrap(),
             ..Default::default()
         };

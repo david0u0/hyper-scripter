@@ -4,6 +4,24 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagFilters(Vec<TagFilter>);
+impl<'de> Deserialize<'de> for TagFilters {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        let filters = TagFilters::from_str(s).unwrap();
+        Ok(filters)
+    }
+}
+impl Serialize for TagFilters {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagFilter {
@@ -83,6 +101,9 @@ impl std::fmt::Display for TagFilters {
     }
 }
 impl TagFilters {
+    pub fn merge(&mut self, mut other: Self) {
+        self.0.append(&mut other.0);
+    }
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
         self.0.into_iter().filter_map(|f| {
             // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣

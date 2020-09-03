@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::history::History;
-use crate::script::ScriptInfo;
+use crate::script::{ScriptInfo, ScriptName};
 use crate::tag::Tag;
 use colored::{Color, Colorize};
 use regex::Regex;
@@ -71,7 +71,9 @@ impl std::str::FromStr for ListPattern {
 }
 pub struct ListOptions<'a> {
     pub long: bool,
+    pub no_grouping: bool,
     pub pattern: &'a Option<ListPattern>,
+    pub plain: bool,
 }
 impl<'a> ListOptions<'a> {
     fn filter(&self, script: &ScriptInfo) -> bool {
@@ -90,7 +92,7 @@ pub fn fmt_meta<W: Write>(
 ) -> Result<()> {
     let color = Config::get().get_script_conf(&script.ty)?.color.as_str();
     if opt.long {
-        if is_last {
+        if is_last && !opt.plain {
             write!(w, "{}", " *".color(Color::Yellow).bold())?;
         } else {
             write!(w, "  ")?;
@@ -100,59 +102,82 @@ pub fn fmt_meta<W: Write>(
             Some(t) => t.to_string(),
             None => "Never".to_owned(),
         };
-        write!(
-            w,
-            "{}\t{}\t{}\n",
-            format!("{}\t{}", script.ty, script.name)
-                .color(color)
-                .bold(),
-            script.read_time,
-            exex_time
-        )?;
+        let mut label: colored::ColoredString = format!("{}\t{}", script.ty, script.name).normal();
+        if !opt.plain {
+            label = label.color(color).bold();
+        }
+        write!(w, "{}\t{}\t{}\n", label, script.read_time, exex_time)?;
     } else {
-        if is_last {
+        if is_last && !opt.plain {
             write!(w, "{}", "*".color(Color::Yellow).bold())?;
         }
-        let mut msg = format!("{}({})", script.name, script.ty).normal();
-        if is_last {
-            msg = msg.underline()
+        let msg = if !opt.plain {
+            let msg = format!("{}({})", script.name, script.ty)
+                .bold()
+                .color(color);
+            if is_last {
+                msg.underline()
+            } else {
+                msg
+            }
+        } else {
+            let p = script.file_path()?;
+            format!("{}", p.to_string_lossy()).normal()
         };
-        write!(w, "{}", msg.bold().color(color))?;
+        write!(w, "{}", msg)?;
     }
     Ok(())
 }
 pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOptions) -> Result<()> {
-    let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
     let latest_script_name = match history.latest_mut(1) {
         Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
-    for script in history.iter() {
-        if !opt.filter(&script) {
-            continue;
-        }
+
+    if opt.long {
+        writeln!(w, "type\tname\tlast read time\tlast execute time")?;
+    }
+    let script_iter = history.iter().filter(|s| opt.filter(&s));
+
+    if opt.no_grouping {
+        let scripts: Vec<_> = script_iter.collect();
+        fmt_group(w, scripts, &latest_script_name, opt)?;
+        return Ok(());
+    }
+
+    let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
+    for script in script_iter {
         let key = TagsKey(script.tags.clone());
         let v = scripts.entry(key).or_default();
         v.push(script);
     }
 
-    if opt.long {
-        writeln!(w, "type\tname\tlast read time\tlast execute time")?;
-    }
     let mut scripts: Vec<_> = scripts.into_iter().collect();
 
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
-    for (tags, mut scripts) in scripts.into_iter() {
-        scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
-        write!(w, "{}\n", tags.to_string().dimmed().italic())?;
-        for script in scripts {
-            if !opt.long {
-                write!(w, "  ")?;
-            }
-            let is_latest = script.name == latest_script_name;
-            fmt_meta(w, script, is_latest, opt)?;
+    for (tags, scripts) in scripts.into_iter() {
+        if !opt.no_grouping {
+            write!(w, "{}\n", tags.to_string().dimmed().italic())?;
         }
-        write!(w, "\n")?;
+        fmt_group(w, scripts, &latest_script_name, opt)?;
     }
+    Ok(())
+}
+
+fn fmt_group<W: Write>(
+    w: &mut W,
+    mut scripts: Vec<&ScriptInfo>,
+    latest_script_name: &ScriptName,
+    opt: &ListOptions,
+) -> Result<()> {
+    scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
+    for script in scripts {
+        if !opt.long {
+            write!(w, "  ")?;
+        }
+        let is_latest = &script.name == latest_script_name;
+        fmt_meta(w, script, is_latest, opt)?;
+    }
+    write!(w, "\n")?;
     Ok(())
 }

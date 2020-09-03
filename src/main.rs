@@ -132,6 +132,10 @@ struct List {
     all: bool,
     #[structopt(short, long, help = "Show verbose information.")]
     long: bool,
+    #[structopt(long, help = "Don't group by tags.")]
+    no_grouping: bool,
+    #[structopt(long, help = "No color and other decoration.")]
+    plain: bool,
     #[structopt(parse(try_from_str))]
     pattern: Option<ListPattern>,
 }
@@ -273,10 +277,18 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             println!("{}", content);
             h.read();
         }
-        Subs::LS(list) => {
+        Subs::LS(List {
+            long,
+            no_grouping,
+            pattern,
+            plain,
+            all: _,
+        }) => {
             let opt = ListOptions {
-                long: list.long,
-                pattern: &list.pattern,
+                long: *long,
+                no_grouping: *no_grouping,
+                plain: *plain,
+                pattern,
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), hs, &opt)?;

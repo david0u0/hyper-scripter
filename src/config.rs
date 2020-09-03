@@ -21,18 +21,16 @@ fn config_file() -> PathBuf {
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
     pub tag_filters: TagFilters,
-    pub named_tag_filters: HashMap<String, TagFilters>,
+    pub named_tag_filters: Vec<(String, TagFilters)>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(skip_serializing, default = "Utc::now")]
     pub open_time: DateTime<Utc>,
 }
 impl Default for Config {
     fn default() -> Self {
-        let mut named_tag_filters = HashMap::new();
-        named_tag_filters.insert("pin".to_owned(), FromStr::from_str("pin").unwrap());
         Config {
-            named_tag_filters,
-            tag_filters: FromStr::from_str("all,-hide").unwrap(),
+            named_tag_filters: vec![("pin".to_owned(), FromStr::from_str("pin").unwrap())],
+            tag_filters: FromStr::from_str("all,^hide").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }
@@ -79,10 +77,11 @@ impl Config {
             .ok_or(Error::UnknownCategory(ty.to_string()))
     }
     pub fn get_tag_filters(&self) -> TagFilters {
-        let mut filters = self.tag_filters.clone();
+        let mut filters = TagFilters::default();
         for (_, f) in self.named_tag_filters.iter() {
             filters.merge(f.clone());
         }
+        filters.merge(self.tag_filters.clone());
         filters
     }
 }

@@ -161,3 +161,40 @@ fn test_edit_same_name() {
     run(&["tags", "hide"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap(), "腳本被撞名的編輯搞爛了？");
 }
+
+#[test]
+fn test_multi_filter() {
+    let _g = setup();
+    run(&[
+        "-t",
+        "test,pin",
+        "e",
+        "test-pin",
+        "fast",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
+    run(&["e", "pin-only", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&[
+        "-t",
+        "test2",
+        "e",
+        "nobody",
+        "fast",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
+
+    assert_eq!(MSG, run(&["pin-only"]).unwrap());
+    assert_eq!(MSG, run(&["test-pin"]).unwrap());
+    assert_eq!(MSG, run(&["nobody"]).unwrap());
+
+    run(&["tags", "hidden"]).unwrap();
+    assert_eq!(MSG, run(&["pin-only"]).unwrap());
+    assert_eq!(MSG, run(&["test-pin"]).unwrap());
+    run(&["nobody"]).expect_err("未能被匿名篩選器篩掉");
+
+    run(&["tags", "^test"]).unwrap();
+    assert_eq!(MSG, run(&["pin-only"]).unwrap());
+    run(&["test-pin"]).expect_err("未能被匿名篩選器篩掉");
+}

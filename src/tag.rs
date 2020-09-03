@@ -2,8 +2,9 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TagFilters(Vec<TagFilter>);
+
 impl<'de> Deserialize<'de> for TagFilters {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -56,7 +57,7 @@ impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(tag: &str) -> std::result::Result<Self, Error> {
         let mut s = tag;
-        let allow = if s.starts_with("-") {
+        let allow = if s.starts_with("^") {
             s = &s[1..s.len()];
             false
         } else if s.starts_with("+") {
@@ -93,7 +94,7 @@ impl std::fmt::Display for TagFilters {
             }
             first = false;
             if !f.allow {
-                write!(w, "-")?;
+                write!(w, "^")?;
             }
             write!(w, "{}", f.tag.0)?;
         }

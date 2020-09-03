@@ -20,8 +20,8 @@ fn config_file() -> PathBuf {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
-    pub tag_filters: TagFilters,
-    pub named_tag_filters: Vec<(String, TagFilters)>,
+    pub main_tag_filters: TagFilters,
+    pub tag_filters: Vec<(String, TagFilters)>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(skip_serializing, default = "Utc::now")]
     pub open_time: DateTime<Utc>,
@@ -29,8 +29,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            named_tag_filters: vec![("pin".to_owned(), FromStr::from_str("pin").unwrap())],
-            tag_filters: FromStr::from_str("all,^hide").unwrap(),
+            tag_filters: vec![("pin".to_owned(), FromStr::from_str("pin").unwrap())],
+            main_tag_filters: FromStr::from_str("all,^hide").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }
@@ -78,10 +78,10 @@ impl Config {
     }
     pub fn get_tag_filters(&self) -> TagFilters {
         let mut filters = TagFilters::default();
-        for (_, f) in self.named_tag_filters.iter() {
+        for (_, f) in self.tag_filters.iter() {
             filters.merge(f.clone());
         }
-        filters.merge(self.tag_filters.clone());
+        filters.merge(self.main_tag_filters.clone());
         filters
     }
 }
@@ -94,7 +94,7 @@ mod test {
     fn test_config_serde() {
         path::set_path_from_sys().unwrap();
         let c1 = Config {
-            tag_filters: FromStr::from_str("a,-b,c").unwrap(),
+            main_tag_filters: FromStr::from_str("a,-b,c").unwrap(),
             ..Default::default()
         };
         let s = to_string(&c1).unwrap();

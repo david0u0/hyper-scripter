@@ -165,6 +165,7 @@ fn test_edit_same_name() {
 #[test]
 fn test_multi_filter() {
     let _g = setup();
+    run(&["e", "nobody", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&[
         "-t",
         "test,pin",
@@ -174,12 +175,11 @@ fn test_multi_filter() {
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
-    run(&["e", "pin-only", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&[
         "-t",
-        "test2",
+        "pin",
         "e",
-        "nobody",
+        "pin-only",
         "fast",
         &format!("echo \"{}\"", MSG),
     ])

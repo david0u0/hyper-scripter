@@ -163,12 +163,6 @@ fn main_err_handle() -> Result<Vec<Error>> {
     let mut conf = Config::get().clone();
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
-    if root.tags.is_none() {
-        root.tags = Some(conf.get_tag_filters());
-    }
-    if !root.all() {
-        hs.filter_by_group(root.tags.as_ref().unwrap());
-    }
 
     match root.subcmd {
         None => {
@@ -226,7 +220,10 @@ fn get_info_mut_strict<'b, 'a>(
 }
 fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Result<Vec<Error>> {
     let mut res = Vec::<Error>::new();
-    let tags = root.tags.clone().unwrap();
+    let tags = root.tags.clone().unwrap_or(conf.get_tag_filters());
+    if !root.all() {
+        hs.filter_by_group(&tags);
+    }
 
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
@@ -234,7 +231,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             category: ty,
             subcmd,
         } => {
-            let (path, script) = edit_or_create(edit_query, hs, ty.clone(), tags)?;
+            let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filters.clone());
+            let (path, script) = edit_or_create(edit_query, hs, ty.clone(), edit_tags)?;
             let (fast, content) = match subcmd {
                 Some(WithContent::Fast { content }) => (true, Some(content)),
                 Some(WithContent::With { content }) => (false, Some(content)),
@@ -346,13 +344,13 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         }
         Subs::Tags { tags } => {
             if let Some(tags) = tags {
-                conf.tag_filters = tags.clone();
+                conf.main_tag_filters = tags.clone();
             } else {
                 println!("current tag filter:");
-                for (name, filter) in conf.named_tag_filters.iter() {
+                for (name, filter) in conf.tag_filters.iter() {
                     println!("  {}=[{}]", name, filter);
                 }
-                println!("  (anonymous)=[{}]", conf.tag_filters);
+                println!("  (main)=[{}]", conf.main_tag_filters);
             }
         }
         _ => unimplemented!(),

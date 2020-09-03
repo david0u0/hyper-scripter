@@ -32,7 +32,7 @@ export VAR=\"${VAR:-default}\"
 cd '{{birthplace}}'
 
 tmux new-session -s $NAME -d \" \"
-tmux split-window -v \" \"
+tmux split-window -h \" \"
 tmux -2 attach-session -d
 
 {{{content}}}

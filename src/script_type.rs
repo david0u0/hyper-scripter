@@ -7,7 +7,7 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 # Here are some useful commands to begin with:
 
-export DIR=$(pwd $0)
+export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd '{{birthplace}}'
@@ -25,8 +25,13 @@ process.chdir('{{birthplace}}');
 {{{content}}}
 ";
 
-const TMUX_WELCOME_MSG: &str = "cd '{{birthplace}}'
-tmux new-session -s {{name}} -d \" \"
+const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
+export DIR=$(dirname $0)
+export NAME=\"{{name}}\"
+export VAR=\"${VAR:-default}\"
+cd '{{birthplace}}'
+
+tmux new-session -s $NAME -d \" \"
 tmux split-window -v \" \"
 tmux -2 attach-session -d
 

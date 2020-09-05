@@ -12,10 +12,11 @@ impl TagFilterGroup {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.filter(tags);
-            if f.must && res != Some(true) {
-                return false;
-            }
-            if let Some(res) = res {
+            if f.must {
+                if res != Some(true) {
+                    return false;
+                }
+            } else if let Some(res) = res {
                 pass = res;
             }
         }
@@ -27,9 +28,13 @@ impl From<TagFilter> for TagFilterGroup {
         TagFilterGroup(vec![t])
     }
 }
+fn is_false(t: &bool) -> bool {
+    !t
+}
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TagFilter {
     pub filter: TagControlFlow,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub must: bool,
 }
 

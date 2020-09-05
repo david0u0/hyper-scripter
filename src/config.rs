@@ -18,9 +18,13 @@ fn config_file() -> PathBuf {
     path::get_path().join(CONFIG_FILE)
 }
 
+fn is_false(t: &bool) -> bool {
+    !t
+}
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct NamedTagFilter {
     pub filter: TagControlFlow,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub must: bool,
     pub name: String,
 }
@@ -36,12 +40,19 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            tag_filters: vec![NamedTagFilter {
-                filter: FromStr::from_str("pin").unwrap(),
-                must: false,
-                name: "pin".to_owned(),
-            }],
-            main_tag_filter: FromStr::from_str("all,^hide,^deleted").unwrap(),
+            tag_filters: vec![
+                NamedTagFilter {
+                    filter: FromStr::from_str("pin").unwrap(),
+                    must: false,
+                    name: "pin".to_owned(),
+                },
+                NamedTagFilter {
+                    filter: FromStr::from_str("all,^deleted").unwrap(),
+                    must: true,
+                    name: "no-deleted".to_owned(),
+                },
+            ],
+            main_tag_filter: FromStr::from_str("all,^hide").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }

@@ -347,11 +347,20 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             if let Some(tags) = tags {
                 conf.main_tag_filter = tags.clone();
             } else {
-                println!("current tag filter:");
+                println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
-                    println!("  {}=[{}]", filter.name, filter.filter);
+                    print!("  {} = [{}]", filter.name, filter.filter);
+                    if filter.must {
+                        print!(" (must)")
+                    }
+                    println!("")
                 }
-                println!("  (main)=[{}]", conf.main_tag_filter.filter);
+                println!("main tag filter:");
+                print!("  [{}]", conf.main_tag_filter.filter);
+                if conf.main_tag_filter.must {
+                    print!(" (must)")
+                }
+                println!("")
             }
         }
         _ => unimplemented!(),

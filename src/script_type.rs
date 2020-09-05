@@ -12,8 +12,7 @@ export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd '{{birthplace}}'
 
-{{{content}}}
-";
+{{{content}}}";
 
 const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
@@ -26,8 +25,7 @@ spawn('test', [], { stdio: 'inherit' });
 let writeFile = require('fs').writeFileSync;
 writeFile('/dev/null', 'some content');
 
-{{{content}}}
-";
+{{{content}}}";
 
 const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
@@ -35,12 +33,9 @@ export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd '{{birthplace}}'
 
-tmux new-session -s $NAME -d \" \"
+tmux new-session -s $NAME -d \"{{{content}}}\"
 tmux split-window -h \" \"
-tmux -2 attach-session -d
-
-{{{content}}}
-";
+tmux -2 attach-session -d";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]

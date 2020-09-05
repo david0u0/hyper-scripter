@@ -3,19 +3,49 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct TagFilters(Vec<TagFilter>);
+pub struct TagFilterGroup(Vec<TagFilter>);
+impl TagFilterGroup {
+    pub fn push(&mut self, filter: TagFilter) {
+        self.0.push(filter);
+    }
+    pub fn filter(&self, tags: &[Tag]) -> bool {
+        let mut pass = false;
+        for f in self.0.iter() {
+            let res = f.filter(tags);
+            if f.must && res != Some(true) {
+                return false;
+            }
+            if let Some(res) = res {
+                pass = res;
+            }
+        }
+        pass
+    }
+}
+impl From<TagFilter> for TagFilterGroup {
+    fn from(t: TagFilter) -> Self {
+        TagFilterGroup(vec![t])
+    }
+}
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TagFilter {
+    pub filter: TagControlFlow,
+    pub must: bool,
+}
 
-impl<'de> Deserialize<'de> for TagFilters {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TagControlFlow(Vec<TagControl>);
+impl<'de> Deserialize<'de> for TagControlFlow {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s: &str = Deserialize::deserialize(deserializer)?;
-        let filters = TagFilters::from_str(s).unwrap();
-        Ok(filters)
+        // TODO: unwrap?
+        Ok(FromStr::from_str(s).unwrap())
     }
 }
-impl Serialize for TagFilters {
+impl Serialize for TagControlFlow {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -25,7 +55,7 @@ impl Serialize for TagFilters {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TagFilter {
+pub struct TagControl {
     allow: bool,
     tag: Tag,
 }
@@ -53,7 +83,7 @@ impl FromStr for Tag {
         }
     }
 }
-impl FromStr for TagFilter {
+impl FromStr for TagControl {
     type Err = Error;
     fn from_str(tag: &str) -> std::result::Result<Self, Error> {
         let mut s = tag;
@@ -66,29 +96,38 @@ impl FromStr for TagFilter {
         } else {
             true
         };
-        Ok(TagFilter {
+        Ok(TagControl {
             tag: Tag::from_str(s)?,
             allow,
         })
     }
 }
-impl FromStr for TagFilters {
+impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(s: &str) -> std::result::Result<Self, Error> {
-        let mut inner = vec![];
+        Ok(TagFilter {
+            filter: FromStr::from_str(s)?,
+            must: false,
+        })
+    }
+}
+impl FromStr for TagControlFlow {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Error> {
+        let mut tags = vec![];
         for filter in s.split(",") {
             if filter.len() > 0 {
-                inner.push(TagFilter::from_str(filter)?);
+                tags.push(TagControl::from_str(filter)?);
             }
         }
-        Ok(TagFilters(inner))
+        Ok(TagControlFlow(tags))
     }
 }
 
-impl std::fmt::Display for TagFilters {
+impl std::fmt::Display for TagControlFlow {
     fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut first = true;
-        for f in &self.0 {
+        for f in self.0.iter() {
             if !first {
                 write!(w, ",")?;
             }
@@ -101,12 +140,9 @@ impl std::fmt::Display for TagFilters {
         Ok(())
     }
 }
-impl TagFilters {
-    pub fn merge(&mut self, mut other: Self) {
-        self.0.append(&mut other.0);
-    }
+impl TagFilter {
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
-        self.0.into_iter().filter_map(|f| {
+        self.filter.0.into_iter().filter_map(|f| {
             // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣
             if f.allow && !f.tag.match_all() {
                 Some(f.tag)
@@ -115,12 +151,12 @@ impl TagFilters {
             }
         })
     }
-    pub fn filter(&self, tags: &[Tag]) -> bool {
-        let mut pass = false;
-        for filter in self.0.iter() {
+    pub fn filter(&self, tags: &[Tag]) -> Option<bool> {
+        let mut pass: Option<bool> = None;
+        for filter in self.filter.0.iter() {
             // TODO: 優化
             if filter.tag.match_all() || tags.contains(&filter.tag) {
-                pass = filter.allow;
+                pass = Some(filter.allow);
             }
         }
         pass

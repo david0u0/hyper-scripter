@@ -6,9 +6,10 @@ use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
 use instant_scripter::script::{AsScriptName, ScriptInfo};
 use instant_scripter::script_query::{EditQuery, ScriptQuery};
 use instant_scripter::script_type::ScriptType;
-use instant_scripter::tag::TagFilters;
+use instant_scripter::tag::{TagFilter, TagFilterGroup};
 use instant_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
+use std::str::FromStr;
 use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
@@ -29,7 +30,7 @@ struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
     #[structopt(short, long, parse(try_from_str))]
-    tags: Option<TagFilters>,
+    tags: Option<TagFilter>,
     #[structopt(short, long, help = "Shorthand for `-t=all,^deleted`")]
     all: bool,
     #[structopt(subcommand)]
@@ -73,7 +74,7 @@ enum Subs {
         #[structopt(help = "Command line args to pass to the script.")]
         args: Vec<String>,
     },
-    #[structopt(about = "Print the script to standard output.")]
+    #[structopt(about = "Print the script to standard output")]
     Cat {
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
@@ -101,7 +102,7 @@ enum Subs {
         )]
         category: Option<ScriptType>,
         #[structopt(short, long)]
-        tags: Option<TagFilters>,
+        tags: Option<TagFilter>,
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
         new: Option<String>,
@@ -109,7 +110,7 @@ enum Subs {
     #[structopt(
         about = "Manage script tags. If a list of tag is given, set it as default, otherwise show tag information."
     )]
-    Tags { tags: Option<TagFilters> },
+    Tags { tags: Option<TagFilter> },
 }
 
 impl Root {
@@ -175,7 +176,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         Some(Subs::Other(args)) => {
             log::info!("執行模式");
             let run = Subs::Run {
-                script_query: std::str::FromStr::from_str(&args[0])?,
+                script_query: FromStr::from_str(&args[0])?,
                 args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
             };
             root.subcmd = Some(run);
@@ -220,12 +221,17 @@ fn get_info_mut_strict<'b, 'a>(
 }
 fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Result<Vec<Error>> {
     let mut res = Vec::<Error>::new();
-    let tags = if root.all() {
-        std::str::FromStr::from_str("all,^deleted").unwrap()
-    } else {
-        root.tags.clone().unwrap_or(conf.get_tag_filters())
-    };
-    hs.filter_by_group(&tags);
+    {
+        let tag_group: TagFilterGroup = if root.all() {
+            TagFilter::from_str("all,^deleted").unwrap().into()
+        } else {
+            match root.tags.clone() {
+                Some(filter) => filter.into(),
+                None => conf.get_tag_filter_group(),
+            }
+        };
+        hs.filter_by_tag(&tag_group);
+    }
 
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
@@ -233,7 +239,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             category: ty,
             subcmd,
         } => {
-            let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filters.clone());
+            let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filter.clone());
             let (path, script) = edit_or_create(edit_query, hs, ty.clone(), edit_tags)?;
             let (fast, content) = match subcmd {
                 Some(WithContent::Fast { content }) => (true, Some(content)),
@@ -295,8 +301,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         }
         Subs::RM { script_queries } => {
             let time_str = Utc::now().format("%Y%m%d%H%M%S");
-            let delete_tag: Option<TagFilters> =
-                Some(std::str::FromStr::from_str("deleted").unwrap());
+            let delete_tag: Option<TagFilter> = Some(FromStr::from_str("deleted").unwrap());
             for query in script_queries.into_iter() {
                 let h = get_info_mut_strict(query, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
@@ -340,13 +345,13 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         }
         Subs::Tags { tags } => {
             if let Some(tags) = tags {
-                conf.main_tag_filters = tags.clone();
+                conf.main_tag_filter = tags.clone();
             } else {
                 println!("current tag filter:");
-                for (name, filter) in conf.tag_filters.iter() {
-                    println!("  {}=[{}]", name, filter);
+                for filter in conf.tag_filters.iter() {
+                    println!("  {}=[{}]", filter.name, filter.filter);
                 }
-                println!("  (main)=[{}]", conf.main_tag_filters);
+                println!("  (main)=[{}]", conf.main_tag_filter.filter);
             }
         }
         _ => unimplemented!(),
@@ -359,7 +364,7 @@ fn mv<'a, 'b>(
     new: &Option<String>,
     history: &'b mut History<'a>,
     ty: &Option<ScriptType>,
-    tags: &Option<TagFilters>,
+    tags: &Option<TagFilter>,
 ) -> Result {
     let h = get_info_mut_strict(origin, history)?;
     let og_script = path::open_script(&h.name, &h.ty, true)?;
@@ -384,7 +389,7 @@ fn edit_or_create<'a, 'b>(
     edit_query: &'b EditQuery,
     history: &'b mut History<'a>,
     ty: Option<ScriptType>,
-    tags: TagFilters,
+    tags: TagFilter,
 ) -> Result<(PathBuf, &'b mut ScriptInfo<'a>)> {
     let final_ty: ScriptType;
     let script = if let EditQuery::Query(query) = edit_query {

@@ -1,5 +1,5 @@
 use crate::script::{ScriptInfo, ScriptName};
-use crate::tag::TagFilters;
+use crate::tag::TagFilterGroup;
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Default, Debug)]
@@ -82,9 +82,9 @@ impl<'a> History<'a> {
     pub fn entry(&mut self, name: &ScriptName) -> Entry<'_, String, ScriptInfo<'a>> {
         self.map.entry(name.key().into_owned())
     }
-    pub fn filter_by_group(&mut self, filter: &TagFilters) {
+    pub fn filter_by_tag(&mut self, filter: &TagFilterGroup) {
         // TODO: 優化
-        log::debug!("根據群組 {:?} 進行篩選", filter);
+        log::debug!("根據標籤 {:?} 進行篩選", filter);
         let drain = self.map.drain();
         let mut map = HashMap::new();
         for (key, info) in drain {

@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
-use crate::tag::TagFilters;
+use crate::tag::{TagControlFlow, TagFilter, TagFilterGroup};
 use crate::util;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -18,19 +18,30 @@ fn config_file() -> PathBuf {
     path::get_path().join(CONFIG_FILE)
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct NamedTagFilter {
+    pub filter: TagControlFlow,
+    pub must: bool,
+    pub name: String,
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
-    pub main_tag_filters: TagFilters,
-    pub tag_filters: Vec<(String, TagFilters)>,
-    pub categories: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(skip_serializing, default = "Utc::now")]
     pub open_time: DateTime<Utc>,
+    pub tag_filters: Vec<NamedTagFilter>,
+    pub main_tag_filter: TagFilter,
+    pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
 impl Default for Config {
     fn default() -> Self {
         Config {
-            tag_filters: vec![("pin".to_owned(), FromStr::from_str("pin").unwrap())],
-            main_tag_filters: FromStr::from_str("all,^hide,^deleted").unwrap(),
+            tag_filters: vec![NamedTagFilter {
+                filter: FromStr::from_str("pin").unwrap(),
+                must: false,
+                name: "pin".to_owned(),
+            }],
+            main_tag_filter: FromStr::from_str("all,^hide,^deleted").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }
@@ -79,28 +90,32 @@ impl Config {
             .get(ty)
             .ok_or(Error::UnknownCategory(ty.to_string()))
     }
-    pub fn get_tag_filters(&self) -> TagFilters {
-        let mut filters = TagFilters::default();
-        for (_, f) in self.tag_filters.iter() {
-            filters.merge(f.clone());
+    pub fn get_tag_filter_group(&self) -> TagFilterGroup {
+        let mut group = TagFilterGroup::default();
+        for f in self.tag_filters.iter() {
+            group.push(TagFilter {
+                must: f.must,
+                filter: f.filter.clone(),
+            });
         }
-        filters.merge(self.main_tag_filters.clone());
-        filters
+        group.push(self.main_tag_filter.clone());
+        group
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use toml::{from_str, to_string};
+    use toml::{from_str, to_string_pretty};
     #[test]
     fn test_config_serde() {
         path::set_path_from_sys().unwrap();
         let c1 = Config {
-            main_tag_filters: FromStr::from_str("a,-b,c").unwrap(),
+            main_tag_filter: FromStr::from_str("a,^b,c").unwrap(),
             ..Default::default()
         };
-        let s = to_string(&c1).unwrap();
+        let s = to_string_pretty(&c1).unwrap();
+        println!("{}", s);
         let mut c2: Config = from_str(&s).unwrap();
         c2.open_time = c1.open_time;
         assert_eq!(c1, c2);

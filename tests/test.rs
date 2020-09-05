@@ -26,7 +26,7 @@ fn clear_config() {
     run(&["ls"]).unwrap(); // 用這指令創建資料夾…
     let mut conf = config::Config::default();
     for (_, category) in conf.categories.iter_mut() {
-        category.template = "{{{content}}}".to_owned();
+        category.template = vec!["{{{content}}}".to_owned()];
     }
     conf.store().unwrap();
 }

@@ -71,9 +71,12 @@ impl Default for ScriptType {
 pub struct ScriptTypeConfig {
     pub ext: Option<String>,
     pub color: String,
-    pub template: String,
+    pub template: Vec<String>,
     pub cmd: Option<String>,
     args: Vec<String>,
+}
+fn split(s: &str) -> Vec<String> {
+    s.split("\n").map(|s| s.to_owned()).collect()
 }
 
 impl ScriptTypeConfig {
@@ -93,7 +96,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("sh".to_owned()),
                 color: "bright magenta".to_owned(),
-                template: SHELL_WELCOME_MSG.to_owned(),
+                template: split(SHELL_WELCOME_MSG),
                 cmd: Some("bash".to_owned()),
                 args: vec!["{{path}}".to_owned()],
             },
@@ -103,7 +106,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("sh".to_owned()),
                 color: "white".to_owned(),
-                template: TMUX_WELCOME_MSG.to_owned(),
+                template: split(TMUX_WELCOME_MSG),
                 cmd: Some("sh".to_owned()),
                 args: vec!["{{path}}".to_owned()],
             },
@@ -113,7 +116,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("js".to_owned()),
                 color: "bright cyan".to_owned(),
-                template: JS_WELCOME_MSG.to_owned(),
+                template: split(JS_WELCOME_MSG),
                 cmd: Some("node".to_owned()),
                 args: vec!["{{path}}".to_owned()],
             },
@@ -123,7 +126,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("js".to_owned()),
                 color: "bright cyan".to_owned(),
-                template: JS_WELCOME_MSG.to_owned(),
+                template: split(JS_WELCOME_MSG),
                 cmd: Some("node".to_owned()),
                 args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
             },
@@ -133,7 +136,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("rb".to_owned()),
                 color: "bright red".to_owned(),
-                template: "".to_owned(),
+                template: split(""),
                 cmd: Some("ruby".to_owned()),
                 args: vec!["{{path}}".to_owned()],
             },
@@ -144,7 +147,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("md".to_owned()),
                 color: "bright black".to_owned(),
-                template: "".to_owned(),
+                template: split(""),
                 cmd: None,
                 args: vec![],
             },

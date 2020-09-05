@@ -157,11 +157,12 @@ pub fn prepare_script(
 }
 fn write_prepare_script<W: Write>(
     w: W,
-    template: &str,
+    template: &Vec<String>,
     info: &serde_json::Value,
 ) -> std::io::Result<()> {
     let reg = Handlebars::new();
-    reg.render_template_to_write(template, &info, w)
+    let template = template.join("\n");
+    reg.render_template_to_write(&template, &info, w)
         .map_err(|err| match err {
             TemplateRenderError::IOError(err, ..) => err,
             e => panic!("解析模版錯誤：{}", e),

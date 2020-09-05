@@ -24,7 +24,7 @@ let spawn = require('child_process').spawnSync;
 spawn('test', [], { stdio: 'inherit' });
 
 let writeFile = require('fs').writeFileSync;
-writeFile('file.txt', 'some content');
+writeFile('/dev/null', 'some content');
 
 {{{content}}}
 ";

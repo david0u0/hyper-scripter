@@ -11,11 +11,11 @@ use std::process::{Command, ExitStatus};
 
 pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Result<()> {
     let ty = &info.ty;
-    let script_conf = Config::get().get_script_conf(ty)?;
+    let script_conf = Config::get()?.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
     } else {
-        return Err(Error::Operation(format!("{} is not runnable", ty)));
+        return Err(Error::PermissionDenied(vec![]));
     };
 
     let info: serde_json::Value;
@@ -52,7 +52,8 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     let stat = run_cmd(&cmd_str, cmd)?;
     log::info!("程式執行結果：{:?}", stat);
     if !stat.success() {
-        Err(Error::ScriptError(stat.to_string()))
+        let code = stat.code().unwrap_or_default();
+        Err(Error::ScriptError(code))
     } else {
         Ok(())
     }
@@ -117,7 +118,7 @@ pub fn handle_fs_err<P: AsRef<Path>>(path: &[P], err: std::io::Error) -> Error {
     match err.kind() {
         std::io::ErrorKind::PermissionDenied => Error::PermissionDenied(p),
         std::io::ErrorKind::NotFound => Error::PathNotFound(path[0].as_ref().to_owned()),
-        _ => Error::GeneralFS(p, err),
+        _ => Error::GeneralFS(p, std::sync::Arc::new(err)),
     }
 }
 pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> Result<T> {
@@ -145,7 +146,7 @@ pub fn prepare_script(
             "name": script.name.key().to_owned(),
             "content": content.unwrap_or_default()
         });
-        let template = &Config::get().get_script_conf(&script.ty)?.template;
+        let template = &Config::get()?.get_script_conf(&script.ty)?.template;
         handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
         true
     };

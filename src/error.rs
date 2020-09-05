@@ -1,43 +1,35 @@
 use crate::script_type::ScriptType;
 use std::path::PathBuf;
-#[derive(Debug)]
-pub enum Others {}
-#[derive(Debug)]
+use std::sync::Arc;
+#[derive(Debug, Clone)]
 pub enum Error {
     Others(
         Vec<String>,
-        Option<Box<dyn 'static + Send + Sync + std::error::Error>>,
+        Option<Arc<dyn 'static + Send + Sync + std::error::Error>>,
     ),
-    SysPathNotFound(&'static str),
+    SysConfigPathNotFound,
 
     PermissionDenied(Vec<PathBuf>),
     // NOTE: PathNotFound 比 ScriptNotFound 更嚴重，代表歷史記錄中有這支腳本，實際要找卻找不到
     PathNotFound(PathBuf),
-    GeneralFS(Vec<PathBuf>, std::io::Error),
+    GeneralFS(Vec<PathBuf>, Arc<std::io::Error>),
 
     ScriptExist(String),
     ScriptNotFound(String),
-    Operation(String),
-    TypeMismatch {
+    CategoryMismatch {
         expect: ScriptType,
         actual: ScriptType,
     },
     MultiFuzz(Vec<String>),
     UnknownCategory(String),
     Format(String),
-    ScriptError(String),
+    ScriptError(i32),
     Empty,
-}
-impl std::fmt::Display for Error {
-    // TODO: 好好實作它！
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 impl<T: 'static + Send + Sync + std::error::Error> From<T> for Error {
     fn from(t: T) -> Self {
-        Error::Others(vec![], Some(Box::new(t)))
+        Error::Others(vec![], Some(Arc::new(t)))
     }
 }
 impl Error {

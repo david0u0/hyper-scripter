@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const CONFIG_FILE: &'static str = "config.toml";
 lazy_static::lazy_static! {
-    static ref CONFIG: Config = Config::load().unwrap();
+    static ref CONFIG: Result<Config> = Config::load();
 }
 
 fn config_file() -> PathBuf {
@@ -68,8 +68,11 @@ impl Config {
         }
         util::write_file(&path, &toml::to_string(self)?)
     }
-    pub fn get() -> &'static Config {
-        &CONFIG
+    pub fn get() -> Result<&'static Config> {
+        match &*CONFIG {
+            Ok(c) => Ok(c),
+            Err(e) => Err(e.clone()),
+        }
     }
     pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
         self.categories

@@ -140,17 +140,17 @@ struct List {
     pattern: Option<ListPattern>,
 }
 
-fn main() -> std::result::Result<(), Vec<Error>> {
+fn main() {
     env_logger::init();
-    match main_err_handle() {
-        Err(e) => Err(vec![e]),
-        Ok(v) => {
-            if v.len() == 0 {
-                Ok(())
-            } else {
-                Err(v)
-            }
-        }
+    let errs = match main_err_handle() {
+        Err(e) => vec![e],
+        Ok(v) => v,
+    };
+    for err in errs.iter() {
+        eprintln!("{}", err);
+    }
+    if errs.len() > 0 {
+        std::process::exit(1);
     }
 }
 fn main_err_handle() -> Result<Vec<Error>> {
@@ -160,7 +160,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         Some(is_path) => path::set_path(is_path)?,
         None => path::set_path_from_sys()?,
     }
-    let mut conf = Config::get().clone();
+    let mut conf = Config::get()?.clone();
 
     let mut hs = path::get_history().context("讀取歷史記錄失敗")?;
 
@@ -261,7 +261,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             log::info!("執行 {:?}", h.name);
             let script = path::open_script(&h.name, &h.ty, true)?;
             match util::run(&script, &h, &args) {
-                Err(e @ Error::ScriptError(_)) => res.push(e),
+                Err(e @ Error::ScriptError(..)) => res.push(e),
                 Err(e) => return Err(e),
                 Ok(_) => (),
             }
@@ -324,23 +324,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             tags,
             category: ty,
         } => {
-            let h = get_info_mut_strict(origin, hs)?;
-            let og_script = path::open_script(&h.name, &h.ty, true)?;
-            if let Some(ty) = ty {
-                h.ty = ty.clone();
-            }
-            let new_name = match new {
-                Some(s) => s.as_script_name()?,
-                None => h.name.clone(),
-            };
-            let new_script = path::open_script(&new_name, &h.ty, false)?;
-            util::mv(&og_script, &new_script)?;
-
-            h.name = new_name.into_static();
-            h.read();
-            if let Some(tags) = tags {
-                h.tags = tags.clone().into_allowed_iter().collect();
-            }
+            mv(origin, new, hs, ty, tags)?;
         }
         Subs::Tags { tags } => {
             if let Some(tags) = tags {
@@ -358,6 +342,32 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
     Ok(res)
 }
 
+fn mv<'a, 'b>(
+    origin: &'b ScriptQuery,
+    new: &Option<String>,
+    history: &'b mut History<'a>,
+    ty: &Option<ScriptType>,
+    tags: &Option<TagFilters>,
+) -> Result {
+    let h = get_info_mut_strict(origin, history)?;
+    let og_script = path::open_script(&h.name, &h.ty, true)?;
+    if let Some(ty) = ty {
+        h.ty = ty.clone();
+    }
+    let new_name = match new {
+        Some(s) => s.as_script_name()?,
+        None => h.name.clone(),
+    };
+    let new_script = path::open_script(&new_name, &h.ty, false)?;
+    util::mv(&og_script, &new_script)?;
+
+    h.name = new_name.into_static();
+    h.read();
+    if let Some(tags) = tags {
+        h.tags = tags.clone().into_allowed_iter().collect();
+    }
+    Ok(())
+}
 fn edit_or_create<'a, 'b>(
     edit_query: &'b EditQuery,
     history: &'b mut History<'a>,
@@ -370,7 +380,7 @@ fn edit_or_create<'a, 'b>(
             if let Some(ty) = ty {
                 log::warn!("已存在的腳本無需再指定類型");
                 if ty != h.ty {
-                    return Err(Error::TypeMismatch {
+                    return Err(Error::CategoryMismatch {
                         expect: ty.clone(),
                         actual: h.ty.clone(),
                     });

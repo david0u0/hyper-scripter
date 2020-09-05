@@ -3,6 +3,7 @@ extern crate serde_json;
 
 pub mod config;
 pub mod error;
+mod error_display;
 pub mod fuzzy;
 pub mod history;
 pub mod list;

@@ -90,7 +90,7 @@ pub fn fmt_meta<W: Write>(
     is_last: bool,
     opt: &ListOptions,
 ) -> Result<()> {
-    let color = Config::get().get_script_conf(&script.ty)?.color.as_str();
+    let color = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
     if opt.long {
         if is_last && !opt.plain {
             write!(w, "{}", " *".color(Color::Yellow).bold())?;

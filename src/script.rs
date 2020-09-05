@@ -32,7 +32,7 @@ impl ScriptName<'_> {
     pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
         let mut file_name: String;
         let add_ext = |name: &mut String| -> Result<()> {
-            if let Some(ext) = &Config::get().get_script_conf(ty)?.ext {
+            if let Some(ext) = &Config::get()?.get_script_conf(ty)?.ext {
                 *name = format!("{}.{}", name, ext);
             }
             Ok(())

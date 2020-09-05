@@ -22,7 +22,7 @@ pub fn get_sys_path() -> Result<PathBuf> {
             p.into()
         }
         Err(std::env::VarError::NotPresent) => dirs::config_dir()
-            .ok_or(Error::SysPathNotFound("config dir"))?
+            .ok_or(Error::SysConfigPathNotFound)?
             .join(ROOT_PATH),
         Err(e) => return Err(e.into()),
     };

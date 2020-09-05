@@ -18,9 +18,13 @@ cd '{{birthplace}}'
 const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
-const dir = __dirname;
 const name = '{{name}}';
 process.chdir('{{birthplace}}');
+let spawn = require('child_process').spawnSync;
+spawn('test', [], { stdio: 'inherit' });
+
+let writeFile = require('fs').writeFileSync;
+writeFile('file.txt', 'some content');
 
 {{{content}}}
 ";

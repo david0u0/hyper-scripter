@@ -210,4 +210,22 @@ fn test_multi_filter() {
     run(&["tags", "^test"]).unwrap();
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
     run(&["test-pin"]).expect_err("未能被匿名篩選器篩掉");
+
+    assert_eq!(MSG, run(&["-a", "test-pin"]).unwrap());
+}
+
+#[test]
+fn test_rm() {
+    let _g = setup();
+    run(&["e", "test", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    assert_eq!(MSG, run(&["test"]).unwrap());
+    run(&["rm", "test"]).unwrap();
+    run(&["test"]).expect_err("未能被刪除掉");
+    run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
+    assert_eq!(MSG, run(&["-t", "deleted", "test"]).unwrap());
+
+    run(&["e", ".", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    assert_eq!(MSG, run(&["-"]).unwrap());
+    run(&["rm", ".1"]).unwrap();
+    run(&["-t", "deleted", ".1"]).expect_err("被刪掉的匿名腳本還能找得回來");
 }

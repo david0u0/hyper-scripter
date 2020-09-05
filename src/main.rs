@@ -30,7 +30,7 @@ struct Root {
     is_path: Option<String>,
     #[structopt(short, long, parse(try_from_str))]
     tags: Option<TagFilters>,
-    #[structopt(short, long, help = "Shorthand for `-t=all`")]
+    #[structopt(short, long, help = "Shorthand for `-t=all,^deleted`")]
     all: bool,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
@@ -220,10 +220,12 @@ fn get_info_mut_strict<'b, 'a>(
 }
 fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Result<Vec<Error>> {
     let mut res = Vec::<Error>::new();
-    let tags = root.tags.clone().unwrap_or(conf.get_tag_filters());
-    if !root.all() {
-        hs.filter_by_group(&tags);
-    }
+    let tags = if root.all() {
+        std::str::FromStr::from_str("all,^deleted").unwrap()
+    } else {
+        root.tags.clone().unwrap_or(conf.get_tag_filters())
+    };
+    hs.filter_by_group(&tags);
 
     match root.subcmd.as_ref().unwrap() {
         Subs::Edit {
@@ -292,14 +294,24 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             fmt_list(&mut stdout.lock(), hs, &opt)?;
         }
         Subs::RM { script_queries } => {
+            let time_str = Utc::now().format("%Y%m%d%H%M%S");
+            let delete_tag: Option<TagFilters> =
+                Some(std::str::FromStr::from_str("deleted").unwrap());
             for query in script_queries.into_iter() {
                 let h = get_info_mut_strict(query, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
                 let script = path::open_script(&h.name, &h.ty, true)?;
                 log::info!("刪除 {:?}", script);
-                util::remove(&script)?;
-                let name = script.name.into_static();
-                hs.remove(&name);
+                if script.name.is_anonymous() {
+                    log::debug!("刪除匿名腳本");
+                    util::remove(&script)?;
+                    let name = script.name.into_static();
+                    hs.remove(&name);
+                } else {
+                    log::debug!("不要真的刪除有名字的腳本，改用標籤隱藏之");
+                    let new_name = format!("{}-{}", time_str, script.name.to_string());
+                    mv(query, &Some(new_name), hs, &None, &delete_tag)?;
+                }
             }
         }
         Subs::CP { origin, new } => {

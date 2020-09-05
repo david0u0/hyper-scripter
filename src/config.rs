@@ -30,7 +30,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             tag_filters: vec![("pin".to_owned(), FromStr::from_str("pin").unwrap())],
-            main_tag_filters: FromStr::from_str("all,^hide").unwrap(),
+            main_tag_filters: FromStr::from_str("all,^hide,^deleted").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             open_time: Utc::now(),
         }

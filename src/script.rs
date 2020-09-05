@@ -23,6 +23,12 @@ pub enum ScriptName<'a> {
     Named(Cow<'a, str>),
 }
 impl ScriptName<'_> {
+    pub fn is_anonymous(&self) -> bool {
+        match self {
+            ScriptName::Anonymous(_) => true,
+            _ => false,
+        }
+    }
     pub fn key(&self) -> Cow<'_, str> {
         match self {
             ScriptName::Anonymous(id) => Cow::Owned(format!(".{}", id)),

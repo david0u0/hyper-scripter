@@ -71,8 +71,13 @@ enum Subs {
     Run {
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
-        #[structopt(help = "Command line args to pass to the script.")]
+        #[structopt(help = "Command line args to pass to the script")]
         args: Vec<String>,
+    },
+    #[structopt(about = "Execute the script query and get the exact file", settings = NO_FLAG_SETTINGS)]
+    Which {
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_query: ScriptQuery,
     },
     #[structopt(about = "Print the script to standard output")]
     Cat {
@@ -274,6 +279,12 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 Ok(_) => (),
             }
             h.exec();
+        }
+        Subs::Which { script_query } => {
+            let h = get_info_mut_strict(script_query, hs)?;
+            let script = path::open_script(&h.name, &h.ty, true)?;
+            log::info!("定位 {:?}", script.name);
+            println!("{}", h.file_path()?.to_string_lossy());
         }
         Subs::Cat { script_query } => {
             let h = get_info_mut_strict(script_query, hs)?;

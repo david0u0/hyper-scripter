@@ -1,13 +1,19 @@
 use crate::script_type::ScriptType;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+pub enum SysPath {
+    Config,
+    Home,
+}
 #[derive(Debug, Clone)]
 pub enum Error {
     Others(
         Vec<String>,
         Option<Arc<dyn 'static + Send + Sync + std::error::Error>>,
     ),
-    SysConfigPathNotFound,
+    SysPathNotFound(SysPath),
 
     PermissionDenied(Vec<PathBuf>),
     // NOTE: PathNotFound 比 ScriptNotFound 更嚴重，代表歷史記錄中有這支腳本，實際要找卻找不到

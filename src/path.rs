@@ -1,4 +1,4 @@
-use crate::error::{Contextable, Error, Result};
+use crate::error::{Contextable, Error, Result, SysPath};
 use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
@@ -22,7 +22,7 @@ pub fn get_sys_path() -> Result<PathBuf> {
             p.into()
         }
         Err(std::env::VarError::NotPresent) => dirs::config_dir()
-            .ok_or(Error::SysConfigPathNotFound)?
+            .ok_or(Error::SysPathNotFound(SysPath::Config))?
             .join(ROOT_PATH),
         Err(e) => return Err(e.into()),
     };

@@ -1,14 +1,15 @@
-use crate::error::{Error, Error::*};
+use crate::error::{Error, Error::*, SysPath};
 use std::fmt::{Display, Formatter, Result};
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Empty => write!(f, "No existing script!")?,
-            SysConfigPathNotFound => write!(
+            SysPathNotFound(SysPath::Config) => write!(
                 f,
-                "Can not find you're config path. Usually it should be `$HOME/.config`"
+                "Can not find you're config path. Usually it should be `$HOME/.config`",
             )?,
+            SysPathNotFound(SysPath::Home) => write!(f, "Can not find you're home path.")?,
             PermissionDenied(v) => {
                 write!(f, "Permission denied")?;
                 if v.len() > 0 {

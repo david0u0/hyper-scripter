@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::{Contextable, Error, Result};
+use crate::error::{Contextable, Error, Result, SysPath};
 use crate::script::{ScriptInfo, ScriptMeta};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
@@ -138,8 +138,9 @@ pub fn prepare_script(
         log::debug!("腳本已存在，不填入預設訊息");
         false
     } else {
+        let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
         let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = birthplace.to_str().unwrap_or_default();
+        let birthplace = birthplace.strip_prefix(home)?;
         let file = handle_fs_res(&[path], File::create(&path))?;
         let info = json!({
             "birthplace": birthplace,

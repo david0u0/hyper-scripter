@@ -10,7 +10,7 @@ const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
-cd '{{birthplace}}'
+cd '~/{{birthplace}}'
 
 {{{content}}}";
 
@@ -18,6 +18,7 @@ const JS_WELCOME_MSG: &str = "// Hello, scripter!
 // Here are some information you may be intrested in:
 
 const name = '{{name}}';
+process.chdir(require('os').homedir());
 process.chdir('{{birthplace}}');
 let spawn = require('child_process').spawnSync;
 spawn('test', [], { stdio: 'inherit' });
@@ -31,7 +32,7 @@ const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
-cd '{{birthplace}}'
+cd '~/{{birthplace}}'
 
 tmux new-session -s $NAME -d \"{{{content}}}\"
 tmux split-window -h \" \"

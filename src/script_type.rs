@@ -19,7 +19,7 @@ const JS_WELCOME_MSG: &str = "// Hello, scripter!
 
 const name = '{{name}}';
 process.chdir(require('os').homedir());
-process.chdir('{{birthplace}}');
+{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
 let spawn = require('child_process').spawnSync;
 spawn('test', [], { stdio: 'inherit' });
 
@@ -27,6 +27,23 @@ let writeFile = require('fs').writeFileSync;
 writeFile('/dev/null', 'some content');
 
 {{{content}}}";
+
+const VORPAL_WELCOME_MSG: &str = "const name = '{{name}}';
+process.chdir(require('os').homedir());
+{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
+
+let Vorpal = require('vorpal');
+let vorpal = new Vorpal();
+
+vorpal.command('test <arg1> [arg2]', 'this is a teeeest!').action(args => {
+    console.log(`arg1 = ${args.arg1}`);
+    console.log(`arg2 = ${args.arg2}`);
+    return Promise.resolve();
+});
+
+{{{content}}}
+
+vorpal.delimiter('>').show();";
 
 const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
@@ -70,6 +87,7 @@ pub struct ScriptTypeConfig {
     pub template: Vec<String>,
     pub cmd: Option<String>,
     args: Vec<String>,
+    env: Vec<(String, String)>,
 }
 fn split(s: &str) -> Vec<String> {
     s.split("\n").map(|s| s.to_owned()).collect()
@@ -85,6 +103,15 @@ impl ScriptTypeConfig {
         }
         Ok(args)
     }
+    pub fn env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>, Error> {
+        let reg = Handlebars::new();
+        let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
+        for (name, e) in self.env.iter() {
+            let res = reg.render_template(e, &info)?;
+            env.push((name.to_owned(), res));
+        }
+        Ok(env)
+    }
     pub fn default_script_types() -> HashMap<ScriptType, ScriptTypeConfig> {
         let mut ret = HashMap::default();
         ret.insert(
@@ -95,6 +122,7 @@ impl ScriptTypeConfig {
                 template: split(SHELL_WELCOME_MSG),
                 cmd: Some("bash".to_owned()),
                 args: vec!["{{path}}".to_owned()],
+                env: vec![],
             },
         );
         ret.insert(
@@ -105,6 +133,7 @@ impl ScriptTypeConfig {
                 template: split(TMUX_WELCOME_MSG),
                 cmd: Some("sh".to_owned()),
                 args: vec!["{{path}}".to_owned()],
+                env: vec![],
             },
         );
         ret.insert(
@@ -115,6 +144,24 @@ impl ScriptTypeConfig {
                 template: split(JS_WELCOME_MSG),
                 cmd: Some("node".to_owned()),
                 args: vec!["{{path}}".to_owned()],
+                env: vec![(
+                    "NODE_PATH".to_owned(),
+                    "{{{script_dir}}}/node_modules".to_owned(),
+                )],
+            },
+        );
+        ret.insert(
+            "vorpal".into(),
+            ScriptTypeConfig {
+                ext: Some("js".to_owned()),
+                color: "bright cyan".to_owned(),
+                template: split(VORPAL_WELCOME_MSG),
+                cmd: Some("node".to_owned()),
+                args: vec!["{{path}}".to_owned()],
+                env: vec![(
+                    "NODE_PATH".to_owned(),
+                    "{{{script_dir}}}/node_modules".to_owned(),
+                )],
             },
         );
         ret.insert(
@@ -125,6 +172,10 @@ impl ScriptTypeConfig {
                 template: split(JS_WELCOME_MSG),
                 cmd: Some("node".to_owned()),
                 args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
+                env: vec![(
+                    "NODE_PATH".to_owned(),
+                    "{{{script_dir}}}/node_modules".to_owned(),
+                )],
             },
         );
         ret.insert(
@@ -135,6 +186,7 @@ impl ScriptTypeConfig {
                 template: split(""),
                 cmd: Some("ruby".to_owned()),
                 args: vec!["{{path}}".to_owned()],
+                env: vec![],
             },
         );
 
@@ -146,6 +198,7 @@ impl ScriptTypeConfig {
                 template: split(""),
                 cmd: None,
                 args: vec![],
+                env: vec![],
             },
         );
 

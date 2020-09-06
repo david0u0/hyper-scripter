@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result, SysPath};
+use crate::path::get_path;
 use crate::script::{ScriptInfo, ScriptMeta};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
@@ -43,12 +44,15 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
         "path": script.path,
         "content": read_file(&script.path)?,
     });
+
     let args = script_conf.args(&info)?;
     let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
     full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
 
-    // TODO: 看要不要把執行狀態傳回去？
-    let cmd = create_cmd(&cmd_str, &full_args);
+    let mut cmd = create_cmd(&cmd_str, &full_args);
+    let env = script_conf.env(&info)?;
+    cmd.envs(env);
+
     let stat = run_cmd(&cmd_str, cmd)?;
     log::info!("程式執行結果：{:?}", stat);
     if !stat.success() {
@@ -140,9 +144,10 @@ pub fn prepare_script(
     } else {
         let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
         let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = birthplace.strip_prefix(home)?;
+        let birthplace = birthplace.strip_prefix(home).unwrap_or(&birthplace);
         let file = handle_fs_res(&[path], File::create(&path))?;
         let info = json!({
+            "script_dir": get_path(),
             "birthplace": birthplace,
             "name": script.name.key().to_owned(),
             "content": content.unwrap_or_default()

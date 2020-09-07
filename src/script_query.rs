@@ -1,4 +1,4 @@
-use crate::error::{Contextable, Error, Result};
+use crate::error::{Contextable, Error, FormatCode::ScriptQuery as ScriptQueryCode, Result};
 use crate::script::{AsScriptName, ScriptName};
 use std::str::FromStr;
 
@@ -47,16 +47,11 @@ fn parse_prev(s: &str) -> Result<usize> {
     }
     // NOTE: 解析 `^4 = Prev(4)`
     match s[1..s.len()].parse::<usize>() {
-        Ok(prev) => {
-            if prev > 0 {
-                return Ok(prev);
-            } else {
-                log::error!("歷史查詢不可為0");
-            }
-        }
-        Err(e) => log::error!("解析整數錯誤：{}", e),
+        Ok(0) => Err(Error::Format(ScriptQueryCode, s.to_owned())).context("歷史查詢不可為0"),
+        Ok(prev) => Ok(prev),
+        Err(e) => Err(Error::Format(ScriptQueryCode, s.to_owned()))
+            .context(format!("解析整數錯誤：{}", e)),
     }
-    Err(Error::Format(s.to_owned()))
 }
 impl FromStr for ScriptQuery {
     type Err = Error;

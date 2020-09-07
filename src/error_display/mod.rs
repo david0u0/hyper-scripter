@@ -1,4 +1,4 @@
-use crate::error::{Error, Error::*, SysPath};
+use crate::error::{Error, Error::*, FormatCode, SysPath};
 use std::fmt::{Display, Formatter, Result};
 
 impl Display for Error {
@@ -34,14 +34,24 @@ impl Display for Error {
                 }
             }
             UnknownCategory(c) => write!(f, "Unknown category: {}", c)?,
-            Format(s) => write!(f, "Format error: {}", s)?,
+            Format(code, s) => {
+                write!(f, "Format error for ")?;
+                use FormatCode::*;
+                match code {
+                    Config => write!(f, "config file")?,
+                    ScriptName => write!(f, "script name")?,
+                    Regex => write!(f, "regular expression")?,
+                    ScriptQuery => write!(f, "script query")?,
+                    Tag => write!(f, "tag")?,
+                }
+                write!(f, " '{}'", s)?;
+            }
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
             _ => {
                 log::warn!("未被正確打印的錯誤：{:?}", self);
                 write!(f, "{:?}", self)?;
             }
         }
-
         Ok(())
     }
 }

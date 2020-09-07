@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::{Error, Result};
+use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode, Result};
 use crate::fuzzy::FuzzKey;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
@@ -149,11 +149,16 @@ impl AsScriptName for str {
             let id_str = m.get(1).unwrap().as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(ScriptName::Anonymous(id)),
-                Err(e) => return Err(Error::Format(self.to_owned()).context(e)),
+                Err(e) => return Err(Error::Format(ScriptNameCode, self.to_owned())).context(e),
             }
         } else {
-            if self.starts_with("-") || self.find(".").is_some() || self.find(" ").is_some() {
-                return Err(Error::Format(self.to_owned()).context("命名腳本格式有誤"));
+            if self.starts_with("-")
+                || self.find(".").is_some()
+                || self.find(" ").is_some()
+                || self.len() == 0
+            {
+                return Err(Error::Format(ScriptNameCode, self.to_owned()))
+                    .context("命名腳本格式有誤");
             }
             Ok(ScriptName::Named(Cow::Borrowed(self)))
         }

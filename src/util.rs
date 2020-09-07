@@ -16,7 +16,7 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
     } else {
-        return Err(Error::PermissionDenied(vec![]));
+        return Err(Error::PermissionDenied(vec![script.path.clone()]));
     };
 
     let info: serde_json::Value;

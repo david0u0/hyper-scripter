@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagControlFlow, TagFilter, TagFilterGroup};
@@ -63,7 +63,8 @@ impl Config {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
-            Ok(s) => toml::from_str(&s).map_err(|_| Error::Format(s)),
+            Ok(s) => toml::from_str(&s)
+                .map_err(|_| Error::Format(FormatCode::Config, path.to_string_lossy().into())),
             Err(Error::PathNotFound(_)) => {
                 log::debug!("找不到設定檔，使用預設值");
                 Ok(Default::default())

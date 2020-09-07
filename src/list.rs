@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::{Error, Result};
+use crate::error::{Error, FormatCode, Result};
 use crate::history::History;
 use crate::script::{ScriptInfo, ScriptName};
 use crate::tag::Tag;
@@ -64,7 +64,7 @@ impl std::str::FromStr for ListPattern {
         let s = s.replace("*", ".*");
         let re = Regex::new(&format!("^{}$", s)).map_err(|e| {
             log::error!("正規表達式錯誤：{}", e);
-            Error::Format(s)
+            Error::Format(FormatCode::Regex, s)
         })?;
         Ok(ListPattern(re))
     }

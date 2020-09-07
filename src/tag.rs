@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Error, FormatCode::Tag as TagCode};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -82,7 +82,7 @@ impl FromStr for Tag {
     fn from_str(s: &str) -> std::result::Result<Self, Error> {
         // TODO: 檢查格式
         if s.len() == 0 {
-            Err(Error::Format(s.to_owned()))
+            Err(Error::Format(TagCode, s.to_owned()))
         } else {
             Ok(Tag(s.to_owned()))
         }

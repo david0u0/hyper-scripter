@@ -2,10 +2,18 @@ use crate::script_type::ScriptType;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SysPath {
     Config,
     Home,
+}
+#[derive(Debug, Clone, Copy)]
+pub enum FormatCode {
+    Config,
+    ScriptName,
+    Regex,
+    ScriptQuery,
+    Tag,
 }
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -28,7 +36,7 @@ pub enum Error {
     },
     MultiFuzz(Vec<String>),
     UnknownCategory(String),
-    Format(String),
+    Format(FormatCode, String),
     ScriptError(i32),
     Empty,
 }

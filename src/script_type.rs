@@ -10,7 +10,7 @@ const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
-cd '~/{{birthplace}}'
+cd ~/{{birthplace}}
 
 {{{content}}}";
 
@@ -49,7 +49,7 @@ const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
 export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
-cd '~/{{birthplace}}'
+cd ~/{{birthplace}}
 
 tmux new-session -s $NAME -d \"{{{content}}}\"
 tmux split-window -h \" \"

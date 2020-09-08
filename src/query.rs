@@ -1,5 +1,9 @@
-use crate::error::{Contextable, Error, FormatCode::ScriptQuery as ScriptQueryCode, Result};
+use crate::error::{
+    Contextable, Error, FormatCode::FilterQuery as FilterQueryCode,
+    FormatCode::ScriptQuery as ScriptQueryCode, Result,
+};
 use crate::script::{AsScriptName, ScriptName};
+use crate::tag::TagControlFlow;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -67,6 +71,31 @@ impl FromStr for ScriptQuery {
         } else {
             s.as_script_name().context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
             Ok(ScriptQuery::Fuzz(s.to_owned()))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FilterQuery {
+    pub name: Option<String>,
+    pub content: TagControlFlow,
+}
+
+impl FromStr for FilterQuery {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        let arr: Vec<&str> = s.split("=").collect();
+        match arr.len() {
+            1 => Ok(FilterQuery {
+                name: None,
+                content: FromStr::from_str(arr[0])?,
+            }),
+            2 => Ok(FilterQuery {
+                // TODO: 檢查名字
+                name: Some(arr[0].to_owned()),
+                content: FromStr::from_str(arr[1])?,
+            }),
+            _ => Err(Error::Format(FilterQueryCode, s.to_owned())),
         }
     }
 }

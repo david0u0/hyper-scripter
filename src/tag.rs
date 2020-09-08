@@ -121,9 +121,10 @@ impl FromStr for TagControlFlow {
     fn from_str(s: &str) -> std::result::Result<Self, Error> {
         let mut tags = vec![];
         for filter in s.split(",") {
-            if filter.len() > 0 {
-                tags.push(TagControl::from_str(filter)?);
-            }
+            tags.push(TagControl::from_str(filter)?);
+        }
+        if tags.len() == 0 {
+            return Err(Error::Format(TagCode, s.to_owned()));
         }
         Ok(TagControlFlow(tags))
     }

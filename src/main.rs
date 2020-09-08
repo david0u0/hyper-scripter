@@ -1,10 +1,10 @@
 use chrono::Utc;
-use instant_scripter::config::Config;
+use instant_scripter::config::{Config, NamedTagFilter};
 use instant_scripter::error::{Contextable, Error, Result};
 use instant_scripter::history::History;
 use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
+use instant_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use instant_scripter::script::{AsScriptName, ScriptInfo};
-use instant_scripter::script_query::{EditQuery, ScriptQuery};
 use instant_scripter::script_type::ScriptType;
 use instant_scripter::tag::{TagFilter, TagFilterGroup};
 use instant_scripter::{fuzzy, path, util};
@@ -30,7 +30,7 @@ struct Root {
     #[structopt(short = "p", long, help = "Path to instant script root")]
     is_path: Option<String>,
     #[structopt(short, long, parse(try_from_str))]
-    tags: Option<TagFilter>,
+    tags: Option<TagFilter>, // TODO: 改為 TagControlFlow
     #[structopt(short, long, help = "Shorthand for `-t=all,^deleted`")]
     all: bool,
     #[structopt(subcommand)]
@@ -107,7 +107,7 @@ enum Subs {
         )]
         category: Option<ScriptType>,
         #[structopt(short, long)]
-        tags: Option<TagFilter>,
+        tags: Option<TagFilter>, // TODO: 改為 TagControlFlow
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
         new: Option<String>,
@@ -115,7 +115,12 @@ enum Subs {
     #[structopt(
         about = "Manage script tags. If a list of tag is given, set it as default, otherwise show tag information."
     )]
-    Tags { tags: Option<TagFilter> },
+    Tags {
+        #[structopt(long, short)]
+        obligation: bool,
+        #[structopt(parse(try_from_str))]
+        filter: Option<FilterQuery>,
+    },
 }
 
 impl Root {
@@ -354,9 +359,32 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         } => {
             mv(origin, new, hs, ty, tags)?;
         }
-        Subs::Tags { tags } => {
-            if let Some(tags) = tags {
-                conf.main_tag_filter = tags.clone();
+        Subs::Tags { filter, obligation } => {
+            if let Some(filter) = filter {
+                if let Some(name) = &filter.name {
+                    log::info!("加入篩選器 {:?}", filter);
+                    let mut found = false;
+                    for f in conf.tag_filters.iter_mut() {
+                        if &f.name == name {
+                            found = true;
+                            f.obligation = *obligation;
+                            f.filter = filter.content.clone();
+                        }
+                    }
+                    if !found {
+                        conf.tag_filters.push(NamedTagFilter {
+                            filter: filter.content.clone(),
+                            obligation: *obligation,
+                            name: name.clone(),
+                        });
+                    }
+                } else {
+                    log::info!("加入主篩選器 {:?}", filter);
+                    conf.main_tag_filter = TagFilter {
+                        filter: filter.content.clone(),
+                        obligation: *obligation,
+                    };
+                }
             } else {
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {

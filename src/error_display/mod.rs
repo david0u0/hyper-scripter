@@ -43,6 +43,7 @@ impl Display for Error {
                     Regex => write!(f, "regular expression")?,
                     ScriptQuery => write!(f, "script query")?,
                     Tag => write!(f, "tag")?,
+                    FilterQuery => write!(f, "tag filter")?,
                 }
                 write!(f, " '{}'", s)?;
             }

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-const CONFIG_FILE: &'static str = "config.toml";
+const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
     static ref CONFIG: Result<Config> = Config::load();
 }
@@ -25,7 +25,7 @@ fn is_false(t: &bool) -> bool {
 pub struct NamedTagFilter {
     pub filter: TagControlFlow,
     #[serde(default, skip_serializing_if = "is_false")]
-    pub must: bool,
+    pub obligation: bool,
     pub name: String,
 }
 
@@ -43,12 +43,12 @@ impl Default for Config {
             tag_filters: vec![
                 NamedTagFilter {
                     filter: FromStr::from_str("pin").unwrap(),
-                    must: false,
+                    obligation: false,
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
                     filter: FromStr::from_str("all,^deleted").unwrap(),
-                    must: true,
+                    obligation: true,
                     name: "no-deleted".to_owned(),
                 },
             ],
@@ -106,7 +106,7 @@ impl Config {
         let mut group = TagFilterGroup::default();
         for f in self.tag_filters.iter() {
             group.push(TagFilter {
-                must: f.must,
+                obligation: f.obligation,
                 filter: f.filter.clone(),
             });
         }

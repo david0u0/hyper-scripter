@@ -1,5 +1,5 @@
 /target
 **/.instant_script_info.json
-config.*
-!config.rs
+.config.*
+config.rs
 .instant_script

@@ -12,7 +12,7 @@ impl TagFilterGroup {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.filter(tags);
-            if f.must {
+            if f.obligation {
                 if res != Some(true) {
                     return false;
                 }
@@ -35,7 +35,7 @@ fn is_false(t: &bool) -> bool {
 pub struct TagFilter {
     pub filter: TagControlFlow,
     #[serde(default, skip_serializing_if = "is_false")]
-    pub must: bool,
+    pub obligation: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -112,7 +112,7 @@ impl FromStr for TagFilter {
     fn from_str(s: &str) -> std::result::Result<Self, Error> {
         Ok(TagFilter {
             filter: FromStr::from_str(s)?,
-            must: false,
+            obligation: false,
         })
     }
 }

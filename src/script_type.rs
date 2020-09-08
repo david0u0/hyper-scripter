@@ -4,18 +4,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-const SHELL_WELCOME_MSG: &str = "# Hello, scripter!
-# Here are some useful commands to begin with:
+const SHELL_WELCOME_MSG: &str = "# Hello, scripter! Here are some useful commands to begin with:
 
-export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
 {{{content}}}";
 
-const JS_WELCOME_MSG: &str = "// Hello, scripter!
-// Here are some information you may be intrested in:
+const JS_WELCOME_MSG: &str =
+    "// Hello, scripter! Here are some information you may be intrested in:
 
 const name = '{{name}}';
 process.chdir(require('os').homedir());

@@ -361,15 +361,15 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
                     print!("  {} = [{}]", filter.name, filter.filter);
-                    if filter.must {
-                        print!(" (must)")
+                    if filter.obligation {
+                        print!(" (obligation)")
                     }
                     println!("")
                 }
                 println!("main tag filter:");
                 print!("  [{}]", conf.main_tag_filter.filter);
-                if conf.main_tag_filter.must {
-                    print!(" (must)")
+                if conf.main_tag_filter.obligation {
+                    print!(" (obligation)")
                 }
                 println!("")
             }

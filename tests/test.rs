@@ -64,7 +64,7 @@ const MSG_JS: &'static str = "你好，腳本人！.js";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run(&["e", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
 
     run(&[
@@ -74,7 +74,7 @@ fn test_tags() {
         "test_js",
         "-c",
         "js",
-        "fast",
+        "-f",
         &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
@@ -93,7 +93,7 @@ fn test_mv() {
     let _g = setup();
 
     clear_config();
-    run(&["e", ".", "-c", "js", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", ".", "-c", "js", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
     run(&["mv", "1", "-c", "sh"]).unwrap();
@@ -116,7 +116,7 @@ fn test_args() {
     run(&[
         "e",
         "test-with-args",
-        "fast",
+        "-f",
         &format!("echo -e \"$1：{}\n$2\"", MSG),
     ])
     .unwrap();
@@ -129,7 +129,7 @@ fn test_args() {
 #[test]
 fn test_exact() {
     let _g = setup();
-    run(&["e", "test-exact", "fast", "echo 'test exact!'"]).unwrap();
+    run(&["e", "test-exact", "-f", "echo 'test exact!'"]).unwrap();
     run(&["tesct"]).expect("模糊搜不到東西！");
     run(&["=tesct"]).expect_err("打錯名字卻還搜得到！");
     run(&["=test-exact"]).expect("打完整名字卻搜不到！");
@@ -140,9 +140,9 @@ fn test_prev() {
     let _g = setup();
     clear_config();
 
-    run(&["e", "test-prev1", "fast", "echo 'test prev 1'"]).unwrap();
-    run(&["e", "test-prev2", "fast", "echo 'test prev 2'"]).unwrap();
-    run(&["e", "test-prev3", "fast", "echo 'test prev 3'"]).unwrap();
+    run(&["e", "test-prev1", "-f", "echo 'test prev 1'"]).unwrap();
+    run(&["e", "test-prev2", "-f", "echo 'test prev 2'"]).unwrap();
+    run(&["e", "test-prev3", "-f", "echo 'test prev 3'"]).unwrap();
 
     assert_eq!(run(&["^2"]).unwrap(), "test prev 2");
     assert_eq!(run(&["^2"]).unwrap(), "test prev 3");
@@ -165,12 +165,12 @@ fn test_edit_same_name() {
         "hide",
         "e",
         "i-am-hidden",
-        "fast",
+        "-f",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
     run(&["-"]).expect_err("執行了隱藏的腳本？？");
-    run(&["e", "i-am-hidden", "fast", "yo"]).expect_err("竟然能編輯撞名的腳本？");
+    run(&["e", "i-am-hidden", "-f", "yo"]).expect_err("竟然能編輯撞名的腳本？");
     run(&["tags", "hide"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap(), "腳本被撞名的編輯搞爛了？");
 }
@@ -178,13 +178,13 @@ fn test_edit_same_name() {
 #[test]
 fn test_multi_filter() {
     let _g = setup();
-    run(&["e", "nobody", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "nobody", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&[
         "-t",
         "test,pin",
         "e",
         "test-pin",
-        "fast",
+        "-f",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -193,7 +193,7 @@ fn test_multi_filter() {
         "pin",
         "e",
         "pin-only",
-        "fast",
+        "-f",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -217,14 +217,14 @@ fn test_multi_filter() {
 #[test]
 fn test_rm() {
     let _g = setup();
-    run(&["e", "test", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "test", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["test"]).unwrap());
     run(&["rm", "test"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
     run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
     assert_eq!(MSG, run(&["-t", "deleted", "test"]).unwrap());
 
-    run(&["e", ".", "fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", ".", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
     run(&["rm", ".1"]).unwrap();
     run(&["-t", "deleted", ".1"]).expect_err("被刪掉的匿名腳本還能找得回來");

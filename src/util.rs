@@ -20,26 +20,6 @@ pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Resu
     };
 
     let info: serde_json::Value;
-    // #[cfg(not(target_os = "linux"))]
-    // {
-    //     let p = script
-    //         .path
-    //         .to_str()
-    //         .unwrap()
-    //         .to_string()
-    //         .replace(r"\", r"\\\\");
-    //     info = json!({
-    //         "path": p,
-    //         "content": read_file(&script.path)?,
-    //     });
-    // }
-    // #[cfg(target_os = "linux")]
-    // {
-    //     info = json!({
-    //         "path": script.path,
-    //         "content": read_file(&script.path)?,
-    //     });
-    // }
     info = json!({
         "path": script.path,
         "content": read_file(&script.path)?,

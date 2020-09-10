@@ -14,6 +14,7 @@ use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
 };
+use structopt::clap::ArgGroup;
 use structopt::StructOpt;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
@@ -37,19 +38,6 @@ struct Root {
     subcmd: Option<Subs>,
 }
 #[derive(StructOpt, Debug)]
-enum WithContent {
-    #[structopt(about = "create script with content", settings = NO_FLAG_SETTINGS)]
-    With {
-        #[structopt(required = true, min_values = 1)]
-        content: Vec<String>,
-    },
-    #[structopt(about = "create script without invoking the editor", settings = NO_FLAG_SETTINGS)]
-    Fast {
-        #[structopt(required = true, min_values = 1)]
-        content: Vec<String>,
-    },
-}
-#[derive(StructOpt, Debug)]
 enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
@@ -64,8 +52,21 @@ enum Subs {
         category: Option<ScriptType>,
         #[structopt(parse(try_from_str), default_value = ".")]
         edit_query: EditQuery,
-        #[structopt(subcommand)]
-        subcmd: Option<WithContent>,
+
+        #[structopt(
+            long,
+            short,
+            conflicts_with = "fast",
+            help = "create script with content"
+        )]
+        with: Option<String>,
+        #[structopt(
+            long,
+            short,
+            conflicts_with = "with",
+            help = "create script without invoking the editor"
+        )]
+        fast: Option<String>,
     },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
@@ -116,7 +117,7 @@ enum Subs {
         about = "Manage script tags. If a list of tag is given, set it as default, otherwise show tag information."
     )]
     Tags {
-        #[structopt(long, short)]
+        #[structopt(long, short, requires("filter"))]
         obligation: bool,
         #[structopt(parse(try_from_str))]
         filter: Option<FilterQuery>,
@@ -180,7 +181,8 @@ fn main_err_handle() -> Result<Vec<Error>> {
             root.subcmd = Some(Subs::Edit {
                 edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
                 category: None,
-                subcmd: None,
+                with: None,
+                fast: None,
             });
         }
         Some(Subs::Other(args)) => {
@@ -247,14 +249,16 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
         Subs::Edit {
             edit_query,
             category: ty,
-            subcmd,
+            fast,
+            with,
         } => {
             let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filter.clone());
             let (path, script) = edit_or_create(edit_query, hs, ty.clone(), edit_tags)?;
-            let (fast, content) = match subcmd {
-                Some(WithContent::Fast { content }) => (true, Some(content)),
-                Some(WithContent::With { content }) => (false, Some(content)),
-                _ => (false, None),
+            let (fast, content) = match (fast, with) {
+                (Some(content), None) => (true, Some(content)),
+                (None, Some(content)) => (false, Some(content)),
+                (None, None) => (false, None),
+                _ => unreachable!(),
             };
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", script.name);
@@ -263,7 +267,6 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                     return Err(Error::ScriptExist(script.name.to_string()));
                 }
             }
-            let content = content.map(|c| c.join(" "));
             let created =
                 util::prepare_script(&path, script, content.as_ref().map(|s| s.as_str()))?;
             if !fast {

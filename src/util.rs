@@ -5,7 +5,7 @@ use crate::script::{ScriptInfo, ScriptMeta};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
-use std::fs::{remove_file, rename, File};
+use std::fs::{create_dir_all, remove_file, rename, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
@@ -87,7 +87,11 @@ pub fn remove(script: &ScriptMeta) -> Result<()> {
 }
 pub fn mv(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
     log::info!("修改 {:?} 為 {:?}", origin.path, new.path);
-    handle_fs_res(&[&origin.path, &new.path], rename(&origin.path, &new.path))
+    // NOTE: 創建資料夾和檔案
+    if let Some(parent) = new.path.parent() {
+        handle_fs_res(&[&new.path], create_dir_all(parent))?;
+    }
+    handle_fs_res(&[&new.path, &origin.path], rename(&origin.path, &new.path))
 }
 pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
     let _copied = handle_fs_res(
@@ -99,6 +103,7 @@ pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
 
 pub fn handle_fs_err<P: AsRef<Path>>(path: &[P], err: std::io::Error) -> Error {
     let p = path.iter().map(|p| p.as_ref().to_owned()).collect();
+    log::warn!("檔案系統錯誤：{:?}, {:?}", p, err);
     match err.kind() {
         std::io::ErrorKind::PermissionDenied => Error::PermissionDenied(p),
         std::io::ErrorKind::NotFound => Error::PathNotFound(path[0].as_ref().to_owned()),
@@ -125,7 +130,13 @@ pub fn prepare_script(
         let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
         let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
         let birthplace = birthplace.strip_prefix(home).unwrap_or(&birthplace);
+
+        // NOTE: 創建資料夾和檔案
+        if let Some(parent) = path.parent() {
+            handle_fs_res(&[path], create_dir_all(parent))?;
+        }
         let file = handle_fs_res(&[path], File::create(&path))?;
+
         let info = json!({
             "script_dir": get_path(),
             "birthplace": birthplace,

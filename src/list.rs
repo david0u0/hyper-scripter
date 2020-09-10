@@ -98,7 +98,7 @@ pub fn fmt_meta<W: Write>(
             write!(w, "  ")?;
         }
 
-        let exex_time = match &script.exec_time {
+        let exex_time = match &script.get_exec_time() {
             Some(t) => t.to_string(),
             None => "Never".to_owned(),
         };
@@ -106,7 +106,7 @@ pub fn fmt_meta<W: Write>(
         if !opt.plain {
             label = label.color(color).bold();
         }
-        write!(w, "{}\t{}\t{}\n", label, script.read_time, exex_time)?;
+        write!(w, "{}\t{}\t{}\n", label, script.get_read_time(), exex_time)?;
     } else {
         if is_last && !opt.plain {
             write!(w, "{}", "*".color(Color::Yellow).bold())?;

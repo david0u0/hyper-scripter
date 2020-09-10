@@ -14,7 +14,6 @@ use structopt::clap::AppSettings::{
     self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
     TrailingVarArg,
 };
-use structopt::clap::ArgGroup;
 use structopt::StructOpt;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
@@ -347,11 +346,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 return Err(Error::ScriptExist(new.clone()));
             }
             util::cp(&og_script, &new_script)?;
-            let new_info = ScriptInfo {
-                name: new_name.into_static(),
-                read_time: Utc::now(),
-                ..h.clone()
-            };
+            let new_info = h.cp(new_name);
             hs.insert(new_info);
         }
         Subs::MV {

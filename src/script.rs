@@ -89,8 +89,14 @@ impl FuzzKey for ScriptName<'_> {
 pub struct ScriptInfo<'a> {
     #[serde(default)]
     exec_count: usize,
+    #[serde(default = "Utc::now")]
     read_time: DateTime<Utc>,
+    #[serde(default = "Utc::now")]
+    created_time: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     exec_time: Option<DateTime<Utc>>,
+    #[serde(default = "Utc::now")]
+    write_time: DateTime<Utc>,
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,
     pub ty: ScriptType,
@@ -103,9 +109,12 @@ impl FuzzKey for ScriptInfo<'_> {
 
 impl ScriptInfo<'_> {
     pub fn cp(&self, new_name: ScriptName) -> Self {
+        let now = Utc::now();
         ScriptInfo {
             name: new_name.into_static(),
-            read_time: Utc::now(),
+            read_time: now,
+            write_time: now,
+            created_time: now,
             exec_time: None,
             exec_count: 0,
             ..self.clone()
@@ -125,20 +134,28 @@ impl ScriptInfo<'_> {
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
     ) -> Result<ScriptInfo<'a>> {
+        let now = Utc::now();
         Ok(ScriptInfo {
             name,
             ty,
             exec_count: 0,
             tags: tags.collect(),
-            read_time: Utc::now(),
+            read_time: now,
+            write_time: now,
+            created_time: now,
             exec_time: None,
         })
     }
     pub fn read(&mut self) {
         self.read_time = Utc::now();
     }
+    pub fn write(&mut self) {
+        self.read_time = Utc::now();
+        self.write_time = Utc::now();
+    }
     pub fn exec(&mut self) {
         self.exec_time = Some(Utc::now());
+        self.read_time = Utc::now();
         self.exec_count += 1;
     }
     pub fn get_read_time(&self) -> DateTime<Utc> {

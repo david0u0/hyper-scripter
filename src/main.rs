@@ -274,7 +274,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                 log::debug!("編輯器返回：{:?}", stat);
             }
             util::after_script(&path, created)?;
-            script.read();
+            script.write();
         }
         Subs::Run { script_query, args } => {
             let h = get_info_mut_strict(script_query, hs)?;

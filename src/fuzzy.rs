@@ -58,11 +58,11 @@ fn my_fuzz(choice: &str, pattern: &str) -> Option<i64> {
     foreach_reorder(choice, "/", &mut |choice_reordered| {
         let score_opt = MATCHER.fuzzy_match(choice_reordered, pattern);
         log::trace!(
-            "模糊搜尋，輸入：{}，候選人：{}，分數：{:?}。重排列成：{}",
+            "模糊搜尋，候選者：{}，重排列成：{}，輸入：{}，分數：{:?}",
             choice,
+            choice_reordered,
             pattern,
             score_opt,
-            choice_reordered,
         );
         if let Some(score) = score_opt {
             if let Some(ans) = ans_opt {

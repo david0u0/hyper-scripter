@@ -28,7 +28,7 @@ impl Display for Error {
                 expect, actual
             )?,
             MultiFuzz(v) => {
-                write!(f, "Multiple scripts with same fuzzy score:")?;
+                writeln!(f, "Multiple scripts with same fuzzy score:")?;
                 for name in v {
                     writeln!(f, "{}", name)?;
                 }

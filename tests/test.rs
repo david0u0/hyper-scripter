@@ -61,7 +61,7 @@ fn run(args: &[&str]) -> Result<String, i32> {
 }
 
 const MSG: &'static str = "你好，腳本人！";
-const MSG_JS: &'static str = "你好，腳本人！.js";
+const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
@@ -218,34 +218,43 @@ fn test_multi_filter() {
 #[test]
 fn test_rm() {
     let _g = setup();
+    run(&["e", "longlive", "-f", "echo 矻立不搖"]).unwrap();
+
     run(&["e", "test", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["test"]).unwrap());
-    run(&["rm", "test"]).unwrap();
+    run(&["rm", "-"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
     run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
     assert_eq!(MSG, run(&["-t", "deleted", "test"]).unwrap());
 
-    run(&["e", ".", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
-    assert_eq!(MSG, run(&["-"]).unwrap());
-    run(&["rm", ".1"]).unwrap();
+    assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
+
+    run(&["e", ".", "-f", "echo \"你匿\""]).unwrap();
+    assert_eq!("你匿", run(&["-"]).unwrap());
+    run(&["rm", "-"]).unwrap();
     run(&["-t", "deleted", ".1"]).expect_err("被刪掉的匿名腳本還能找得回來");
+
+    assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
     run(&[
         "e",
-        "test-namespace/super-test",
+        "my-namespace/super-test",
         "-f",
-        &format!("echo \"{}\"", MSG),
+        "echo \"不要刪我 QmmmmQ\"",
     ])
     .unwrap();
-    assert_eq!(MSG, run(&["-"]).unwrap());
-    run(&["rm", "-"]).expect("刪除被命名空間搞爛了");
+    assert_eq!("不要刪我 QmmmmQ", run(&["my-super-test"]).unwrap());
+    run(&["rm", "my-super-test"]).expect("刪除被命名空間搞爛了");
+    run(&["my-super-test"]).expect_err("未能被刪除掉");
     assert_eq!(
-        MSG,
-        run(&["-t", "deleted", "test-namespace/super-test"]).unwrap()
+        "不要刪我 QmmmmQ",
+        run(&["-t", "deleted", "my-namespace/super-test"]).unwrap()
     );
     let file_path = run(&["-t", "deleted", "which", "-"]).unwrap();
-    let re = Regex::new(r"^test-namespace/\d{14}-super-test\.sh$").unwrap();
+    let re = Regex::new(r"^my-namespace/\d{14}-super-test\.sh$").unwrap();
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
+
+    assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 }
 
 #[test]

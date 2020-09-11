@@ -247,3 +247,30 @@ fn test_rm() {
     let re = Regex::new(r"^test-namespace/\d{14}-super-test\.sh$").unwrap();
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 }
+
+#[test]
+fn test_namespace_reorder_search() {
+    let _g = setup();
+    run(&[
+        "e",
+        "my/super/long/namespace-d/test-script",
+        "-f",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
+    run(&[
+        "e",
+        "a/shorter/script",
+        "-c",
+        "js",
+        "-f",
+        &format!("console.log(\"{}\")", MSG_JS),
+    ])
+    .unwrap();
+    assert_eq!(MSG, run(&["myscript"]).expect("正常空間搜尋失敗"));
+    assert_eq!(MSG, run(&["scriptsuper"]).expect("重排命名空間搜尋失敗"));
+    assert_eq!(MSG, run(&["testlong"]).expect("重排命名空間搜尋失敗"));
+    assert_eq!(MSG_JS, run(&["scrishorter"]).expect("重排命名空間搜尋失敗"));
+    assert_eq!(MSG, run(&["namsplongsuery"]).expect("重排命名空間搜尋失敗"));
+    run(&["script-test"]).expect_err("重排到腳本名字去了= =");
+}

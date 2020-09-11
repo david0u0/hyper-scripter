@@ -69,11 +69,22 @@ impl std::str::FromStr for ListPattern {
         Ok(ListPattern(re))
     }
 }
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DisplayScriptIdent {
+    File,
+    Name,
+    Normal,
+}
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DisplayStyle {
+    Short(DisplayScriptIdent),
+    Long,
+}
 pub struct ListOptions<'a> {
-    pub long: bool,
     pub no_grouping: bool,
     pub pattern: &'a Option<ListPattern>,
     pub plain: bool,
+    pub display_style: DisplayStyle,
 }
 impl<'a> ListOptions<'a> {
     fn filter(&self, script: &ScriptInfo) -> bool {
@@ -91,40 +102,44 @@ pub fn fmt_meta<W: Write>(
     opt: &ListOptions,
 ) -> Result<()> {
     let color = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
-    if opt.long {
-        if is_last && !opt.plain {
-            write!(w, "{}", " *".color(Color::Yellow).bold())?;
-        } else {
-            write!(w, "  ")?;
-        }
-
-        let exex_time = match &script.get_exec_time() {
-            Some(t) => t.to_string(),
-            None => "Never".to_owned(),
-        };
-        let mut label: colored::ColoredString = format!("{}\t{}", script.ty, script.name).normal();
-        if !opt.plain {
-            label = label.color(color).bold();
-        }
-        write!(w, "{}\t{}\t{}\n", label, script.get_read_time(), exex_time)?;
-    } else {
-        if is_last && !opt.plain {
-            write!(w, "{}", "*".color(Color::Yellow).bold())?;
-        }
-        let msg = if !opt.plain {
-            let msg = format!("{}({})", script.name, script.ty)
-                .bold()
-                .color(color);
-            if is_last {
-                msg.underline()
+    match opt.display_style {
+        DisplayStyle::Long => {
+            if is_last && !opt.plain {
+                write!(w, "{}", " *".color(Color::Yellow).bold())?;
             } else {
-                msg
+                write!(w, "  ")?;
             }
-        } else {
-            let p = script.file_path()?;
-            format!("{}", p.to_string_lossy()).normal()
-        };
-        write!(w, "{}", msg)?;
+
+            let exex_time = match &script.get_exec_time() {
+                Some(t) => t.to_string(),
+                None => "Never".to_owned(),
+            };
+            let mut label: colored::ColoredString =
+                format!("{}\t{}", script.ty, script.name).normal();
+            if !opt.plain {
+                label = label.color(color).bold();
+            }
+            write!(w, "{}\t{}\t{}\n", label, script.get_read_time(), exex_time)?;
+        }
+        DisplayStyle::Short(ident) => {
+            if is_last && !opt.plain {
+                write!(w, "{}", "*".color(Color::Yellow).bold())?;
+            }
+            let msg = match ident {
+                DisplayScriptIdent::Normal => format!("{}({})", script.name, script.ty),
+                DisplayScriptIdent::File => script.file_path()?.to_string_lossy().to_string(),
+                DisplayScriptIdent::Name => script.name.to_string(),
+            };
+            if !opt.plain {
+                let mut msg = msg.bold().color(color);
+                if is_last {
+                    msg = msg.underline()
+                }
+                write!(w, "{}", msg)?;
+            } else {
+                write!(w, "{}", msg)?;
+            }
+        }
     }
     Ok(())
 }
@@ -134,7 +149,7 @@ pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOption
         None => return Ok(()),
     };
 
-    if opt.long {
+    if opt.display_style == DisplayStyle::Long {
         writeln!(w, "type\tname\tlast read time\tlast execute time")?;
     }
     let script_iter = history.iter().filter(|s| opt.filter(&s));
@@ -172,7 +187,7 @@ fn fmt_group<W: Write>(
 ) -> Result<()> {
     scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
     for script in scripts {
-        if !opt.long {
+        if opt.display_style != DisplayStyle::Long {
             write!(w, "  ")?;
         }
         let is_latest = &script.name == latest_script_name;

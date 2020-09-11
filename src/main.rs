@@ -2,7 +2,9 @@ use chrono::Utc;
 use instant_scripter::config::{Config, NamedTagFilter};
 use instant_scripter::error::{Contextable, Error, Result};
 use instant_scripter::history::History;
-use instant_scripter::list::{fmt_list, ListOptions, ListPattern};
+use instant_scripter::list::{
+    fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern,
+};
 use instant_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use instant_scripter::script::{AsScriptName, ScriptInfo};
 use instant_scripter::script_type::ScriptType;
@@ -147,6 +149,10 @@ struct List {
     no_grouping: bool,
     #[structopt(long, help = "No color and other decoration.")]
     plain: bool,
+    #[structopt(long, help = "Show file path to the script.", conflicts_with_all = &["name", "long"])]
+    file: bool,
+    #[structopt(long, help = "Show only name of the script.", conflicts_with_all = &["file", "long"])]
+    name: bool,
     #[structopt(parse(try_from_str))]
     pattern: Option<ListPattern>,
 }
@@ -306,13 +312,22 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             no_grouping,
             pattern,
             plain,
+            name,
+            file,
             all: _,
         }) => {
+            let display_style = match (long, file, name) {
+                (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File),
+                (false, false, true) => DisplayStyle::Short(DisplayScriptIdent::Name),
+                (false, false, false) => DisplayStyle::Short(DisplayScriptIdent::Normal),
+                (true, false, false) => DisplayStyle::Long,
+                _ => unreachable!(),
+            };
             let opt = ListOptions {
-                long: *long,
                 no_grouping: *no_grouping,
                 plain: *plain,
                 pattern,
+                display_style,
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), hs, &opt)?;

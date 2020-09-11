@@ -1,4 +1,5 @@
 use instant_scripter::{config, path};
+use regex::Regex;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
@@ -228,4 +229,21 @@ fn test_rm() {
     assert_eq!(MSG, run(&["-"]).unwrap());
     run(&["rm", ".1"]).unwrap();
     run(&["-t", "deleted", ".1"]).expect_err("被刪掉的匿名腳本還能找得回來");
+
+    run(&[
+        "e",
+        "test-namespace/super-test",
+        "-f",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
+    assert_eq!(MSG, run(&["-"]).unwrap());
+    run(&["rm", "-"]).expect("刪除被命名空間搞爛了");
+    assert_eq!(
+        MSG,
+        run(&["-t", "deleted", "test-namespace/super-test"]).unwrap()
+    );
+    let file_path = run(&["-t", "deleted", "which", "-"]).unwrap();
+    let re = Regex::new(r"^test-namespace/\d{14}-super-test\.sh$").unwrap();
+    assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 }

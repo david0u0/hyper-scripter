@@ -318,7 +318,6 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             fmt_list(&mut stdout.lock(), hs, &opt)?;
         }
         Subs::RM { script_queries } => {
-            let time_str = Utc::now().format("%Y%m%d%H%M%S");
             let delete_tag: Option<TagFilter> = Some(FromStr::from_str("deleted").unwrap());
             for query in script_queries.into_iter() {
                 let h = get_info_mut_strict(query, hs)?;
@@ -332,8 +331,11 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                     hs.remove(&name);
                 } else {
                     log::debug!("不要真的刪除有名字的腳本，改用標籤隱藏之");
-                    let new_name = format!("{}-{}", time_str, script.name.to_string());
-                    mv(query, &Some(new_name), hs, &None, &delete_tag)?;
+                    let time_str = Utc::now().format("%Y%m%d%H%M%S");
+                    let new_name = util::change_name_only(&script.name.to_string(), |name| {
+                        format!("{}-{}", time_str, name)
+                    });
+                    mv(query, Some(&new_name), hs, &None, &delete_tag)?;
                 }
             }
         }
@@ -355,7 +357,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             tags,
             category: ty,
         } => {
-            mv(origin, new, hs, ty, tags)?;
+            mv(origin, new.as_ref().map(|s| s.as_ref()), hs, ty, tags)?;
         }
         Subs::Tags { filter, obligation } => {
             if let Some(filter) = filter {
@@ -407,7 +409,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
 
 fn mv<'a, 'b>(
     origin: &'b ScriptQuery,
-    new: &Option<String>,
+    new: Option<&str>,
     history: &'b mut History<'a>,
     ty: &Option<ScriptType>,
     tags: &Option<TagFilter>,

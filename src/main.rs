@@ -49,23 +49,18 @@ enum Subs {
             help = "Category of the script, e.g. `sh`"
         )]
         category: Option<ScriptType>,
+        #[structopt(long, short)]
+        no_template: bool,
         #[structopt(parse(try_from_str), default_value = ".")]
         edit_query: EditQuery,
-
+        content: Option<String>,
         #[structopt(
             long,
             short,
-            conflicts_with = "fast",
-            help = "create script with content"
-        )]
-        with: Option<String>,
-        #[structopt(
-            long,
-            short,
-            conflicts_with = "with",
+            requires("content"),
             help = "create script without invoking the editor"
         )]
-        fast: Option<String>,
+        fast: bool,
     },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
@@ -184,8 +179,9 @@ fn main_err_handle() -> Result<Vec<Error>> {
             root.subcmd = Some(Subs::Edit {
                 edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
                 category: None,
-                with: None,
-                fast: None,
+                content: None,
+                fast: false,
+                no_template: false,
             });
         }
         Some(Subs::Other(args)) => {
@@ -253,16 +249,11 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             edit_query,
             category: ty,
             fast,
-            with,
+            content,
+            no_template,
         } => {
             let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filter.clone());
             let (path, script) = edit_or_create(edit_query, hs, ty.clone(), edit_tags)?;
-            let (fast, content) = match (fast, with) {
-                (Some(content), None) => (true, Some(content)),
-                (None, Some(content)) => (false, Some(content)),
-                (None, None) => (false, None),
-                _ => unreachable!(),
-            };
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", script.name);
                 if path.exists() {
@@ -270,8 +261,8 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
                     return Err(Error::ScriptExist(script.name.to_string()));
                 }
             }
-            let created =
-                util::prepare_script(&path, script, content.as_ref().map(|s| s.as_str()))?;
+            let content = content.as_ref().map(|s| s.as_str());
+            let created = util::prepare_script(&path, script, *no_template, content)?;
             if !fast {
                 let cmd = util::create_cmd("vim", &[&path]);
                 let stat = util::run_cmd("vim", cmd)?;

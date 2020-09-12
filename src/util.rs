@@ -133,6 +133,7 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
 pub fn prepare_script(
     path: &Path,
     script: &ScriptInfo,
+    no_template: bool,
     content: Option<&str>,
 ) -> Result<Option<DateTime<Utc>>> {
     log::info!("開始準備 {} 腳本內容……", script.name);
@@ -148,16 +149,22 @@ pub fn prepare_script(
         if let Some(parent) = path.parent() {
             handle_fs_res(&[path], create_dir_all(parent))?;
         }
-        let file = handle_fs_res(&[path], File::create(&path))?;
+        let mut file = handle_fs_res(&[path], File::create(&path))?;
 
-        let info = json!({
-            "script_dir": get_path(),
-            "birthplace": birthplace,
-            "name": script.name.key().to_owned(),
-            "content": content.unwrap_or_default()
-        });
-        let template = &Config::get()?.get_script_conf(&script.ty)?.template;
-        handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
+        let content = content.unwrap_or_default();
+        if !no_template {
+            let content: Vec<_> = content.split(";").collect();
+            let info = json!({
+                "script_dir": get_path(),
+                "birthplace": birthplace,
+                "name": script.name.key().to_owned(),
+                "content": content,
+            });
+            let template = &Config::get()?.get_script_conf(&script.ty)?.template;
+            handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
+        } else {
+            write!(file, "{}", content)?;
+        }
         true
     };
     if content.is_some() {

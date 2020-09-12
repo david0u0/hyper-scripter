@@ -16,7 +16,7 @@ lazy_static::lazy_static! {
 
 #[cfg(not(debug_assertions))]
 pub fn get_sys_path() -> Result<PathBuf> {
-    let p = match std::env::var("HYPER_SCRIPT_PATH") {
+    let p = match std::env::var("HYPER_SCRIPTER_PATH") {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
             p.into()

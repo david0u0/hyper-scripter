@@ -10,7 +10,8 @@ export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
-{{{content}}}";
+{{#each content}}{{{this}}}
+{{/each}}";
 
 const JS_WELCOME_MSG: &str =
     "// Hello, scripter! Here are some information you may be intrested in:
@@ -24,7 +25,8 @@ spawn('test', [], { stdio: 'inherit' });
 let writeFile = require('fs').writeFileSync;
 writeFile('/dev/null', 'some content');
 
-{{{content}}}";
+{{#each content}}{{{this}}}
+{{/each}}";
 
 const VORPAL_WELCOME_MSG: &str = "const name = '{{name}}';
 process.chdir(require('os').homedir());
@@ -39,7 +41,8 @@ vorpal.command('test <arg1> [arg2]', 'this is a teeeest!').action(args => {
     return Promise.resolve();
 });
 
-{{{content}}}
+{{#each content}}{{{this}}}
+{{/each}}
 
 vorpal.delimiter('>').show();";
 
@@ -49,8 +52,10 @@ export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
-tmux new-session -s $NAME -d \"{{{content}}}\"
-tmux split-window -h \" \"
+tmux new-session -s $NAME -d \"{{{content.0}}}\"
+tmux split-window -h \"{{{content.1}}}\"
+{{#if content.2}}tmux split-window -v \"{{{content.2}}}\"
+{{/if}}
 tmux -2 attach-session -d";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]

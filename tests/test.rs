@@ -1,4 +1,4 @@
-use hyper_scripter::{config, path};
+use hyper_scripter::path;
 use regex::Regex;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -22,14 +22,6 @@ fn setup<'a>() -> MutexGuard<'a, ()> {
     }
 
     guard
-}
-fn clear_config() {
-    run(&["ls"]).unwrap(); // 用這指令創建資料夾…
-    let mut conf = config::Config::default();
-    for (_, category) in conf.categories.iter_mut() {
-        category.template = vec!["{{{content}}}".to_owned()];
-    }
-    conf.store().unwrap();
 }
 fn check_exist(p: &[&str]) -> bool {
     let mut file = path::get_path();
@@ -65,7 +57,7 @@ const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run(&["e", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", ".", &format!("echo \"{}\"", MSG), "-f"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
 
     run(&[
@@ -93,8 +85,16 @@ fn test_tags() {
 fn test_mv() {
     let _g = setup();
 
-    clear_config();
-    run(&["e", ".", "-c", "js", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&[
+        "e",
+        ".",
+        "-c",
+        "js",
+        "--no-template",
+        "-f",
+        &format!("echo \"{}\"", MSG),
+    ])
+    .unwrap();
     run(&["-"]).expect_err("用 nodejs 執行 echo ……？");
 
     run(&["mv", "1", "-c", "sh"]).unwrap();
@@ -139,11 +139,10 @@ fn test_exact() {
 #[test]
 fn test_prev() {
     let _g = setup();
-    clear_config();
 
     run(&["e", "test-prev1", "-f", "echo 'test prev 1'"]).unwrap();
     run(&["e", "test-prev2", "-f", "echo 'test prev 2'"]).unwrap();
-    run(&["e", "test-prev3", "-f", "echo 'test prev 3'"]).unwrap();
+    run(&["e", "test-prev3", "-n", "-f", "echo 'test prev 3'"]).unwrap();
 
     assert_eq!(run(&["^2"]).unwrap(), "test prev 2");
     assert_eq!(run(&["^2"]).unwrap(), "test prev 3");

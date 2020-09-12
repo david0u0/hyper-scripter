@@ -1,4 +1,4 @@
-use instant_scripter::{config, path};
+use hyper_scripter::{config, path};
 use regex::Regex;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -39,7 +39,7 @@ fn check_exist(p: &[&str]) -> bool {
     file.exists()
 }
 fn run(args: &[&str]) -> Result<String, i32> {
-    let mut cmd = Command::new("./target/debug/instant_scripter");
+    let mut cmd = Command::new("./target/debug/hyper_scripter");
     let mut child = cmd.args(args).stdout(Stdio::piped()).spawn().unwrap();
     let stdout = child.stdout.as_mut().unwrap();
     let mut out_str = vec![];

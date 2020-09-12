@@ -334,7 +334,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant_scripter"
+name = "hyper_scripter"
 version = "0.2.0"
 dependencies = [
  "chrono",

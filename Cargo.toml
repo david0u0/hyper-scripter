@@ -1,5 +1,5 @@
 [package]
-name = "instant_scripter"
+name = "hyper_scripter"
 version = "0.2.0"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"

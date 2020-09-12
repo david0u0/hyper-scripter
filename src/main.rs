@@ -1,15 +1,13 @@
 use chrono::Utc;
-use instant_scripter::config::{Config, NamedTagFilter};
-use instant_scripter::error::{Contextable, Error, Result};
-use instant_scripter::history::History;
-use instant_scripter::list::{
-    fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern,
-};
-use instant_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
-use instant_scripter::script::{AsScriptName, ScriptInfo};
-use instant_scripter::script_type::ScriptType;
-use instant_scripter::tag::{TagFilter, TagFilterGroup};
-use instant_scripter::{fuzzy, path, util};
+use hyper_scripter::config::{Config, NamedTagFilter};
+use hyper_scripter::error::{Contextable, Error, Result};
+use hyper_scripter::history::History;
+use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern};
+use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
+use hyper_scripter::script::{AsScriptName, ScriptInfo};
+use hyper_scripter::script_type::ScriptType;
+use hyper_scripter::tag::{TagFilter, TagFilterGroup};
+use hyper_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
 use std::str::FromStr;
 use structopt::clap::AppSettings::{
@@ -29,7 +27,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 #[derive(StructOpt, Debug)]
 #[structopt(setting = AllowLeadingHyphen)]
 struct Root {
-    #[structopt(short = "p", long, help = "Path to instant script root")]
+    #[structopt(short = "p", long, help = "Path to hyper script root")]
     is_path: Option<String>,
     #[structopt(short, long, parse(try_from_str))]
     tags: Option<TagFilter>, // TODO: 改為 TagControlFlow
@@ -42,7 +40,7 @@ struct Root {
 enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
-    #[structopt(about = "Edit instant script", alias = "e")]
+    #[structopt(about = "Edit hyper script", alias = "e")]
     Edit {
         #[structopt(
             long,
@@ -91,7 +89,7 @@ enum Subs {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
         script_queries: Vec<ScriptQuery>,
     },
-    #[structopt(about = "List instant scripts", alias = "l")]
+    #[structopt(about = "List hyper scripts", alias = "l")]
     LS(List),
     #[structopt(about = "Copy the script to another one")]
     CP {

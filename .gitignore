@@ -1,5 +1,5 @@
 /target
-**/.instant_script_info.json
+**/.hyper_scripter_info.json
 .config.*
 config.rs
-.instant_script
+.hyper_scripter

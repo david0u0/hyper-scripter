@@ -7,8 +7,8 @@ use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const META: &'static str = ".instant_scripter_info.json";
-const ROOT_PATH: &'static str = "instant_scripter";
+const META: &'static str = ".hyper_scripter_info.json";
+const ROOT_PATH: &'static str = "hyper_scripter";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -16,7 +16,7 @@ lazy_static::lazy_static! {
 
 #[cfg(not(debug_assertions))]
 pub fn get_sys_path() -> Result<PathBuf> {
-    let p = match std::env::var("INSTANT_SCRIPT_PATH") {
+    let p = match std::env::var("HYPER_SCRIPT_PATH") {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
             p.into()
@@ -30,11 +30,11 @@ pub fn get_sys_path() -> Result<PathBuf> {
 }
 #[cfg(all(debug_assertions, not(test)))]
 pub fn get_sys_path() -> Result<PathBuf> {
-    Ok(".instant_script".into())
+    Ok(".hyper_scripter".into())
 }
 #[cfg(all(debug_assertions, test))]
 pub fn get_sys_path() -> Result<PathBuf> {
-    Ok(".test_instant_script".into())
+    Ok(".test_hyper_scripter".into())
 }
 
 pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
@@ -167,13 +167,13 @@ mod test {
         assert_eq!(s.name, ScriptName::Anonymous(6));
         assert_eq!(
             s.path,
-            join_path("./.test_instant_script/.anonymous", "6.sh").unwrap()
+            join_path("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
         );
         let s = open_anonymous(5, &"js".into()).unwrap();
         assert_eq!(s.name, ScriptName::Anonymous(5));
         assert_eq!(
             s.path,
-            join_path("./.test_instant_script/.anonymous", "5.js").unwrap()
+            join_path("./.test_hyper_scripter/.anonymous", "5.js").unwrap()
         );
     }
     #[test]
@@ -192,7 +192,7 @@ mod test {
         assert_eq!(s.name, ScriptName::Anonymous(1));
         assert_eq!(
             s.path,
-            join_path("./.test_instant_script/.anonymous", "1.sh").unwrap()
+            join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
         match open_script("not-exist", &"sh".into(), true).unwrap_err() {

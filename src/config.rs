@@ -6,12 +6,19 @@ use crate::util;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
 
 const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
-    static ref CONFIG: Result<Config> = Config::load();
+    static ref CONFIG: Result<Config> = RawConfig::load().map(|c| {
+        Config {
+            changed: false,
+            raw_config: c,
+            open_time: Utc::now(),
+        }
+    });
 }
 
 fn config_file() -> PathBuf {
@@ -30,16 +37,20 @@ pub struct NamedTagFilter {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
-pub struct Config {
-    #[serde(skip_serializing, default = "Utc::now")]
-    pub open_time: DateTime<Utc>,
+pub struct RawConfig {
     pub tag_filters: Vec<NamedTagFilter>,
     pub main_tag_filter: TagFilter,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
-impl Default for Config {
+#[derive(Debug, Clone)]
+pub struct Config {
+    changed: bool,
+    open_time: DateTime<Utc>,
+    raw_config: RawConfig,
+}
+impl Default for RawConfig {
     fn default() -> Self {
-        Config {
+        RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
                     filter: FromStr::from_str("pin").unwrap(),
@@ -54,11 +65,10 @@ impl Default for Config {
             ],
             main_tag_filter: FromStr::from_str("all,^hide").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
-            open_time: Utc::now(),
         }
     }
 }
-impl Config {
+impl RawConfig {
     fn load() -> Result<Self> {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
@@ -72,8 +82,26 @@ impl Config {
             Err(e) => Err(e),
         }
     }
+}
+impl Deref for Config {
+    type Target = RawConfig;
+    fn deref(&self) -> &Self::Target {
+        &self.raw_config
+    }
+}
+impl DerefMut for Config {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.changed = true;
+        &mut self.raw_config
+    }
+}
+impl Config {
     pub fn store(&self) -> Result<()> {
         log::info!("寫入設定檔…");
+        if !self.changed {
+            log::info!("設定檔未改變，不寫入");
+            return Ok(());
+        }
         let path = config_file();
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {
@@ -89,7 +117,7 @@ impl Config {
             }
             Err(err) => return Err(err),
         }
-        util::write_file(&path, &toml::to_string_pretty(self)?)
+        util::write_file(&path, &toml::to_string_pretty(self.deref())?)
     }
     pub fn get() -> Result<&'static Config> {
         match &*CONFIG {
@@ -122,17 +150,13 @@ mod test {
     #[test]
     fn test_config_serde() {
         path::set_path_from_sys().unwrap();
-        let c1 = Config {
+        let c1 = RawConfig {
             main_tag_filter: FromStr::from_str("a,^b,c").unwrap(),
             ..Default::default()
         };
         let s = to_string_pretty(&c1).unwrap();
         println!("{}", s);
-        let mut c2: Config = from_str(&s).unwrap();
-        c2.open_time = c1.open_time;
+        let c2: RawConfig = from_str(&s).unwrap();
         assert_eq!(c1, c2);
-
-        c2.store().unwrap();
-        Config::load().unwrap();
     }
 }

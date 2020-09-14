@@ -5,7 +5,7 @@ pub mod config;
 pub mod error;
 mod error_display;
 pub mod fuzzy;
-pub mod history;
+pub mod script_repo;
 pub mod list;
 pub mod path;
 pub mod query;

@@ -13,9 +13,9 @@ pub trait FuzzKey {
 }
 pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
     name: &str,
-    iter: impl Iterator<Item = &'a mut T>,
-) -> Result<Option<&'a mut T>> {
-    let mut ans = (0, Vec::<&mut T>::new());
+    iter: impl Iterator<Item = T>,
+) -> Result<Option<T>> {
+    let mut ans = (0, Vec::<T>::new());
     for data in iter {
         let key_tmp = data.fuzz_key();
         let key = key_tmp.as_ref();
@@ -40,7 +40,7 @@ pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
     } else if ans.1.len() == 1 {
         log::debug!("模糊搜到一個東西");
         // SAFETY: 不會再用到這個向量了，而且 &mut 也沒有 Drop 特徵，安啦
-        let first = unsafe { std::ptr::read(&ans.1[0]) };
+        let first = ans.1.into_iter().next().unwrap();
         Ok(Some(first))
     } else {
         log::debug!("模糊搜到太多東西");
@@ -112,21 +112,21 @@ mod test {
     #[test]
     fn test_fuzz() {
         let _ = env_logger::try_init();
-        let mut t1 = "測試腳本1".as_script_name().unwrap();
+        let t1 = "測試腳本1".as_script_name().unwrap();
         let t2 = "測試腳本2".as_script_name().unwrap();
-        let mut t3 = ".42".as_script_name().unwrap();
-        let mut vec = vec![t1.clone(), t2, t3.clone()];
+        let t3 = ".42".as_script_name().unwrap();
+        let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz_mut("測試1", vec.iter_mut()).unwrap();
-        assert_eq!(res, Some(&mut t1));
+        let res = fuzz_mut("測試1", vec.clone().into_iter()).unwrap();
+        assert_eq!(res, Some(t1));
 
-        let res = fuzz_mut("42", vec.iter_mut()).unwrap();
-        assert_eq!(res, Some(&mut t3));
+        let res = fuzz_mut("42", vec.clone().into_iter()).unwrap();
+        assert_eq!(res, Some(t3));
 
-        let res = fuzz_mut("找不到", vec.iter_mut()).unwrap();
+        let res = fuzz_mut("找不到", vec.clone().into_iter()).unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz_mut("測試", vec.iter_mut()).unwrap_err();
+        let err = fuzz_mut("測試", vec.clone().into_iter()).unwrap_err();
         let mut v = match err {
             Error::MultiFuzz(v) => v,
             _ => unreachable!(),
@@ -137,11 +137,11 @@ mod test {
     #[test]
     fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
-        let mut t1 = "測試腳本1".as_script_name().unwrap();
+        let t1 = "測試腳本1".as_script_name().unwrap();
         let t2 = "測試腳本234".as_script_name().unwrap();
-        let mut vec = vec![t1.clone(), t2];
-        let res = fuzz_mut("測試", vec.iter_mut()).unwrap();
-        assert_eq!(res, Some(&mut t1), "模糊搜尋無法找出較短者");
+        let vec = vec![t1.clone(), t2];
+        let res = fuzz_mut("測試", vec.clone().into_iter()).unwrap();
+        assert_eq!(res, Some(t1), "模糊搜尋無法找出較短者");
     }
     #[test]
     fn test_reorder() {

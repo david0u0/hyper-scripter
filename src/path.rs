@@ -1,6 +1,6 @@
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::history::History;
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
+use crate::script_repo::ScriptRepo;
 use crate::script_type::ScriptType;
 use crate::util::{handle_fs_res, read_file, write_file};
 use std::fs::{canonicalize, create_dir, read_dir};
@@ -115,7 +115,7 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
         Ok(script)
     }
 }
-pub fn get_history() -> Result<History<'static>> {
+pub fn get_history() -> Result<ScriptRepo<'static>> {
     let path = join_path(get_path(), META)?;
     let content = match read_file(&path) {
         Ok(s) => s,
@@ -125,25 +125,22 @@ pub fn get_history() -> Result<History<'static>> {
         }
         Err(e) => return Err(e).context("打開歷史檔案失敗"),
     };
-    let history: Vec<ScriptInfo> = serde_json::from_str(&content)?;
-    let history =
-        History::new(
-            history
-                .into_iter()
-                .filter(|s| match open_script(&s.name, &s.ty, true) {
-                    Err(e) => {
-                        log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
-                        false
-                    }
-                    _ => true,
-                }),
-        );
-    Ok(history)
+    let script_repo: Vec<ScriptInfo> = serde_json::from_str(&content)?;
+    let script_repo = ScriptRepo::new(script_repo.into_iter().filter(|s| {
+        match open_script(&s.name, &s.ty, true) {
+            Err(e) => {
+                log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
+                false
+            }
+            _ => true,
+        }
+    }));
+    Ok(script_repo)
 }
 
-pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
+pub fn store_history<'a>(script_repo: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
     let path = join_path(get_path(), META)?;
-    let v: Vec<_> = history.collect();
+    let v: Vec<_> = script_repo.collect();
     write_file(&path, &serde_json::to_string(&v)?).context("寫入歷史檔案失敗")?;
     Ok(())
 }

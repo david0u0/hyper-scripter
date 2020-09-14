@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{Error, FormatCode, Result};
-use crate::history::History;
 use crate::script::{ScriptInfo, ScriptName};
+use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
 use colored::{Color, Colorize};
 use regex::Regex;
@@ -143,8 +143,12 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOptions) -> Result<()> {
-    let latest_script_name = match history.latest_mut(1) {
+pub fn fmt_list<'a, W: Write>(
+    w: &mut W,
+    script_repo: &mut ScriptRepo,
+    opt: &ListOptions,
+) -> Result<()> {
+    let latest_script_name = match script_repo.latest_mut(1) {
         Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
@@ -152,7 +156,7 @@ pub fn fmt_list<'a, W: Write>(w: &mut W, history: &mut History, opt: &ListOption
     if opt.display_style == DisplayStyle::Long {
         writeln!(w, "type\tname\tlast read time\tlast execute time")?;
     }
-    let script_iter = history.iter().filter(|s| opt.filter(&s));
+    let script_iter = script_repo.iter().filter(|s| opt.filter(&s));
 
     if opt.no_grouping {
         let scripts: Vec<_> = script_iter.collect();

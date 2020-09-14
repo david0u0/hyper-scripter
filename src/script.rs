@@ -133,9 +133,9 @@ impl ScriptInfo<'_> {
         name: ScriptName<'a>,
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
-    ) -> Result<ScriptInfo<'a>> {
+    ) -> ScriptInfo<'a> {
         let now = Utc::now();
-        Ok(ScriptInfo {
+        ScriptInfo {
             name,
             ty,
             exec_count: 0,
@@ -144,7 +144,7 @@ impl ScriptInfo<'_> {
             write_time: now,
             created_time: now,
             exec_time: None,
-        })
+        }
     }
     pub fn read(&mut self) {
         self.read_time = Utc::now();

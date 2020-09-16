@@ -85,15 +85,15 @@ impl FromStr for FilterQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         let arr: Vec<&str> = s.split("=").collect();
-        match arr.len() {
-            1 => Ok(FilterQuery {
+        match AsRef::<[&str]>::as_ref(&arr) {
+            &[s] => Ok(FilterQuery {
                 name: None,
-                content: FromStr::from_str(arr[0])?,
+                content: FromStr::from_str(s)?,
             }),
-            2 => Ok(FilterQuery {
+            &[name, s] => Ok(FilterQuery {
                 // TODO: 檢查名字
-                name: Some(arr[0].to_owned()),
-                content: FromStr::from_str(arr[1])?,
+                name: Some(name.to_owned()),
+                content: FromStr::from_str(s)?,
             }),
             _ => Err(Error::Format(FilterQueryCode, s.to_owned())),
         }

@@ -4,7 +4,6 @@ use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::TagFilterGroup;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::collections::HashMap;
-use std::str::FromStr;
 
 pub mod helper;
 use helper::*;
@@ -38,12 +37,7 @@ impl<'a> ScriptRepo<'a> {
     pub async fn new<'b>() -> Result<ScriptRepo<'b>> {
         let path = get_path().join("script_info.db");
 
-        let pool = SqlitePool::connect_with(
-            SqliteConnectOptions::new()
-                .filename(path)
-                .create_if_missing(true),
-        )
-        .await?;
+        let pool = SqlitePool::connect_with(SqliteConnectOptions::new().filename(path)).await?;
 
         let scripts = sqlx::query!("SELECT * from script_infos")
             .fetch_all(&pool)

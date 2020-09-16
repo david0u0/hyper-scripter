@@ -1,12 +1,11 @@
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
+use crate::script::{AsScriptName, ScriptMeta, ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
-use crate::util::{handle_fs_res, write_file};
+use crate::util::handle_fs_res;
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const META: &'static str = ".hyper_scripter_info.json";
 const ROOT_PATH: &'static str = "hyper_scripter";
 
 lazy_static::lazy_static! {
@@ -115,12 +114,6 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
     }
 }
 
-pub fn store_history<'a>(script_repo: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
-    let path = join_path(get_path(), META)?;
-    let v: Vec<_> = script_repo.collect();
-    write_file(&path, &serde_json::to_string(&v)?).context("寫入歷史檔案失敗")?;
-    Ok(())
-}
 #[cfg(test)]
 mod test {
     use super::*;

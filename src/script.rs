@@ -85,17 +85,12 @@ impl FuzzKey for ScriptName<'_> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct ScriptInfo<'a> {
-    #[serde(default)]
     exec_count: usize,
-    #[serde(default = "Utc::now")]
     read_time: DateTime<Utc>,
-    #[serde(default = "Utc::now")]
     created_time: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     exec_time: Option<DateTime<Utc>>,
-    #[serde(default = "Utc::now")]
     write_time: DateTime<Utc>,
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,

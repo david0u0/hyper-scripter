@@ -78,7 +78,7 @@ pub struct TagControl {
     allow: bool,
     tag: Tag,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag(String);
 impl AsRef<str> for Tag {
     fn as_ref(&self) -> &str {
@@ -93,13 +93,12 @@ impl Tag {
 }
 impl FromStr for Tag {
     type Err = Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Error> {
-        // TODO: 檢查格式
-        if s.len() == 0 {
-            Err(Error::Format(TagCode, s.to_owned()))
-        } else {
-            Ok(Tag(s.to_owned()))
+    fn from_str(s: &str) -> Result<Self, Error> {
+        let re = Regex::new(&format!(r"^(\w|\d|-|_)+$")).unwrap();
+        if !re.is_match(s) {
+            return Err(Error::Format(TagCode, s.to_owned()));
         }
+        Ok(Tag(s.to_owned()))
     }
 }
 impl FromStr for TagControl {
@@ -111,10 +110,6 @@ impl FromStr for TagControl {
         } else {
             true
         };
-        let re = Regex::new(&format!(r"^(\w|\d|-|_)+$")).unwrap();
-        if !re.is_match(s) {
-            return Err(Error::Format(TagCode, s.to_owned()));
-        }
         Ok(TagControl {
             tag: Tag::from_str(s)?,
             allow,

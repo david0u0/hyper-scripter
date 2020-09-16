@@ -229,8 +229,6 @@ fn get_info_mut_strict<'b, 'a>(
     }
 }
 async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
-    hyper_scripter::migration::do_migrate(path::get_path()).await?;
-
     let mut repo = ScriptRepo::new().await.context("讀取歷史記錄失敗")?;
     let mut res = Vec::<Error>::new();
     {

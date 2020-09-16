@@ -1,8 +1,7 @@
 use crate::error::Result;
-use crate::path::get_path;
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
-use crate::tag::TagFilterGroup;
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+use crate::tag::{Tag, TagFilterGroup};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 
 pub mod helper;
@@ -35,21 +34,24 @@ impl<'a> ScriptRepo<'a> {
         }
     }
     pub async fn new<'b>() -> Result<ScriptRepo<'b>> {
-        let path = get_path().join("script_info.db");
-
-        let pool = SqlitePool::connect_with(SqliteConnectOptions::new().filename(path)).await?;
-
+        let pool = crate::db::get_pool().await?;
         let scripts = sqlx::query!("SELECT * from script_infos")
             .fetch_all(&pool)
             .await?;
         let map: HashMap<String, ScriptInfo> = scripts
             .into_iter()
             .map(|script| {
+                use std::str::FromStr;
                 let name = script.name;
-                let script_name = name.as_script_name().unwrap().into_static();
+                log::trace!("載入腳本：{}, {}, {}", name, script.category, script.tags);
+                let script_name = name.as_script_name().unwrap().into_static(); // TODO: 正確實作 from string
                 (
                     name,
-                    ScriptInfo::new(script_name, script.category.into(), vec![].into_iter()),
+                    ScriptInfo::new(
+                        script_name,
+                        script.category.into(),
+                        script.tags.split(",").map(|s| Tag::from_str(s).unwrap()),
+                    ),
                 )
             })
             .collect();
@@ -105,6 +107,7 @@ impl<'a> ScriptRepo<'a> {
     }
     pub fn remove(&mut self, name: &ScriptName) {
         self.map.remove(&*name.key());
+        // TODO: db 操作
     }
     pub fn insert(&mut self, info: ScriptInfo<'a>) {
         self.map.insert(info.name.key().into_owned(), info);

@@ -205,11 +205,11 @@ fn test_multi_filter() {
     run(&["tags", "hidden"]).unwrap();
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
     assert_eq!(MSG, run(&["test-pin"]).unwrap());
-    run(&["nobody"]).expect_err("未能被匿名篩選器篩掉");
+    run(&["nobody"]).expect_err("未能被主篩選器篩掉");
 
     run(&["tags", "^test"]).unwrap();
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
-    run(&["test-pin"]).expect_err("未能被匿名篩選器篩掉");
+    run(&["test-pin"]).expect_err("未能被主篩選器篩掉");
 
     assert_eq!(MSG, run(&["-a", "test-pin"]).unwrap());
 }

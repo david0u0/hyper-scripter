@@ -6,7 +6,7 @@ use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptio
 use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo};
 use hyper_scripter::script_type::ScriptType;
-use hyper_scripter::tag::{TagFilter, TagFilterGroup};
+use hyper_scripter::tag::{TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -28,9 +28,9 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 #[structopt(setting = AllowLeadingHyphen)]
 struct Root {
     #[structopt(short = "p", long, help = "Path to hyper script root")]
-    is_path: Option<String>,
+    hs_path: Option<String>,
     #[structopt(short, long, parse(try_from_str))]
-    tags: Option<TagFilter>, // TODO: 改為 TagControlFlow
+    tags: Option<TagControlFlow>,
     #[structopt(short, long, help = "Shorthand for `-t=all,^deleted`")]
     all: bool,
     #[structopt(subcommand)]
@@ -102,7 +102,7 @@ enum Subs {
         )]
         category: Option<ScriptType>,
         #[structopt(short, long)]
-        tags: Option<TagFilter>, // TODO: 改為 TagControlFlow
+        tags: Option<TagControlFlow>,
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
         new: Option<String>,
@@ -166,8 +166,8 @@ fn main() {
 fn main_err_handle() -> Result<Vec<Error>> {
     let mut root = Root::from_args();
     log::debug!("命令行物件：{:?}", root);
-    match &root.is_path {
-        Some(is_path) => path::set_path(is_path)?,
+    match &root.hs_path {
+        Some(hs_path) => path::set_path(hs_path)?,
         None => path::set_path_from_sys()?,
     }
     let mut conf = Config::get()?.clone();
@@ -237,7 +237,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             TagFilter::from_str("all,^deleted").unwrap().into()
         } else {
             match root.tags.clone() {
-                Some(filter) => filter.into(),
+                Some(filter) => Into::<TagFilter>::into(filter).into(),
                 None => conf.get_tag_filter_group(),
             }
         };
@@ -252,7 +252,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             content,
             no_template,
         } => {
-            let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filter.clone());
+            let edit_tags = root.tags.clone().unwrap_or(conf.main_tag_filter.clone().filter);
             let (path, script) = edit_or_create(edit_query, hs, ty.clone(), edit_tags)?;
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", script.name);
@@ -322,7 +322,7 @@ fn main_inner<'a>(root: &Root, hs: &mut History<'a>, conf: &mut Config) -> Resul
             fmt_list(&mut stdout.lock(), hs, &opt)?;
         }
         Subs::RM { script_queries } => {
-            let delete_tag: Option<TagFilter> = Some(FromStr::from_str("deleted").unwrap());
+            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("deleted").unwrap());
             for query in script_queries.into_iter() {
                 let h = get_info_mut_strict(query, hs)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
@@ -416,7 +416,7 @@ fn mv<'a, 'b>(
     new: Option<&str>,
     history: &'b mut History<'a>,
     ty: &Option<ScriptType>,
-    tags: &Option<TagFilter>,
+    tags: &Option<TagControlFlow>,
 ) -> Result {
     let h = get_info_mut_strict(origin, history)?;
     let og_script = path::open_script(&h.name, &h.ty, true)?;
@@ -441,7 +441,7 @@ fn edit_or_create<'a, 'b>(
     edit_query: &'b EditQuery,
     history: &'b mut History<'a>,
     ty: Option<ScriptType>,
-    tags: TagFilter,
+    tags: TagControlFlow,
 ) -> Result<(PathBuf, &'b mut ScriptInfo<'a>)> {
     let final_ty: ScriptType;
     let script = if let EditQuery::Query(query) = edit_query {

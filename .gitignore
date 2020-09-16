@@ -3,3 +3,4 @@
 .config.*
 config.rs
 .hyper_scripter
+*.db

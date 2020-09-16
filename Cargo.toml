@@ -14,6 +14,8 @@ default = []
 
 [dependencies]
 chrono = { version = "0.4.7", features = ["serde"] }
+sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "chrono", "migrate", "sqlite" ] }
+tokio = { version = "0.2.22", features = ["full"] }
 env_logger = "0.6.2"
 lazy_static = "1.4"
 log = "0.4.8"
@@ -27,3 +29,8 @@ colored = "2"
 dirs = "3.0.1"
 handlebars = "3.3.0"
 toml = "0.5.6"
+
+[build-dependencies]
+sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "chrono", "migrate", "sqlite" ] }
+tokio = { version = "0.2.22", features = ["full"] }
+log = "0.4.8"

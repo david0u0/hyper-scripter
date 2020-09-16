@@ -1,8 +1,7 @@
 use crate::error::{Contextable, Error, Result, SysPath};
 use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
-use crate::script_repo::ScriptRepo;
 use crate::script_type::ScriptType;
-use crate::util::{handle_fs_res, read_file, write_file};
+use crate::util::{handle_fs_res, write_file};
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -114,28 +113,6 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
     } else {
         Ok(script)
     }
-}
-pub fn get_history() -> Result<ScriptRepo<'static>> {
-    let path = join_path(get_path(), META)?;
-    let content = match read_file(&path) {
-        Ok(s) => s,
-        Err(Error::PathNotFound(_)) => {
-            log::info!("找不到歷史檔案，視為空歷史");
-            return Ok(Default::default());
-        }
-        Err(e) => return Err(e).context("打開歷史檔案失敗"),
-    };
-    let script_repo: Vec<ScriptInfo> = serde_json::from_str(&content)?;
-    let script_repo = ScriptRepo::new(script_repo.into_iter().filter(|s| {
-        match open_script(&s.name, &s.ty, true) {
-            Err(e) => {
-                log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
-                false
-            }
-            _ => true,
-        }
-    }));
-    Ok(script_repo)
 }
 
 pub fn store_history<'a>(script_repo: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {

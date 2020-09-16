@@ -13,3 +13,4 @@ pub mod script_repo;
 pub mod script_type;
 pub mod tag;
 pub mod util;
+pub mod migration;

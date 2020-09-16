@@ -150,9 +150,10 @@ struct List {
     pattern: Option<ListPattern>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
-    let errs = match main_err_handle() {
+    let errs = match main_err_handle().await {
         Err(e) => vec![e],
         Ok(v) => v,
     };
@@ -163,7 +164,7 @@ fn main() {
         std::process::exit(1);
     }
 }
-fn main_err_handle() -> Result<Vec<Error>> {
+async fn main_err_handle() -> Result<Vec<Error>> {
     let mut root = Root::from_args();
     log::debug!("命令行物件：{:?}", root);
     match &root.hs_path {
@@ -192,7 +193,7 @@ fn main_err_handle() -> Result<Vec<Error>> {
         }
         _ => (),
     }
-    let res = main_inner(&root, &mut conf)?;
+    let res = main_inner(&root, &mut conf).await?;
     conf.store()?;
     Ok(res)
 }
@@ -227,8 +228,10 @@ fn get_info_mut_strict<'b, 'a>(
         Ok(Some(info)) => Ok(info),
     }
 }
-fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
-    let mut repo = path::get_history().context("讀取歷史記錄失敗")?;
+async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
+    hyper_scripter::migration::do_migrate(path::get_path()).await?;
+
+    let mut repo = ScriptRepo::new().await.context("讀取歷史記錄失敗")?;
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all() {
@@ -254,7 +257,8 @@ fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 .tags
                 .clone()
                 .unwrap_or(conf.main_tag_filter.clone().filter);
-            let (path, mut entry) = edit_or_create(edit_query, &mut repo, ty.clone(), edit_tags)?;
+            let (path, mut entry) =
+                edit_or_create(edit_query, &mut repo, ty.clone(), edit_tags).await?;
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", entry.name);
                 if path.exists() {
@@ -451,7 +455,7 @@ fn mv<'a, 'b>(
         info.write();
     })
 }
-fn edit_or_create<'a, 'b>(
+async fn edit_or_create<'a, 'b>(
     edit_query: &EditQuery,
     script_repo: &'b mut ScriptRepo<'a>,
     ty: Option<ScriptType>,
@@ -495,8 +499,10 @@ fn edit_or_create<'a, 'b>(
     log::info!("編輯 {:?}", script.name);
 
     let name = script.name.into_static();
-    let entry = script_repo.upsert(&name, || {
-        ScriptInfo::new(name.clone(), final_ty, tags.into_allowed_iter())
-    });
+    let entry = script_repo
+        .upsert(&name, || {
+            ScriptInfo::new(name.clone(), final_ty, tags.into_allowed_iter())
+        })
+        .await?;
     Ok((path, entry))
 }

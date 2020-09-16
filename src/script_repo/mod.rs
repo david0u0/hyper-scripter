@@ -1,36 +1,70 @@
 use crate::error::Result;
-use crate::script::{ScriptInfo, ScriptName};
+use crate::path::get_path;
+use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::TagFilterGroup;
+use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 pub mod helper;
 use helper::*;
 
-pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, ()>;
+pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, SqlitePool>;
 
-#[derive(Default, Debug)]
+impl Environment for SqlitePool {
+    fn handle_change(&self, info: &ScriptInfo) -> Result {
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 pub struct ScriptRepo<'a> {
     map: HashMap<String, ScriptInfo<'a>>,
     hidden_map: HashMap<String, ScriptInfo<'a>>,
     latest_name: Option<String>,
-    env: (),
-}
-
-impl Environment for () {
-    fn handle_change(&self, _info: &ScriptInfo) -> Result {
-        Ok(())
-    }
+    pool: SqlitePool,
 }
 
 impl<'a> ScriptRepo<'a> {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut<'b>(&'b mut self) -> Iter<'a, 'b, ()> {
+    pub fn iter_mut<'b>(&'b mut self) -> Iter<'a, 'b, SqlitePool> {
         Iter {
             iter: self.map.iter_mut(),
-            env: &self.env,
+            env: &self.pool,
         }
+    }
+    pub async fn new<'b>() -> Result<ScriptRepo<'b>> {
+        let path = get_path().join("script_info.db");
+
+        let pool = SqlitePool::connect_with(
+            SqliteConnectOptions::new()
+                .filename(path)
+                .create_if_missing(true),
+        )
+        .await?;
+
+        let scripts = sqlx::query!("SELECT * from script_infos")
+            .fetch_all(&pool)
+            .await?;
+        let map: HashMap<String, ScriptInfo> = scripts
+            .into_iter()
+            .map(|script| {
+                let name = script.name;
+                let script_name = name.as_script_name().unwrap().into_static();
+                (
+                    name,
+                    ScriptInfo::new(script_name, script.category.into(), vec![].into_iter()),
+                )
+            })
+            .collect();
+        Ok(ScriptRepo {
+            map,
+            pool,
+            hidden_map: Default::default(),
+            latest_name: None,
+        })
     }
     // fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
     //     let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());
@@ -57,23 +91,10 @@ impl<'a> ScriptRepo<'a> {
             let t = unsafe { std::ptr::read(&v[v.len() - n]) };
             Some(RepoEntry {
                 info: t,
-                env: &self.env,
+                env: &self.pool,
             })
         } else {
             None
-        }
-    }
-    pub fn new<I: Iterator<Item = ScriptInfo<'a>>>(iter: I) -> Self {
-        let mut map = HashMap::new();
-        for mut s in iter {
-            s.tags.sort();
-            map.insert(s.name.key().into_owned(), s);
-        }
-        ScriptRepo {
-            map,
-            hidden_map: Default::default(),
-            latest_name: None,
-            env: (),
         }
     }
     pub fn get_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
@@ -81,7 +102,7 @@ impl<'a> ScriptRepo<'a> {
             None => None,
             Some(info) => Some(RepoEntry {
                 info,
-                env: &self.env,
+                env: &self.pool,
             }),
         }
     }
@@ -94,19 +115,43 @@ impl<'a> ScriptRepo<'a> {
     pub fn insert(&mut self, info: ScriptInfo<'a>) {
         self.map.insert(info.name.key().into_owned(), info);
     }
-    pub fn upsert<F: FnOnce() -> ScriptInfo<'a>>(
+    pub async fn upsert<'b, F: FnOnce() -> ScriptInfo<'a>>(
         &mut self,
-        name: &ScriptName,
+        name: &ScriptName<'b>,
         default: F,
-    ) -> ScriptRepoEntry<'a, '_> {
+    ) -> Result<ScriptRepoEntry<'a, '_>> {
+        let entry = self.map.entry(name.key().into_owned());
+        use std::collections::hash_map::Entry::*;
+        let exist = match &entry {
+            Vacant(_) => false,
+            _ => true,
+        };
         let info = self
             .map
             .entry(name.key().into_owned())
             .or_insert_with(default);
-        RepoEntry {
-            info,
-            env: &self.env,
+        if !exist {
+            let name_cow = info.name.key();
+            let name = name_cow.as_ref();
+            let tags_arr: Vec<&str> = info.tags.iter().map(|t| t.as_ref()).collect();
+            let tags = tags_arr.join(",");
+            let category = info.ty.as_ref();
+            sqlx::query!(
+                "
+                INSERT INTO script_infos (name, category, tags)
+                VALUES(?, ?, ?)
+                ",
+                name,
+                category,
+                tags,
+            )
+            .execute(&self.pool)
+            .await?;
         }
+        Ok(RepoEntry {
+            info,
+            env: &self.pool,
+        })
     }
     pub fn filter_by_tag(&mut self, filter: &TagFilterGroup) {
         // TODO: 優化

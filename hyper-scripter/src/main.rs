@@ -272,7 +272,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 log::debug!("編輯器返回：{:?}", stat);
             }
             util::after_script(&path, created)?;
-            entry.update(|info| info.write())?;
+            entry.update(|info| info.write()).await?;
         }
         Subs::Run { script_query, args } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;
@@ -283,7 +283,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Err(e) => return Err(e),
                 Ok(_) => (),
             }
-            entry.update(|info| info.exec())?;
+            entry.update(|info| info.exec()).await?;
         }
         Subs::Which { script_query } => {
             let entry = get_info_mut_strict(script_query, &mut repo)?;
@@ -297,7 +297,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             log::info!("打印 {:?}", script.name);
             let content = util::read_file(&script.path)?;
             println!("{}", content);
-            entry.update(|info| info.read())?;
+            entry.update(|info| info.read()).await?;
         }
         Subs::LS(List {
             long,
@@ -348,7 +348,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                         &mut repo,
                         None,
                         &delete_tag,
-                    )?;
+                    )
+                    .await?;
                 }
             }
         }
@@ -374,7 +375,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Some(s) => Some(s.as_script_name()?),
                 None => None,
             };
-            mv(origin, new_name, &mut repo, ty.as_ref(), tags)?;
+            mv(origin, new_name, &mut repo, ty.as_ref(), tags).await?;
         }
         Subs::Tags { filter, obligation } => {
             if let Some(filter) = filter {
@@ -424,7 +425,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     Ok(res)
 }
 
-fn mv<'a, 'b>(
+async fn mv<'a, 'b>(
     origin: &ScriptQuery,
     new_name: Option<ScriptName<'a>>,
     script_repo: &'b mut ScriptRepo<'a>,
@@ -440,18 +441,20 @@ fn mv<'a, 'b>(
     )?;
     util::mv(&og_script, &new_script)?;
 
-    entry.update(|info| {
-        if let Some(ty) = ty {
-            info.ty = ty.clone();
-        }
-        if let Some(name) = new_name {
-            info.name = name;
-        }
-        if let Some(tags) = tags {
-            info.tags = tags.clone().into_allowed_iter().collect();
-        }
-        info.write();
-    })
+    entry
+        .update(|info| {
+            if let Some(ty) = ty {
+                info.ty = ty.clone();
+            }
+            if let Some(name) = new_name {
+                info.name = name;
+            }
+            if let Some(tags) = tags {
+                info.tags = tags.clone().into_allowed_iter().collect();
+            }
+            info.write();
+        })
+        .await
 }
 async fn edit_or_create<'a, 'b>(
     edit_query: &EditQuery,
@@ -499,7 +502,7 @@ async fn edit_or_create<'a, 'b>(
     let name = script.name.into_static();
     let entry = script_repo
         .upsert(&name, || {
-            ScriptInfo::new(name.clone(), final_ty, tags.into_allowed_iter())
+            ScriptInfo::new(0, name.clone(), final_ty, tags.into_allowed_iter())
         })
         .await?;
     Ok((path, entry))

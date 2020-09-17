@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
+use async_trait::async_trait;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
@@ -9,10 +10,29 @@ use helper::*;
 
 pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, SqlitePool>;
 
+#[async_trait]
 impl Environment for SqlitePool {
-    fn handle_change(&self, info: &ScriptInfo) -> Result {
+    async fn handle_change<'a>(&self, info: &ScriptInfo<'a>) -> Result {
+        let name_cow = info.name.key();
+        let name = name_cow.as_ref();
+        let tags = join_tags(&info.tags);
+        let category = info.ty.as_ref();
+        sqlx::query!(
+            "UPDATE script_infos SET name = ?, tags = ?, category = ? where id = ?",
+            name,
+            tags,
+            category,
+            info.id
+        )
+        .execute(self)
+        .await?;
         Ok(())
     }
+}
+
+fn join_tags(tags: &[Tag]) -> String {
+    let tags_arr: Vec<&str> = tags.iter().map(|t| t.as_ref()).collect();
+    tags_arr.join(",")
 }
 
 #[derive(Debug)]
@@ -48,6 +68,7 @@ impl<'a> ScriptRepo<'a> {
                 (
                     name,
                     ScriptInfo::new(
+                        script.id,
                         script_name,
                         script.category.into(),
                         script.tags.split(",").map(|s| Tag::from_str(s).unwrap()),
@@ -123,16 +144,15 @@ impl<'a> ScriptRepo<'a> {
             Vacant(_) => false,
             _ => true,
         };
-        let info = self
+        let mut info = self
             .map
             .entry(name.key().into_owned())
             .or_insert_with(default);
         if !exist {
             let name_cow = info.name.key();
             let name = name_cow.as_ref();
-            let tags_arr: Vec<&str> = info.tags.iter().map(|t| t.as_ref()).collect();
-            let tags = tags_arr.join(",");
             let category = info.ty.as_ref();
+            let tags = join_tags(&info.tags);
             sqlx::query!(
                 "
                 INSERT INTO script_infos (name, category, tags)
@@ -142,8 +162,13 @@ impl<'a> ScriptRepo<'a> {
                 category,
                 tags,
             )
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await?;
+            let id = sqlx::query!("SELECT last_insert_rowid() as id")
+                .fetch_one(&self.pool)
+                .await?
+                .id;
+            info.id = id as i64;
         }
         Ok(RepoEntry {
             info,

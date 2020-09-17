@@ -92,6 +92,7 @@ pub struct ScriptInfo<'a> {
     created_time: DateTime<Utc>,
     exec_time: Option<DateTime<Utc>>,
     write_time: DateTime<Utc>,
+    pub id: i64,
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,
     pub ty: ScriptType,
@@ -125,12 +126,14 @@ impl ScriptInfo<'_> {
         self.name.to_file_path(&self.ty)
     }
     pub fn new<'a>(
+        id: i64,
         name: ScriptName<'a>,
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
     ) -> ScriptInfo<'a> {
         let now = Utc::now();
         ScriptInfo {
+            id,
             name,
             ty,
             exec_count: 0,

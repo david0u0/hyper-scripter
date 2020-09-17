@@ -13,6 +13,7 @@ path = "tests/test.rs"
 default = []
 
 [dependencies]
+async-trait = "0.1.38"
 chrono = { version = "0.4.7", features = ["serde"] }
 sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "chrono", "migrate", "sqlite" ] }
 tokio = { version = "0.2.22", features = ["full"] }

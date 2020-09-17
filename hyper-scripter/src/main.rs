@@ -271,8 +271,13 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 let stat = util::run_cmd("vim", cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
             }
-            util::after_script(&path, created)?;
-            entry.update(|info| info.write()).await?;
+            let exist = util::after_script(&path, created)?;
+            if exist {
+                entry.update(|info| info.write()).await?;
+            } else {
+                let name = entry.name.clone();
+                repo.remove(&name).await?
+            }
         }
         Subs::Run { script_query, args } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;
@@ -335,7 +340,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                     log::debug!("刪除匿名腳本");
                     util::remove(&script)?;
                     let name = script.name.into_static();
-                    repo.remove(&name);
+                    repo.remove(&name).await?;
                 } else {
                     log::debug!("不要真的刪除有名字的腳本，改用標籤隱藏之");
                     let time_str = Utc::now().format("%Y%m%d%H%M%S");
@@ -432,6 +437,7 @@ async fn mv<'a, 'b>(
     ty: Option<&ScriptType>,
     tags: &Option<TagControlFlow>,
 ) -> Result {
+    // FIXME: 避免 rm 時做兩次模糊搜尋
     let mut entry = get_info_mut_strict(origin, script_repo)?;
     let og_script = path::open_script(&entry.name, &entry.ty, true)?;
     let new_script = path::open_script(

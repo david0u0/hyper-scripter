@@ -14,6 +14,7 @@ pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, SqlitePool>;
 #[async_trait]
 impl Environment for SqlitePool {
     async fn handle_change<'a>(&self, info: &ScriptInfo<'a>) -> Result {
+        log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
         let name = name_cow.as_ref();
         let tags = join_tags(&info.tags);
@@ -24,8 +25,8 @@ impl Environment for SqlitePool {
             name,
             tags,
             category,
+            write_time,
             info.id,
-            write_time
         )
         .execute(self)
         .await?;
@@ -141,9 +142,14 @@ impl<'a> ScriptRepo<'a> {
     pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {
         self.hidden_map.get_mut(&*name.key())
     }
-    pub fn remove(&mut self, name: &ScriptName) {
-        self.map.remove(&*name.key());
-        // TODO: db 操作
+    pub async fn remove<'c>(&mut self, name: &ScriptName<'c>) -> Result {
+        if let Some(info) = self.map.remove(&*name.key()) {
+            log::debug!("從資料庫刪除腳本 {:?}", info);
+            sqlx::query!("DELETE from script_infos where id = ?", info.id)
+                .execute(&self.pool)
+                .await?;
+        }
+        Ok(())
     }
     pub async fn upsert<'b, F: FnOnce() -> ScriptInfo<'a>>(
         &mut self,

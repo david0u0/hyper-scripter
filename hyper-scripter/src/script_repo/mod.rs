@@ -97,27 +97,39 @@ impl<'a> ScriptRepo<'a> {
             log::trace!("載入腳本：{}, {}, {}", name, script.category, script.tags);
             let script_name = name.as_script_name().unwrap().into_static(); // TODO: 正確實作 from string
 
-            let exec_time = match last_exec.first() {
-                Some((id, time)) => {
-                    if *id == script.id {
-                        last_exec = &last_exec[1..last_exec.len()];
-                        Some(*time)
-                    } else {
-                        None
+            let exec_time = loop {
+                match last_exec.first() {
+                    Some((id, time)) => {
+                        if *id == script.id {
+                            last_exec = &last_exec[1..last_exec.len()];
+                            break Some(*time);
+                        } else if *id < script.id {
+                            last_exec = &last_exec[1..last_exec.len()];
+                        } else {
+                            break None;
+                        }
+                    }
+                    None => {
+                        break None;
                     }
                 }
-                None => None,
             };
-            let read_time = match last_read.first() {
-                Some((id, time)) => {
-                    if *id == script.id {
-                        last_read = &last_read[1..last_read.len()];
-                        Some(*time)
-                    } else {
-                        None
+            let read_time = loop {
+                match last_read.first() {
+                    Some((id, time)) => {
+                        if *id == script.id {
+                            last_read = &last_read[1..last_read.len()];
+                            break Some(*time);
+                        } else if *id < script.id {
+                            last_read = &last_read[1..last_read.len()];
+                        } else {
+                            break None;
+                        }
+                    }
+                    None => {
+                        break None;
                     }
                 }
-                None => None,
             }; // TODO: 真的可以是空值嗎？
 
             let script = ScriptInfo::new(

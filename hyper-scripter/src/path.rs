@@ -1,13 +1,11 @@
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::history::History;
-use crate::script::{AsScriptName, ScriptInfo, ScriptMeta, ScriptName, ANONYMOUS};
+use crate::script::{AsScriptName, ScriptMeta, ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
-use crate::util::{handle_fs_res, read_file, write_file};
+use crate::util::handle_fs_res;
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const META: &'static str = ".hyper_scripter_info.json";
 const ROOT_PATH: &'static str = "hyper_scripter";
 
 lazy_static::lazy_static! {
@@ -115,38 +113,7 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
         Ok(script)
     }
 }
-pub fn get_history() -> Result<History<'static>> {
-    let path = join_path(get_path(), META)?;
-    let content = match read_file(&path) {
-        Ok(s) => s,
-        Err(Error::PathNotFound(_)) => {
-            log::info!("找不到歷史檔案，視為空歷史");
-            return Ok(Default::default());
-        }
-        Err(e) => return Err(e).context("打開歷史檔案失敗"),
-    };
-    let history: Vec<ScriptInfo> = serde_json::from_str(&content)?;
-    let history =
-        History::new(
-            history
-                .into_iter()
-                .filter(|s| match open_script(&s.name, &s.ty, true) {
-                    Err(e) => {
-                        log::warn!("{:?} 腳本歷史資料有誤：{:?}", s.name, e);
-                        false
-                    }
-                    _ => true,
-                }),
-        );
-    Ok(history)
-}
 
-pub fn store_history<'a>(history: impl Iterator<Item = ScriptInfo<'a>>) -> Result<()> {
-    let path = join_path(get_path(), META)?;
-    let v: Vec<_> = history.collect();
-    write_file(&path, &serde_json::to_string(&v)?).context("寫入歷史檔案失敗")?;
-    Ok(())
-}
 #[cfg(test)]
 mod test {
     use super::*;

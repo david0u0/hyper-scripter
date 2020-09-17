@@ -66,11 +66,21 @@ impl From<&str> for ScriptType {
         Self::from_str(s).unwrap()
     }
 }
+impl From<String> for ScriptType {
+    fn from(s: String) -> Self {
+        // TODO: 檢查
+        ScriptType(s)
+    }
+}
+impl AsRef<str> for ScriptType {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 impl FromStr for ScriptType {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: 檢查
-        Ok(ScriptType(s.to_owned()))
+        Ok(s.to_owned().into())
     }
 }
 impl std::fmt::Display for ScriptType {

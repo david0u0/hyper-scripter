@@ -1,3 +1,6 @@
+## 編譯 ##
+* 安裝 pkg config
+* 安裝 libssl-dev
 
 ## TODO ##
 - [x] 模糊搜尋功能

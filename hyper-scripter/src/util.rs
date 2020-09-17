@@ -185,19 +185,21 @@ fn write_prepare_script<W: Write>(
             e => panic!("解析模版錯誤：{}", e),
         })
 }
-pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<()> {
+pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<bool> {
     if let Some(created) = created {
         let meta = handle_fs_res(&[path], std::fs::metadata(path))?;
         let modified = handle_fs_res(&[path], meta.modified())?;
         let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
         if created.timestamp() >= modified as i64 {
             log::info!("腳本未變動，刪除之");
-            handle_fs_res(&[path], remove_file(path))
+            handle_fs_res(&[path], remove_file(path))?;
+            Ok(false)
         } else {
-            Ok(())
+            log::debug!("腳本更新時間比創建還新，不執行後處理");
+            Ok(true)
         }
     } else {
         log::debug!("既存腳本，不執行後處理");
-        Ok(())
+        Ok(true)
     }
 }

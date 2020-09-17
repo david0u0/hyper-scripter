@@ -1,5 +1,6 @@
-/target
+**/target
 **/.hyper_scripter_info.json
 .config.*
-config.rs
 .hyper_scripter
+*.db
+*.db-*

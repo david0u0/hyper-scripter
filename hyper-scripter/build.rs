@@ -10,5 +10,8 @@ async fn main() {
 
     std::fs::create_dir(dir).unwrap();
     migration::do_migrate(&file).await.unwrap();
-    println!("cargo:rustc-env=DATABASE_URL=sqlite:{}", file);
+    println!(
+        "cargo:rustc-env=DATABASE_URL=sqlite:hyper-scripter/{}",
+        file
+    );
 }

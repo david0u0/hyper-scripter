@@ -32,6 +32,18 @@ pub async fn record(event: Event, pool: &SqlitePool) -> Result<(), DBError> {
             .execute(pool)
             .await?;
         }
+        EventData::ExecDone(code) => {
+            let code = code.to_string();
+            sqlx::query!(
+                "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
+                event.script_id,
+                ty,
+                cmd,
+                code
+            )
+            .execute(pool)
+            .await?;
+        }
     }
     Ok(())
 }

@@ -94,8 +94,8 @@ impl<'a> ScriptRepo<'a> {
             use std::str::FromStr;
 
             let name = script.name;
-            log::trace!("載入腳本：{}, {}, {}", name, script.category, script.tags);
-            let script_name = name.as_script_name().unwrap().into_static(); // TODO: 正確實作 from string
+            log::trace!("載入腳本：{} {} {}", name, script.category, script.tags);
+            let script_name = name.as_script_name()?.into_static(); // TODO: 正確實作 from string
 
             let exec_time = loop {
                 match last_exec.first() {
@@ -114,7 +114,7 @@ impl<'a> ScriptRepo<'a> {
                     }
                 }
             };
-            let read_time = loop {
+            let mut read_time = loop {
                 match last_read.first() {
                     Some((id, time)) => {
                         if *id == script.id {
@@ -130,7 +130,14 @@ impl<'a> ScriptRepo<'a> {
                         break None;
                     }
                 }
-            }; // TODO: 真的可以是空值嗎？
+            };
+            if read_time.is_none() {
+                log::warn!(
+                    "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
+                    script_name
+                );
+                read_time = script.created_time;
+            }
 
             let script = ScriptInfo::new(
                 script.id,

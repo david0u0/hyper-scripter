@@ -1,6 +1,7 @@
 use chrono::Utc;
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
+use hyper_scripter::historian::{self, Event, EventData};
 use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern};
 use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
@@ -230,7 +231,9 @@ fn get_info_mut_strict<'b, 'a>(
 }
 async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     let pool = hyper_scripter::db::get_pool().await?;
-    let mut repo = ScriptRepo::new(pool).await.context("讀取歷史記錄失敗")?;
+    let mut repo = ScriptRepo::new(pool.clone())
+        .await
+        .context("讀取歷史記錄失敗")?;
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all() {
@@ -283,13 +286,26 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Run { script_query, args } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;
             log::info!("執行 {:?}", entry.name);
-            let script = path::open_script(&entry.name, &entry.ty, true)?;
-            match util::run(&script, &*entry, &args) {
-                Err(e @ Error::ScriptError(..)) => res.push(e),
-                Err(e) => return Err(e),
-                Ok(_) => (),
-            }
             entry.update(|info| info.exec()).await?;
+            let script = path::open_script(&entry.name, &entry.ty, true)?;
+            let ret_code: i32;
+            let run_res = util::run(&script, &*entry, &args);
+            match run_res {
+                Err(Error::ScriptError(code)) => {
+                    ret_code = code;
+                    res.push(run_res.unwrap_err());
+                }
+                Err(e) => return Err(e),
+                Ok(_) => ret_code = 0,
+            }
+            historian::record(
+                Event {
+                    data: EventData::ExecDone(ret_code),
+                    script_id: entry.id,
+                },
+                &pool,
+            )
+            .await?;
         }
         Subs::Which { script_query } => {
             let entry = get_info_mut_strict(script_query, &mut repo)?;

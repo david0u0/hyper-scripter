@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS script_infos (
     name text NOT NULL UNIQUE,
     category varchar(10) NOT NULL,
     tags text NOT NULL,
-    write_time timestamp NOT NULL DEFAULT (datetime ('now', 'localtime')),
-    created_time timestamp NOT NULL DEFAULT (datetime ('now', 'localtime'))
+    write_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

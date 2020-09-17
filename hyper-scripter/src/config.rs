@@ -6,7 +6,7 @@ use crate::util;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -42,10 +42,11 @@ pub struct RawConfig {
     pub main_tag_filter: TagFilter,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deref)]
 pub struct Config {
     changed: bool,
     open_time: DateTime<Utc>,
+    #[deref]
     raw_config: RawConfig,
 }
 impl Default for RawConfig {
@@ -83,12 +84,6 @@ impl RawConfig {
         }
     }
 }
-impl Deref for Config {
-    type Target = RawConfig;
-    fn deref(&self) -> &Self::Target {
-        &self.raw_config
-    }
-}
 impl DerefMut for Config {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.changed = true;
@@ -117,7 +112,7 @@ impl Config {
             }
             Err(err) => return Err(err),
         }
-        util::write_file(&path, &toml::to_string_pretty(self.deref())?)
+        util::write_file(&path, &toml::to_string_pretty(&**self)?)
     }
     pub fn get() -> Result<&'static Config> {
         match &*CONFIG {

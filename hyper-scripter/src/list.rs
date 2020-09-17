@@ -8,7 +8,6 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::ops::Deref;
 
 #[derive(PartialEq, Eq)]
 struct TagsKey(Vec<Tag>);
@@ -123,10 +122,7 @@ pub fn fmt_meta<W: Write>(
             write!(
                 w,
                 "{}\t{}\t{}\t{}\n",
-                label,
-                script.created_time.deref(),
-                script.read_time.deref(),
-                exex_time
+                label, *script.created_time, *script.read_time, exex_time
             )?;
         }
         DisplayStyle::Short(ident) => {

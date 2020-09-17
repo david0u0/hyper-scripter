@@ -1,10 +1,10 @@
 use crate::error::Result;
+use crate::historian::{self, Event, EventData, EventType};
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use async_trait::async_trait;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
-use std::ops::Deref;
 
 pub mod helper;
 use helper::*;
@@ -19,7 +19,7 @@ impl Environment for SqlitePool {
         let name = name_cow.as_ref();
         let tags = join_tags(&info.tags);
         let category = info.ty.as_ref();
-        let write_time = *info.write_time.deref();
+        let write_time = *info.write_time;
         sqlx::query!(
             "UPDATE script_infos SET name = ?, tags = ?, category = ?, write_time = ? where id = ?",
             name,
@@ -32,10 +32,26 @@ impl Environment for SqlitePool {
         .await?;
 
         if info.read_time.has_changed() {
-            println!("TODO: 讀取事件");
+            log::debug!("{:?} 的讀取事件", info.name);
+            historian::record(
+                Event {
+                    script_id: info.id,
+                    data: EventData::Read,
+                },
+                &self,
+            )
+            .await?;
         }
         if info.exec_time.map_or(false, |t| t.has_changed()) {
-            println!("TODO: 執行事件");
+            log::debug!("{:?} 的執行事件", info.name);
+            historian::record(
+                Event {
+                    script_id: info.id,
+                    data: EventData::Exec("aa".to_owned()), // FIXME: !!
+                },
+                &self,
+            )
+            .await?;
         }
 
         Ok(())
@@ -65,33 +81,57 @@ impl<'a> ScriptRepo<'a> {
             env: &self.pool,
         }
     }
-    pub async fn new<'b>() -> Result<ScriptRepo<'b>> {
-        let pool = crate::db::get_pool().await?;
-        let scripts = sqlx::query!("SELECT * from script_infos")
+    pub async fn new<'b>(pool: SqlitePool) -> Result<ScriptRepo<'b>> {
+        let scripts = sqlx::query!("SELECT * from script_infos ORDER BY id")
             .fetch_all(&pool)
             .await?;
-        let map: HashMap<String, ScriptInfo> = scripts
-            .into_iter()
-            .map(|script| {
-                use std::str::FromStr;
-                let name = script.name;
-                log::trace!("載入腳本：{}, {}, {}", name, script.category, script.tags);
-                let script_name = name.as_script_name().unwrap().into_static(); // TODO: 正確實作 from string
-                (
-                    name,
-                    ScriptInfo::new(
-                        script.id,
-                        script_name,
-                        script.category.into(),
-                        script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
-                        None, // TODO: 好好把時間補上
-                        Some(script.created_time),
-                        Some(script.write_time),
-                        None,
-                    ),
-                )
-            })
-            .collect();
+        let last_read_records = historian::last_time_of(EventType::Read, &pool).await?;
+        let last_exec_records = historian::last_time_of(EventType::Exec, &pool).await?;
+        let mut last_read: &[_] = &last_read_records;
+        let mut last_exec: &[_] = &last_exec_records;
+        let mut map: HashMap<String, ScriptInfo> = Default::default();
+        for script in scripts.into_iter() {
+            use std::str::FromStr;
+
+            let name = script.name;
+            log::trace!("載入腳本：{}, {}, {}", name, script.category, script.tags);
+            let script_name = name.as_script_name().unwrap().into_static(); // TODO: 正確實作 from string
+
+            let exec_time = match last_exec.first() {
+                Some((id, time)) => {
+                    if *id == script.id {
+                        last_exec = &last_exec[1..last_exec.len()];
+                        Some(*time)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            };
+            let read_time = match last_read.first() {
+                Some((id, time)) => {
+                    if *id == script.id {
+                        last_read = &last_read[1..last_read.len()];
+                        Some(*time)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            }; // TODO: 真的可以是空值嗎？
+
+            let script = ScriptInfo::new(
+                script.id,
+                script_name,
+                script.category.into(),
+                script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
+                exec_time,
+                Some(script.created_time),
+                Some(script.write_time),
+                read_time,
+            );
+            map.insert(name, script);
+        }
         Ok(ScriptRepo {
             map,
             pool,

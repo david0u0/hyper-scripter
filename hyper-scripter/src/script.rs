@@ -8,7 +8,6 @@ use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ops::Deref;
 use std::path::PathBuf;
 
 pub const ANONYMOUS: &'static str = ".anonymous";
@@ -121,7 +120,7 @@ impl ScriptInfo<'_> {
             Some(exec_time) => std::cmp::max(self.read_time, exec_time),
             _ => self.read_time,
         };
-        *time.deref()
+        *time
     }
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)

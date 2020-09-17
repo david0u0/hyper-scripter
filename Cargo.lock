@@ -319,6 +319,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "0.99.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dcfabdab475c16a93d669dddfc393027803e347d09663f524447f642fbb84ba"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -639,6 +650,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "colored",
+ "derive_more",
  "dirs 3.0.1",
  "env_logger",
  "fuzzy-matcher",

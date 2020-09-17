@@ -1,10 +1,10 @@
 use chrono::{NaiveDateTime, Utc};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone, Copy, Ord, Eq)]
+#[derive(Debug, Clone, Copy, Ord, Eq, Deref)]
 pub struct ScriptTime {
     changed: bool,
+    #[deref]
     time: NaiveDateTime,
 }
 impl PartialEq for ScriptTime {
@@ -18,24 +18,10 @@ impl PartialOrd for ScriptTime {
     }
 }
 
-impl Deref for ScriptTime {
-    type Target = NaiveDateTime;
-    fn deref(&self) -> &Self::Target {
-        &self.time
-    }
-}
-
-impl DerefMut for ScriptTime {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.changed = true;
-        &mut self.time
-    }
-}
-
 impl ScriptTime {
     pub fn now() -> Self {
         ScriptTime {
-            time: Utc::now().naive_local(),
+            time: Utc::now().naive_utc(),
             changed: true,
         }
     }

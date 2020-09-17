@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate derive_more;
 
 pub mod config;
 pub mod db;
 pub mod error;
 mod error_display;
 pub mod fuzzy;
+pub mod historian;
 pub mod list;
 pub mod migration;
 pub mod path;

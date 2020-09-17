@@ -229,7 +229,8 @@ fn get_info_mut_strict<'b, 'a>(
     }
 }
 async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
-    let mut repo = ScriptRepo::new().await.context("讀取歷史記錄失敗")?;
+    let pool = hyper_scripter::db::get_pool().await?;
+    let mut repo = ScriptRepo::new(pool).await.context("讀取歷史記錄失敗")?;
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all() {

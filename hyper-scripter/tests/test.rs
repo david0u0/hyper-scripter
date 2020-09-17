@@ -1,6 +1,6 @@
-use hyper_scripter::path;
 use regex::Regex;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
 
@@ -8,11 +8,12 @@ lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
 }
 
+const PATH: &str = "./.hyper_scripter";
+
 fn setup<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap();
     let _ = env_logger::try_init();
-    path::set_path_from_sys().unwrap();
-    match std::fs::remove_dir_all(path::get_path()) {
+    match std::fs::remove_dir_all(PATH) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -24,17 +25,25 @@ fn setup<'a>() -> MutexGuard<'a, ()> {
     guard
 }
 fn check_exist(p: &[&str]) -> bool {
-    let mut file = path::get_path();
+    let mut file: PathBuf = PATH.into();
     for p in p.iter() {
         file = file.join(p);
     }
     file.exists()
 }
 fn run(args: &[&str]) -> Result<String, i32> {
-    let mut full_args = vec!["-p", "./.hyper_scripter"];
+    let mut full_args = vec!["-p", PATH];
     full_args.extend(args);
 
-    let mut cmd = Command::new("../target/debug/hyper_scripter");
+    let mut cmd: Command;
+    #[cfg(not(debug_assertions))]
+    {
+        cmd = Command::new("../target/release/hyper_scripter");
+    }
+    #[cfg(debug_assertions)]
+    {
+        cmd = Command::new("../target/debug/hyper_scripter");
+    }
     let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
     let stdout = child.stdout.as_mut().unwrap();
     let mut out_str = vec![];

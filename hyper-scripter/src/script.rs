@@ -131,7 +131,7 @@ impl ScriptInfo<'_> {
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
         exec_time: Option<NaiveDateTime>,
-        create_time: Option<NaiveDateTime>,
+        created_time: Option<NaiveDateTime>,
         write_time: Option<NaiveDateTime>,
         read_time: Option<NaiveDateTime>,
     ) -> ScriptInfo<'a> {
@@ -141,7 +141,7 @@ impl ScriptInfo<'_> {
             name,
             ty,
             tags: tags.collect(),
-            created_time: ScriptTime::new_or(create_time, now),
+            created_time: ScriptTime::new_or(created_time, now),
             write_time: ScriptTime::new_or(write_time, now),
             read_time: ScriptTime::new_or(read_time, now),
             exec_time: exec_time.map(|t| ScriptTime::new(t)),

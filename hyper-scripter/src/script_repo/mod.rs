@@ -47,7 +47,7 @@ impl Environment for SqlitePool {
             historian::record(
                 Event {
                     script_id: info.id,
-                    data: EventData::Exec("aa".to_owned()), // FIXME: !!
+                    data: EventData::Exec("content".to_owned()), // FIXME: !!
                 },
                 &self,
             )
@@ -126,8 +126,8 @@ impl<'a> ScriptRepo<'a> {
                 script.category.into(),
                 script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
                 exec_time,
-                Some(script.created_time),
-                Some(script.write_time),
+                script.created_time,
+                script.write_time,
                 read_time,
             );
             map.insert(name, script);

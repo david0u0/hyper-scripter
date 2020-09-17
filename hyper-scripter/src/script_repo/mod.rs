@@ -4,6 +4,7 @@ use crate::tag::{Tag, TagFilterGroup};
 use async_trait::async_trait;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 pub mod helper;
 use helper::*;
@@ -17,15 +18,25 @@ impl Environment for SqlitePool {
         let name = name_cow.as_ref();
         let tags = join_tags(&info.tags);
         let category = info.ty.as_ref();
+        let write_time = *info.write_time.deref();
         sqlx::query!(
-            "UPDATE script_infos SET name = ?, tags = ?, category = ? where id = ?",
+            "UPDATE script_infos SET name = ?, tags = ?, category = ?, write_time = ? where id = ?",
             name,
             tags,
             category,
-            info.id
+            info.id,
+            write_time
         )
         .execute(self)
         .await?;
+
+        if info.read_time.has_changed() {
+            println!("TODO: 讀取事件");
+        }
+        if info.exec_time.map_or(false, |t| t.has_changed()) {
+            println!("TODO: 執行事件");
+        }
+
         Ok(())
     }
 }
@@ -71,7 +82,11 @@ impl<'a> ScriptRepo<'a> {
                         script.id,
                         script_name,
                         script.category.into(),
-                        script.tags.split(",").map(|s| Tag::from_str(s).unwrap()),
+                        script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
+                        None, // TODO: 好好把時間補上
+                        Some(script.created_time),
+                        Some(script.write_time),
+                        None,
                     ),
                 )
             })
@@ -130,9 +145,6 @@ impl<'a> ScriptRepo<'a> {
         self.map.remove(&*name.key());
         // TODO: db 操作
     }
-    pub fn insert(&mut self, info: ScriptInfo<'a>) {
-        self.map.insert(info.name.key().into_owned(), info);
-    }
     pub async fn upsert<'b, F: FnOnce() -> ScriptInfo<'a>>(
         &mut self,
         name: &ScriptName<'b>,
@@ -149,6 +161,7 @@ impl<'a> ScriptRepo<'a> {
             .entry(name.key().into_owned())
             .or_insert_with(default);
         if !exist {
+            log::debug!("往資料庫塞新腳本 {:?}", info);
             let name_cow = info.name.key();
             let name = name_cow.as_ref();
             let category = info.ty.as_ref();
@@ -162,12 +175,14 @@ impl<'a> ScriptRepo<'a> {
                 category,
                 tags,
             )
-            .fetch_one(&self.pool)
+            .execute(&self.pool)
             .await?;
+            log::debug!("往資料庫新增腳本成功");
             let id = sqlx::query!("SELECT last_insert_rowid() as id")
                 .fetch_one(&self.pool)
                 .await?
                 .id;
+            log::debug!("得到新腳本 id {}", id);
             info.id = id as i64;
         }
         Ok(RepoEntry {

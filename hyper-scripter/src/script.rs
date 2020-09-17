@@ -1,12 +1,14 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode, Result};
 use crate::fuzzy::FuzzKey;
+use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
-use chrono::{DateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 pub const ANONYMOUS: &'static str = ".anonymous";
@@ -87,11 +89,10 @@ impl FuzzKey for ScriptName<'_> {
 
 #[derive(Debug, Clone)]
 pub struct ScriptInfo<'a> {
-    exec_count: usize,
-    read_time: DateTime<Utc>,
-    created_time: DateTime<Utc>,
-    exec_time: Option<DateTime<Utc>>,
-    write_time: DateTime<Utc>,
+    pub read_time: ScriptTime,
+    pub created_time: ScriptTime,
+    pub write_time: ScriptTime,
+    pub exec_time: Option<ScriptTime>,
     pub id: i64,
     pub name: ScriptName<'a>,
     pub tags: Vec<Tag>,
@@ -105,22 +106,22 @@ impl FuzzKey for ScriptInfo<'_> {
 
 impl ScriptInfo<'_> {
     pub fn cp(&self, new_name: ScriptName) -> Self {
-        let now = Utc::now();
+        let now = ScriptTime::now();
         ScriptInfo {
             name: new_name.into_static(),
             read_time: now,
             write_time: now,
             created_time: now,
             exec_time: None,
-            exec_count: 0,
             ..self.clone()
         }
     }
-    pub fn last_time(&self) -> DateTime<Utc> {
-        match self.exec_time {
+    pub fn last_time(&self) -> NaiveDateTime {
+        let time = match self.exec_time {
             Some(exec_time) => std::cmp::max(self.read_time, exec_time),
             _ => self.read_time,
-        }
+        };
+        *time.deref()
     }
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)
@@ -130,37 +131,35 @@ impl ScriptInfo<'_> {
         name: ScriptName<'a>,
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
+        exec_time: Option<NaiveDateTime>,
+        create_time: Option<NaiveDateTime>,
+        write_time: Option<NaiveDateTime>,
+        read_time: Option<NaiveDateTime>,
     ) -> ScriptInfo<'a> {
-        let now = Utc::now();
+        let now = Utc::now().naive_local();
         ScriptInfo {
             id,
             name,
             ty,
-            exec_count: 0,
             tags: tags.collect(),
-            read_time: now,
-            write_time: now,
-            created_time: now,
-            exec_time: None,
+            created_time: ScriptTime::new_or(create_time, now),
+            write_time: ScriptTime::new_or(write_time, now),
+            read_time: ScriptTime::new_or(read_time, now),
+            exec_time: exec_time.map(|t| ScriptTime::new(t)),
         }
     }
     pub fn read(&mut self) {
-        self.read_time = Utc::now();
+        self.read_time = ScriptTime::now();
     }
     pub fn write(&mut self) {
-        self.read_time = Utc::now();
-        self.write_time = Utc::now();
+        let now = ScriptTime::now();
+        self.read_time = now;
+        self.write_time = now;
     }
     pub fn exec(&mut self) {
-        self.exec_time = Some(Utc::now());
-        self.read_time = Utc::now();
-        self.exec_count += 1;
-    }
-    pub fn get_read_time(&self) -> DateTime<Utc> {
-        self.read_time
-    }
-    pub fn get_exec_time(&self) -> Option<DateTime<Utc>> {
-        self.exec_time
+        let now = ScriptTime::now();
+        self.exec_time = Some(now);
+        self.read_time = now;
     }
 }
 

@@ -362,8 +362,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 return Err(Error::ScriptExist(new.clone()));
             }
             util::cp(&og_script, &new_script)?;
-            let new_info = h.cp(new_name);
-            repo.insert(new_info);
+            let new_info = h.cp(new_name.clone());
+            repo.upsert(&new_name, || new_info).await?;
         }
         Subs::MV {
             origin,
@@ -502,7 +502,16 @@ async fn edit_or_create<'a, 'b>(
     let name = script.name.into_static();
     let entry = script_repo
         .upsert(&name, || {
-            ScriptInfo::new(0, name.clone(), final_ty, tags.into_allowed_iter())
+            ScriptInfo::new(
+                0,
+                name.clone(),
+                final_ty,
+                tags.into_allowed_iter(),
+                None,
+                None,
+                None,
+                None,
+            )
         })
         .await?;
     Ok((path, entry))

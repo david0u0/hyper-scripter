@@ -8,6 +8,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+use std::ops::Deref;
 
 #[derive(PartialEq, Eq)]
 struct TagsKey(Vec<Tag>);
@@ -110,7 +111,7 @@ pub fn fmt_meta<W: Write>(
                 write!(w, "  ")?;
             }
 
-            let exex_time = match &script.get_exec_time() {
+            let exex_time = match &script.exec_time {
                 Some(t) => t.to_string(),
                 None => "Never".to_owned(),
             };
@@ -119,7 +120,14 @@ pub fn fmt_meta<W: Write>(
             if !opt.plain {
                 label = label.color(color).bold();
             }
-            write!(w, "{}\t{}\t{}\n", label, script.get_read_time(), exex_time)?;
+            write!(
+                w,
+                "{}\t{}\t{}\t{}\n",
+                label,
+                script.created_time.deref(),
+                script.read_time.deref(),
+                exex_time
+            )?;
         }
         DisplayStyle::Short(ident) => {
             if is_last && !opt.plain {
@@ -154,7 +162,10 @@ pub fn fmt_list<'a, W: Write>(
     };
 
     if opt.display_style == DisplayStyle::Long {
-        writeln!(w, "type\tname\tlast read time\tlast execute time")?;
+        writeln!(
+            w,
+            "type\tname\tcreate time\tlast read time\tlast execute time"
+        )?;
     }
     let script_iter = script_repo.iter().filter(|s| opt.filter(&s));
 

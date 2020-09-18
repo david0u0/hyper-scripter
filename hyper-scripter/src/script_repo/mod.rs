@@ -136,7 +136,7 @@ impl<'a> ScriptRepo<'a> {
                     "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
                     script_name
                 );
-                read_time = script.created_time;
+                read_time = Some(script.created_time);
             }
 
             let script = ScriptInfo::new(
@@ -145,8 +145,8 @@ impl<'a> ScriptRepo<'a> {
                 script.category.into(),
                 script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
                 exec_time,
-                script.created_time,
-                script.write_time,
+                Some(script.created_time),
+                Some(script.write_time),
                 read_time,
             );
             map.insert(name, script);

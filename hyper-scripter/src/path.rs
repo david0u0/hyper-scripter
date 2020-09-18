@@ -118,7 +118,7 @@ pub fn open_script<'a, T: ?Sized + AsScriptName>(
 mod test {
     use super::*;
     fn setup() {
-        set_path_from_sys().unwrap();
+        set_path(".test_hyper_scripter").unwrap();
     }
     #[test]
     fn test_anonymous_ids() {

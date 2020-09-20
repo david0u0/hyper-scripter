@@ -130,35 +130,29 @@ mod test {
     #[test]
     fn test_open_anonymous() {
         setup();
-        let s = open_new_anonymous(&"sh".into()).unwrap();
-        assert_eq!(s.name, ScriptName::Anonymous(6));
+        let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
+        assert_eq!(name, ScriptName::Anonymous(6));
         assert_eq!(
-            s.path,
+            p,
             join_path("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
         );
-        let s = open_anonymous(5, &"js".into()).unwrap();
-        assert_eq!(s.name, ScriptName::Anonymous(5));
+        let p = open_anonymous(5, &"js".into()).unwrap();
         assert_eq!(
-            s.path,
+            p,
             join_path("./.test_hyper_scripter/.anonymous", "5.js").unwrap()
         );
     }
     #[test]
     fn test_open() {
         setup();
-        let s = open_script("first", &"md".into(), true).unwrap();
-        assert_eq!(s.name, "first".as_script_name().unwrap());
-
         let second = "second".to_owned();
         let second_name = second.as_script_name().unwrap();
-        let s = open_script(&second_name, &"rb".into(), false).unwrap();
-        assert_eq!(s.name, second_name);
-        assert_eq!(s.path, get_path().join("second.rb"));
+        let p = open_script(&second_name, &"rb".into(), false).unwrap();
+        assert_eq!(p, get_path().join("second.rb"));
 
-        let s = open_script(".1", &"sh".into(), true).unwrap();
-        assert_eq!(s.name, ScriptName::Anonymous(1));
+        let p = open_script(".1", &"sh".into(), true).unwrap();
         assert_eq!(
-            s.path,
+            p,
             join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 

@@ -3,15 +3,13 @@ mod migration;
 
 #[tokio::main]
 async fn main() {
-    let dir = "db_example";
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let dir = format!("{}/db_example", manifest);
     let file = format!("{}/.script_info.db", dir);
 
-    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(&dir);
 
     std::fs::create_dir(dir).unwrap();
     migration::do_migrate(&file).await.unwrap();
-    println!(
-        "cargo:rustc-env=DATABASE_URL=sqlite:hyper-scripter/{}",
-        file
-    );
+    println!("cargo:rustc-env=DATABASE_URL=sqlite:{}", file);
 }

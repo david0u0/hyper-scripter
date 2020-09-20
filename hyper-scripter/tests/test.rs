@@ -245,7 +245,10 @@ fn test_rm() {
     run(&["e", ".", "-f", "echo \"你匿\""]).unwrap();
     assert_eq!("你匿", run(&["-"]).unwrap());
     run(&["rm", "-"]).unwrap();
-    run(&["-t", "deleted", ".1"]).expect_err("被刪掉的匿名腳本還能找得回來");
+    assert_eq!(
+        "你匿",
+        run(&["-t", "deleted", "-"]).expect("就算是匿名腳本也不該真的被刪掉！")
+    );
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 

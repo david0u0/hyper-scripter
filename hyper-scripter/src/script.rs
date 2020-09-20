@@ -188,7 +188,8 @@ impl AsScriptName for str {
             }
         } else {
             if self.starts_with("-")
-                || self.find(".").is_some()
+                || self.starts_with(".")
+                || self.find("..").is_some()
                 || self.find(" ").is_some()
                 || self.len() == 0
             {

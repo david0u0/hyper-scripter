@@ -356,28 +356,20 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             for query in script_queries.into_iter() {
                 let entry = get_info_mut_strict(query, &mut repo)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
-                let script_path = path::open_script(&entry.name, &entry.ty, true)?;
                 log::info!("刪除 {:?}", *entry);
-                if entry.name.is_anonymous() {
-                    log::debug!("刪除匿名腳本");
-                    util::remove(&script_path)?;
-                    let name = entry.name.clone().into_static();
-                    repo.remove(&name).await?;
-                } else {
-                    log::debug!("不要真的刪除有名字的腳本，改用標籤隱藏之");
-                    let time_str = Utc::now().format("%Y%m%d%H%M%S");
-                    let new_name = util::change_name_only(&entry.name.to_string(), |name| {
-                        format!("{}-{}", time_str, name)
-                    });
-                    mv(
-                        query,
-                        Some(new_name.as_script_name()?.into_static()), // TODO: 正確地實作 scriptname from string
-                        &mut repo,
-                        None,
-                        &delete_tag,
-                    )
-                    .await?;
-                }
+                log::debug!("不要真的刪除腳本，改用標籤隱藏之");
+                let time_str = Utc::now().format("%Y%m%d%H%M%S");
+                let new_name = util::change_name_only(&entry.name.to_string(), |name| {
+                    format!("{}-{}", time_str, name)
+                });
+                mv(
+                    query,
+                    Some(new_name.as_script_name()?.into_static()), // TODO: 正確地實作 scriptname from string
+                    &mut repo,
+                    None,
+                    &delete_tag,
+                )
+                .await?;
             }
         }
         Subs::CP { origin, new } => {

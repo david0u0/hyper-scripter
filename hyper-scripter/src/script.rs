@@ -18,6 +18,16 @@ pub enum ScriptName<'a> {
     Named(Cow<'a, str>),
 }
 impl ScriptName<'_> {
+    pub fn namespaces(&self) -> Vec<&'_ str> {
+        match self {
+            ScriptName::Anonymous(_) => vec![],
+            ScriptName::Named(s) => {
+                let mut v: Vec<_> = s.split("/").collect();
+                v.pop();
+                v
+            }
+        }
+    }
     pub fn is_anonymous(&self) -> bool {
         match self {
             ScriptName::Anonymous(_) => true,

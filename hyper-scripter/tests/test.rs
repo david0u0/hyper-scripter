@@ -76,7 +76,7 @@ fn test_tags() {
         "-t",
         "super_tag,hide",
         "e",
-        "test_js",
+        "test/js",
         "-c",
         "js",
         "-f",
@@ -91,6 +91,8 @@ fn test_tags() {
     run(&["tesjs"]).expect_err("標籤沒有篩選掉不該出現的腳本！可能是上上個操作把設定檔寫爛了");
     run(&["tags", "all"]).unwrap();
     run(&["tesjs"]).expect("沒吃到設定檔的標籤？");
+    run(&["tags", "test"]).unwrap();
+    run(&["tesjs"]).expect("命名空間沒賦與它標籤？");
 }
 
 #[test]

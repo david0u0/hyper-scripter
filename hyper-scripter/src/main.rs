@@ -7,7 +7,7 @@ use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
-use hyper_scripter::tag::{TagControlFlow, TagFilter, TagFilterGroup};
+use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{fuzzy, path, util};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -491,6 +491,7 @@ async fn edit_or_create<'a, 'b>(
     tags: TagControlFlow,
 ) -> Result<(PathBuf, ScriptRepoEntry<'a, 'b>)> {
     let final_ty: ScriptType;
+    let mut new_namespaces: Vec<Tag> = vec![];
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         if let Some(entry) = get_info_mut(query, script_repo)? {
             if let Some(ty) = ty {
@@ -516,8 +517,15 @@ async fn edit_or_create<'a, 'b>(
                 log::error!("與被篩掉的腳本撞名");
                 return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
             }
+
             log::debug!("打開新命名腳本：{:?}", query);
             let name = query.as_script_name()?;
+            new_namespaces = name
+                .namespaces()
+                .iter()
+                .map(|s| Tag::from_str(s))
+                .collect::<Result<Vec<_>>>()?;
+
             let p = path::open_script(&name, &final_ty, false)
                 .context(format!("打開新命名腳本失敗：{:?}", query))?;
             (name, p)
@@ -535,7 +543,7 @@ async fn edit_or_create<'a, 'b>(
                 0,
                 script_name.clone().into_static(),
                 final_ty,
-                tags.into_allowed_iter(),
+                tags.into_allowed_iter().chain(new_namespaces.into_iter()),
                 None,
                 None,
                 None,

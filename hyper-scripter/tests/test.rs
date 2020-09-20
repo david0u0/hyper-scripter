@@ -38,11 +38,11 @@ fn run(args: &[&str]) -> Result<String, i32> {
     let mut cmd: Command;
     #[cfg(not(debug_assertions))]
     {
-        cmd = Command::new("../target/release/hyper_scripter");
+        cmd = Command::new("../target/release/hyper-scripter");
     }
     #[cfg(debug_assertions)]
     {
-        cmd = Command::new("../target/debug/hyper_scripter");
+        cmd = Command::new("../target/debug/hyper-scripter");
     }
     let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
     let stdout = child.stdout.as_mut().unwrap();

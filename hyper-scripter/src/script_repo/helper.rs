@@ -3,7 +3,6 @@ use crate::fuzzy::FuzzKey;
 use crate::script::ScriptInfo;
 use async_trait::async_trait;
 use std::collections::hash_map::IterMut as HashMapIter;
-use std::ops::Deref;
 
 #[async_trait]
 pub trait Environment {
@@ -14,17 +13,13 @@ pub struct Iter<'a, 'b, ENV: Environment> {
     pub(super) iter: HashMapIter<'b, String, ScriptInfo<'a>>,
     pub(super) env: &'b ENV,
 }
+#[derive(Deref)]
 pub struct RepoEntry<'a, 'b, ENV: Environment> {
-    pub info: &'b mut ScriptInfo<'a>,
+    #[deref]
+    pub(super) info: &'b mut ScriptInfo<'a>,
     pub(super) env: &'b ENV,
 }
 
-impl<'a, 'b, ENV: Environment> Deref for RepoEntry<'a, 'b, ENV> {
-    type Target = ScriptInfo<'a>;
-    fn deref(&self) -> &Self::Target {
-        self.info
-    }
-}
 impl<'a, 'b, ENV: Environment> RepoEntry<'a, 'b, ENV> {
     pub async fn update<F: FnOnce(&mut ScriptInfo<'a>)>(&mut self, handler: F) -> Result {
         handler(self.info);

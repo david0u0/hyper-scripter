@@ -6,13 +6,13 @@ pub enum EventType {
 }
 
 #[derive(Debug)]
-pub enum EventData {
-    Exec(String),
+pub enum EventData<'a> {
+    Exec(&'a str),
     ExecDone(i32),
     Read,
 }
 
-impl EventData {
+impl EventData<'_> {
     pub fn get_type(&self) -> EventType {
         match self {
             EventData::Exec(_) => EventType::Exec,
@@ -23,7 +23,7 @@ impl EventData {
 }
 
 #[derive(Debug)]
-pub struct Event {
-    pub data: EventData,
+pub struct Event<'a> {
+    pub data: EventData<'a>,
     pub script_id: i64,
 }

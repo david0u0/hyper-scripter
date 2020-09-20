@@ -42,12 +42,12 @@ impl Environment for SqlitePool {
             )
             .await?;
         }
-        if info.exec_time.map_or(false, |t| t.has_changed()) {
+        if let Some(content) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
             log::debug!("{:?} 的執行事件", info.name);
             historian::record(
                 Event {
                     script_id: info.id,
-                    data: EventData::Exec("content".to_owned()), // FIXME: !!
+                    data: EventData::Exec(content),
                 },
                 &self,
             )

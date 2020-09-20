@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result, SysPath};
 use crate::path::get_path;
-use crate::script::{ScriptInfo, ScriptMeta};
+use crate::script::ScriptInfo;
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
@@ -10,19 +10,24 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
-pub fn run(script: &ScriptMeta, info: &ScriptInfo, remaining: &[String]) -> Result<()> {
+pub fn run(
+    script_path: &PathBuf,
+    info: &ScriptInfo,
+    remaining: &[String],
+    content: &str,
+) -> Result<()> {
     let ty = &info.ty;
     let script_conf = Config::get()?.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
     } else {
-        return Err(Error::PermissionDenied(vec![script.path.clone()]));
+        return Err(Error::PermissionDenied(vec![script_path.clone()]));
     };
 
     let info: serde_json::Value;
     info = json!({
-        "path": script.path,
-        "content": read_file(&script.path)?,
+        "path": script_path,
+        "content": content,
     });
 
     let args = script_conf.args(&info)?;
@@ -82,8 +87,8 @@ pub fn write_file(path: &PathBuf, content: &str) -> Result<()> {
     let mut file = handle_fs_res(&[path], File::create(path))?;
     handle_fs_res(&[path], file.write_all(content.as_bytes()))
 }
-pub fn remove(script: &ScriptMeta) -> Result<()> {
-    handle_fs_res(&[&script.path], remove_file(&script.path))
+pub fn remove(script_path: &PathBuf) -> Result<()> {
+    handle_fs_res(&[&script_path], remove_file(&script_path))
 }
 pub fn change_name_only<F: Fn(&str) -> String>(full_name: &str, transform: F) -> String {
     let mut arr: Vec<_> = full_name.split("/").collect();
@@ -98,19 +103,16 @@ pub fn change_name_only<F: Fn(&str) -> String>(full_name: &str, transform: F) ->
         arr.join("/")
     }
 }
-pub fn mv(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
-    log::info!("修改 {:?} 為 {:?}", origin.path, new.path);
+pub fn mv(origin: &PathBuf, new: &PathBuf) -> Result<()> {
+    log::info!("修改 {:?} 為 {:?}", origin, new);
     // NOTE: 創建資料夾和檔案
-    if let Some(parent) = new.path.parent() {
-        handle_fs_res(&[&new.path], create_dir_all(parent))?;
+    if let Some(parent) = new.parent() {
+        handle_fs_res(&[&new], create_dir_all(parent))?;
     }
-    handle_fs_res(&[&new.path, &origin.path], rename(&origin.path, &new.path))
+    handle_fs_res(&[&new, &origin], rename(&origin, &new))
 }
-pub fn cp(origin: &ScriptMeta, new: &ScriptMeta) -> Result<()> {
-    let _copied = handle_fs_res(
-        &[&origin.path, &new.path],
-        std::fs::copy(&origin.path, &new.path),
-    )?;
+pub fn cp(origin: &PathBuf, new: &PathBuf) -> Result<()> {
+    let _copied = handle_fs_res(&[&origin, &new], std::fs::copy(&origin, &new))?;
     Ok(())
 }
 

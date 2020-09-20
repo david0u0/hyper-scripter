@@ -1,47 +1,51 @@
 use chrono::{NaiveDateTime, Utc};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
+use std::fmt::Debug;
 
-#[derive(Debug, Clone, Copy, Ord, Eq, Deref)]
-pub struct ScriptTime {
-    changed: bool,
+#[derive(Debug, Clone, Ord, Eq, Deref)]
+pub struct ScriptTime<T: Clone + Debug = ()> {
+    changed: Option<T>,
     #[deref]
     time: NaiveDateTime,
 }
-impl PartialEq for ScriptTime {
+impl<T: Clone + Debug> PartialEq for ScriptTime<T> {
     fn eq(&self, other: &Self) -> bool {
         self.time.eq(&other.time)
     }
 }
-impl PartialOrd for ScriptTime {
+impl<T: Clone + Debug> PartialOrd for ScriptTime<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.time.partial_cmp(&other.time)
     }
 }
 
-impl ScriptTime {
-    pub fn now() -> Self {
+impl<T: Clone + Debug> ScriptTime<T> {
+    pub fn now(data: T) -> Self {
         ScriptTime {
             time: Utc::now().naive_utc(),
-            changed: true,
+            changed: Some(data),
         }
     }
-    pub fn new_or(time: Option<NaiveDateTime>, default: NaiveDateTime) -> Self {
+    pub fn new_or(time: Option<NaiveDateTime>, default: Self) -> Self {
         if let Some(time) = time {
-            ScriptTime::new(time)
-        } else {
             ScriptTime {
-                time: default,
-                changed: true,
+                time,
+                changed: None,
             }
+        } else {
+            default
         }
     }
     pub fn new(time: NaiveDateTime) -> Self {
         ScriptTime {
             time,
-            changed: false,
+            changed: None,
         }
     }
+    pub fn data(&self) -> Option<&T> {
+        self.changed.as_ref()
+    }
     pub fn has_changed(&self) -> bool {
-        self.changed
+        self.changed.is_some()
     }
 }

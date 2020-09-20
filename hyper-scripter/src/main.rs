@@ -286,10 +286,16 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Run { script_query, args } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;
             log::info!("執行 {:?}", entry.name);
-            entry.update(|info| info.exec()).await?;
-            let script = path::open_script(&entry.name, &entry.ty, true)?;
+            let script_path = path::open_script(&entry.name, &entry.ty, true)?;
+            let content = util::read_file(&script_path)?;
+            entry.update(|info| info.exec(content)).await?;
             let ret_code: i32;
-            let run_res = util::run(&script, &*entry, &args);
+            let run_res = util::run(
+                &script_path,
+                &*entry,
+                &args,
+                entry.exec_time.as_ref().unwrap().data().unwrap(),
+            );
             match run_res {
                 Err(Error::ScriptError(code)) => {
                     ret_code = code;
@@ -309,15 +315,14 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::Which { script_query } => {
             let entry = get_info_mut_strict(script_query, &mut repo)?;
-            let script = path::open_script(&entry.name, &entry.ty, true)?;
-            log::info!("定位 {:?}", script.name);
+            log::info!("定位 {:?}", entry.name);
             println!("{}", entry.file_path()?.to_string_lossy());
         }
         Subs::Cat { script_query } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;
-            let script = path::open_script(&entry.name, &entry.ty, true)?;
-            log::info!("打印 {:?}", script.name);
-            let content = util::read_file(&script.path)?;
+            let script_path = path::open_script(&entry.name, &entry.ty, true)?;
+            log::info!("打印 {:?}", entry.name);
+            let content = util::read_file(&script_path)?;
             println!("{}", content);
             entry.update(|info| info.read()).await?;
         }
@@ -351,17 +356,17 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             for query in script_queries.into_iter() {
                 let entry = get_info_mut_strict(query, &mut repo)?;
                 // TODO: 若是模糊搜出來的，問一下使用者是不是真的要刪
-                let script = path::open_script(&entry.name, &entry.ty, true)?;
-                log::info!("刪除 {:?}", script);
-                if script.name.is_anonymous() {
+                let script_path = path::open_script(&entry.name, &entry.ty, true)?;
+                log::info!("刪除 {:?}", *entry);
+                if entry.name.is_anonymous() {
                     log::debug!("刪除匿名腳本");
-                    util::remove(&script)?;
-                    let name = script.name.into_static();
+                    util::remove(&script_path)?;
+                    let name = entry.name.clone().into_static();
                     repo.remove(&name).await?;
                 } else {
                     log::debug!("不要真的刪除有名字的腳本，改用標籤隱藏之");
                     let time_str = Utc::now().format("%Y%m%d%H%M%S");
-                    let new_name = util::change_name_only(&script.name.to_string(), |name| {
+                    let new_name = util::change_name_only(&entry.name.to_string(), |name| {
                         format!("{}-{}", time_str, name)
                     });
                     mv(
@@ -380,7 +385,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             let new_name = new.as_script_name()?;
             let og_script = path::open_script(&h.name, &h.ty, true)?;
             let new_script = path::open_script(&new_name, &h.ty, false)?;
-            if new_script.path.exists() {
+            if new_script.exists() {
                 return Err(Error::ScriptExist(new.clone()));
             }
             util::cp(&og_script, &new_script)?;
@@ -486,7 +491,7 @@ async fn edit_or_create<'a, 'b>(
     tags: TagControlFlow,
 ) -> Result<(PathBuf, ScriptRepoEntry<'a, 'b>)> {
     let final_ty: ScriptType;
-    let script = if let EditQuery::Query(query) = edit_query {
+    let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         if let Some(entry) = get_info_mut(query, script_repo)? {
             if let Some(ty) = ty {
                 log::warn!("已存在的腳本無需再指定類型");
@@ -499,8 +504,9 @@ async fn edit_or_create<'a, 'b>(
             }
             final_ty = entry.ty.clone();
             log::debug!("打開既有命名腳本：{:?}", entry.name);
-            path::open_script(&entry.info.name, &entry.ty, true)
-                .context(format!("打開命名腳本失敗：{:?}", entry.name))?
+            let p = path::open_script(&entry.name, &entry.ty, true)
+                .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+            (entry.name.clone(), p)
         } else {
             final_ty = ty.unwrap_or_default();
             if script_repo
@@ -511,23 +517,23 @@ async fn edit_or_create<'a, 'b>(
                 return Err(Error::ScriptExist(query.as_script_name()?.to_string()));
             }
             log::debug!("打開新命名腳本：{:?}", query);
-            path::open_script(query, &final_ty, false)
-                .context(format!("打開新命名腳本失敗：{:?}", query))?
+            let name = query.as_script_name()?;
+            let p = path::open_script(&name, &final_ty, false)
+                .context(format!("打開新命名腳本失敗：{:?}", query))?;
+            (name, p)
         }
     } else {
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");
         path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?
     };
-    let path = script.path;
-    log::info!("編輯 {:?}", script.name);
+    log::info!("編輯 {:?}", script_name);
 
-    let name = script.name.into_static();
     let entry = script_repo
-        .upsert(&name, || {
+        .upsert(&script_name, || {
             ScriptInfo::new(
                 0,
-                name.clone(),
+                script_name.clone().into_static(),
                 final_ty,
                 tags.into_allowed_iter(),
                 None,
@@ -537,5 +543,5 @@ async fn edit_or_create<'a, 'b>(
             )
         })
         .await?;
-    Ok((path, entry))
+    Ok((script_path, entry))
 }

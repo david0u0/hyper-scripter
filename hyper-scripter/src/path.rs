@@ -1,5 +1,5 @@
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::script::{AsScriptName, ScriptMeta, ScriptName, ANONYMOUS};
+use crate::script::{AsScriptName, ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::util::handle_fs_res;
 use std::fs::{canonicalize, create_dir, read_dir};
@@ -83,34 +83,34 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous(ty: &ScriptType) -> Result<ScriptMeta<'static>> {
+pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName<'static>, PathBuf)> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
-    open_anonymous(id, ty)
+    Ok((ScriptName::Anonymous(id), open_anonymous(id, ty)?))
 }
-pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<ScriptMeta<'static>> {
+pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
     let name = ScriptName::Anonymous(id);
     let path = get_path().join(name.to_file_path(ty)?);
-    Ok(ScriptMeta { path, name })
+    Ok(path)
 }
 
-pub fn open_script<'a, T: ?Sized + AsScriptName>(
-    name: &'a T,
+pub fn open_script<T: ?Sized + AsScriptName>(
+    name: &T,
     ty: &ScriptType,
     check_sxist: bool,
-) -> Result<ScriptMeta<'a>> {
-    let script = match name.as_script_name()? {
+) -> Result<PathBuf> {
+    let script_path = match name.as_script_name()? {
         ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
         ScriptName::Named(name) => {
             let name = ScriptName::Named(name);
             let path = get_path().join(name.to_file_path(ty)?);
-            ScriptMeta { path, name }
+            path
         }
     };
-    if check_sxist && !script.path.exists() {
-        Err(Error::PathNotFound(script.path))
+    if check_sxist && !script_path.exists() {
+        Err(Error::PathNotFound(script_path))
     } else {
-        Ok(script)
+        Ok(script_path)
     }
 }
 

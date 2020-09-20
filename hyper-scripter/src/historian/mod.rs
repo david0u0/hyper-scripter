@@ -5,7 +5,7 @@ use chrono::NaiveDateTime;
 use sqlx::error::Error as DBError;
 use sqlx::SqlitePool;
 
-pub async fn record(event: Event, pool: &SqlitePool) -> Result<(), DBError> {
+pub async fn record(event: Event<'_>, pool: &SqlitePool) -> Result<(), DBError> {
     log::debug!("記錄事件 {:?}", event);
     let cmd = std::env::args().collect::<Vec<_>>().join(" ");
     let ty = event.data.get_type().to_string();

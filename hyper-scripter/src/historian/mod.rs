@@ -21,13 +21,28 @@ pub async fn record(event: Event<'_>, pool: &SqlitePool) -> Result<(), DBError> 
             .await?;
         }
         EventData::Exec(content) => {
-            // TODO: 如果跟上次內容相同就別存了
+            let mut content = Some(*content);
+            let last_event = sqlx::query!(
+                "SELECT content FROM events
+                WHERE type = ? AND script_id = ? AND NOT content IS NULL
+                ORDER BY time DESC LIMIT 1",
+                ty,
+                event.script_id
+            )
+            .fetch_optional(pool)
+            .await?;
+            if let Some(last_event) = last_event {
+                if last_event.content.as_ref().map(|s| s.as_str()) == content {
+                    log::debug!("上次執行內容相同，不重覆記錄");
+                    content = None;
+                }
+            }
             sqlx::query!(
                 "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
                 event.script_id,
                 ty,
                 cmd,
-                content
+                content,
             )
             .execute(pool)
             .await?;

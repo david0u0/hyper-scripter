@@ -299,3 +299,57 @@ fn test_namespace_reorder_search() {
     assert_eq!(MSG, run(&["namsplongsuery"]).expect("重排命名空間搜尋失敗"));
     run(&["script-test"]).expect_err("重排到腳本名字去了= =");
 }
+
+#[test]
+fn test_append_tags() {
+    let _g = setup();
+    run(&["tags", "global"]).unwrap();
+    run(&[
+        "-t",
+        "+append",
+        "e",
+        "append-test",
+        "-f",
+        &format!("echo 附加標籤"),
+    ])
+    .unwrap();
+    run(&[
+        "-t",
+        "no-append",
+        "e",
+        "no-append-test",
+        "-f",
+        &format!("echo 不要給我打標籤"),
+    ])
+    .unwrap();
+
+    assert_eq!("附加標籤", run(&["apptest"]).unwrap());
+    run(&["no-apptest"]).expect_err("標籤還是附加上去了？");
+
+    assert_eq!(
+        "附加標籤",
+        run(&["-t", "append", "apptest"]).expect("標籤沒附加上去？")
+    );
+    assert_eq!(
+        "不要給我打標籤",
+        run(&["-t", "no-append", "apptest"]).unwrap()
+    );
+
+    run(&[
+        "-t",
+        "no-append",
+        "mv",
+        "no-append-test",
+        "-t",
+        "+eventually-append",
+    ])
+    .unwrap();
+    assert_eq!(
+        "不要給我打標籤",
+        run(&["-t", "eventually-append", "apptest"]).expect("標籤沒被 mv 附加上去？")
+    );
+    assert_eq!(
+        "不要給我打標籤",
+        run(&["-t", "no-append", "apptest"]).expect("標籤被 mv 弄壞了？")
+    );
+}

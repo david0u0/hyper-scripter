@@ -38,16 +38,23 @@ impl std::fmt::Display for TagsKey {
     }
 }
 impl TagsKey {
+    fn new(mut tags: Vec<Tag>) -> Self {
+        tags.sort();
+        TagsKey(tags)
+    }
     fn partial_cmp(&self, other: &TagsKey) -> Option<std::cmp::Ordering> {
-        if other.0.len() != self.0.len() {
-            return self.0.len().partial_cmp(&other.0.len());
-        }
-        for (t1, t2) in self.0.iter().zip(other.0.iter()) {
-            if t1 != t2 {
-                return t1.partial_cmp(t2);
+        let mut self_slice: &[_] = &self.0;
+        let mut other_slice: &[_] = &other.0;
+        while self_slice.len() > 0 && other_slice.len() > 0 {
+            let (t1, t2) = (&self_slice[0], &other_slice[0]);
+            let cmp = t1.partial_cmp(t2);
+            if cmp != Some(std::cmp::Ordering::Equal) {
+                return cmp;
             }
+            self_slice = &self_slice[1..self_slice.len()];
+            other_slice = &other_slice[1..other_slice.len()];
         }
-        Some(std::cmp::Ordering::Equal)
+        self.0.len().partial_cmp(&other.0.len())
     }
     fn cmp(&self, other: &TagsKey) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
@@ -173,7 +180,7 @@ pub fn fmt_list<'a, W: Write>(
 
     let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
     for script in script_iter {
-        let key = TagsKey(script.tags.clone());
+        let key = TagsKey::new(script.tags.clone());
         let v = scripts.entry(key).or_default();
         v.push(script);
     }

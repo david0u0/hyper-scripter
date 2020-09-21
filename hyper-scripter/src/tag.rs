@@ -165,6 +165,13 @@ impl std::fmt::Display for TagControlFlow {
     }
 }
 impl TagControlFlow {
+    pub fn push(&mut self, flow: Self) {
+        if flow.append {
+            self.tags.extend(flow.tags.into_iter());
+        } else {
+            *self = flow
+        }
+    }
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
         self.tags.into_iter().filter_map(|f| {
             // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣

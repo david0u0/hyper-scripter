@@ -240,7 +240,15 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             TagFilter::from_str("all,^deleted").unwrap().into()
         } else {
             match root.tags.clone() {
-                Some(filter) => Into::<TagFilter>::into(filter).into(),
+                Some(filter) => {
+                    if filter.append {
+                        let mut group = conf.get_tag_filter_group();
+                        group.push(filter.into());
+                        group
+                    } else {
+                        Into::<TagFilter>::into(filter).into()
+                    }
+                }
                 None => conf.get_tag_filter_group(),
             }
         };
@@ -255,10 +263,18 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             content,
             no_template,
         } => {
-            let edit_tags = root
-                .tags
-                .clone()
-                .unwrap_or(conf.main_tag_filter.clone().filter);
+            let edit_tags = match root.tags.clone() {
+                None => conf.main_tag_filter.clone().filter,
+                Some(tags) => {
+                    if tags.append {
+                        let mut main_tags = conf.main_tag_filter.clone().filter;
+                        main_tags.push(tags);
+                        main_tags
+                    } else {
+                        tags
+                    }
+                }
+            };
             let (path, mut entry) =
                 edit_or_create(edit_query, &mut repo, ty.clone(), edit_tags).await?;
             if content.is_some() {
@@ -470,7 +486,13 @@ async fn mv<'a, 'b>(
                 info.name = name;
             }
             if let Some(tags) = tags {
-                info.tags = tags.clone().into_allowed_iter().collect();
+                if tags.append {
+                    log::debug!("附加上標籤：{:?}", tags);
+                    info.tags.extend(tags.clone().into_allowed_iter());
+                } else {
+                    log::debug!("設定標籤：{:?}", tags);
+                    info.tags = tags.clone().into_allowed_iter().collect();
+                }
             }
             info.write();
         })

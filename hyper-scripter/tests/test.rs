@@ -267,7 +267,7 @@ fn test_rm() {
         run(&["-t", "deleted", "my-namespace/super-test"]).unwrap()
     );
     let file_path = run(&["-t", "deleted", "which", "-"]).unwrap();
-    let re = Regex::new(r"^my-namespace/\d{14}-super-test\.sh$").unwrap();
+    let re = Regex::new(r".+my-namespace/\d{14}-super-test\.sh$").unwrap();
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());

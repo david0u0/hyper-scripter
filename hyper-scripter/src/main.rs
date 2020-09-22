@@ -343,7 +343,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Which { script_query } => {
             let entry = get_info_mut_strict(script_query, &mut repo)?;
             log::info!("定位 {:?}", entry.name);
-            println!("{}", entry.file_path()?.to_string_lossy());
+            let p = path::get_path().join(entry.file_path()?);
+            println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {
             let mut entry = get_info_mut_strict(script_query, &mut repo)?;

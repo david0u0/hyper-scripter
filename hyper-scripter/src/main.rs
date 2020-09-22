@@ -320,14 +320,25 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Err(e) => return Err(e),
                 Ok(_) => ret_code = 0,
             }
-            historian::record(
+            let res = historian::record(
                 Event {
                     data: EventData::ExecDone(ret_code),
                     script_id: entry.id,
                 },
                 &pool,
             )
-            .await?;
+            .await;
+            match &res {
+                Ok(_) => (),
+                Err(sqlx::error::Error::Database(err)) => {
+                    if err.code().as_ref().map(|s| s.as_ref()) == Some("517") {
+                        log::warn!("資料庫最後被鎖住了！ {:?}", err);
+                    } else {
+                        res?;
+                    }
+                }
+                Err(_) => res?,
+            }
         }
         Subs::Which { script_query } => {
             let entry = get_info_mut_strict(script_query, &mut repo)?;

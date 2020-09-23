@@ -47,16 +47,22 @@ vorpal.command('test <arg1> [arg2]', 'this is a teeeest!').action(args => {
 vorpal.delimiter('>').show();";
 
 const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
-export DIR=$(dirname $0)
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
-tmux new-session -s $NAME -d \"{{{content.0}}}\"
+tmux new-session -s $NAME -d \"{{{content.0}}}\" || exit 1
 tmux split-window -h \"{{{content.1}}}\"
 {{#if content.2}}tmux split-window -v \"{{{content.2}}}\"
 {{/if}}
 tmux -2 attach-session -d";
+
+const RB_WELCOME_MSG: &str = "# Hello, scripter!
+Dir.chdir('~/{{birthplace}}')
+NAME = '{{name}}'
+
+{{#each content}}{{{this}}}
+{{/each}} ";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
@@ -104,6 +110,12 @@ pub struct ScriptTypeConfig {
 }
 fn split(s: &str) -> Vec<String> {
     s.split("\n").map(|s| s.to_owned()).collect()
+}
+fn default_template() -> Vec<String> {
+    vec![
+        "{{#each content}}{{{this}}}".to_owned(),
+        "{{/each}}".to_owned(),
+    ]
 }
 
 impl ScriptTypeConfig {
@@ -196,7 +208,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("rb".to_owned()),
                 color: "bright red".to_owned(),
-                template: split(""),
+                template: split(RB_WELCOME_MSG),
                 cmd: Some("ruby".to_owned()),
                 args: vec!["{{path}}".to_owned()],
                 env: vec![],
@@ -208,7 +220,7 @@ impl ScriptTypeConfig {
             ScriptTypeConfig {
                 ext: Some("md".to_owned()),
                 color: "bright black".to_owned(),
-                template: split(""),
+                template: default_template(),
                 cmd: None,
                 args: vec![],
                 env: vec![],

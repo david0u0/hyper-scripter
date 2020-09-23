@@ -70,7 +70,7 @@ def import_dir(dir)
       puts "importing #{script.name}..."
       content = do_hs("cat =#{script.name}", ['all'], dir)
       content = Shellwords.escape(content)
-      do_hs("edit =#{script.name} -c #{script.category} -f #{content}")
+      do_hs("edit =#{script.name} -c #{script.category} --no-template --fast #{content}")
       tags_str = script.tags.join(',')
       do_hs("mv =#{script.name} -t #{tags_str}")
     end

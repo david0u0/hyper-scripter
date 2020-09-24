@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::historian::{self, Event, EventData};
@@ -152,6 +152,8 @@ struct List {
     file: bool,
     #[structopt(long, help = "Show only name of the script.", conflicts_with_all = &["file", "long"])]
     name: bool,
+    #[structopt(long, help = "Show scripts within recent days.")]
+    recent: Option<u32>,
     #[structopt(parse(try_from_str))]
     pattern: Option<ListPattern>,
 }
@@ -366,6 +368,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             plain,
             name,
             file,
+            recent,
             all: _,
         }) => {
             let display_style = match (long, file, name) {
@@ -380,6 +383,11 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 plain: *plain,
                 pattern,
                 display_style,
+                time_bound: recent.map(|recent| {
+                    let mut now = Utc::now().naive_utc();
+                    now -= Duration::days(recent.into());
+                    now
+                }),
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;

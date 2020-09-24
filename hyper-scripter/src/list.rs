@@ -3,6 +3,7 @@ use crate::error::{Error, FormatCode, Result};
 use crate::script::{ScriptInfo, ScriptName};
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
+use chrono::NaiveDateTime;
 use colored::{Color, Colorize};
 use regex::Regex;
 use std::collections::HashMap;
@@ -92,13 +93,22 @@ pub struct ListOptions<'a> {
     pub pattern: &'a Option<ListPattern>,
     pub plain: bool,
     pub display_style: DisplayStyle,
+    pub time_bound: Option<NaiveDateTime>,
 }
 impl<'a> ListOptions<'a> {
     fn filter(&self, script: &ScriptInfo) -> bool {
-        match &self.pattern {
-            Some(ListPattern(re)) => re.is_match(&script.name.to_string()),
-            _ => true,
+        if let Some(time_bound) = self.time_bound {
+            // TODO: 前面排序過了，可以省點計算量
+            if script.last_time() < time_bound {
+                return false;
+            }
         }
+        if let Some(ListPattern(re)) = self.pattern {
+            if !re.is_match(&script.name.to_string()) {
+                return false;
+            }
+        }
+        true
     }
 }
 

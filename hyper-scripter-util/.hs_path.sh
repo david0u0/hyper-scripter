@@ -1,3 +1,5 @@
+cd $(dirname $0)
+
 while true; do
     CUR=$(pwd)
     if [ -f ".script_info.db" ]; then

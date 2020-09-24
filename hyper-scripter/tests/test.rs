@@ -185,8 +185,11 @@ fn test_edit_same_name() {
     .unwrap();
     run(&["-"]).expect_err("執行了隱藏的腳本？？");
     run(&["e", "i-am-hidden", "-f", "yo"]).expect_err("竟然能編輯撞名的腳本？");
-    run(&["tags", "hide"]).unwrap();
-    assert_eq!(MSG, run(&["-"]).unwrap(), "腳本被撞名的編輯搞爛了？");
+    assert_eq!(
+        MSG,
+        run(&["-t", "hide", "-"]).unwrap(),
+        "腳本被撞名的編輯搞爛了？"
+    );
 }
 
 #[test]

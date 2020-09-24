@@ -1,28 +1,8 @@
 require 'shellwords'
+require_relative './.util.rb'
 
-HS = 'hs'.freeze
 DIR = File.dirname(__FILE__)
-
-def find_hs_path
-  cur = DIR
-  loop do
-    if File.file?(File.join(cur, '.script_info.db'))
-      return cur
-    elsif cur == '/'
-      puts "can't find hyper scripter directory!"
-      exit 1
-    else
-      cur = File.expand_path('..', cur)
-    end
-  end
-end
-HS_DIR = find_hs_path
-
-def do_hs(arg, tags = ['all'], path = HS_DIR)
-  tags = ['all'] if tags.length == 0
-  tags_str = tags.join(',')
-  `#{HS} -p #{path} -t #{tags_str} #{arg}`
-end
+HS_ENV = HSEnv.new(DIR)
 
 class Script
   attr_reader :name, :category, :tags
@@ -60,19 +40,19 @@ end
 def import_dir(dir)
   dir = File.expand_path(dir)
   puts "import directory #{dir}"
-  out = do_hs('ls --plain', ['all'], dir)
+  out = HS_ENV.do_hs('ls --plain', [], dir)
   parse(out).each do |script|
-    content = do_hs("which =#{script.name} 2>/dev/null")
-    if $?.success?
+    content = HS_ENV.do_hs("which =#{script.name} 2>/dev/null")
+    if $?.success? && false
       puts "#{script.name} already exist!"
       next
     else
       puts "importing #{script.name}..."
-      content = do_hs("cat =#{script.name}", ['all'], dir)
+      content = HS_ENV.do_hs("cat =#{script.name}", [], dir)
       content = Shellwords.escape(content)
-      do_hs("edit =#{script.name} -c #{script.category} --no-template --fast #{content}")
+      HS_ENV.do_hs("edit =#{script.name} -c #{script.category} --no-template -f #{content}")
       tags_str = script.tags.join(',')
-      do_hs("mv =#{script.name} -t #{tags_str}")
+      HS_ENV.do_hs("mv =#{script.name} -t #{tags_str}")
     end
   end
 end

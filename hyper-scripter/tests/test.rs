@@ -271,6 +271,11 @@ fn test_rm() {
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
+
+    assert!(check_exist(&["longlive.sh"]));
+    run(&["rm", "--purge", "longlive"]).expect("未能被消滅掉");
+    run(&["-t", "all", "longlive"]).expect_err("沒有確實消滅掉");
+    assert!(!check_exist(&["longlive.sh"]));
 }
 
 #[test]

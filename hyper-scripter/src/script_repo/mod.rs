@@ -3,6 +3,7 @@ use crate::historian::{self, Event, EventData, EventType};
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use async_trait::async_trait;
+use chrono::{Duration, Utc};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
@@ -81,7 +82,14 @@ impl<'a> ScriptRepo<'a> {
             env: &self.pool,
         }
     }
-    pub async fn new<'b>(pool: SqlitePool) -> Result<ScriptRepo<'b>> {
+    pub async fn new<'b>(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo<'b>> {
+        let mut hidden_map = HashMap::<String, ScriptInfo>::new();
+        let time_bound = recent.map(|recent| {
+            let mut time = Utc::now().naive_utc();
+            time -= Duration::days(recent.into());
+            time
+        });
+
         let scripts = sqlx::query!("SELECT * from script_infos ORDER BY id")
             .fetch_all(&pool)
             .await?;
@@ -149,12 +157,16 @@ impl<'a> ScriptRepo<'a> {
                 Some(script.write_time),
                 read_time,
             );
-            map.insert(name, script);
+            if time_bound.map_or(true, |time_bound| script.last_time() > time_bound) {
+                map.insert(name, script);
+            } else {
+                hidden_map.insert(name, script);
+            }
         }
         Ok(ScriptRepo {
             map,
             pool,
-            hidden_map: Default::default(),
+            hidden_map,
             latest_name: None,
         })
     }

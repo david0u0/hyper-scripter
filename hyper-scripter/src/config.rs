@@ -38,8 +38,10 @@ pub struct NamedTagFilter {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct RawConfig {
-    pub tag_filters: Vec<NamedTagFilter>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
+    pub tag_filters: Vec<NamedTagFilter>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
 #[derive(Debug, Clone, Deref)]
@@ -66,6 +68,7 @@ impl Default for RawConfig {
             ],
             main_tag_filter: FromStr::from_str("all,^hide").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
+            recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
         }
     }
 }
@@ -93,11 +96,11 @@ impl DerefMut for Config {
 impl Config {
     pub fn store(&self) -> Result<()> {
         log::info!("寫入設定檔…");
-        if !self.changed {
+        let path = config_file();
+        if !self.changed && path.exists() {
             log::info!("設定檔未改變，不寫入");
             return Ok(());
         }
-        let path = config_file();
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {
                 let modified = util::handle_fs_res(&[&path], meta.modified())?;
@@ -150,7 +153,6 @@ mod test {
             ..Default::default()
         };
         let s = to_string_pretty(&c1).unwrap();
-        println!("{}", s);
         let c2: RawConfig = from_str(&s).unwrap();
         assert_eq!(c1, c2);
     }

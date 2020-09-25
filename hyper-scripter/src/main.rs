@@ -30,9 +30,9 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 struct Root {
     #[structopt(short = "p", long, help = "Path to hyper script root")]
     hs_path: Option<String>,
-    #[structopt(short, long, parse(try_from_str))]
-    tags: Option<TagControlFlow>,
-    #[structopt(short, long, help = "Shorthand for `-t=all,^deleted`")]
+    #[structopt(short, long, global = true, parse(try_from_str))]
+    filter: Option<TagControlFlow>,
+    #[structopt(short, long, global = true, help = "Shorthand for `-t=all,^deleted`")]
     all: bool,
     #[structopt(subcommand)]
     subcmd: Option<Subs>,
@@ -57,7 +57,6 @@ enum Subs {
         content: Option<String>,
         #[structopt(
             long,
-            short,
             requires("content"),
             help = "create script without invoking the editor"
         )]
@@ -104,7 +103,7 @@ enum Subs {
             long,
             short,
             parse(try_from_str),
-            help = "Category type of the script, e.g. `sh`"
+            help = "Category of the script, e.g. `sh`"
         )]
         category: Option<ScriptType>,
         #[structopt(short, long)]
@@ -124,24 +123,9 @@ enum Subs {
     },
 }
 
-impl Root {
-    fn all(&self) -> bool {
-        if self.all {
-            return true;
-        }
-        if let Some(Subs::LS(List { all, .. })) = self.subcmd {
-            all
-        } else {
-            false
-        }
-    }
-}
-
 #[derive(StructOpt, Debug)]
 struct List {
     // TODO: 滿滿的其它排序/篩選選項
-    #[structopt(short, long, help = "Show all scripts.")]
-    all: bool,
     #[structopt(short, long, help = "Show verbose information.")]
     long: bool,
     #[structopt(long, help = "Don't group by tags.")]
@@ -243,10 +227,10 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         .context("讀取歷史記錄失敗")?;
     let mut res = Vec::<Error>::new();
     {
-        let tag_group: TagFilterGroup = if root.all() {
+        let tag_group: TagFilterGroup = if root.all {
             TagFilter::from_str("all,^deleted").unwrap().into()
         } else {
-            match root.tags.clone() {
+            match root.filter.clone() {
                 Some(filter) => {
                     if filter.append {
                         let mut group = conf.get_tag_filter_group();
@@ -270,7 +254,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             content,
             no_template,
         } => {
-            let edit_tags = match root.tags.clone() {
+            let edit_tags = match root.filter.clone() {
                 None => conf.main_tag_filter.clone().filter,
                 Some(tags) => {
                     if tags.append {
@@ -369,7 +353,6 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             name,
             file,
             recent,
-            all: _,
         }) => {
             let display_style = match (long, file, name) {
                 (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File),

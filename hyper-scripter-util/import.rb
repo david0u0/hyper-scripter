@@ -1,5 +1,5 @@
 require 'shellwords'
-require_relative './.util.rb'
+require_relative './common.rb'
 
 DIR = File.dirname(__FILE__)
 HS_ENV = HSEnv.new(DIR)
@@ -50,7 +50,7 @@ def import_dir(dir)
       puts "importing #{script.name}..."
       content = HS_ENV.do_hs("cat =#{script.name}", [], dir)
       content = Shellwords.escape(content)
-      HS_ENV.do_hs("edit =#{script.name} -c #{script.category} --no-template -f #{content}")
+      HS_ENV.do_hs("edit =#{script.name} -c #{script.category} --no-template --fast #{content}")
       tags_str = script.tags.join(',')
       HS_ENV.do_hs("mv =#{script.name} -t #{tags_str}")
     end

@@ -69,22 +69,22 @@ const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run(&["e", ".", &format!("echo \"{}\"", MSG), "-f"]).unwrap();
+    run(&["e", ".", &format!("echo \"{}\"", MSG), "--fast"]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
 
     run(&[
-        "-t",
+        "-f",
         "super_tag,hide",
         "e",
         "test/js",
         "-c",
         "js",
-        "-f",
+        "--fast",
         &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
     run(&["tesjs"]).expect_err("標籤沒有篩選掉不該出現的腳本！");
-    assert_eq!(MSG_JS, run(&["-t", "super_tag", "-"]).unwrap());
+    assert_eq!(MSG_JS, run(&["-f", "super_tag", "-"]).unwrap());
 
     assert_eq!(MSG, run(&[".1"]).expect("標籤篩選把舊的腳本搞爛了！"));
 
@@ -105,7 +105,7 @@ fn test_mv() {
         "-c",
         "js",
         "--no-template",
-        "-f",
+        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -131,7 +131,7 @@ fn test_args() {
     run(&[
         "e",
         "test-with-args",
-        "-f",
+        "--fast",
         &format!("echo -e \"$1：{}\n$2\"", MSG),
     ])
     .unwrap();
@@ -144,7 +144,7 @@ fn test_args() {
 #[test]
 fn test_exact() {
     let _g = setup();
-    run(&["e", "test-exact", "-f", "echo 'test exact!'"]).unwrap();
+    run(&["e", "test-exact", "--fast", "echo 'test exact!'"]).unwrap();
     run(&["tesct"]).expect("模糊搜不到東西！");
     run(&["=tesct"]).expect_err("打錯名字卻還搜得到！");
     run(&["=test-exact"]).expect("打完整名字卻搜不到！");
@@ -154,9 +154,9 @@ fn test_exact() {
 fn test_prev() {
     let _g = setup();
 
-    run(&["e", "test-prev1", "-f", "echo 'test prev 1'"]).unwrap();
-    run(&["e", "test-prev2", "-f", "echo 'test prev 2'"]).unwrap();
-    run(&["e", "test-prev3", "-n", "-f", "echo 'test prev 3'"]).unwrap();
+    run(&["e", "test-prev1", "--fast", "echo 'test prev 1'"]).unwrap();
+    run(&["e", "test-prev2", "--fast", "echo 'test prev 2'"]).unwrap();
+    run(&["e", "test-prev3", "-n", "--fast", "echo 'test prev 3'"]).unwrap();
 
     assert_eq!(run(&["^2"]).unwrap(), "test prev 2");
     assert_eq!(run(&["^2"]).unwrap(), "test prev 3");
@@ -175,19 +175,19 @@ fn test_prev() {
 fn test_edit_same_name() {
     let _g = setup();
     run(&[
-        "-t",
+        "-f",
         "hide",
         "e",
         "i-am-hidden",
-        "-f",
+        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
     run(&["-"]).expect_err("執行了隱藏的腳本？？");
-    run(&["e", "i-am-hidden", "-f", "yo"]).expect_err("竟然能編輯撞名的腳本？");
+    run(&["e", "i-am-hidden", "--fast", "yo"]).expect_err("竟然能編輯撞名的腳本？");
     assert_eq!(
         MSG,
-        run(&["-t", "hide", "-"]).unwrap(),
+        run(&["-f", "hide", "-"]).unwrap(),
         "腳本被撞名的編輯搞爛了？"
     );
 }
@@ -195,22 +195,22 @@ fn test_edit_same_name() {
 #[test]
 fn test_multi_filter() {
     let _g = setup();
-    run(&["e", "nobody", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "nobody", "--fast", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&[
-        "-t",
+        "-f",
         "test,pin",
         "e",
         "test-pin",
-        "-f",
+        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
     run(&[
-        "-t",
+        "-f",
         "pin",
         "e",
         "pin-only",
-        "-f",
+        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -234,23 +234,23 @@ fn test_multi_filter() {
 #[test]
 fn test_rm() {
     let _g = setup();
-    run(&["e", "longlive", "-f", "echo 矻立不搖"]).unwrap();
+    run(&["e", "longlive", "--fast", "echo 矻立不搖"]).unwrap();
 
-    run(&["e", "test", "-f", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "test", "--fast", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["test"]).unwrap());
     run(&["rm", "-"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
     run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
-    assert_eq!(MSG, run(&["-t", "deleted", "test"]).unwrap());
+    assert_eq!(MSG, run(&["-f", "deleted", "test"]).unwrap());
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
-    run(&["e", ".", "-f", "echo \"你匿\""]).unwrap();
+    run(&["e", ".", "--fast", "echo \"你匿\""]).unwrap();
     assert_eq!("你匿", run(&["-"]).unwrap());
     run(&["rm", "-"]).unwrap();
     assert_eq!(
         "你匿",
-        run(&["-t", "deleted", "-"]).expect("就算是匿名腳本也不該真的被刪掉！")
+        run(&["-f", "deleted", "-"]).expect("就算是匿名腳本也不該真的被刪掉！")
     );
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
@@ -258,7 +258,7 @@ fn test_rm() {
     run(&[
         "e",
         "my-namespace/super-test",
-        "-f",
+        "--fast",
         "echo \"不要刪我 QmmmmQ\"",
     ])
     .unwrap();
@@ -267,9 +267,9 @@ fn test_rm() {
     run(&["my-super-test"]).expect_err("未能被刪除掉");
     assert_eq!(
         "不要刪我 QmmmmQ",
-        run(&["-t", "deleted", "my-namespace/super-test"]).unwrap()
+        run(&["-f", "deleted", "my-namespace/super-test"]).unwrap()
     );
-    let file_path = run(&["-t", "deleted", "which", "-"]).unwrap();
+    let file_path = run(&["-f", "deleted", "which", "-"]).unwrap();
     let re = Regex::new(r".+my-namespace/\d{14}-super-test\.sh$").unwrap();
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 
@@ -277,7 +277,7 @@ fn test_rm() {
 
     assert!(check_exist(&["longlive.sh"]));
     run(&["rm", "--purge", "longlive"]).expect("未能被消滅掉");
-    run(&["-t", "all", "longlive"]).expect_err("沒有確實消滅掉");
+    run(&["-f", "all", "longlive"]).expect_err("沒有確實消滅掉");
     assert!(!check_exist(&["longlive.sh"]));
 }
 
@@ -287,7 +287,7 @@ fn test_namespace_reorder_search() {
     run(&[
         "e",
         "my/super/long/namespace-d/test-script",
-        "-f",
+        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -296,7 +296,7 @@ fn test_namespace_reorder_search() {
         "a/shorter/script",
         "-c",
         "js",
-        "-f",
+        "--fast",
         &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
@@ -313,20 +313,20 @@ fn test_append_tags() {
     let _g = setup();
     run(&["tags", "global"]).unwrap();
     run(&[
-        "-t",
+        "-f",
         "+append",
         "e",
         "append-test",
-        "-f",
+        "--fast",
         &format!("echo 附加標籤"),
     ])
     .unwrap();
     run(&[
-        "-t",
+        "-f",
         "no-append",
         "e",
         "no-append-test",
-        "-f",
+        "--fast",
         &format!("echo 不要給我打標籤"),
     ])
     .unwrap();
@@ -336,15 +336,15 @@ fn test_append_tags() {
 
     assert_eq!(
         "附加標籤",
-        run(&["-t", "append", "apptest"]).expect("標籤沒附加上去？")
+        run(&["-f", "append", "apptest"]).expect("標籤沒附加上去？")
     );
     assert_eq!(
         "不要給我打標籤",
-        run(&["-t", "no-append", "apptest"]).unwrap()
+        run(&["-f", "no-append", "apptest"]).unwrap()
     );
 
     run(&[
-        "-t",
+        "-f",
         "no-append",
         "mv",
         "no-append-test",
@@ -354,10 +354,10 @@ fn test_append_tags() {
     .unwrap();
     assert_eq!(
         "不要給我打標籤",
-        run(&["-t", "eventually-append", "apptest"]).expect("標籤沒被 mv 附加上去？")
+        run(&["-f", "eventually-append", "apptest"]).expect("標籤沒被 mv 附加上去？")
     );
     assert_eq!(
         "不要給我打標籤",
-        run(&["-t", "no-append", "apptest"]).expect("標籤被 mv 弄壞了？")
+        run(&["-f", "no-append", "apptest"]).expect("標籤被 mv 弄壞了？")
     );
 }

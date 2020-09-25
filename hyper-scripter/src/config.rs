@@ -61,12 +61,17 @@ impl Default for RawConfig {
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
+                    filter: FromStr::from_str("all,^hide").unwrap(),
+                    obligation: true,
+                    name: "no-hidden".to_owned(),
+                },
+                NamedTagFilter {
                     filter: FromStr::from_str("all,^deleted").unwrap(),
                     obligation: true,
                     name: "no-deleted".to_owned(),
                 },
             ],
-            main_tag_filter: FromStr::from_str("all,^hide").unwrap(),
+            main_tag_filter: FromStr::from_str("all").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
         }

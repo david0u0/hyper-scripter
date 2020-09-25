@@ -86,15 +86,21 @@ impl FromStr for FilterQuery {
     fn from_str(s: &str) -> Result<Self> {
         let arr: Vec<&str> = s.split("=").collect();
         match AsRef::<[&str]>::as_ref(&arr) {
-            &[s] => Ok(FilterQuery {
-                name: None,
-                content: FromStr::from_str(s)?,
-            }),
-            &[name, s] => Ok(FilterQuery {
-                // TODO: 檢查名字
-                name: Some(name.to_owned()),
-                content: FromStr::from_str(s)?,
-            }),
+            &[s] => {
+                log::trace!("解析無名篩選器：{}", s);
+                Ok(FilterQuery {
+                    name: None,
+                    content: FromStr::from_str(s)?,
+                })
+            }
+            &[name, s] => {
+                log::trace!("解析有名篩選器：{} = {}", name, s);
+                Ok(FilterQuery {
+                    // TODO: 檢查名字
+                    name: Some(name.to_owned()),
+                    content: FromStr::from_str(s)?,
+                })
+            }
             _ => Err(Error::Format(FilterQueryCode, s.to_owned())),
         }
     }

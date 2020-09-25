@@ -122,13 +122,13 @@ enum Subs {
         new: Option<String>,
     },
     #[structopt(
-        about = "Manage script tags. If a list of tag is given, set it as default, otherwise show tag information."
+        about = "Manage script tags. If a tag filter is given, set it as default, otherwise show tag information."
     )]
     Tags {
-        #[structopt(long, short, requires("filter"))]
-        obligation: bool,
         #[structopt(parse(try_from_str))]
-        filter: Option<FilterQuery>,
+        tag_filter: Option<FilterQuery>,
+        #[structopt(long, short, help = "Set the filter to obligation")]
+        obligation: bool, // FIXME: 這邊下 requires 不知為何會炸掉 clap
     },
 }
 
@@ -436,8 +436,11 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             };
             mv(origin, new_name, &mut repo, ty.as_ref(), tags).await?;
         }
-        Subs::Tags { filter, obligation } => {
-            if let Some(filter) = filter {
+        Subs::Tags {
+            tag_filter,
+            obligation,
+        } => {
+            if let Some(filter) = tag_filter {
                 if let Some(name) = &filter.name {
                     log::info!("加入篩選器 {:?}", filter);
                     let mut found = false;

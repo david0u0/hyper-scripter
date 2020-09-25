@@ -96,6 +96,7 @@ impl FromStr for Tag {
     fn from_str(s: &str) -> Result<Self, Error> {
         let re = Regex::new(&format!(r"^(\w|\d|-|_)+$")).unwrap();
         if !re.is_match(s) {
+            log::error!("標籤格式不符：{}", s);
             return Err(Error::Format(TagCode, s.to_owned()));
         }
         Ok(Tag(s.to_owned()))

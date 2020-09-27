@@ -1,3 +1,3 @@
 [workspace]
 
-members = [ "hyper-scripter", "hyper-scripter-historian" ]
+members = [ "hyper-scripter", "hyper-scripter-historian", "hyper-scripter-util" ]

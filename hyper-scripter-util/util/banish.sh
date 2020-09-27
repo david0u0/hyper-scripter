@@ -8,5 +8,5 @@ fi
 
 for script in $(hs --timeless -p $HS_PATH -f deleted ls --plain --no-grouping --name); do
     echo purge $script !
-    hs -p $HS_PATH -t deleted rm --purge =$script
+    hs -p $HS_PATH -f deleted rm --purge =$script
 done

@@ -50,6 +50,8 @@ struct Root {
 enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
+    #[structopt(setting = AppSettings::Hidden)]
+    LoadUtils,
     #[structopt(about = "Edit hyper script", alias = "e")]
     Edit {
         #[structopt(
@@ -260,6 +262,42 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     }
 
     match root.subcmd.as_ref().unwrap() {
+        Subs::LoadUtils => {
+            let utils = hyper_scripter_util::get_all();
+            for u in utils.into_iter() {
+                log::info!("載入小工具 {:?}", u);
+                let name = u.name.as_script_name()?;
+                let ty = ScriptType::from_str(u.category)?;
+                let tags: Vec<Tag> = if u.is_hidden {
+                    vec![
+                        Tag::from_str("util").unwrap(),
+                        Tag::from_str("hide").unwrap(),
+                    ]
+                } else {
+                    vec![Tag::from_str("util").unwrap()]
+                };
+                let p = path::open_script(&name, &ty, false)?;
+                if p.exists() {
+                    log::warn!("已存在的工具 {:?}，跳過", name);
+                    continue;
+                }
+                let entry = repo
+                    .upsert(&name, || {
+                        ScriptInfo::new(
+                            0,
+                            name.clone(),
+                            ty,
+                            tags.into_iter(),
+                            None,
+                            None,
+                            None,
+                            None,
+                        )
+                    })
+                    .await?;
+                util::prepare_script(&p, *entry, true, Some(u.content))?;
+            }
+        }
         Subs::Edit {
             edit_query,
             category: ty,

@@ -21,17 +21,23 @@ fn main() -> std::io::Result<()> {
     let dest = Path::new(&out_dir).join("get_all_utils.rs");
     let mut file = File::create(dest)?;
     let inner = read_all()?
-        .map(|name| {
+        .map(|path| {
+            let mut splited = path.rsplitn(2, ".");
+            let category = splited.next().unwrap();
+            let name = splited.next().unwrap();
             format!(
-                "(\"{}\", std::include_str!(\"{}\"))",
+                "(\"util/{}\", \"{}\", std::include_str!(\"{}\"))",
                 name,
-                join_file(&name)
+                category,
+                join_file(&path)
             )
         })
         .collect::<Vec<_>>()
         .join(",");
-    file.write_all(b"pub fn get_all() -> Vec<(&'static str, &'static str)> {\n")?;
-    file.write_all(format!("    vec![{}]", inner).as_bytes())?;
+    file.write_all(
+        b"pub fn get_all() -> &'static [(&'static str, &'static str, &'static str)] {\n",
+    )?;
+    file.write_all(format!("    &[{}]", inner).as_bytes())?;
     file.write_all(b"}\n")?;
     Ok(())
 }

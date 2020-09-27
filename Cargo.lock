@@ -656,6 +656,7 @@ dependencies = [
  "fuzzy-matcher",
  "handlebars",
  "hyper-scripter-historian",
+ "hyper-scripter-util",
  "lazy_static",
  "log",
  "openssl",

@@ -15,8 +15,8 @@ mod get_all_utils {
 lazy_static::lazy_static! {
     static ref HIDDEN_SET: HashSet<&'static str> = {
         let mut set = HashSet::<&str>::new();
-        set.insert("common.rb");
-        set.insert("hs_path.sh");
+        set.insert("util/common");
+        set.insert("util/hs_path");
         set
     };
 }
@@ -24,14 +24,11 @@ lazy_static::lazy_static! {
 pub fn get_all() -> Vec<Util> {
     get_all_utils::get_all()
         .into_iter()
-        .map(|(name, content)| {
-            let category = name.rsplitn(2, ".").next().expect("小工具竟然沒有副檔名？");
-            Util {
-                is_hidden: HIDDEN_SET.contains(name),
-                name,
-                category,
-                content,
-            }
+        .map(|(name, category, content)| Util {
+            is_hidden: HIDDEN_SET.contains(name),
+            name,
+            category,
+            content,
         })
         .collect()
 }

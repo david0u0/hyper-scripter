@@ -655,6 +655,7 @@ dependencies = [
  "env_logger",
  "fuzzy-matcher",
  "handlebars",
+ "hyper-scripter-historian",
  "lazy_static",
  "log",
  "openssl",
@@ -666,6 +667,18 @@ dependencies = [
  "structopt",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "hyper-scripter-historian"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "derive_more",
+ "log",
+ "openssl",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

@@ -1,19 +1,26 @@
 use crate::error::Result;
-use crate::historian::{self, Event, EventData, EventType};
+use crate::path;
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
+use hyper_scripter_historian::{Event, EventData, EventType, Historian};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
 pub mod helper;
 use helper::*;
 
-pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, SqlitePool>;
+#[derive(Clone, Debug)]
+pub struct DBEnv {
+    info_pool: SqlitePool,
+    historian: Historian,
+}
+
+pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, DBEnv>;
 
 #[async_trait]
-impl Environment for SqlitePool {
+impl Environment for DBEnv {
     async fn handle_change<'a>(&self, info: &ScriptInfo<'a>) -> Result {
         log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
@@ -29,30 +36,26 @@ impl Environment for SqlitePool {
             write_time,
             info.id,
         )
-        .execute(self)
+        .execute(&self.info_pool)
         .await?;
 
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
-            historian::record(
-                Event {
+            self.historian
+                .record(Event {
                     script_id: info.id,
                     data: EventData::Read,
-                },
-                &self,
-            )
-            .await?;
+                })
+                .await?;
         }
         if let Some(content) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
             log::debug!("{:?} 的執行事件", info.name);
-            historian::record(
-                Event {
+            self.historian
+                .record(Event {
                     script_id: info.id,
                     data: EventData::Exec(content),
-                },
-                &self,
-            )
-            .await?;
+                })
+                .await?;
         }
 
         Ok(())
@@ -69,20 +72,25 @@ pub struct ScriptRepo<'a> {
     map: HashMap<String, ScriptInfo<'a>>,
     hidden_map: HashMap<String, ScriptInfo<'a>>,
     latest_name: Option<String>,
-    pool: SqlitePool,
+    db_env: DBEnv,
 }
 
 impl<'a> ScriptRepo<'a> {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut<'b>(&'b mut self) -> Iter<'a, 'b, SqlitePool> {
+    pub fn iter_mut<'b>(&'b mut self) -> Iter<'a, 'b, DBEnv> {
         Iter {
             iter: self.map.iter_mut(),
-            env: &self.pool,
+            env: &self.db_env,
         }
     }
+    pub fn historian(&self) -> &Historian {
+        &self.db_env.historian
+    }
     pub async fn new<'b>(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo<'b>> {
+        let historian = Historian::new(path::get_path()).await?;
+
         let mut hidden_map = HashMap::<String, ScriptInfo>::new();
         let time_bound = recent.map(|recent| {
             let mut time = Utc::now().naive_utc();
@@ -93,8 +101,8 @@ impl<'a> ScriptRepo<'a> {
         let scripts = sqlx::query!("SELECT * from script_infos ORDER BY id")
             .fetch_all(&pool)
             .await?;
-        let last_read_records = historian::last_time_of(EventType::Read, &pool).await?;
-        let last_exec_records = historian::last_time_of(EventType::Exec, &pool).await?;
+        let last_read_records = historian.last_time_of(EventType::Read).await?;
+        let last_exec_records = historian.last_time_of(EventType::Exec).await?;
         let mut last_read: &[_] = &last_read_records;
         let mut last_exec: &[_] = &last_exec_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
@@ -151,7 +159,13 @@ impl<'a> ScriptRepo<'a> {
                 script.id,
                 script_name,
                 script.category.into(),
-                script.tags.split(",").filter_map(|s| Tag::from_str(s).ok()),
+                script.tags.split(",").filter_map(|s| {
+                    if s == "" {
+                        None
+                    } else {
+                        Tag::from_str(s).ok()
+                    }
+                }),
                 exec_time,
                 Some(script.created_time),
                 Some(script.write_time),
@@ -165,9 +179,12 @@ impl<'a> ScriptRepo<'a> {
         }
         Ok(ScriptRepo {
             map,
-            pool,
             hidden_map,
             latest_name: None,
+            db_env: DBEnv {
+                info_pool: pool,
+                historian,
+            },
         })
     }
     // fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
@@ -195,7 +212,7 @@ impl<'a> ScriptRepo<'a> {
             let t = unsafe { std::ptr::read(&v[v.len() - n]) };
             Some(RepoEntry {
                 info: t,
-                env: &self.pool,
+                env: &self.db_env,
             })
         } else {
             None
@@ -206,7 +223,7 @@ impl<'a> ScriptRepo<'a> {
             None => None,
             Some(info) => Some(RepoEntry {
                 info,
-                env: &self.pool,
+                env: &self.db_env,
             }),
         }
     }
@@ -217,7 +234,7 @@ impl<'a> ScriptRepo<'a> {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
             sqlx::query!("DELETE from script_infos where id = ?", info.id)
-                .execute(&self.pool)
+                .execute(&self.db_env.info_pool)
                 .await?;
         }
         Ok(())
@@ -252,11 +269,11 @@ impl<'a> ScriptRepo<'a> {
                 category,
                 tags,
             )
-            .execute(&self.pool)
+            .execute(&self.db_env.info_pool)
             .await?;
             log::debug!("往資料庫新增腳本成功");
             let id = sqlx::query!("SELECT last_insert_rowid() as id")
-                .fetch_one(&self.pool)
+                .fetch_one(&self.db_env.info_pool)
                 .await?
                 .id;
             log::debug!("得到新腳本 id {}", id);
@@ -264,7 +281,7 @@ impl<'a> ScriptRepo<'a> {
         }
         Ok(RepoEntry {
             info,
-            env: &self.pool,
+            env: &self.db_env,
         })
     }
     pub fn filter_by_tag(&mut self, filter: &TagFilterGroup) {

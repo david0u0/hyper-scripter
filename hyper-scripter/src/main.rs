@@ -1,7 +1,6 @@
 use chrono::Utc;
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::historian::{self, Event, EventData};
 use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern};
 use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
@@ -9,6 +8,7 @@ use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{fuzzy, path, util};
+use hyper_scripter_historian::{Event, EventData};
 use std::path::PathBuf;
 use std::str::FromStr;
 use structopt::clap::AppSettings::{
@@ -237,6 +237,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     let mut repo = ScriptRepo::new(pool.clone(), recent)
         .await
         .context("讀取歷史記錄失敗")?;
+    let historian = repo.historian().clone();
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all {
@@ -323,14 +324,12 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Err(e) => return Err(e),
                 Ok(_) => ret_code = 0,
             }
-            let res = historian::record(
-                Event {
+            let res = historian
+                .record(Event {
                     data: EventData::ExecDone(ret_code),
                     script_id: entry.id,
-                },
-                &pool,
-            )
-            .await;
+                })
+                .await;
             match &res {
                 Ok(_) => (),
                 Err(sqlx::error::Error::Database(err)) => {

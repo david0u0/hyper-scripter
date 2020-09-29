@@ -247,7 +247,7 @@ fn test_rm() {
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
     run(&["e", ".", "--fast", "echo \"你匿\""]).unwrap();
-    assert_eq!("你匿", run(&["-"]).unwrap());
+    assert_eq!("你匿", run(&[".1"]).unwrap());
     run(&["rm", "-"]).unwrap();
     assert_eq!(
         "你匿",
@@ -277,9 +277,11 @@ fn test_rm() {
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
     assert!(check_exist(&["longlive.sh"]));
-    run(&["rm", "--purge", "long"]).expect("未能被消滅掉");
+    run(&["rm", "--purge", "*", "-f", "all"]).expect("未能消滅掉一切");
     run(&["-f", "all", "longlive"]).expect_err("沒有確實消滅掉");
     assert!(!check_exist(&["longlive.sh"]));
+
+    run(&["-f", "all", "my-super-test"]).expect_err("沒有確實消滅掉");
 }
 
 #[test]

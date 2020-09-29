@@ -9,6 +9,7 @@ use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{path, util};
 use hyper_scripter_historian::{Event, EventData};
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::str::FromStr;
 use structopt::clap::AppSettings::{
@@ -93,7 +94,7 @@ enum Subs {
     #[structopt(about = "Remove the script")]
     RM {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
-        queries: Vec<ScriptQuery>,
+        queries: Vec<ListQuery>,
         #[structopt(
             long,
             help = "Actually remove scripts, rather than hiding them with tag."
@@ -389,30 +390,26 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::RM { queries, purge } => {
             let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("deleted").unwrap());
-            for query in queries.into_iter() {
-                let entry = query::do_script_query_strict(query, &mut repo)?;
+            let mut to_purge = vec![];
+            for entry in query::do_list_query(&mut repo, queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 if *purge {
                     log::debug!("真的刪除腳本！");
-                    let p = path::open_script(&entry.name, &entry.ty, false)?;
-                    let name = entry.name.clone().into_static();
-                    repo.remove(&name).await?;
-                    util::remove(&p)?;
+                    to_purge.push((entry.name.clone().into_static(), entry.ty.clone()));
                 } else {
                     log::debug!("不要真的刪除腳本，改用標籤隱藏之");
                     let time_str = Utc::now().format("%Y%m%d%H%M%S");
                     let new_name = util::change_name_only(&entry.name.to_string(), |name| {
                         format!("{}-{}", time_str, name)
                     });
-                    mv(
-                        query,
-                        Some(new_name.as_script_name()?.into_static()), // TODO: 正確地實作 scriptname from string
-                        &mut repo,
-                        None,
-                        &delete_tag,
-                    )
-                    .await?;
+                    let new_name = Some(ScriptName::Named(Cow::Owned(new_name)));
+                    mv(entry, new_name, None, &delete_tag).await?;
                 }
+            }
+            for (name, ty) in to_purge.into_iter() {
+                let p = path::open_script(&name, &ty, false)?;
+                repo.remove(&name).await?;
+                util::remove(&p)?;
             }
         }
         Subs::CP { origin, new } => {
@@ -437,7 +434,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Some(s) => Some(s.as_script_name()?),
                 None => None,
             };
-            mv(origin, new_name, &mut repo, ty.as_ref(), tags).await?;
+            let entry = query::do_script_query_strict(origin, &mut repo)?;
+            mv(entry, new_name, ty.as_ref(), tags).await?;
         }
         Subs::Tags {
             tag_filter,
@@ -491,14 +489,11 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
 }
 
 async fn mv<'a, 'b>(
-    origin: &ScriptQuery,
+    mut entry: ScriptRepoEntry<'a, 'b>,
     new_name: Option<ScriptName<'a>>,
-    script_repo: &'b mut ScriptRepo<'a>,
     ty: Option<&ScriptType>,
     tags: &Option<TagControlFlow>,
 ) -> Result {
-    // FIXME: 避免 rm 時做兩次模糊搜尋
-    let mut entry = query::do_script_query_strict(origin, script_repo)?;
     let og_script = path::open_script(&entry.name, &entry.ty, true)?;
     let new_script = path::open_script(
         new_name.as_ref().unwrap_or(&entry.name),

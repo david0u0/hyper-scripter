@@ -35,14 +35,13 @@ pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
         }
     }
     if ans.1.len() == 0 {
-        log::debug!("模糊搜沒搜到東西");
+        log::warn!("模糊搜沒搜到東西");
         Ok(None)
     } else if ans.1.len() == 1 {
         log::debug!(
             "模糊搜到一個東西 {:?}",
             ans.1.iter().map(|k| k.fuzz_key()).collect::<Vec<_>>()
         );
-        // SAFETY: 不會再用到這個向量了，而且 &mut 也沒有 Drop 特徵，安啦
         let first = ans.1.into_iter().next().unwrap();
         Ok(Some(first))
     } else {

@@ -264,7 +264,7 @@ fn test_rm() {
     ])
     .unwrap();
     assert_eq!("不要刪我 QmmmmQ", run(&["my-super-test"]).unwrap());
-    run(&["rm", "my-super-test"]).expect("刪除被命名空間搞爛了");
+    run(&["rm", "mysupertest"]).expect("刪除被命名空間搞爛了");
     run(&["my-super-test"]).expect_err("未能被刪除掉");
     assert_eq!(
         "不要刪我 QmmmmQ",
@@ -277,7 +277,7 @@ fn test_rm() {
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
     assert!(check_exist(&["longlive.sh"]));
-    run(&["rm", "--purge", "longlive"]).expect("未能被消滅掉");
+    run(&["rm", "--purge", "long"]).expect("未能被消滅掉");
     run(&["-f", "all", "longlive"]).expect_err("沒有確實消滅掉");
     assert!(!check_exist(&["longlive.sh"]));
 }

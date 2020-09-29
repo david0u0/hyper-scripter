@@ -1,10 +1,10 @@
 use crate::config::Config;
-use crate::error::{Error, FormatCode, Result};
+use crate::error::Result;
+use crate::query::{do_list_query, ListQuery};
 use crate::script::{ScriptInfo, ScriptName};
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
 use colored::{Color, Colorize};
-use regex::Regex;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -61,21 +61,6 @@ impl TagsKey {
     }
 }
 
-#[derive(Debug)]
-pub struct ListPattern(Regex);
-impl std::str::FromStr for ListPattern {
-    type Err = Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Error> {
-        // TODO: 好好檢查
-        let s = s.replace(".", "\\.");
-        let s = s.replace("*", ".*");
-        let re = Regex::new(&format!("^{}$", s)).map_err(|e| {
-            log::error!("正規表達式錯誤：{}", e);
-            Error::Format(FormatCode::Regex, s)
-        })?;
-        Ok(ListPattern(re))
-    }
-}
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum DisplayScriptIdent {
     File,
@@ -87,21 +72,12 @@ pub enum DisplayStyle {
     Short(DisplayScriptIdent),
     Long,
 }
+#[derive(Debug, Clone)]
 pub struct ListOptions<'a> {
     pub no_grouping: bool,
-    pub pattern: &'a Option<ListPattern>,
+    pub queries: &'a [ListQuery],
     pub plain: bool,
     pub display_style: DisplayStyle,
-}
-impl<'a> ListOptions<'a> {
-    fn filter(&self, script: &ScriptInfo) -> bool {
-        if let Some(ListPattern(re)) = self.pattern {
-            if !re.is_match(&script.name.to_string()) {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 pub fn fmt_meta<W: Write>(
@@ -172,22 +148,24 @@ pub fn fmt_list<'a, W: Write>(
             "type\tname\tcreate time\tlast read time\tlast execute time"
         )?;
     }
-    let script_iter = script_repo.iter().filter(|s| opt.filter(&s));
+    let scripts_iter = do_list_query(script_repo, &opt.queries)?
+        .into_iter()
+        .map(|e| &*e.into_inner());
 
     if opt.no_grouping {
-        let scripts: Vec<_> = script_iter.collect();
+        let scripts: Vec<_> = scripts_iter.collect();
         fmt_group(w, scripts, &latest_script_name, opt)?;
         return Ok(());
     }
 
-    let mut scripts: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
-    for script in script_iter {
+    let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
+    for script in scripts_iter {
         let key = TagsKey::new(script.tags.clone());
-        let v = scripts.entry(key).or_default();
+        let v = script_map.entry(key).or_default();
         v.push(script);
     }
 
-    let mut scripts: Vec<_> = scripts.into_iter().collect();
+    let mut scripts: Vec<_> = script_map.into_iter().collect();
 
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
     for (tags, scripts) in scripts.into_iter() {

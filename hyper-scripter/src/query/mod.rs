@@ -1,10 +1,14 @@
 use crate::error::{
-    Contextable, Error, FormatCode::FilterQuery as FilterQueryCode,
+    Contextable, Error, FormatCode::FilterQuery as FilterQueryCode, FormatCode::Regex as RegexCode,
     FormatCode::ScriptQuery as ScriptQueryCode, Result,
 };
 use crate::script::{AsScriptName, ScriptName};
 use crate::tag::TagControlFlow;
+use regex::Regex;
 use std::str::FromStr;
+
+mod util;
+pub use util::*;
 
 #[derive(Debug)]
 pub enum EditQuery {
@@ -19,6 +23,28 @@ impl FromStr for EditQuery {
         } else {
             EditQuery::Query(ScriptQuery::from_str(s)?)
         })
+    }
+}
+#[derive(Debug)]
+pub enum ListQuery {
+    Pattern(Regex),
+    Query(ScriptQuery),
+}
+impl FromStr for ListQuery {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        if s.find("*").is_some() {
+            // TODO: 好好檢查
+            let s = s.replace(".", r"\.");
+            let s = s.replace("*", ".*");
+            let re = Regex::new(&format!("^{}$", s)).map_err(|e| {
+                log::error!("正規表達式錯誤：{}", e);
+                Error::Format(RegexCode, s)
+            })?;
+            Ok(ListQuery::Pattern(re))
+        } else {
+            Ok(ListQuery::Query(ScriptQuery::from_str(s)?))
+        }
     }
 }
 #[derive(Debug)]

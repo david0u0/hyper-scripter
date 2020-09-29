@@ -25,6 +25,9 @@ impl<'a, 'b, ENV: Environment> RepoEntry<'a, 'b, ENV> {
         handler(self.info);
         self.env.handle_change(self.info).await
     }
+    pub fn into_inner(self) -> &'b mut ScriptInfo<'a> {
+        self.info
+    }
 }
 impl<'a, 'b, ENV: Environment> Iterator for Iter<'a, 'b, ENV> {
     type Item = RepoEntry<'a, 'b, ENV>;

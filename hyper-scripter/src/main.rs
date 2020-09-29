@@ -1,13 +1,13 @@
 use chrono::Utc;
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions, ListPattern};
-use hyper_scripter::query::{EditQuery, FilterQuery, ScriptQuery};
+use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions};
+use hyper_scripter::query::{self, EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
-use hyper_scripter::{fuzzy, path, util};
+use hyper_scripter::{path, util};
 use hyper_scripter_historian::{Event, EventData};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -93,7 +93,7 @@ enum Subs {
     #[structopt(about = "Remove the script")]
     RM {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
-        script_queries: Vec<ScriptQuery>,
+        queries: Vec<ScriptQuery>,
         #[structopt(
             long,
             help = "Actually remove scripts, rather than hiding them with tag."
@@ -148,7 +148,7 @@ struct List {
     #[structopt(long, help = "Show only name of the script.", conflicts_with_all = &["file", "long"])]
     name: bool,
     #[structopt(parse(try_from_str))]
-    pattern: Option<ListPattern>,
+    queries: Vec<ListQuery>,
 }
 
 #[tokio::main]
@@ -197,37 +197,6 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     let res = main_inner(&root, &mut conf).await?;
     conf.store()?;
     Ok(res)
-}
-fn get_info_mut<'b, 'a>(
-    script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo<'a>,
-) -> Result<Option<ScriptRepoEntry<'a, 'b>>> {
-    log::debug!("開始尋找 `{:?}`", script_query);
-    match script_query {
-        ScriptQuery::Prev(prev) => {
-            let latest = script_repo.latest_mut(*prev);
-            log::trace!("找最新腳本");
-            return if latest.is_some() {
-                Ok(latest)
-            } else {
-                Err(Error::Empty)
-            };
-        }
-        ScriptQuery::Exact(name) => Ok(script_repo.get_mut(name)),
-        ScriptQuery::Fuzz(name) => fuzzy::fuzz_mut(name, script_repo.iter_mut()),
-    }
-}
-fn get_info_mut_strict<'b, 'a>(
-    script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo<'a>,
-) -> Result<ScriptRepoEntry<'a, 'b>> {
-    match get_info_mut(script_query, script_repo) {
-        Err(e) => Err(e),
-        Ok(None) => Err(Error::ScriptNotFound(
-            script_query.as_script_name()?.to_string(),
-        )),
-        Ok(Some(info)) => Ok(info),
-    }
 }
 async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     let pool = hyper_scripter::db::get_pool().await?;
@@ -342,7 +311,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Run { script_query, args } => {
-            let mut entry = get_info_mut_strict(script_query, &mut repo)?;
+            let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
             log::info!("執行 {:?}", entry.name);
             let script_path = path::open_script(&entry.name, &entry.ty, true)?;
             let content = util::read_file(&script_path)?;
@@ -381,13 +350,13 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Which { script_query } => {
-            let entry = get_info_mut_strict(script_query, &mut repo)?;
+            let entry = query::do_script_query_strict(script_query, &mut repo)?;
             log::info!("定位 {:?}", entry.name);
             let p = path::get_path().join(entry.file_path()?);
             println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {
-            let mut entry = get_info_mut_strict(script_query, &mut repo)?;
+            let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
             let script_path = path::open_script(&entry.name, &entry.ty, true)?;
             log::info!("打印 {:?}", entry.name);
             let content = util::read_file(&script_path)?;
@@ -397,7 +366,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::LS(List {
             long,
             no_grouping,
-            pattern,
+            queries,
             plain,
             name,
             file,
@@ -412,19 +381,16 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             let opt = ListOptions {
                 no_grouping: *no_grouping,
                 plain: *plain,
-                pattern,
+                queries,
                 display_style,
             };
             let stdout = std::io::stdout();
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
-        Subs::RM {
-            script_queries,
-            purge,
-        } => {
+        Subs::RM { queries, purge } => {
             let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("deleted").unwrap());
-            for query in script_queries.into_iter() {
-                let entry = get_info_mut_strict(query, &mut repo)?;
+            for query in queries.into_iter() {
+                let entry = query::do_script_query_strict(query, &mut repo)?;
                 log::info!("刪除 {:?}", *entry);
                 if *purge {
                     log::debug!("真的刪除腳本！");
@@ -450,7 +416,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::CP { origin, new } => {
-            let h = get_info_mut_strict(origin, &mut repo)?;
+            let h = query::do_script_query_strict(origin, &mut repo)?;
             let new_name = new.as_script_name()?;
             let og_script = path::open_script(&h.name, &h.ty, true)?;
             let new_script = path::open_script(&new_name, &h.ty, false)?;
@@ -532,7 +498,7 @@ async fn mv<'a, 'b>(
     tags: &Option<TagControlFlow>,
 ) -> Result {
     // FIXME: 避免 rm 時做兩次模糊搜尋
-    let mut entry = get_info_mut_strict(origin, script_repo)?;
+    let mut entry = query::do_script_query_strict(origin, script_repo)?;
     let og_script = path::open_script(&entry.name, &entry.ty, true)?;
     let new_script = path::open_script(
         new_name.as_ref().unwrap_or(&entry.name),
@@ -571,7 +537,7 @@ async fn edit_or_create<'a, 'b>(
     let final_ty: ScriptType;
     let mut new_namespaces: Vec<Tag> = vec![];
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        if let Some(entry) = get_info_mut(query, script_repo)? {
+        if let Some(entry) = query::do_script_query(query, script_repo)? {
             if let Some(ty) = ty {
                 log::warn!("已存在的腳本無需再指定類型");
                 if ty != entry.ty {

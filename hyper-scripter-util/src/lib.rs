@@ -41,7 +41,7 @@ mod test {
         let utils = get_all();
         let comm = utils
             .iter()
-            .find(|u| u.name == "common.rb")
+            .find(|u| u.name == "util/common")
             .expect("找不到應該存在的工具");
         assert!(comm.is_hidden, "{:?} 有問題", comm);
         assert_eq!(comm.category, "rb", "{:?} 有問題", comm);
@@ -49,7 +49,7 @@ mod test {
 
         let banish = utils
             .iter()
-            .find(|u| u.name == "banish.sh")
+            .find(|u| u.name == "util/banish")
             .expect("找不到應該存在的工具");
         assert!(!banish.is_hidden, "{:?} 有問題", banish);
         assert_eq!(banish.category, "sh", "{:?} 有問題", banish);
@@ -57,7 +57,7 @@ mod test {
 
         assert_eq!(
             None,
-            utils.iter().find(|u| u.name == "not-exist.sh"),
+            utils.iter().find(|u| u.name == "not-exist"),
             "找到了不存在的工具"
         );
     }

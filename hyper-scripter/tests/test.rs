@@ -11,7 +11,7 @@ lazy_static::lazy_static! {
 const PATH: &str = "./.hyper_scripter";
 
 fn setup<'a>() -> MutexGuard<'a, ()> {
-    let guard = LOCK.lock().unwrap();
+    let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
     match std::fs::remove_dir_all(PATH) {
         Ok(_) => (),

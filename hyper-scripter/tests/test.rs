@@ -237,14 +237,24 @@ fn test_rm() {
     let _g = setup();
     run(&["e", "longlive", "--fast", "echo 矻立不搖"]).unwrap();
 
-    run(&["e", "test", "--fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&[
+        "e",
+        "test",
+        "--fast",
+        &format!("echo \"{}\"", MSG),
+        "-f",
+        "test-tag",
+    ])
+    .unwrap();
     assert_eq!(MSG, run(&["test"]).unwrap());
     run(&["rm", "-"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
     run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
     assert_eq!(MSG, run(&["-f", "deleted", "test"]).unwrap());
-
-    assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
+    assert_eq!(
+        MSG,
+        run(&["-f", "test-tag", "test"]).expect("刪除沒有保留本來的標籤？")
+    );
 
     run(&["e", ".", "--fast", "echo \"你匿\""]).unwrap();
     assert_eq!("你匿", run(&[".1"]).unwrap());

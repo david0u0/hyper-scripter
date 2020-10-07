@@ -31,9 +31,15 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 struct Root {
     #[structopt(short = "p", long, help = "Path to hyper script root")]
     hs_path: Option<String>,
-    #[structopt(short, long, global = true, parse(try_from_str))]
+    #[structopt(
+        short,
+        long,
+        global = true,
+        parse(try_from_str),
+        help = "Filter by tags, e.g. `all,^mytag`"
+    )]
     filter: Option<TagControlFlow>,
-    #[structopt(short, long, global = true, help = "Shorthand for `-t=all,^deleted`")]
+    #[structopt(short, long, global = true, help = "Shorthand for `-f=all,^deleted`")]
     all: bool,
     #[structopt(long, global = true, help = "Show scripts within recent days.")]
     recent: Option<u32>,
@@ -81,7 +87,7 @@ enum Subs {
         #[structopt(help = "Command line args to pass to the script")]
         args: Vec<String>,
     },
-    #[structopt(about = "Execute the script query and get the exact file", settings = NO_FLAG_SETTINGS)]
+    #[structopt(about = "Execute the script query and get the exact file")]
     Which {
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
@@ -382,7 +388,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
-            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("deleted").unwrap());
+            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+deleted").unwrap());
             let mut to_purge = vec![];
             for entry in query::do_list_query(&mut repo, queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);

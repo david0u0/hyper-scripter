@@ -220,12 +220,12 @@ fn test_multi_filter() {
     assert_eq!(MSG, run(&["test-pin"]).unwrap());
     assert_eq!(MSG, run(&["nobody"]).unwrap());
 
-    run(&["tags", "hidden"]).unwrap();
+    run(&["tags", "+hidden"]).unwrap();
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
     assert_eq!(MSG, run(&["test-pin"]).unwrap());
     run(&["nobody"]).expect_err("未能被主篩選器篩掉");
 
-    run(&["tags", "^test"]).unwrap();
+    run(&["tags", "+^test"]).unwrap();
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
     run(&["test-pin"]).expect_err("未能被主篩選器篩掉");
 

@@ -7,7 +7,11 @@ use std::str::FromStr;
 pub struct TagFilterGroup(Vec<TagFilter>);
 impl TagFilterGroup {
     pub fn push(&mut self, filter: TagFilter) {
-        self.0.push(filter);
+        if filter.filter.append {
+            self.0.push(filter);
+        } else {
+            self.0 = vec![filter];
+        }
     }
     pub fn filter(&self, tags: &[Tag]) -> bool {
         let mut pass = false;

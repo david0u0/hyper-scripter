@@ -215,18 +215,11 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         let tag_group: TagFilterGroup = if root.all {
             TagFilter::from_str("all,^deleted").unwrap().into()
         } else {
-            match root.filter.clone() {
-                Some(filter) => {
-                    if filter.append {
-                        let mut group = conf.get_tag_filter_group();
-                        group.push(filter.into());
-                        group
-                    } else {
-                        Into::<TagFilter>::into(filter).into()
-                    }
-                }
-                None => conf.get_tag_filter_group(),
+            let mut group = conf.get_tag_filter_group();
+            if let Some(flow) = root.filter.clone() {
+                group.push(flow.into());
             }
+            group
         };
         repo.filter_by_tag(&tag_group);
     }

@@ -26,7 +26,7 @@ fn main() -> std::io::Result<()> {
             let category = splited.next().unwrap();
             let name = splited.next().unwrap();
             format!(
-                "(\"util/{}\", \"{}\", std::include_str!(\"{}\"))",
+                "(\"util/{}\", \"{}\", std::include_str!(r\"{}\"))",
                 name,
                 category,
                 join_file(&path)

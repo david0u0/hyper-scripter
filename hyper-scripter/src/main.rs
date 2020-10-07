@@ -442,16 +442,25 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         } => {
             if let Some(filter) = tag_filter {
                 if let Some(name) = &filter.name {
-                    log::info!("加入篩選器 {:?}", filter);
+                    log::debug!("處理篩選器 {:?}", filter);
                     let mut found = false;
-                    for f in conf.tag_filters.iter_mut() {
+                    let tag_filters = &mut conf.tag_filters;
+                    for (i, f) in tag_filters.iter_mut().enumerate() {
                         if &f.name == name {
+                            if filter.content.is_empty() {
+                                log::info!("刪除篩選器 {}", name);
+                                tag_filters.remove(i);
+                            } else {
+                                log::info!("修改篩選器 {:?}", filter);
+                                f.obligation = *obligation;
+                                f.filter = filter.content.clone();
+                            }
                             found = true;
-                            f.obligation = *obligation;
-                            f.filter = filter.content.clone();
+                            break;
                         }
                     }
-                    if !found {
+                    if !found && !filter.content.is_empty() {
+                        log::info!("新增篩選器 {:?}", filter);
                         conf.tag_filters.push(NamedTagFilter {
                             filter: filter.content.clone(),
                             obligation: *obligation,

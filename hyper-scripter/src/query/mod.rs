@@ -121,10 +121,15 @@ impl FromStr for FilterQuery {
             }
             &[name, s] => {
                 log::trace!("解析有名篩選器：{} = {}", name, s);
+                let content: TagControlFlow = if s.len() == 0 {
+                    Default::default()
+                } else {
+                    FromStr::from_str(s)?
+                };
                 Ok(FilterQuery {
                     // TODO: 檢查名字
                     name: Some(name.to_owned()),
-                    content: FromStr::from_str(s)?,
+                    content,
                 })
             }
             _ => Err(Error::Format(FilterQueryCode, s.to_owned())),

@@ -53,7 +53,7 @@ pub struct TagFilter {
     pub obligation: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TagControlFlow {
     tags: Vec<TagControl>,
     pub append: bool,
@@ -170,6 +170,9 @@ impl std::fmt::Display for TagControlFlow {
     }
 }
 impl TagControlFlow {
+    pub fn is_empty(&self) -> bool {
+        self.tags.is_empty()
+    }
     pub fn push(&mut self, flow: Self) {
         if flow.append {
             self.tags.extend(flow.tags.into_iter());

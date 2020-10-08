@@ -8,6 +8,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 pub const ANONYMOUS: &'static str = ".anonymous";
@@ -98,7 +99,7 @@ pub struct ScriptInfo<'a> {
     pub exec_time: Option<ScriptTime<String>>,
     pub id: i64,
     pub name: ScriptName<'a>,
-    pub tags: Vec<Tag>,
+    pub tags: HashSet<Tag>,
     pub ty: ScriptType,
 }
 impl FuzzKey for ScriptInfo<'_> {

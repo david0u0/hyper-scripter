@@ -25,7 +25,7 @@ impl Environment for DBEnv {
         log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
         let name = name_cow.as_ref();
-        let tags = join_tags(&info.tags);
+        let tags = join_tags(info.tags.iter());
         let category = info.ty.as_ref();
         let write_time = *info.write_time;
         sqlx::query!(
@@ -62,8 +62,8 @@ impl Environment for DBEnv {
     }
 }
 
-fn join_tags(tags: &[Tag]) -> String {
-    let tags_arr: Vec<&str> = tags.iter().map(|t| t.as_ref()).collect();
+fn join_tags<'a, I: Iterator<Item = &'a Tag>>(tags: I) -> String {
+    let tags_arr: Vec<&str> = tags.map(|t| t.as_ref()).collect();
     tags_arr.join(",")
 }
 
@@ -259,7 +259,7 @@ impl<'a> ScriptRepo<'a> {
             let name_cow = info.name.key();
             let name = name_cow.as_ref();
             let category = info.ty.as_ref();
-            let tags = join_tags(&info.tags);
+            let tags = join_tags(info.tags.iter());
             sqlx::query!(
                 "
                 INSERT INTO script_infos (name, category, tags)
@@ -290,7 +290,8 @@ impl<'a> ScriptRepo<'a> {
         let drain = self.map.drain();
         let mut map = HashMap::new();
         for (key, info) in drain {
-            if filter.filter(&info.tags) {
+            let tags_arr: Vec<_> = info.tags.iter().collect();
+            if filter.filter(&tags_arr) {
                 log::trace!("腳本 {:?} 通過篩選", info.name);
                 map.insert(key, info);
             } else {

@@ -38,7 +38,8 @@ impl std::fmt::Display for TagsKey {
     }
 }
 impl TagsKey {
-    fn new(mut tags: Vec<Tag>) -> Self {
+    fn new(tags: impl Iterator<Item = Tag>) -> Self {
+        let mut tags: Vec<_> = tags.collect();
         tags.sort();
         TagsKey(tags)
     }
@@ -160,7 +161,7 @@ pub fn fmt_list<'a, W: Write>(
 
     let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
     for script in scripts_iter {
-        let key = TagsKey::new(script.tags.clone());
+        let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
         let v = script_map.entry(key).or_default();
         v.push(script);
     }

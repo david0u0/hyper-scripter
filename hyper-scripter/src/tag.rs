@@ -13,7 +13,7 @@ impl TagFilterGroup {
             self.0 = vec![filter];
         }
     }
-    pub fn filter(&self, tags: &[Tag]) -> bool {
+    pub fn filter(&self, tags: &[&Tag]) -> bool {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.filter(tags);
@@ -82,7 +82,7 @@ pub struct TagControl {
     allow: bool,
     tag: Tag,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tag(String);
 impl AsRef<str> for Tag {
     fn as_ref(&self) -> &str {
@@ -192,11 +192,11 @@ impl TagControlFlow {
     }
 }
 impl TagFilter {
-    pub fn filter(&self, tags: &[Tag]) -> Option<bool> {
+    pub fn filter(&self, tags: &[&Tag]) -> Option<bool> {
         let mut pass: Option<bool> = None;
         for filter in self.filter.tags.iter() {
             // TODO: 優化
-            if filter.tag.match_all() || tags.contains(&filter.tag) {
+            if filter.tag.match_all() || tags.contains(&&filter.tag) {
                 pass = Some(filter.allow);
             }
         }

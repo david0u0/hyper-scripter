@@ -1,85 +1,11 @@
+#[path = "../../hyper-scripter-test-lib/test_util.rs"]
+mod test_util;
+
 use hyper_scripter::path::HS_EXECUTABLE_INFO_PATH;
 use regex::Regex;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::process::ExitStatus;
-use std::process::{Command, Stdio};
-use std::sync::{Mutex, MutexGuard};
-
-lazy_static::lazy_static! {
-    static ref LOCK: Mutex<()> = Mutex::new(());
-}
-#[cfg(not(debug_assertions))]
-const EXE: &'static str = "../target/release/hyper-scripter";
-#[cfg(debug_assertions)]
-const EXE: &'static str = "../target/debug/hyper-scripter";
-
-fn get_exe_abs() -> String {
-    std::fs::canonicalize(EXE)
-        .unwrap()
-        .to_string_lossy()
-        .as_ref()
-        .to_owned()
-}
-
-const PATH: &str = "./.hyper_scripter";
-
-fn setup<'a>() -> MutexGuard<'a, ()> {
-    let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
-    let _ = env_logger::try_init();
-    match std::fs::remove_dir_all(PATH) {
-        Ok(_) => (),
-        Err(e) => {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                panic!("重整測試用資料夾失敗了……")
-            }
-        }
-    }
-
-    guard
-}
-fn read(p: &[&str]) -> Option<String> {
-    let mut file: PathBuf = PATH.into();
-    for p in p.iter() {
-        file = file.join(p);
-    }
-    if file.exists() {
-        let s = std::fs::read(file).unwrap();
-        let s: &str = std::str::from_utf8(&s).unwrap();
-        Some(s.to_owned())
-    } else {
-        None
-    }
-}
-fn check_exist(p: &[&str]) -> bool {
-    read(p).is_some()
-}
-fn run(args: &[&str]) -> Result<String, ExitStatus> {
-    let mut full_args = vec!["-p", PATH];
-    full_args.extend(args);
-
-    let mut cmd = Command::new(EXE);
-    let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
-    let stdout = child.stdout.as_mut().unwrap();
-    let mut out_str = vec![];
-    let reader = BufReader::new(stdout);
-    reader
-        .lines()
-        .filter_map(|line| line.ok())
-        .for_each(|line| {
-            println!("{}", line);
-            out_str.push(line);
-        });
-
-    let status = child.wait().unwrap();
-    if status.success() {
-        Ok(out_str.join("\n"))
-    } else {
-        Err(status)
-    }
-}
-
+use test_util::*;
 const MSG: &'static str = "你好，腳本人！";
+
 const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
@@ -158,7 +84,7 @@ fn test_run() {
     );
 
     assert_eq!(
-        read(&[HS_EXECUTABLE_INFO_PATH]).expect("沒記錄到執行檔位置？"),
+        read(&[HS_EXECUTABLE_INFO_PATH]),
         get_exe_abs(),
         "記錄到的執行檔位置有誤"
     );

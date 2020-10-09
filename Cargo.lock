@@ -686,7 +686,9 @@ dependencies = [
 name = "hyper-scripter-util"
 version = "0.1.0"
 dependencies = [
+ "env_logger",
  "lazy_static",
+ "log",
 ]
 
 [[package]]

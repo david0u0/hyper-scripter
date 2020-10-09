@@ -58,7 +58,7 @@ tmux split-window -h \"{{{content.1}}}\"
 tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# Hello, scripter!
-Dir.chdir('~/{{birthplace}}')
+Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 NAME = '{{name}}'
 
 {{#each content}}{{{this}}}

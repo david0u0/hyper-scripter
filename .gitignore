@@ -1,6 +1,7 @@
 **/target
-**/.hyper_scripter_info.json
 .config.*
 .hyper_scripter
 *.db
 *.db-*
+.hs_exe_path
+.tmp

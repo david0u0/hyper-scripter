@@ -16,7 +16,7 @@ lazy_static::lazy_static! {
     static ref HIDDEN_SET: HashSet<&'static str> = {
         let mut set = HashSet::<&str>::new();
         set.insert("util/common");
-        set.insert("util/hs_path");
+        set.insert("util/hs_env");
         set
     };
 }

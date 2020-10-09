@@ -2,6 +2,7 @@ use hyper_scripter::path::HS_EXECUTABLE_INFO_PATH;
 use regex::Regex;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::process::ExitStatus;
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
 
@@ -53,7 +54,7 @@ fn read(p: &[&str]) -> Option<String> {
 fn check_exist(p: &[&str]) -> bool {
     read(p).is_some()
 }
-fn run(args: &[&str]) -> Result<String, i32> {
+fn run(args: &[&str]) -> Result<String, ExitStatus> {
     let mut full_args = vec!["-p", PATH];
     full_args.extend(args);
 
@@ -74,7 +75,7 @@ fn run(args: &[&str]) -> Result<String, i32> {
     if status.success() {
         Ok(out_str.join("\n"))
     } else {
-        Err(status.code().unwrap_or_default())
+        Err(status)
     }
 }
 

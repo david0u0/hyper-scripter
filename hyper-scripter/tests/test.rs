@@ -1,3 +1,4 @@
+use hyper_scripter::path::HS_EXECUTABLE_INFO_PATH;
 use regex::Regex;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -6,6 +7,18 @@ use std::sync::{Mutex, MutexGuard};
 
 lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
+}
+#[cfg(not(debug_assertions))]
+const EXE: &'static str = "../target/release/hyper-scripter";
+#[cfg(debug_assertions)]
+const EXE: &'static str = "../target/debug/hyper-scripter";
+
+fn get_exe_abs() -> String {
+    std::fs::canonicalize(EXE)
+        .unwrap()
+        .to_string_lossy()
+        .as_ref()
+        .to_owned()
 }
 
 const PATH: &str = "./.hyper_scripter";
@@ -24,26 +37,27 @@ fn setup<'a>() -> MutexGuard<'a, ()> {
 
     guard
 }
-fn check_exist(p: &[&str]) -> bool {
+fn read(p: &[&str]) -> Option<String> {
     let mut file: PathBuf = PATH.into();
     for p in p.iter() {
         file = file.join(p);
     }
-    file.exists()
+    if file.exists() {
+        let s = std::fs::read(file).unwrap();
+        let s: &str = std::str::from_utf8(&s).unwrap();
+        Some(s.to_owned())
+    } else {
+        None
+    }
+}
+fn check_exist(p: &[&str]) -> bool {
+    read(p).is_some()
 }
 fn run(args: &[&str]) -> Result<String, i32> {
     let mut full_args = vec!["-p", PATH];
     full_args.extend(args);
 
-    let mut cmd: Command;
-    #[cfg(not(debug_assertions))]
-    {
-        cmd = Command::new("../target/release/hyper-scripter");
-    }
-    #[cfg(debug_assertions)]
-    {
-        cmd = Command::new("../target/debug/hyper-scripter");
-    }
+    let mut cmd = Command::new(EXE);
     let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
     let stdout = child.stdout.as_mut().unwrap();
     let mut out_str = vec![];
@@ -127,7 +141,7 @@ fn test_mv() {
 const TALKER: &'static str = "--腳本小子";
 const APPEND: &'static str = "第二行";
 #[test]
-fn test_args() {
+fn test_run() {
     let _g = setup();
     run(&[
         "e",
@@ -138,7 +152,14 @@ fn test_args() {
     .unwrap();
     assert_eq!(
         format!("{}：{}\n{}", TALKER, MSG, APPEND),
-        run(&["-", TALKER, APPEND]).unwrap()
+        run(&["-", TALKER, APPEND]).unwrap(),
+        "沒吃到命令行參數？"
+    );
+
+    assert_eq!(
+        read(&[HS_EXECUTABLE_INFO_PATH]).expect("沒記錄到執行檔位置？"),
+        get_exe_abs(),
+        "記錄到的執行檔位置有誤"
     );
 }
 

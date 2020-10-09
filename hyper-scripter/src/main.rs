@@ -313,6 +313,12 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Run { script_query, args } => {
             let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
             log::info!("執行 {:?}", entry.name);
+            {
+                let exe = std::env::current_exe()?;
+                let exe = exe.to_string_lossy();
+                log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
+                util::write_file(&path::get_path().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
+            }
             let script_path = path::open_script(&entry.name, &entry.ty, true)?;
             let content = util::read_file(&script_path)?;
             entry.update(|info| info.exec(content)).await?;

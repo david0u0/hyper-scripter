@@ -1,3 +1,8 @@
+if ARGV.length == 0
+  puts 'At least one argument is required!'
+  exit 1
+end
+
 require 'shellwords'
 require_relative './common.rb'
 
@@ -42,9 +47,9 @@ def import_dir(dir)
   puts "import directory #{dir}"
   out = HS_ENV.do_hs('ls --plain', [], dir)
   parse(out).each do |script|
-    content = HS_ENV.do_hs("which =#{script.name} 2>/dev/null")
-    if $?.success? && false
-      puts "#{script.name} already exist!"
+    HS_ENV.do_hs("which =#{script.name} 2>/dev/null")
+    if $?.success?
+      puts "#{script.name} already exists!"
       next
     else
       puts "importing #{script.name}..."
@@ -71,11 +76,6 @@ def import(arg)
     import_dir('repo')
     Dir.chdir(cur)
   end
-end
-
-if ARGV.length == 0
-  puts 'at least one argument is required!'
-  exit 1
 end
 
 ARGV.each do |arg|

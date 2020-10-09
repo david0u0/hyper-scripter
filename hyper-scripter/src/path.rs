@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ROOT_PATH: &'static str = "hyper_scripter";
+pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -35,7 +36,7 @@ pub fn get_sys_path() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }
 
-pub fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
+fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
     let here = canonicalize(base)?;
     Ok(here.join(path))
 }

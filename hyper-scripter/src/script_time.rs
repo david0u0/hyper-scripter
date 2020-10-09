@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, Utc};
+use chrono::{Local, NaiveDateTime, TimeZone, Utc};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::fmt::Debug;
 
@@ -47,5 +47,12 @@ impl<T: Clone + Debug> ScriptTime<T> {
     }
     pub fn has_changed(&self) -> bool {
         self.changed.is_some()
+    }
+}
+
+impl<T: Clone + Debug> std::fmt::Display for ScriptTime<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let local_time = Local.from_utc_datetime(&self.time);
+        write!(f, "{}", local_time)
     }
 }

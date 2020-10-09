@@ -108,7 +108,7 @@ pub fn fmt_meta<W: Write>(
             write!(
                 w,
                 "{}\t{}\t{}\t{}\n",
-                label, *script.created_time, *script.read_time, exex_time
+                label, script.created_time, script.read_time, exex_time
             )?;
         }
         DisplayStyle::Short(ident) => {

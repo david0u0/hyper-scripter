@@ -86,7 +86,7 @@ impl Historian {
             "
         SELECT e.script_id, MAX(e.time) as time FROM events e
         WHERE type = ?
-        GROUP BY e.script_id ORDER BY script_id 
+        GROUP BY e.script_id ORDER BY script_id
         ",
         )
         .bind(ty)

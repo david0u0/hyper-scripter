@@ -129,28 +129,6 @@ impl<'a> ScriptInfo<'a> {
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)
     }
-    pub fn new<'b>(
-        id: i64,
-        name: ScriptName<'b>,
-        ty: ScriptType,
-        tags: impl Iterator<Item = Tag>,
-        exec_time: Option<NaiveDateTime>,
-        created_time: Option<NaiveDateTime>,
-        write_time: Option<NaiveDateTime>,
-        read_time: Option<NaiveDateTime>,
-    ) -> ScriptInfo<'b> {
-        let now = ScriptTime::now(());
-        ScriptInfo {
-            id,
-            name,
-            ty,
-            tags: tags.collect(),
-            created_time: ScriptTime::new_or(created_time, now.clone()),
-            write_time: ScriptTime::new_or(write_time, now.clone()),
-            read_time: ScriptTime::new_or(read_time, now.clone()),
-            exec_time: exec_time.map(|t| ScriptTime::new(t)),
-        }
-    }
     pub fn read(&mut self) {
         self.read_time = ScriptTime::now(());
     }
@@ -163,6 +141,23 @@ impl<'a> ScriptInfo<'a> {
         log::trace!("{:?} 執行內容為 {}", self, content);
         self.exec_time = Some(ScriptTime::now(content));
         self.read_time = ScriptTime::now(());
+    }
+    pub fn builder<'b>(
+        id: i64,
+        name: ScriptName<'b>,
+        ty: ScriptType,
+        tags: impl Iterator<Item = Tag>,
+    ) -> ScriptBuilder<'b> {
+        ScriptBuilder {
+            id,
+            name,
+            ty,
+            tags: tags.collect(),
+            read_time: None,
+            created_time: None,
+            exec_time: None,
+            write_time: None,
+        }
     }
 }
 
@@ -207,5 +202,49 @@ impl AsScriptName for ScriptName<'_> {
             ScriptName::Anonymous(id) => ScriptName::Anonymous(*id),
             ScriptName::Named(s) => ScriptName::Named(Cow::Borrowed(&*s)),
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct ScriptBuilder<'a> {
+    pub name: ScriptName<'a>,
+    read_time: Option<NaiveDateTime>,
+    created_time: Option<NaiveDateTime>,
+    write_time: Option<NaiveDateTime>,
+    exec_time: Option<NaiveDateTime>,
+    id: i64,
+    tags: HashSet<Tag>,
+    ty: ScriptType,
+}
+
+impl<'a> ScriptBuilder<'a> {
+    pub fn exec_time(mut self, time: NaiveDateTime) -> Self {
+        self.exec_time = Some(time);
+        self
+    }
+    pub fn read_time(mut self, time: NaiveDateTime) -> Self {
+        self.read_time = Some(time);
+        self
+    }
+    pub fn write_time(mut self, time: NaiveDateTime) -> Self {
+        self.write_time = Some(time);
+        self
+    }
+    pub fn created_time(mut self, time: NaiveDateTime) -> Self {
+        self.created_time = Some(time);
+        self
+    }
+    pub fn build(self) -> ScriptInfo<'a> {
+        let now = ScriptTime::now(());
+        ScriptInfo {
+            id: self.id,
+            name: self.name,
+            ty: self.ty,
+            tags: self.tags,
+            created_time: ScriptTime::new_or(self.created_time, now.clone()),
+            write_time: ScriptTime::new_or(self.write_time, now.clone()),
+            read_time: ScriptTime::new_or(self.read_time, now.clone()),
+            exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
+        }
     }
 }

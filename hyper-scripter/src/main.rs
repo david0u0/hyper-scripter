@@ -252,16 +252,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 }
                 let entry = repo
                     .upsert(&name, || {
-                        ScriptInfo::new(
-                            0,
-                            name.clone(),
-                            ty,
-                            tags.into_iter(),
-                            None,
-                            None,
-                            None,
-                            None,
-                        )
+                        ScriptInfo::builder(0, name.clone(), ty, tags.into_iter()).build()
                     })
                     .await?;
                 util::prepare_script(&p, *entry, true, Some(u.content))?;
@@ -592,16 +583,13 @@ async fn edit_or_create<'a, 'b>(
 
     let entry = script_repo
         .upsert(&script_name, || {
-            ScriptInfo::new(
+            ScriptInfo::builder(
                 0,
                 script_name.clone().into_static(),
                 final_ty,
                 tags.into_allowed_iter().chain(new_namespaces.into_iter()),
-                None,
-                None,
-                None,
-                None,
             )
+            .build()
         })
         .await?;
     Ok((script_path, entry))

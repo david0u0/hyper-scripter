@@ -3,7 +3,7 @@ use crate::path;
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -113,49 +113,7 @@ impl<'a> ScriptRepo<'a> {
             log::trace!("載入腳本：{} {} {}", name, script.category, script.tags);
             let script_name = name.as_script_name()?.into_static(); // TODO: 正確實作 from string
 
-            let exec_time = loop {
-                match last_exec.first() {
-                    Some((id, time)) => {
-                        if *id == script.id {
-                            last_exec = &last_exec[1..last_exec.len()];
-                            break Some(*time);
-                        } else if *id < script.id {
-                            last_exec = &last_exec[1..last_exec.len()];
-                        } else {
-                            break None;
-                        }
-                    }
-                    None => {
-                        break None;
-                    }
-                }
-            };
-            let mut read_time = loop {
-                match last_read.first() {
-                    Some((id, time)) => {
-                        if *id == script.id {
-                            last_read = &last_read[1..last_read.len()];
-                            break Some(*time);
-                        } else if *id < script.id {
-                            last_read = &last_read[1..last_read.len()];
-                        } else {
-                            break None;
-                        }
-                    }
-                    None => {
-                        break None;
-                    }
-                }
-            };
-            if read_time.is_none() {
-                log::warn!(
-                    "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
-                    script_name
-                );
-                read_time = Some(script.created_time);
-            }
-
-            let script = ScriptInfo::new(
+            let mut builder = ScriptInfo::builder(
                 script.id,
                 script_name,
                 script.category.into(),
@@ -163,14 +121,28 @@ impl<'a> ScriptRepo<'a> {
                     if s == "" {
                         None
                     } else {
+                        // TODO: 錯誤處理，至少印個警告
                         Tag::from_str(s).ok()
                     }
                 }),
-                exec_time,
-                Some(script.created_time),
-                Some(script.write_time),
-                read_time,
-            );
+            )
+            .created_time(script.created_time)
+            .write_time(script.write_time);
+
+            if let Some(time) = extract_from_time(script.id, &mut last_exec) {
+                builder = builder.exec_time(time);
+            }
+            if let Some(time) = extract_from_time(script.id, &mut last_read) {
+                builder = builder.read_time(time);
+            } else {
+                log::warn!(
+                    "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
+                    builder.name
+                );
+                builder = builder.read_time(script.created_time);
+            }
+
+            let script = builder.build();
             if time_bound.map_or(true, |time_bound| script.last_time() > time_bound) {
                 map.insert(name, script);
             } else {
@@ -300,5 +272,25 @@ impl<'a> ScriptRepo<'a> {
             }
         }
         self.map = map;
+    }
+}
+
+fn extract_from_time(cur_id: i64, series: &mut &[(i64, NaiveDateTime)]) -> Option<NaiveDateTime> {
+    loop {
+        match series.first() {
+            Some((id, time)) => {
+                if *id == cur_id {
+                    *series = &series[1..series.len()];
+                    return Some(*time);
+                } else if *id < cur_id {
+                    *series = &series[1..series.len()];
+                } else {
+                    return None;
+                }
+            }
+            None => {
+                return None;
+            }
+        }
     }
 }

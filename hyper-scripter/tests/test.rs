@@ -198,7 +198,7 @@ fn test_rm() {
     run(&["rm", "-"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
     run(&["-a", "test"]).expect_err("被刪除掉的腳本竟能用 `-a` 找回來");
-    assert_eq!(MSG, run(&["-f", "deleted", "test"]).unwrap());
+    assert_eq!(MSG, run(&["-f", "removed", "test"]).unwrap());
     assert_eq!(
         MSG,
         run(&["-f", "test-tag", "test"]).expect("刪除沒有保留本來的標籤？")
@@ -209,7 +209,7 @@ fn test_rm() {
     run(&["rm", "-"]).unwrap();
     assert_eq!(
         "你匿",
-        run(&["-f", "deleted", "-"]).expect("就算是匿名腳本也不該真的被刪掉！")
+        run(&["-f", "removed", "-"]).expect("就算是匿名腳本也不該真的被刪掉！")
     );
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
@@ -226,9 +226,9 @@ fn test_rm() {
     run(&["my-super-test"]).expect_err("未能被刪除掉");
     assert_eq!(
         "不要刪我 QmmmmQ",
-        run(&["-f", "deleted", "my-namespace/super-test"]).unwrap()
+        run(&["-f", "removed", "my-namespace/super-test"]).unwrap()
     );
-    let file_path = run(&["-f", "deleted", "which", "-"]).unwrap();
+    let file_path = run(&["-f", "removed", "which", "-"]).unwrap();
     let re = Regex::new(r".+my-namespace/\d{14}-super-test\.sh$").unwrap();
     assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 

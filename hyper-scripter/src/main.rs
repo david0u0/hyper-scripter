@@ -39,7 +39,7 @@ struct Root {
         help = "Filter by tags, e.g. `all,^mytag`"
     )]
     filter: Option<TagControlFlow>,
-    #[structopt(short, long, global = true, help = "Shorthand for `-f=all,^deleted`")]
+    #[structopt(short, long, global = true, help = "Shorthand for `-f=all,^removed`")]
     all: bool,
     #[structopt(long, global = true, help = "Show scripts within recent days.")]
     recent: Option<u32>,
@@ -219,7 +219,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all {
-            TagFilter::from_str("all,^deleted").unwrap().into()
+            TagFilter::from_str("all,^removed").unwrap().into()
         } else {
             let mut group = conf.get_tag_filter_group();
             if let Some(flow) = root.filter.clone() {
@@ -385,7 +385,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
-            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+deleted").unwrap());
+            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+removed").unwrap());
             let mut to_purge = vec![];
             for entry in query::do_list_query(&mut repo, queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);

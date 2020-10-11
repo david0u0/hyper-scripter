@@ -66,9 +66,9 @@ impl Default for RawConfig {
                     name: "no-hidden".to_owned(),
                 },
                 NamedTagFilter {
-                    filter: FromStr::from_str("+all,^deleted").unwrap(),
+                    filter: FromStr::from_str("+all,^removed").unwrap(),
                     obligation: true,
-                    name: "no-deleted".to_owned(),
+                    name: "no-removed".to_owned(),
                 },
             ],
             main_tag_filter: FromStr::from_str("+all").unwrap(),

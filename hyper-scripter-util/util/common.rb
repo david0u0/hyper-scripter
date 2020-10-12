@@ -10,9 +10,16 @@ class HSEnv
     @hs_home, @hs_exe = env.split(':')
   end
 
+  def home
+    @hs_home
+  end
+
   def do_hs(arg, tags = [], path = @hs_home)
     tags = ['all'] if tags.length == 0
     tags_str = tags.join(',')
     `#{@hs_exe} --timeless -p #{path} -f #{tags_str} #{arg}`
   end
 end
+
+DIR = File.dirname(__FILE__)
+HS_ENV = HSEnv.new(DIR)

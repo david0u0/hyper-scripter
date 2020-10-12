@@ -6,9 +6,6 @@ end
 require 'shellwords'
 require_relative './common.rb'
 
-DIR = File.dirname(__FILE__)
-HS_ENV = HSEnv.new(DIR)
-
 class Script
   attr_reader :name, :category, :tags
   def initialize(name, category, tags)

@@ -24,6 +24,7 @@ directory_tree(root).each do |full_path|
   next if script.start_with? '.'
 
   name, ext = script.split('.')
+
   HS_ENV.do_hs("which =#{name} 2>/dev/null")
   next if $?.success?
 
@@ -32,5 +33,15 @@ directory_tree(root).each do |full_path|
   file = File.open(full_path)
   content = Shellwords.escape(file.read)
   File.delete(full_path)
-  HS_ENV.do_hs("edit #{name} -c #{ext} --fast #{content} --no-template")
+  HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template")
+end
+
+HS_ENV.do_hs('ls --no-grouping --name --plain').split(' ').each do |name|
+  file = HS_ENV.do_hs("which =#{name} 2>/dev/null").delete_suffix("\n")
+  next unless $?.success?
+
+  unless File.exist?(file)
+    puts "removing script #{file}!"
+    HS_ENV.do_hs("rm --purge =#{name}")
+  end
 end

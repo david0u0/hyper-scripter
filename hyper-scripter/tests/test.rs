@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[path = "../../hyper-scripter-test-lib/test_util.rs"]
 mod test_util;
 

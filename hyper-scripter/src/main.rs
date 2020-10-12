@@ -405,7 +405,9 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             for (name, ty) in to_purge.into_iter() {
                 let p = path::open_script(&name, &ty, None)?;
                 repo.remove(&name).await?;
-                util::remove(&p)?;
+                if let Err(e) = util::remove(&p) {
+                    log::warn!("刪除腳本實體遭遇錯誤：{}", e);
+                }
             }
         }
         Subs::CP { origin, new } => {

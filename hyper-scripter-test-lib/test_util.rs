@@ -20,7 +20,11 @@ pub fn get_exe_abs() -> String {
         .to_owned()
 }
 
-pub const PATH: &str = "./.hyper_scripter";
+const PATH: &str = "./.hyper_scripter";
+
+pub fn get_path() -> PathBuf {
+    PATH.into()
+}
 
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());

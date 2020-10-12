@@ -3,9 +3,8 @@
 mod test_util;
 
 use hyper_scripter_util::get_all;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::sync::MutexGuard;
 use test_util::*;
 
@@ -47,7 +46,7 @@ fn test_import() {
 
     assert_eq!(run(&["-f", "my", "test"]).unwrap(), "安安，紅寶石");
     assert_eq!(run(&["-f", "tag", "mytest"]).unwrap(), "安安，紅寶石");
-    assert_eq!(run(&["-f", "tag", "youtest"]).unwrap(), "安安，殼");
+    assert_eq!(run(&["-f", "tag", "youtest"]).unwrap(), "殼已破碎");
     assert_eq!(run(&["-f", "nameless", "-"]).unwrap(), "安安，匿名殼");
 
     run(&["-f", "something-evil", "which", "-"]).expect_err("標籤匯入錯了？");
@@ -63,12 +62,15 @@ fn test_git() {
     assert_eq!(GITIGNORE_CONTENT, read(&[".gitignore"]));
 }
 fn test_collect() {
-    let p: PathBuf = PATH.into();
-    create_dir_all(p.join("this/is/a/collect")).unwrap();
-    let mut file = File::create(p.join("this/is/a/collect/test.rb")).unwrap();
+    create_dir_all(get_path().join("this/is/a/collect")).unwrap();
+    let mut file = File::create(get_path().join("this/is/a/collect/test.rb")).unwrap();
     file.write_all("puts '這是一個收集測試'".as_bytes())
         .unwrap();
+    remove_dir_all(get_path().join("my")).unwrap();
+    run(&["-f", "innate", "which", "myinnate"]).expect("還沒跑 collect 就壞掉了？");
+    run(&["-f", "my", "which", "mytest"]).expect("還沒跑 collect 就壞掉了？");
     run(&["thisisacolltest"]).expect_err("還沒收集就出現了，嚇死");
+
     run(&["collect"]).unwrap();
     assert_eq!(
         run(&["-f", "this", "thisisacolltest"]).unwrap(),
@@ -78,6 +80,11 @@ fn test_collect() {
         run(&["-f", "is", "thisisacolltest"]).unwrap(),
         "這是一個收集測試"
     );
+    run(&["-f", "innate", "which", "myinnate"]).expect_err("跑了 collect 沒有刪成功");
+    run(&["-f", "my", "which", "mytest"]).expect_err("跑了 collect 沒有刪成功");
+
+    assert_eq!(run(&["-f", "tag", "youtest"]).unwrap(), "殼已破碎");
+    assert_eq!(run(&["-f", "nameless", "-"]).unwrap(), "安安，匿名殼");
 }
 
 #[test]

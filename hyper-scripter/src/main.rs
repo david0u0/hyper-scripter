@@ -234,8 +234,12 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::LoadUtils => {
             let utils = hyper_scripter_util::get_all();
             for u in utils.into_iter() {
-                log::info!("載入小工具 {:?}", u);
+                log::info!("載入小工具 {}", u.name);
                 let name = u.name.as_script_name()?;
+                if repo.get_regardless_mut(&name).is_some() {
+                    log::warn!("已存在的小工具 {:?}，跳過", name);
+                    continue;
+                }
                 let ty = ScriptType::from_str(u.category)?;
                 let tags: Vec<Tag> = if u.is_hidden {
                     vec![
@@ -245,11 +249,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 } else {
                     vec![Tag::from_str("util").unwrap()]
                 };
-                let p = path::open_script(&name, &ty, false)?;
-                if p.exists() {
-                    log::warn!("已存在的工具 {:?}，跳過", name);
-                    continue;
-                }
+                let p = path::open_script(&name, &ty, Some(false))?;
                 let entry = repo
                     .upsert(&name, || {
                         ScriptInfo::builder(0, name.clone(), ty, tags.into_iter()).build()
@@ -310,7 +310,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
                 util::write_file(&path::get_path().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
             }
-            let script_path = path::open_script(&entry.name, &entry.ty, true)?;
+            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             entry.update(|info| info.exec(content)).await?;
             let ret_code: i32;
@@ -354,7 +354,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::Cat { script_query } => {
             let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
-            let script_path = path::open_script(&entry.name, &entry.ty, true)?;
+            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             log::info!("打印 {:?}", entry.name);
             let content = util::read_file(&script_path)?;
             println!("{}", content);
@@ -403,7 +403,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 }
             }
             for (name, ty) in to_purge.into_iter() {
-                let p = path::open_script(&name, &ty, false)?;
+                let p = path::open_script(&name, &ty, None)?;
                 repo.remove(&name).await?;
                 util::remove(&p)?;
             }
@@ -411,8 +411,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::CP { origin, new } => {
             let h = query::do_script_query_strict(origin, &mut repo)?;
             let new_name = new.as_script_name()?;
-            let og_script = path::open_script(&h.name, &h.ty, true)?;
-            let new_script = path::open_script(&new_name, &h.ty, false)?;
+            let og_script = path::open_script(&h.name, &h.ty, Some(true))?;
+            let new_script = path::open_script(&new_name, &h.ty, Some(false))?;
             if new_script.exists() {
                 return Err(Error::ScriptExist(new.clone()));
             }
@@ -499,11 +499,11 @@ async fn mv<'a, 'b>(
     ty: Option<&ScriptType>,
     tags: &Option<TagControlFlow>,
 ) -> Result {
-    let og_script = path::open_script(&entry.name, &entry.ty, true)?;
+    let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let new_script = path::open_script(
         new_name.as_ref().unwrap_or(&entry.name),
         ty.unwrap_or(&entry.ty),
-        false,
+        None,
     )?;
     util::mv(&og_script, &new_script)?;
 
@@ -549,7 +549,7 @@ async fn edit_or_create<'a, 'b>(
             }
             final_ty = entry.ty.clone();
             log::debug!("打開既有命名腳本：{:?}", entry.name);
-            let p = path::open_script(&entry.name, &entry.ty, true)
+            let p = path::open_script(&entry.name, &entry.ty, Some(true))
                 .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
             (entry.name.clone(), p)
         } else {
@@ -570,7 +570,7 @@ async fn edit_or_create<'a, 'b>(
                 .map(|s| Tag::from_str(s))
                 .collect::<Result<Vec<_>>>()?;
 
-            let p = path::open_script(&name, &final_ty, false)
+            let p = path::open_script(&name, &final_ty, Some(false))
                 .context(format!("打開新命名腳本失敗：{:?}", query))?;
             (name, p)
         }

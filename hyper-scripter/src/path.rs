@@ -98,21 +98,25 @@ pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
 pub fn open_script<T: ?Sized + AsScriptName>(
     name: &T,
     ty: &ScriptType,
-    check_sxist: bool,
+    check_sxist: Option<bool>,
 ) -> Result<PathBuf> {
-    let script_path = match name.as_script_name()? {
-        ScriptName::Anonymous(id) => open_anonymous(id, ty)?,
-        ScriptName::Named(name) => {
-            let name = ScriptName::Named(name);
+    let name = name.as_script_name()?;
+    let script_path = match &name {
+        ScriptName::Anonymous(id) => open_anonymous(*id, ty)?,
+        ScriptName::Named(_) => {
             let path = get_path().join(name.to_file_path(ty)?);
             path
         }
     };
-    if check_sxist && !script_path.exists() {
-        Err(Error::PathNotFound(script_path))
-    } else {
-        Ok(script_path)
+    if let Some(should_exist) = check_sxist {
+        if !script_path.exists() && should_exist {
+            return Err(Error::PathNotFound(script_path).context("開腳本失敗：應存在卻不存在"));
+        } else if script_path.exists() && !should_exist {
+            return Err(Error::ScriptExist(name.key().as_ref().to_owned())
+                .context("開腳本失敗：不應存在卻存在"));
+        }
     }
+    Ok(script_path)
 }
 
 #[cfg(test)]
@@ -148,16 +152,16 @@ mod test {
         setup();
         let second = "second".to_owned();
         let second_name = second.as_script_name().unwrap();
-        let p = open_script(&second_name, &"rb".into(), false).unwrap();
+        let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();
         assert_eq!(p, get_path().join("second.rb"));
 
-        let p = open_script(".1", &"sh".into(), true).unwrap();
+        let p = open_script(".1", &"sh".into(), None).unwrap();
         assert_eq!(
             p,
             join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
-        match open_script("not-exist", &"sh".into(), true).unwrap_err() {
+        match open_script("not-exist", &"sh".into(), Some(true)).unwrap_err() {
             Error::PathNotFound(name) => assert_eq!(name, get_path().join("not-exist.sh")),
             _ => unreachable!(),
         }

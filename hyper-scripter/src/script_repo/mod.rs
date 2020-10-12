@@ -199,8 +199,33 @@ impl<'a> ScriptRepo<'a> {
             }),
         }
     }
-    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<&mut ScriptInfo<'a>> {
-        self.hidden_map.get_mut(&*name.key())
+    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
+        match self.hidden_map.get_mut(&*name.key()) {
+            None => None,
+            Some(info) => Some(RepoEntry {
+                info,
+                env: &self.db_env,
+            }),
+        }
+    }
+    pub fn get_regardless_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
+        // FIXME: 一旦 NLL 進化就修掉這段，改用 if let Some(..) = get_mut { } else { get_hidden_mut... }
+        match self.map.get_mut(&*name.key()) {
+            Some(info) => {
+                return Some(RepoEntry {
+                    info,
+                    env: &self.db_env,
+                })
+            }
+            _ => (),
+        };
+        match self.hidden_map.get_mut(&*name.key()) {
+            None => None,
+            Some(info) => Some(RepoEntry {
+                info,
+                env: &self.db_env,
+            }),
+        }
     }
     pub async fn remove<'c>(&mut self, name: &ScriptName<'c>) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {

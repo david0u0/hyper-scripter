@@ -71,11 +71,11 @@ pub enum DisplayScriptIdent {
     Normal,
 }
 #[derive(Debug, Eq, PartialEq)]
-pub enum DisplayStyle<T> {
-    Short(DisplayScriptIdent),
+pub enum DisplayStyle<T, U> {
+    Short(DisplayScriptIdent, U),
     Long(T),
 }
-impl<T> DisplayStyle<T> {
+impl<T, U> DisplayStyle<T, U> {
     pub fn is_long(&self) -> bool {
         if let DisplayStyle::Long(_) = self {
             true
@@ -111,17 +111,20 @@ impl FromStr for Grouping {
 }
 
 #[derive(Debug)]
-pub struct ListOptions<'a, T = ()> {
+pub struct ListOptions<'a, T = (), U = ()> {
     pub grouping: Grouping,
     pub queries: &'a [ListQuery],
     pub plain: bool,
-    pub display_style: DisplayStyle<T>,
+    pub display_style: DisplayStyle<T, U>,
 }
 
-fn opt_with_table<'a>(opt: &ListOptions<'a>) -> ListOptions<'a, Table> {
+fn convert_opt<'a, W: Write>(
+    w: &'a mut W,
+    opt: &ListOptions<'a>,
+) -> ListOptions<'a, Table, &'a mut W> {
     ListOptions {
         display_style: match opt.display_style {
-            DisplayStyle::Short(t) => DisplayStyle::Short(t),
+            DisplayStyle::Short(t, _) => DisplayStyle::Short(t, w),
             DisplayStyle::Long(_) => DisplayStyle::Long(Table::new()),
         },
         grouping: opt.grouping,
@@ -134,10 +137,9 @@ fn color(script: &ScriptInfo) -> Result<Color> {
     Ok(Color::from(c))
 }
 pub fn fmt_meta<W: Write>(
-    w: &mut W,
     script: &ScriptInfo,
     is_last: bool,
-    opt: &mut ListOptions<Table>,
+    opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
     let color = color(script)?;
     match &mut opt.display_style {
@@ -160,7 +162,7 @@ pub fn fmt_meta<W: Write>(
             let row = row![name_txt, c->ty_txt, script.write_time, exec_time_txt];
             table.add_row(row);
         }
-        DisplayStyle::Short(ident) => {
+        DisplayStyle::Short(ident, w) => {
             if is_last && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
@@ -188,7 +190,7 @@ pub fn fmt_list<'a, W: Write>(
     script_repo: &mut ScriptRepo,
     opt: &ListOptions,
 ) -> Result<()> {
-    let mut opt = opt_with_table(opt);
+    let mut opt = convert_opt(w, opt);
 
     let latest_script_name = match script_repo.latest_mut(1) {
         Some(script) => script.name.clone().into_static(),
@@ -206,7 +208,7 @@ pub fn fmt_list<'a, W: Write>(
 
     if opt.grouping.is_none() {
         let scripts: Vec<_> = scripts_iter.collect();
-        fmt_group(w, scripts, &latest_script_name, &mut opt)?;
+        fmt_group(scripts, &latest_script_name, &mut opt)?;
     } else {
         // TODO: 樹狀
         let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
@@ -222,15 +224,18 @@ pub fn fmt_list<'a, W: Write>(
         for (tags, scripts) in scripts.into_iter() {
             if !opt.grouping.is_none() {
                 let tags_txt = tags.to_string().dimmed().italic();
-                if let DisplayStyle::Long(table) = &mut opt.display_style {
-                    table.add_row(Row::new(vec![
-                        Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
-                    ]));
-                } else {
-                    write!(w, "{}\n", tags_txt)?;
+                match &mut opt.display_style {
+                    DisplayStyle::Long(table) => {
+                        table.add_row(Row::new(vec![
+                            Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
+                        ]));
+                    }
+                    DisplayStyle::Short(_, w) => {
+                        write!(w, "{}\n", tags_txt)?;
+                    }
                 }
             }
-            fmt_group(w, scripts, &latest_script_name, &mut opt)?;
+            fmt_group(scripts, &latest_script_name, &mut opt)?;
         }
     }
     if let DisplayStyle::Long(table) = &mut opt.display_style {
@@ -240,21 +245,20 @@ pub fn fmt_list<'a, W: Write>(
 }
 
 fn fmt_group<W: Write>(
-    w: &mut W,
     mut scripts: Vec<&ScriptInfo>,
     latest_script_name: &ScriptName,
-    opt: &mut ListOptions<Table>,
+    opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
     scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
     for script in scripts {
-        if !opt.display_style.is_long() {
+        if let DisplayStyle::Short(_, w) = &mut opt.display_style {
             write!(w, "  ")?;
         }
         let is_latest = &script.name == latest_script_name;
-        fmt_meta(w, script, is_latest, opt)?;
-        if !opt.display_style.is_long() {
-            write!(w, "\n")?;
-        }
+        fmt_meta(script, is_latest, opt)?;
+    }
+    if let DisplayStyle::Short(_, w) = &mut opt.display_style {
+        write!(w, "\n")?;
     }
     Ok(())
 }

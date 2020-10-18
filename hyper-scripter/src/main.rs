@@ -369,9 +369,9 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             file,
         }) => {
             let display_style = match (long, file, name) {
-                (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File),
-                (false, false, true) => DisplayStyle::Short(DisplayScriptIdent::Name),
-                (false, false, false) => DisplayStyle::Short(DisplayScriptIdent::Normal),
+                (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File, ()),
+                (false, false, true) => DisplayStyle::Short(DisplayScriptIdent::Name, ()),
+                (false, false, false) => DisplayStyle::Short(DisplayScriptIdent::Normal, ()),
                 (true, false, false) => DisplayStyle::Long(()),
                 _ => unreachable!(),
             };

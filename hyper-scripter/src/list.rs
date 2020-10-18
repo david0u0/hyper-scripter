@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::Result;
+use crate::error::{Error, FormatCode::Grouping as GroupCode, Result};
 use crate::query::{do_list_query, ListQuery};
 use crate::script::{ScriptInfo, ScriptName};
 use crate::script_repo::ScriptRepo;
@@ -8,6 +8,7 @@ use colored::{Color, Colorize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+use std::str::FromStr;
 
 #[derive(PartialEq, Eq)]
 struct TagsKey(Vec<Tag>);
@@ -73,9 +74,35 @@ pub enum DisplayStyle {
     Short(DisplayScriptIdent),
     Long,
 }
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Grouping {
+    Tag,
+    Tree,
+    None,
+}
+impl Grouping {
+    pub fn is_none(self) -> bool {
+        self == Grouping::None
+    }
+}
+impl FromStr for Grouping {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(match s {
+            "tag" => Grouping::Tag,
+            "tree" => {
+                unimplemented!();
+                // Grouping::Tree
+            }
+            "none" => Grouping::None,
+            _ => return Err(Error::Format(GroupCode, s.to_owned())),
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ListOptions<'a> {
-    pub no_grouping: bool,
+    pub grouping: Grouping,
     pub queries: &'a [ListQuery],
     pub plain: bool,
     pub display_style: DisplayStyle,
@@ -153,7 +180,7 @@ pub fn fmt_list<'a, W: Write>(
         .into_iter()
         .map(|e| &*e.into_inner());
 
-    if opt.no_grouping {
+    if opt.grouping.is_none() {
         let scripts: Vec<_> = scripts_iter.collect();
         fmt_group(w, scripts, &latest_script_name, opt)?;
         return Ok(());
@@ -170,7 +197,7 @@ pub fn fmt_list<'a, W: Write>(
 
     scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
     for (tags, scripts) in scripts.into_iter() {
-        if !opt.no_grouping {
+        if !opt.grouping.is_none() {
             write!(w, "{}\n", tags.to_string().dimmed().italic())?;
         }
         fmt_group(w, scripts, &latest_script_name, opt)?;

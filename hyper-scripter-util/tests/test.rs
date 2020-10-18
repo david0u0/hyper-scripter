@@ -91,7 +91,6 @@ fn test_collect() {
 fn test_utils() {
     let _g = setup_util();
     test_import();
-    run(&["tags", "all"]).unwrap();
     test_git();
     test_collect();
 }

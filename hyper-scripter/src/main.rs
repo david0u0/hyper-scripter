@@ -1,7 +1,7 @@
 use chrono::Utc;
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions};
+use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, Grouping, ListOptions};
 use hyper_scripter::query::{self, EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
@@ -146,8 +146,8 @@ struct List {
     // TODO: 滿滿的其它排序/篩選選項
     #[structopt(short, long, help = "Show verbose information.")]
     long: bool,
-    #[structopt(long, help = "Don't group by tags.")]
-    no_grouping: bool,
+    #[structopt(long, default_value = "tag", help = "Grouping style (tag/tree/none).")]
+    grouping: Grouping,
     #[structopt(long, help = "No color and other decoration.")]
     plain: bool,
     #[structopt(long, help = "Show file path to the script.", conflicts_with_all = &["name", "long"])]
@@ -362,7 +362,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::LS(List {
             long,
-            no_grouping,
+            grouping,
             queries,
             plain,
             name,
@@ -376,7 +376,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 _ => unreachable!(),
             };
             let opt = ListOptions {
-                no_grouping: *no_grouping,
+                grouping: *grouping,
                 plain: *plain,
                 queries,
                 display_style,

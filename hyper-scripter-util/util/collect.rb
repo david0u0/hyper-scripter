@@ -36,7 +36,7 @@ directory_tree(root).each do |full_path|
   HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template")
 end
 
-HS_ENV.do_hs('ls --no-grouping --name --plain').split(' ').each do |name|
+HS_ENV.do_hs('ls --grouping=none --name --plain').split(' ').each do |name|
   file = HS_ENV.do_hs("which =#{name} 2>/dev/null").delete_suffix("\n")
   next unless $?.success?
 

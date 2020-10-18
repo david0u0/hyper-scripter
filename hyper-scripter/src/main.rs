@@ -372,7 +372,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File),
                 (false, false, true) => DisplayStyle::Short(DisplayScriptIdent::Name),
                 (false, false, false) => DisplayStyle::Short(DisplayScriptIdent::Normal),
-                (true, false, false) => DisplayStyle::Long,
+                (true, false, false) => DisplayStyle::Long(()),
                 _ => unreachable!(),
             };
             let opt = ListOptions {

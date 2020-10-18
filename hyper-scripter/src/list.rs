@@ -5,6 +5,7 @@ use crate::script::{ScriptInfo, ScriptName};
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
 use colored::{Color, Colorize};
+use prettytable::{cell, format, row, Cell, Row, Table};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -69,10 +70,19 @@ pub enum DisplayScriptIdent {
     Name,
     Normal,
 }
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum DisplayStyle {
+#[derive(Debug, Eq, PartialEq)]
+pub enum DisplayStyle<T> {
     Short(DisplayScriptIdent),
-    Long,
+    Long(T),
+}
+impl<T> DisplayStyle<T> {
+    pub fn is_long(&self) -> bool {
+        if let DisplayStyle::Long(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Grouping {
@@ -100,43 +110,55 @@ impl FromStr for Grouping {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ListOptions<'a> {
+#[derive(Debug)]
+pub struct ListOptions<'a, T = ()> {
     pub grouping: Grouping,
     pub queries: &'a [ListQuery],
     pub plain: bool,
-    pub display_style: DisplayStyle,
+    pub display_style: DisplayStyle<T>,
 }
 
+fn opt_with_table<'a>(opt: &ListOptions<'a>) -> ListOptions<'a, Table> {
+    ListOptions {
+        display_style: match opt.display_style {
+            DisplayStyle::Short(t) => DisplayStyle::Short(t),
+            DisplayStyle::Long(_) => DisplayStyle::Long(Table::new()),
+        },
+        grouping: opt.grouping,
+        queries: opt.queries,
+        plain: opt.plain,
+    }
+}
+fn color(script: &ScriptInfo) -> Result<Color> {
+    let c = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
+    Ok(Color::from(c))
+}
 pub fn fmt_meta<W: Write>(
     w: &mut W,
     script: &ScriptInfo,
     is_last: bool,
-    opt: &ListOptions,
+    opt: &mut ListOptions<Table>,
 ) -> Result<()> {
-    let color = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
-    match opt.display_style {
-        DisplayStyle::Long => {
-            if is_last && !opt.plain {
-                write!(w, "{}", " *".color(Color::Yellow).bold())?;
+    let color = color(script)?;
+    match &mut opt.display_style {
+        DisplayStyle::Long(table) => {
+            let last_txt = if is_last && !opt.plain {
+                "*".color(Color::Yellow).bold()
             } else {
-                write!(w, "  ")?;
-            }
-
-            let exex_time = match &script.exec_time {
+                " ".normal()
+            };
+            let name_txt = format!(
+                "{} {}",
+                last_txt,
+                script.name.to_string().color(color).bold()
+            );
+            let ty_txt = script.ty.as_ref().color(color).bold();
+            let exec_time_txt = match &script.exec_time {
                 Some(t) => t.to_string(),
                 None => "Never".to_owned(),
             };
-            let mut label: colored::ColoredString =
-                format!("{}\t{}", script.ty, script.name).normal();
-            if !opt.plain {
-                label = label.color(color).bold();
-            }
-            write!(
-                w,
-                "{}\t{}\t{}\t{}\n",
-                label, script.created_time, script.read_time, exex_time
-            )?;
+            let row = row![name_txt, c->ty_txt, script.write_time, exec_time_txt];
+            table.add_row(row);
         }
         DisplayStyle::Short(ident) => {
             if is_last && !opt.plain {
@@ -160,47 +182,59 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
+const TITLE: &[&str] = &["name", "category", "last write time", "last execute time"];
 pub fn fmt_list<'a, W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,
     opt: &ListOptions,
 ) -> Result<()> {
+    let mut opt = opt_with_table(opt);
+
     let latest_script_name = match script_repo.latest_mut(1) {
         Some(script) => script.name.clone().into_static(),
         None => return Ok(()),
     };
 
-    if opt.display_style == DisplayStyle::Long {
-        writeln!(
-            w,
-            "type\tname\tcreate time\tlast read time\tlast execute time"
-        )?;
+    if let DisplayStyle::Long(table) = &mut opt.display_style {
+        table.set_format(*format::consts::FORMAT_CLEAN);
+        table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
     }
+
     let scripts_iter = do_list_query(script_repo, &opt.queries)?
         .into_iter()
         .map(|e| &*e.into_inner());
 
     if opt.grouping.is_none() {
         let scripts: Vec<_> = scripts_iter.collect();
-        fmt_group(w, scripts, &latest_script_name, opt)?;
-        return Ok(());
-    }
-
-    let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
-    for script in scripts_iter {
-        let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
-        let v = script_map.entry(key).or_default();
-        v.push(script);
-    }
-
-    let mut scripts: Vec<_> = script_map.into_iter().collect();
-
-    scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
-    for (tags, scripts) in scripts.into_iter() {
-        if !opt.grouping.is_none() {
-            write!(w, "{}\n", tags.to_string().dimmed().italic())?;
+        fmt_group(w, scripts, &latest_script_name, &mut opt)?;
+    } else {
+        // TODO: 樹狀
+        let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
+        for script in scripts_iter {
+            let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
+            let v = script_map.entry(key).or_default();
+            v.push(script);
         }
-        fmt_group(w, scripts, &latest_script_name, opt)?;
+
+        let mut scripts: Vec<_> = script_map.into_iter().collect();
+
+        scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
+        for (tags, scripts) in scripts.into_iter() {
+            if !opt.grouping.is_none() {
+                let tags_txt = tags.to_string().dimmed().italic();
+                if let DisplayStyle::Long(table) = &mut opt.display_style {
+                    table.add_row(Row::new(vec![
+                        Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
+                    ]));
+                } else {
+                    write!(w, "{}\n", tags_txt)?;
+                }
+            }
+            fmt_group(w, scripts, &latest_script_name, &mut opt)?;
+        }
+    }
+    if let DisplayStyle::Long(table) = &mut opt.display_style {
+        table.print(w)?;
     }
     Ok(())
 }
@@ -209,16 +243,18 @@ fn fmt_group<W: Write>(
     w: &mut W,
     mut scripts: Vec<&ScriptInfo>,
     latest_script_name: &ScriptName,
-    opt: &ListOptions,
+    opt: &mut ListOptions<Table>,
 ) -> Result<()> {
     scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
     for script in scripts {
-        if opt.display_style != DisplayStyle::Long {
+        if !opt.display_style.is_long() {
             write!(w, "  ")?;
         }
         let is_latest = &script.name == latest_script_name;
         fmt_meta(w, script, is_latest, opt)?;
+        if !opt.display_style.is_long() {
+            write!(w, "\n")?;
+        }
     }
-    write!(w, "\n")?;
     Ok(())
 }

@@ -53,6 +53,6 @@ impl<T: Clone + Debug> ScriptTime<T> {
 impl<T: Clone + Debug> std::fmt::Display for ScriptTime<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let local_time = Local.from_utc_datetime(&self.time);
-        write!(f, "{}", local_time)
+        write!(f, "{}", local_time.format("%Y-%m-%d %H:%M"))
     }
 }

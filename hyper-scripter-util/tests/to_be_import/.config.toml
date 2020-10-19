@@ -1,4 +1,5 @@
-recent = 0
+# NOTE: 亂搞近期篩選器，測試 --timeless 選項
+recent = 1
 
 [main_tag_filter]
 filter = 'none'
@@ -44,6 +45,16 @@ env = [[
     'NODE_PATH',
     '{{{script_dir}}}/node_modules',
 ]]
+
+# NOTE: 亂搞別名，測試 --no-alias 選項
+[alias.ls]
+after = [
+    'which'
+]
+[alias.which]
+after = [
+    'oh-nooooo'
+]
 
 [categories.md]
 ext = 'md'

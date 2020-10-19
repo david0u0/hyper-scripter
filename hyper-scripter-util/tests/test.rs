@@ -10,20 +10,10 @@ use test_util::*;
 
 pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
     let g = setup();
-    if !check_exist(&["."]) {
-        let utils = get_all();
-        for u in utils.into_iter() {
-            run(&[
-                "e",
-                "-c",
-                u.category,
-                u.name,
-                u.content,
-                "--fast",
-                "--no-template",
-            ])
-            .unwrap();
-        }
+    let utils = get_all();
+    for u in utils.into_iter() {
+        log::info!("載入 {}", u.name);
+        run(&["e", "-c", u.category, u.name, u.content, "--no-template"]).unwrap();
     }
     g
 }
@@ -33,7 +23,6 @@ fn test_import() {
         "e",
         "my/innate",
         "cp tests/to_be_import ./.tmp -r",
-        "--fast",
         "-f",
         "+innate",
     ])

@@ -38,6 +38,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
         }
     }
     let _ = std::fs::remove_dir_all(".tmp");
+    run(&["alias", "e", "e", "--fast"]).unwrap();
 
     guard
 }

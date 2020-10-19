@@ -1,8 +1,9 @@
 use chrono::Utc;
+use hyper_scripter::args::{self, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, Grouping, ListOptions};
-use hyper_scripter::query::{self, EditQuery, FilterQuery, ListQuery, ScriptQuery};
+use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions};
+use hyper_scripter::query::{self, EditQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
@@ -12,151 +13,6 @@ use hyper_scripter_historian::{Event, EventData};
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::str::FromStr;
-use structopt::clap::AppSettings::{
-    self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
-    TrailingVarArg,
-};
-use structopt::StructOpt;
-
-const NO_FLAG_SETTINGS: &[AppSettings] = &[
-    AllowLeadingHyphen,
-    DisableHelpFlags,
-    TrailingVarArg,
-    DisableHelpSubcommand,
-    DisableVersion,
-];
-
-#[derive(StructOpt, Debug)]
-#[structopt(setting = AllowLeadingHyphen)]
-struct Root {
-    #[structopt(short = "p", long, help = "Path to hyper script root")]
-    hs_path: Option<String>,
-    #[structopt(
-        short,
-        long,
-        global = true,
-        parse(try_from_str),
-        help = "Filter by tags, e.g. `all,^mytag`"
-    )]
-    filter: Option<TagControlFlow>,
-    #[structopt(short, long, global = true, help = "Shorthand for `-f=all,^removed`")]
-    all: bool,
-    #[structopt(long, global = true, help = "Show scripts within recent days.")]
-    recent: Option<u32>,
-    #[structopt(
-        long,
-        global = true,
-        help = "Show scripts of all time.",
-        conflicts_with = "recent"
-    )]
-    timeless: bool,
-    #[structopt(subcommand)]
-    subcmd: Option<Subs>,
-}
-#[derive(StructOpt, Debug)]
-enum Subs {
-    #[structopt(external_subcommand)]
-    Other(Vec<String>),
-    #[structopt(setting = AppSettings::Hidden)]
-    LoadUtils,
-    #[structopt(about = "Edit hyper script", alias = "e")]
-    Edit {
-        #[structopt(
-            long,
-            short,
-            parse(try_from_str),
-            help = "Category of the script, e.g. `sh`"
-        )]
-        category: Option<ScriptType>,
-        #[structopt(long, short)]
-        no_template: bool,
-        #[structopt(parse(try_from_str), default_value = ".")]
-        edit_query: EditQuery,
-        content: Option<String>,
-        #[structopt(
-            long,
-            requires("content"),
-            help = "create script without invoking the editor"
-        )]
-        fast: bool,
-    },
-    #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
-    Run {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script_query: ScriptQuery,
-        #[structopt(help = "Command line args to pass to the script")]
-        args: Vec<String>,
-    },
-    #[structopt(about = "Execute the script query and get the exact file")]
-    Which {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script_query: ScriptQuery,
-    },
-    #[structopt(about = "Print the script to standard output")]
-    Cat {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script_query: ScriptQuery,
-    },
-    #[structopt(about = "Remove the script")]
-    RM {
-        #[structopt(parse(try_from_str), required = true, min_values = 1)]
-        queries: Vec<ListQuery>,
-        #[structopt(
-            long,
-            help = "Actually remove scripts, rather than hiding them with tag."
-        )]
-        purge: bool,
-    },
-    #[structopt(about = "List hyper scripts", alias = "l")]
-    LS(List),
-    #[structopt(about = "Copy the script to another one")]
-    CP {
-        #[structopt(parse(try_from_str))]
-        origin: ScriptQuery,
-        new: String,
-    },
-    #[structopt(about = "Move the script to another one")]
-    MV {
-        #[structopt(
-            long,
-            short,
-            parse(try_from_str),
-            help = "Category of the script, e.g. `sh`"
-        )]
-        category: Option<ScriptType>,
-        #[structopt(short, long)]
-        tags: Option<TagControlFlow>,
-        #[structopt(parse(try_from_str))]
-        origin: ScriptQuery,
-        new: Option<String>,
-    },
-    #[structopt(
-        about = "Manage script tags. If a tag filter is given, set it as default, otherwise show tag information."
-    )]
-    Tags {
-        #[structopt(parse(try_from_str))]
-        tag_filter: Option<FilterQuery>,
-        #[structopt(long, short, help = "Set the filter to obligation")]
-        obligation: bool, // FIXME: 這邊下 requires 不知為何會炸掉 clap
-    },
-}
-
-#[derive(StructOpt, Debug)]
-struct List {
-    // TODO: 滿滿的其它排序/篩選選項
-    #[structopt(short, long, help = "Show verbose information.")]
-    long: bool,
-    #[structopt(long, default_value = "tag", help = "Grouping style (tag/tree/none).")]
-    grouping: Grouping,
-    #[structopt(long, help = "No color and other decoration.")]
-    plain: bool,
-    #[structopt(long, help = "Show file path to the script.", conflicts_with_all = &["name", "long"])]
-    file: bool,
-    #[structopt(long, help = "Show only name of the script.", conflicts_with_all = &["file", "long"])]
-    name: bool,
-    #[structopt(parse(try_from_str))]
-    queries: Vec<ListQuery>,
-}
 
 #[tokio::main]
 async fn main() {
@@ -173,48 +29,8 @@ async fn main() {
     }
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
-    let mut root = Root::from_args();
-    log::debug!("命令行物件：{:?}", root);
-    match &root.hs_path {
-        Some(hs_path) => path::set_path(hs_path)?,
-        None => path::set_path_from_sys()?,
-    }
+    let root = args::handle_args()?;
     let mut conf = Config::get()?.clone();
-
-    match root.subcmd {
-        None => {
-            root.subcmd = Some(Subs::Edit {
-                edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
-                category: None,
-                content: None,
-                fast: false,
-                no_template: false,
-            });
-        }
-        Some(Subs::Other(args)) => {
-            let first = &args[0];
-            if let Some(alias) = conf.alias.get(first) {
-                log::info!("別名 {} => {:?}", first, alias);
-                let mut new_args = vec![];
-                for arg in std::env::args() {
-                    if first == &arg {
-                        new_args.extend(alias.actual.clone());
-                    } else {
-                        new_args.push(arg);
-                    }
-                }
-                root = Root::from_iter(new_args);
-            } else {
-                log::info!("執行模式");
-                let run = Subs::Run {
-                    script_query: FromStr::from_str(&args[0])?,
-                    args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
-                };
-                root.subcmd = Some(run);
-            }
-        }
-        _ => (),
-    }
     let res = main_inner(&root, &mut conf).await?;
     conf.store()?;
     Ok(res)
@@ -271,6 +87,15 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                     .await?;
                 util::prepare_script(&p, *entry, true, Some(u.content))?;
             }
+        }
+        Subs::Alias {
+            before: Some(before),
+            after,
+        } => {
+            conf.alias.insert(before.clone(), after.clone().into());
+        }
+        Subs::Alias { .. } => {
+            unimplemented!("view alias");
         }
         Subs::Edit {
             edit_query,
@@ -504,7 +329,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 println!("")
             }
         }
-        _ => unimplemented!(),
+        _ => unimplemented!("{:?}", root),
     }
     Ok(res)
 }

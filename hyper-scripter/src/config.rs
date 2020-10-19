@@ -38,14 +38,19 @@ pub struct NamedTagFilter {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Alias {
-    pub actual: Vec<String>,
+    pub after: Vec<String>,
+}
+impl From<Vec<String>> for Alias {
+    fn from(after: Vec<String>) -> Self {
+        Alias { after }
+    }
 }
 
-fn gen_alias(from: &str, actual: &[&str]) -> (String, Alias) {
+fn gen_alias(from: &str, after: &[&str]) -> (String, Alias) {
     (
         from.to_owned(),
         Alias {
-            actual: actual.iter().map(|s| s.to_string()).collect(),
+            after: after.iter().map(|s| s.to_string()).collect(),
         },
     )
 }

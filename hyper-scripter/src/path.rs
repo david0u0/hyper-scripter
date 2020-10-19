@@ -44,7 +44,7 @@ fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf
 pub fn set_path_from_sys() -> Result<()> {
     set_path(get_sys_path()?)
 }
-pub fn set_path<T: AsRef<Path>>(p: T) -> Result<()> {
+pub fn set_path<T: AsRef<Path>>(p: T) -> Result {
     let path = join_path(".", p)?;
     log::debug!("使用路徑：{:?}", path);
     if !path.exists() {

@@ -11,7 +11,7 @@ const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run(&["e", ".", &format!("echo \"{}\"", MSG), "--fast"]).unwrap();
+    run(&["e", ".", &format!("echo \"{}\"", MSG)]).unwrap();
     assert_eq!(MSG, run(&["-"]).unwrap());
 
     run(&[
@@ -21,7 +21,6 @@ fn test_tags() {
         "test/js",
         "-c",
         "js",
-        "--fast",
         &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
@@ -48,7 +47,6 @@ fn test_mv() {
         "-c",
         "js",
         "--no-template",
-        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -74,7 +72,6 @@ fn test_run() {
     run(&[
         "e",
         "test-with-args",
-        "--fast",
         &format!("echo -e \"$1：{}\n$2\"", MSG),
     ])
     .unwrap();
@@ -94,7 +91,7 @@ fn test_run() {
 #[test]
 fn test_exact() {
     let _g = setup();
-    run(&["e", "test-exact", "--fast", "echo 'test exact!'"]).unwrap();
+    run(&["e", "test-exact", "echo 'test exact!'"]).unwrap();
     run(&["tesct"]).expect("模糊搜不到東西！");
     run(&["=tesct"]).expect_err("打錯名字卻還搜得到！");
     run(&["=test-exact"]).expect("打完整名字卻搜不到！");
@@ -104,9 +101,9 @@ fn test_exact() {
 fn test_prev() {
     let _g = setup();
 
-    run(&["e", "test-prev1", "--fast", "echo 'test prev 1'"]).unwrap();
-    run(&["e", "test-prev2", "--fast", "echo 'test prev 2'"]).unwrap();
-    run(&["e", "test-prev3", "-n", "--fast", "echo 'test prev 3'"]).unwrap();
+    run(&["e", "test-prev1", "echo 'test prev 1'"]).unwrap();
+    run(&["e", "test-prev2", "echo 'test prev 2'"]).unwrap();
+    run(&["e", "test-prev3", "-n", "echo 'test prev 3'"]).unwrap();
 
     assert_eq!(run(&["^2"]).unwrap(), "test prev 2");
     assert_eq!(run(&["^2"]).unwrap(), "test prev 3");
@@ -129,12 +126,11 @@ fn test_edit_same_name() {
         "hide",
         "e",
         "i-am-hidden",
-        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
     run(&["-"]).expect_err("執行了隱藏的腳本？？");
-    run(&["e", "i-am-hidden", "--fast", "yo"]).expect_err("竟然能編輯撞名的腳本？");
+    run(&["e", "i-am-hidden", "yo"]).expect_err("竟然能編輯撞名的腳本？");
     assert_eq!(
         MSG,
         run(&["-f", "hide", "-"]).unwrap(),
@@ -145,25 +141,16 @@ fn test_edit_same_name() {
 #[test]
 fn test_multi_filter() {
     let _g = setup();
-    run(&["e", "nobody", "--fast", &format!("echo \"{}\"", MSG)]).unwrap();
+    run(&["e", "nobody", &format!("echo \"{}\"", MSG)]).unwrap();
     run(&[
         "-f",
         "test,pin",
         "e",
         "test-pin",
-        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
-    run(&[
-        "-f",
-        "pin",
-        "e",
-        "pin-only",
-        "--fast",
-        &format!("echo \"{}\"", MSG),
-    ])
-    .unwrap();
+    run(&["-f", "pin", "e", "pin-only", &format!("echo \"{}\"", MSG)]).unwrap();
 
     assert_eq!(MSG, run(&["pin-only"]).unwrap());
     assert_eq!(MSG, run(&["test-pin"]).unwrap());
@@ -184,17 +171,9 @@ fn test_multi_filter() {
 #[test]
 fn test_rm() {
     let _g = setup();
-    run(&["e", "longlive", "--fast", "echo 矻立不搖"]).unwrap();
+    run(&["e", "longlive", "echo 矻立不搖"]).unwrap();
 
-    run(&[
-        "e",
-        "test",
-        "--fast",
-        &format!("echo \"{}\"", MSG),
-        "-f",
-        "test-tag",
-    ])
-    .unwrap();
+    run(&["e", "test", &format!("echo \"{}\"", MSG), "-f", "test-tag"]).unwrap();
     assert_eq!(MSG, run(&["test"]).unwrap());
     run(&["rm", "-"]).unwrap();
     run(&["test"]).expect_err("未能被刪除掉");
@@ -205,7 +184,7 @@ fn test_rm() {
         run(&["-f", "test-tag", "test"]).expect("刪除沒有保留本來的標籤？")
     );
 
-    run(&["e", ".", "--fast", "echo \"你匿\""]).unwrap();
+    run(&["e", ".", "echo \"你匿\""]).unwrap();
     assert_eq!("你匿", run(&[".1"]).unwrap());
     run(&["rm", "-"]).unwrap();
     assert_eq!(
@@ -215,13 +194,7 @@ fn test_rm() {
 
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
-    run(&[
-        "e",
-        "my-namespace/super-test",
-        "--fast",
-        "echo \"不要刪我 QmmmmQ\"",
-    ])
-    .unwrap();
+    run(&["e", "my-namespace/super-test", "echo \"不要刪我 QmmmmQ\""]).unwrap();
     assert_eq!("不要刪我 QmmmmQ", run(&["my-super-test"]).unwrap());
     run(&["rm", "mysupertest"]).expect("刪除被命名空間搞爛了");
     run(&["my-super-test"]).expect_err("未能被刪除掉");
@@ -236,7 +209,7 @@ fn test_rm() {
     assert_eq!("矻立不搖", run(&["longlive"]).unwrap());
 
     assert!(check_exist(&["longlive.sh"]));
-    run(&["rm", "--purge", "*", "-f", "all"]).expect("未能消滅掉一切");
+    run(&["purge", "*", "-f", "all"]).expect("未能消滅掉一切（順便測了別名）");
     run(&["-f", "all", "longlive"]).expect_err("沒有確實消滅掉");
     assert!(!check_exist(&["longlive.sh"]));
 
@@ -249,7 +222,6 @@ fn test_namespace_reorder_search() {
     run(&[
         "e",
         "my/super/long/namespace-d/test-script",
-        "--fast",
         &format!("echo \"{}\"", MSG),
     ])
     .unwrap();
@@ -258,7 +230,6 @@ fn test_namespace_reorder_search() {
         "a/shorter/script",
         "-c",
         "js",
-        "--fast",
         &format!("console.log(\"{}\")", MSG_JS),
     ])
     .unwrap();
@@ -279,7 +250,6 @@ fn test_append_tags() {
         "+append",
         "e",
         "append-test",
-        "--fast",
         &format!("echo 附加標籤"),
     ])
     .unwrap();
@@ -288,7 +258,6 @@ fn test_append_tags() {
         "no-append",
         "e",
         "no-append-test",
-        "--fast",
         &format!("echo 不要給我打標籤"),
     ])
     .unwrap();

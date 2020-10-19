@@ -95,7 +95,10 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             conf.alias.insert(before.clone(), after.clone().into());
         }
         Subs::Alias { .. } => {
-            unimplemented!("view alias");
+            for (before, alias) in conf.alias.iter() {
+                let after = alias.after.join(" ");
+                println!("{}=\"{}\"", before, after);
+            }
         }
         Subs::Edit {
             edit_query,

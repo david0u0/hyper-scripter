@@ -192,12 +192,26 @@ async fn main_err_handle() -> Result<Vec<Error>> {
             });
         }
         Some(Subs::Other(args)) => {
-            log::info!("執行模式");
-            let run = Subs::Run {
-                script_query: FromStr::from_str(&args[0])?,
-                args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
-            };
-            root.subcmd = Some(run);
+            let first = &args[0];
+            if let Some(alias) = conf.alias.get(first) {
+                log::info!("別名 {} => {:?}", first, alias);
+                let mut new_args = vec![];
+                for arg in std::env::args() {
+                    if first == &arg {
+                        new_args.extend(alias.actual.clone());
+                    } else {
+                        new_args.push(arg);
+                    }
+                }
+                root = Root::from_iter(new_args);
+            } else {
+                log::info!("執行模式");
+                let run = Subs::Run {
+                    script_query: FromStr::from_str(&args[0])?,
+                    args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
+                };
+                root.subcmd = Some(run);
+            }
         }
         _ => (),
     }

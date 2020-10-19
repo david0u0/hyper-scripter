@@ -37,11 +37,27 @@ pub struct NamedTagFilter {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
+pub struct Alias {
+    pub actual: Vec<String>,
+}
+
+fn gen_alias(from: &str, actual: &[&str]) -> (String, Alias) {
+    (
+        from.to_owned(),
+        Alias {
+            actual: actual.iter().map(|s| s.to_string()).collect(),
+        },
+    )
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct RawConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
     pub tag_filters: Vec<NamedTagFilter>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub alias: HashMap<String, Alias>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
 }
 #[derive(Debug, Clone, Deref)]
@@ -73,6 +89,14 @@ impl Default for RawConfig {
             ],
             main_tag_filter: FromStr::from_str("+all").unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
+            alias: vec![
+                // FIXME: 一旦陣列實作了 intoiterator 就用陣列
+                gen_alias("la", &["ls", "-a"]),
+                gen_alias("ll", &["ls", "-l"]),
+                gen_alias("purge", &["rm", "--purge"]),
+            ]
+            .into_iter()
+            .collect(),
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
         }
     }

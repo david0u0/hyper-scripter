@@ -38,7 +38,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
         }
     }
     let _ = std::fs::remove_dir_all(".tmp");
-    run(&["alias", "e", "edit", "--fast"]).unwrap();
+    run("alias e edit --fast").unwrap();
 
     guard
 }
@@ -60,12 +60,20 @@ pub fn check_exist(p: &[&str]) -> bool {
     let file = join_path(p);
     file.exists()
 }
-pub fn run(args: &[&str]) -> Result<String, ExitStatus> {
+pub fn run(args: &str) -> Result<String, ExitStatus> {
     run_with_home(PATH, args)
 }
-pub fn run_with_home(home: &str, args: &[&str]) -> Result<String, ExitStatus> {
+pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
     let mut full_args = vec!["-p", home];
-    full_args.extend(args);
+    let args_vec: Vec<&str> = if args.find("|").is_some() {
+        let (first, second) = args.split_once("|").unwrap();
+        let mut v: Vec<_> = first.split(" ").filter(|s| s.len() > 0).collect();
+        v.push(second.trim());
+        v
+    } else {
+        args.split(" ").collect()
+    };
+    full_args.extend(&args_vec);
 
     let mut cmd = Command::new(EXE);
     let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
@@ -86,6 +94,6 @@ pub fn run_with_home(home: &str, args: &[&str]) -> Result<String, ExitStatus> {
     } else {
         Err(status)
     };
-    log::trace!("執行 {:?} 完畢，結果為 {:?}", args, res);
+    log::trace!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res
 }

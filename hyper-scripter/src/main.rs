@@ -2,7 +2,7 @@ use chrono::Utc;
 use hyper_scripter::args::{self, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::list::{fmt_list, DisplayScriptIdent, DisplayStyle, ListOptions};
+use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, EditQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
@@ -211,14 +211,14 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             file,
         }) => {
             let display_style = match (long, file, name) {
-                (false, true, false) => DisplayStyle::Short(DisplayScriptIdent::File, ()),
-                (false, false, true) => DisplayStyle::Short(DisplayScriptIdent::Name, ()),
-                (false, false, false) => DisplayStyle::Short(DisplayScriptIdent::Normal, ()),
+                (false, true, false) => DisplayStyle::Short(DisplayIdentStyle::File, ()),
+                (false, false, true) => DisplayStyle::Short(DisplayIdentStyle::Name, ()),
+                (false, false, false) => DisplayStyle::Short(DisplayIdentStyle::Normal, ()),
                 (true, false, false) => DisplayStyle::Long(()),
                 _ => unreachable!(),
             };
             let opt = ListOptions {
-                grouping: *grouping,
+                grouping: grouping.into(),
                 plain: *plain,
                 queries,
                 display_style,

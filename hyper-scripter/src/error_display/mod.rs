@@ -44,7 +44,6 @@ impl Display for Error {
                     ScriptQuery => write!(f, "script query")?,
                     Tag => write!(f, "tag")?,
                     FilterQuery => write!(f, "tag filter")?,
-                    Grouping => write!(f, "grouping. Expect (tag/none/tree), get")?,
                 }
                 write!(f, " '{}'", s)?;
             }

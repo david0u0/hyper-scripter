@@ -1,15 +1,14 @@
 use crate::config::Config;
-use crate::error::{Error, FormatCode::Grouping as GroupCode, Result};
+use crate::error::Result;
 use crate::query::{do_list_query, ListQuery};
 use crate::script::{ScriptInfo, ScriptName};
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
-use colored::{Color, Colorize};
+use colored::{Color, ColoredString, Colorize};
 use prettytable::{cell, format, row, Cell, Row, Table};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::str::FromStr;
 
 #[derive(PartialEq, Eq)]
 struct TagsKey(Vec<Tag>);
@@ -65,14 +64,14 @@ impl TagsKey {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum DisplayScriptIdent {
+pub enum DisplayIdentStyle {
     File,
     Name,
     Normal,
 }
 #[derive(Debug, Eq, PartialEq)]
 pub enum DisplayStyle<T, U> {
-    Short(DisplayScriptIdent, U),
+    Short(DisplayIdentStyle, U),
     Long(T),
 }
 impl<T, U> DisplayStyle<T, U> {
@@ -95,18 +94,17 @@ impl Grouping {
         self == Grouping::None
     }
 }
-impl FromStr for Grouping {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        Ok(match s {
+impl<T: AsRef<str>> From<T> for Grouping {
+    fn from(s: T) -> Self {
+        match s.as_ref() {
             "tag" => Grouping::Tag,
             "tree" => {
                 unimplemented!();
                 // Grouping::Tree
             }
             "none" => Grouping::None,
-            _ => return Err(Error::Format(GroupCode, s.to_owned())),
-        })
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -132,7 +130,20 @@ fn convert_opt<'a, W: Write>(
         plain: opt.plain,
     }
 }
-fn color(script: &ScriptInfo) -> Result<Color> {
+#[inline]
+fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
+    plain: bool,
+    s: T,
+    f: F,
+) -> ColoredString {
+    let s = s.as_ref().normal();
+    if !plain {
+        f(s)
+    } else {
+        s
+    }
+}
+fn get_color(script: &ScriptInfo) -> Result<Color> {
     let c = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
     Ok(Color::from(c))
 }
@@ -141,7 +152,7 @@ pub fn fmt_meta<W: Write>(
     is_last: bool,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let color = color(script)?;
+    let color = get_color(script)?;
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             let last_txt = if is_last && !opt.plain {
@@ -152,9 +163,9 @@ pub fn fmt_meta<W: Write>(
             let name_txt = format!(
                 "{} {}",
                 last_txt,
-                script.name.to_string().color(color).bold()
+                style(opt.plain, script.name.key(), |s| s.color(color).bold()),
             );
-            let ty_txt = script.ty.as_ref().color(color).bold();
+            let ty_txt = style(opt.plain, &script.ty, |s| s.color(color).bold());
             let exec_time_txt = match &script.exec_time {
                 Some(t) => t.to_string(),
                 None => "Never".to_owned(),
@@ -162,24 +173,24 @@ pub fn fmt_meta<W: Write>(
             let row = row![name_txt, c->ty_txt, script.write_time, exec_time_txt];
             table.add_row(row);
         }
-        DisplayStyle::Short(ident, w) => {
+        DisplayStyle::Short(ident_style, w) => {
             if is_last && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
-            let msg = match ident {
-                DisplayScriptIdent::Normal => format!("{}({})", script.name, script.ty),
-                DisplayScriptIdent::File => script.file_path()?.to_string_lossy().to_string(),
-                DisplayScriptIdent::Name => script.name.to_string(),
+            let ident = match ident_style {
+                DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
+                DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
+                DisplayIdentStyle::Name => script.name.to_string(),
             };
-            if !opt.plain {
-                let mut msg = msg.bold().color(color);
+            let ident = style(opt.plain, ident, |s| {
+                let s = s.color(color).bold();
                 if is_last {
-                    msg = msg.underline()
+                    s.underline()
+                } else {
+                    s
                 }
-                write!(w, "{}", msg)?;
-            } else {
-                write!(w, "{}", msg)?;
-            }
+            });
+            write!(w, "{}", ident)?;
         }
     }
     Ok(())
@@ -223,7 +234,7 @@ pub fn fmt_list<'a, W: Write>(
         scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
         for (tags, scripts) in scripts.into_iter() {
             if !opt.grouping.is_none() {
-                let tags_txt = tags.to_string().dimmed().italic();
+                let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
                 match &mut opt.display_style {
                     DisplayStyle::Long(table) => {
                         table.add_row(Row::new(vec![

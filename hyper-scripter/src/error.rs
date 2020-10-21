@@ -15,7 +15,6 @@ pub enum FormatCode {
     ScriptQuery,
     Tag,
     FilterQuery,
-    Grouping,
 }
 #[derive(Debug, Clone)]
 pub enum Error {

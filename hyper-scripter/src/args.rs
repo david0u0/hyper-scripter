@@ -1,14 +1,13 @@
 use crate::config::{Alias, Config};
 use crate::error::Result;
-use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use crate::script_type::ScriptType;
 use crate::tag::TagControlFlow;
 use std::str::FromStr;
 use structopt::clap::AppSettings::{
-    self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, DisableVersion,
-    TrailingVarArg,
+    self, AllArgsOverrideSelf, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand,
+    DisableVersion, TrailingVarArg,
 };
 use structopt::StructOpt;
 
@@ -23,7 +22,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 macro_rules! def_root {
     ($sub:ident: $sub_type:ty) => {
         #[derive(StructOpt, Debug)]
-        #[structopt(setting = AllowLeadingHyphen)]
+        #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
             #[structopt(long)]
             pub no_alias: bool,
@@ -56,7 +55,7 @@ macro_rules! def_root {
 }
 
 mod alias_mod {
-    use super::{AllowLeadingHyphen, StructOpt, TagControlFlow};
+    use super::{AllArgsOverrideSelf, AllowLeadingHyphen, StructOpt, TagControlFlow};
     #[derive(StructOpt, Debug)]
     pub enum Subs {
         #[structopt(external_subcommand)]
@@ -72,12 +71,13 @@ def_root! {
 }
 
 #[derive(StructOpt, Debug)]
+#[structopt(settings = &[AllArgsOverrideSelf])]
 pub enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
-    #[structopt(about = "Edit hyper script", alias = "e")]
+    #[structopt(about = "Edit hyper script")]
     Edit {
         #[structopt(
             long,
@@ -132,7 +132,7 @@ pub enum Subs {
         )]
         purge: bool,
     },
-    #[structopt(about = "List hyper scripts", alias = "l")]
+    #[structopt(about = "List hyper scripts")]
     LS(List),
     #[structopt(about = "Copy the script to another one")]
     CP {
@@ -167,17 +167,28 @@ pub enum Subs {
 }
 
 #[derive(StructOpt, Debug)]
+#[structopt(settings = &[AllArgsOverrideSelf])]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項
     #[structopt(short, long, help = "Show verbose information.")]
     pub long: bool,
-    #[structopt(long, default_value = "tag", help = "Grouping style (tag/tree/none).")]
-    pub grouping: Grouping,
+    #[structopt(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
+    pub grouping: String,
     #[structopt(long, help = "No color and other decoration.")]
     pub plain: bool,
-    #[structopt(long, help = "Show file path to the script.", conflicts_with_all = &["name", "long"])]
+    #[structopt(
+        long,
+        help = "Show file path to the script.",
+        conflicts_with("long"),
+        overrides_with("name")
+    )]
     pub file: bool,
-    #[structopt(long, help = "Show only name of the script.", conflicts_with_all = &["file", "long"])]
+    #[structopt(
+        long,
+        help = "Show only name of the script.",
+        conflicts_with("long"),
+        overrides_with("file")
+    )]
     pub name: bool,
     #[structopt(parse(try_from_str))]
     pub queries: Vec<ListQuery>,

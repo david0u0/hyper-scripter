@@ -1,10 +1,10 @@
-use crate::config::Config;
+use super::{get_color, style, tree, DisplayStyle, ListOptions};
 use crate::error::Result;
-use crate::query::{do_list_query, ListQuery};
-use crate::script::{ScriptInfo, ScriptName};
+use crate::query::do_list_query;
+use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
-use colored::{Color, ColoredString, Colorize};
+use colored::{Color, Colorize};
 use prettytable::{cell, format, row, Cell, Row, Table};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -63,56 +63,6 @@ impl TagsKey {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum DisplayIdentStyle {
-    File,
-    Name,
-    Normal,
-}
-#[derive(Debug, Eq, PartialEq)]
-pub enum DisplayStyle<T, U> {
-    Short(DisplayIdentStyle, U),
-    Long(T),
-}
-impl<T, U> DisplayStyle<T, U> {
-    pub fn is_long(&self) -> bool {
-        if let DisplayStyle::Long(_) = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Grouping {
-    Tag,
-    Tree,
-    None,
-}
-impl Grouping {
-    pub fn is_none(self) -> bool {
-        self == Grouping::None
-    }
-}
-impl<T: AsRef<str>> From<T> for Grouping {
-    fn from(s: T) -> Self {
-        match s.as_ref() {
-            "tag" => Grouping::Tag,
-            "tree" => Grouping::Tree,
-            "none" => Grouping::None,
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ListOptions<'a, T = (), U = ()> {
-    pub grouping: Grouping,
-    pub queries: &'a [ListQuery],
-    pub plain: bool,
-    pub display_style: DisplayStyle<T, U>,
-}
-
 fn convert_opt<'a, W: Write>(
     w: &'a mut W,
     opt: &ListOptions<'a>,
@@ -126,23 +76,6 @@ fn convert_opt<'a, W: Write>(
         queries: opt.queries,
         plain: opt.plain,
     }
-}
-#[inline]
-fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
-    plain: bool,
-    s: T,
-    f: F,
-) -> ColoredString {
-    let s = s.as_ref().normal();
-    if !plain {
-        f(s)
-    } else {
-        s
-    }
-}
-fn get_color(script: &ScriptInfo) -> Result<Color> {
-    let c = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
-    Ok(Color::from(c))
 }
 pub fn fmt_meta<W: Write>(
     script: &ScriptInfo,
@@ -174,11 +107,7 @@ pub fn fmt_meta<W: Write>(
             if is_last && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
-            let ident = match ident_style {
-                DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
-                DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
-                DisplayIdentStyle::Name => script.name.to_string(),
-            };
+            let ident = ident_style.ident_string(script)?;
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
                 if is_last {
@@ -200,8 +129,8 @@ pub fn fmt_list<'a, W: Write>(
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
-    let latest_script_name = match script_repo.latest_mut(1) {
-        Some(script) => script.name.clone().into_static(),
+    let latest_script_id = match script_repo.latest_mut(1) {
+        Some(script) => script.id,
         None => return Ok(()),
     };
 
@@ -216,7 +145,7 @@ pub fn fmt_list<'a, W: Write>(
 
     if opt.grouping.is_none() {
         let scripts: Vec<_> = scripts_iter.collect();
-        fmt_group(scripts, &latest_script_name, &mut opt)?;
+        fmt_group(scripts, latest_script_id, &mut opt)?;
     } else {
         // TODO: 樹狀
         let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
@@ -243,7 +172,7 @@ pub fn fmt_list<'a, W: Write>(
                     }
                 }
             }
-            fmt_group(scripts, &latest_script_name, &mut opt)?;
+            fmt_group(scripts, latest_script_id, &mut opt)?;
         }
     }
     if let DisplayStyle::Long(table) = &mut opt.display_style {
@@ -254,7 +183,7 @@ pub fn fmt_list<'a, W: Write>(
 
 fn fmt_group<W: Write>(
     mut scripts: Vec<&ScriptInfo>,
-    latest_script_name: &ScriptName,
+    latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
     scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
@@ -262,7 +191,7 @@ fn fmt_group<W: Write>(
         if let DisplayStyle::Short(_, w) = &mut opt.display_style {
             write!(w, "  ")?;
         }
-        let is_latest = &script.name == latest_script_name;
+        let is_latest = script.id == latest_script_id;
         fmt_meta(script, is_latest, opt)?;
     }
     if let DisplayStyle::Short(_, w) = &mut opt.display_style {

@@ -25,8 +25,10 @@ pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
 }
 
 fn test_import() {
+    run("e copy/test -f +innate | echo 我要留下來").unwrap();
     run("e my/innate -f +innate | cp tests/to_be_import ./.tmp -r").unwrap();
     run("-f my -").unwrap();
+    assert_eq!(run("-f copy -").unwrap(), "我要留下來");
 
     run("tags something-evil").unwrap();
     run("-f util import .tmp").unwrap();
@@ -36,9 +38,17 @@ fn test_import() {
     assert_eq!(run("-f tag mytest").unwrap(), "安安，紅寶石");
     assert_eq!(run("-f tag youtest").unwrap(), "殼已破碎");
     assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
+    assert_eq!(run("-f copy -").unwrap(), "我要留下來");
 
     run("-f something-evil which -").expect_err("標籤匯入錯了？");
     run("tags +all").unwrap();
+
+    let ls_res = run("ls -f all --grouping none --plain --name").unwrap();
+    let ls_vec = ls_res
+        .split(" ")
+        .filter(|s| s.len() > 0)
+        .collect::<Vec<_>>();
+    assert_eq!(15, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
 }
 
 const GITIGNORE_CONTENT: &'static str = ".script_history.db
@@ -54,7 +64,7 @@ fn test_collect() {
     let mut file = File::create(get_path().join("this/is/a/collect/test.rb")).unwrap();
     file.write_all("puts '這是一個收集測試'".as_bytes())
         .unwrap();
-    remove_dir_all(get_path().join("my")).unwrap();
+    remove_dir_all(get_path().join("my")).unwrap(); // 刪掉 myinnate 和 mytest
     run("-f innate which myinnate").expect("還沒跑 collect 就壞掉了？");
     run("-f my which mytest").expect("還沒跑 collect 就壞掉了？");
     run("thisisacolltest").expect_err("還沒收集就出現了，嚇死");

@@ -98,10 +98,7 @@ impl<T: AsRef<str>> From<T> for Grouping {
     fn from(s: T) -> Self {
         match s.as_ref() {
             "tag" => Grouping::Tag,
-            "tree" => {
-                unimplemented!();
-                // Grouping::Tree
-            }
+            "tree" => Grouping::Tree,
             "none" => Grouping::None,
             _ => unreachable!(),
         }

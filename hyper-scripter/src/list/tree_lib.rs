@@ -76,6 +76,7 @@ impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
     }
 }
 
+#[derive(Debug)]
 pub struct TreeFmtOption {
     is_done: Vec<bool>,
 }
@@ -109,6 +110,12 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
         opt: &mut TreeFmtOption,
         self_is_end: bool,
     ) -> Result {
+        log::trace!(
+            "打印節點 {:?}: opt={:?}, self_is_end={}",
+            node,
+            opt,
+            self_is_end
+        );
         for is_done in opt.is_done.iter().take(opt.is_done.len() - 1) {
             if *is_done {
                 write!(f, "    ")?;
@@ -127,7 +134,7 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
                 self.fmt_leaf(f, leaf)?;
             }
             TreeNode::NonLeaf { value, childs } => {
-                opt.is_done.push(self_is_end);
+                opt.is_done.push(false);
                 self.fmt_nonleaf(f, value)?;
                 self.fmt_lists(f, childs, opt)?;
                 opt.is_done.pop();
@@ -149,6 +156,13 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
                 )
             }
         }
+    }
+    fn fmt_all(&mut self, f: &mut W, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
+        for mut root in forest {
+            self.fmt(f, &mut root)?;
+            writeln!(f, "")?;
+        }
+        Ok(())
     }
 }
 

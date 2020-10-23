@@ -109,6 +109,11 @@ impl Default for RawConfig {
     }
 }
 impl RawConfig {
+    #[cfg(test)]
+    fn load() -> Result<Self> {
+        Ok(Self::default())
+    }
+    #[cfg(not(test))]
     fn load() -> Result<Self> {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);

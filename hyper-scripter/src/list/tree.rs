@@ -60,9 +60,7 @@ impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for S
 
 type TreeNode<'a, 'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b, 'a>>;
 
-fn build_tree<'a, 'b>(
-    scripts: Vec<&'b ScriptInfo<'a>>,
-) -> tree_lib::Childs<'b, TrimmedScriptInfo<'b, 'a>> {
+fn build_forest<'a, 'b>(scripts: Vec<&'b ScriptInfo<'a>>) -> Vec<TreeNode<'a, 'b>> {
     let mut m = HashMap::new();
     for script in scripts.into_iter() {
         let name = script.name.key();
@@ -81,7 +79,9 @@ fn build_tree<'a, 'b>(
         let leaf = TreeNode::new_leaf(TrimmedScriptInfo(name, script));
         TreeNode::insert_to_map(&mut m, &path, leaf);
     }
-    m
+    let mut forest: Vec<_> = m.into_iter().map(|(_, t)| t).collect();
+    forest.sort_by(|a, b| a.cmp(b));
+    forest
 }
 
 pub fn fmt<W: Write>(
@@ -89,10 +89,7 @@ pub fn fmt<W: Write>(
     latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let tree = build_tree(scripts);
-    log::debug!("樹狀圖：{:?}", tree);
-    let mut tree: Vec<_> = tree.into_iter().map(|(_, n)| n).collect();
-    tree.sort_by(|a, b| a.cmp(b));
+    let forest = build_forest(scripts);
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             panic!();
@@ -103,11 +100,78 @@ pub fn fmt<W: Write>(
                 ident_style: *ident_style,
                 latest_script_id,
             };
-            for mut root in tree.into_iter() {
-                fmter.fmt(w, &mut root)?;
-                writeln!(w, "")?;
-            }
+            fmter.fmt_all(w, forest.into_iter())?;
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::script::AsScriptName;
+    use chrono::NaiveDateTime;
+
+    fn build(v: Vec<(&'static str, &'static str)>) -> Vec<ScriptInfo<'static>> {
+        v.into_iter()
+            .enumerate()
+            .map(|(id, (name, ty))| {
+                let id = id as i64;
+                let time = NaiveDateTime::from_timestamp(id, 0);
+                ScriptInfo::builder(
+                    id,
+                    name.as_script_name().unwrap(),
+                    ty.into(),
+                    vec![].into_iter(),
+                )
+                .created_time(time)
+                .build()
+            })
+            .collect()
+    }
+    #[test]
+    fn test_fmt_tree_short() {
+        let _ = env_logger::try_init();
+        let scripts = build(vec![
+            ("bbb/ccc/ggg/rrr", "tmux"),
+            ("aaa/bbb", "rb"),
+            ("bbb/ccc/ddd", "tmux"),
+            ("bbb/ccc/ggg/fff", "tmux"),
+            ("aaa", "sh"),
+            ("bbb/ccc/ddd/eee", "tmux"),
+            (".2", "md"),
+            ("bbb/ccc/yyy", "js"),
+            ("bbb/ccc/ddd/www", "rb"),
+            ("bbb/ccc/ggg/xxx", "tmux"),
+            ("bbb/ddd", "tmux"),
+        ]);
+        let forest = build_forest(scripts.iter().collect());
+        let mut fmter = ShortFormatter {
+            plain: true,
+            ident_style: DisplayIdentStyle::Normal,
+            latest_script_id: 1,
+        };
+        let ans = "
+.2(md)
+aaa(sh)
+aaa
+└── bbb(rb)
+bbb
+├── ddd(tmux)
+└── ccc
+    ├── yyy(js)
+    ├── ddd(tmux)
+    ├── ddd
+    │   ├── www(rb)
+    │   └── eee(tmux)
+    └── ggg
+        ├── xxx(tmux)
+        ├── fff(tmux)
+        └── rrr(tmux)
+"
+        .trim();
+        let mut v8 = Vec::<u8>::new();
+        fmter.fmt_all(&mut v8, forest.into_iter()).unwrap();
+        assert_eq!(std::str::from_utf8(&v8).unwrap().trim(), ans);
+    }
 }

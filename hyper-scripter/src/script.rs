@@ -236,14 +236,15 @@ impl<'a> ScriptBuilder<'a> {
     }
     pub fn build(self) -> ScriptInfo<'a> {
         let now = ScriptTime::now(());
+        let created_time = ScriptTime::new_or(self.created_time, now);
         ScriptInfo {
             id: self.id,
             name: self.name,
             ty: self.ty,
             tags: self.tags,
-            created_time: ScriptTime::new_or(self.created_time, now.clone()),
-            write_time: ScriptTime::new_or(self.write_time, now.clone()),
-            read_time: ScriptTime::new_or(self.read_time, now.clone()),
+            write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
+            read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
+            created_time,
             exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
         }
     }

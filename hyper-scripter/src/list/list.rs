@@ -1,4 +1,6 @@
-use super::{get_color, style, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions};
+use super::{
+    get_color, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
+};
 use crate::error::Result;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
@@ -104,11 +106,8 @@ pub fn fmt_meta<W: Write>(
                 style(opt.plain, script.name.key(), |s| s.color(color).bold()),
             );
             let ty_txt = style(opt.plain, &script.ty, |s| s.color(color).bold());
-            let exec_time_txt = match &script.exec_time {
-                Some(t) => t.to_string(),
-                None => "Never".to_owned(),
-            };
-            let row = row![name_txt, c->ty_txt, script.write_time, exec_time_txt];
+            let row =
+                row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time)];
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, w) => {
@@ -143,8 +142,10 @@ pub fn fmt_list<'a, W: Write>(
     };
 
     if let DisplayStyle::Long(table) = &mut opt.display_style {
+        if opt.grouping != Grouping::Tree {
+            table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
+        }
         table.set_format(*format::consts::FORMAT_CLEAN);
-        table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
     }
 
     let scripts_iter = do_list_query(script_repo, &opt.queries)?

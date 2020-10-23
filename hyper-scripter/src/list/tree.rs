@@ -1,20 +1,27 @@
 use super::{
-    get_color, style,
+    get_color, style, time_str,
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
 use crate::error::Result;
 use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
-use prettytable::{cell, row, Cell, Row, Table};
+use prettytable::{cell, format, row, Row, Table};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::io::Write;
 
+const TITLE: &[&str] = &["category", "last write time", "last execute time"];
+
 struct ShortFormatter {
     plain: bool,
     ident_style: DisplayIdentStyle,
+    latest_script_id: i64,
+}
+struct LongFormatter {
+    table: Table,
+    plain: bool,
     latest_script_id: i64,
 }
 struct TrimmedScriptInfo<'b, 'a: 'b>(Cow<'b, str>, &'b ScriptInfo<'a>);
@@ -57,6 +64,29 @@ impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for S
         Ok(())
     }
 }
+impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for LongFormatter {
+    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b, 'a>) -> Result {
+        let TrimmedScriptInfo(name, script) = t;
+        let color = get_color(script)?;
+        let ident = style(self.plain, name, |s| s.color(color).bold());
+        let ty_txt = style(self.plain, &script.ty, |s| s.color(color).bold());
+        if self.latest_script_id == script.id && !self.plain {
+            write!(f, "{}", "*".color(Color::Yellow).bold())?;
+        }
+        write!(f, "{}", ident)?;
+        let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time)];
+        self.table.add_row(row);
+        Ok(())
+    }
+    fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
+        let ident = style(self.plain, t, |s| s.dimmed().italic());
+        let empty = style(self.plain, "----", |s| s.dimmed());
+        write!(f, "{}", ident)?;
+        self.table
+            .add_row(Row::new(vec![cell!(c->empty).with_hspan(TITLE.len())]));
+        Ok(())
+    }
+}
 
 type TreeNode<'a, 'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b, 'a>>;
 
@@ -92,7 +122,19 @@ pub fn fmt<W: Write>(
     let forest = build_forest(scripts);
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
-            panic!();
+            let mut right_table = Table::new();
+            right_table.set_format(*format::consts::FORMAT_CLEAN);
+            right_table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
+            let mut fmter = LongFormatter {
+                plain: opt.plain,
+                latest_script_id,
+                table: right_table,
+            };
+            let mut left = Vec::<u8>::new();
+            writeln!(left, "")?;
+            fmter.fmt_all(&mut left, forest.into_iter())?;
+            let left = std::str::from_utf8(&left)?;
+            table.add_row(row![left, fmter.table.to_string()]);
         }
         DisplayStyle::Short(ident_style, w) => {
             let mut fmter = ShortFormatter {

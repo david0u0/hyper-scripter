@@ -4,8 +4,18 @@ pub use list::*;
 mod tree;
 mod tree_lib;
 
-use crate::{config::Config, error::Result, query::ListQuery, script::ScriptInfo};
+use crate::{
+    config::Config, error::Result, query::ListQuery, script::ScriptInfo, script_time::ScriptTime,
+};
 use colored::{Color, ColoredString, Colorize};
+use std::borrow::Cow;
+
+fn time_str<T: Clone + std::fmt::Debug>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
+    match time {
+        None => Cow::Borrowed("Never"),
+        Some(t) => Cow::Owned(t.to_string()),
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum DisplayIdentStyle {

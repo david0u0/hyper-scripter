@@ -48,6 +48,7 @@ impl Display for Error {
                 write!(f, " '{}'", s)?;
             }
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
+            NoAlias(alias) => write!(f, "No such alias: {}", alias)?,
             _ => {
                 log::warn!("未被正確打印的錯誤：{:?}", self);
                 write!(f, "{:?}", self)?;

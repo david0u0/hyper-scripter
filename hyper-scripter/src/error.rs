@@ -36,6 +36,7 @@ pub enum Error {
         actual: ScriptType,
     },
     MultiFuzz(Vec<String>),
+    NoAlias(String),
     UnknownCategory(String),
     Format(FormatCode, String),
     ScriptError(i32),

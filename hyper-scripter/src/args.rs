@@ -6,8 +6,8 @@ use crate::script_type::ScriptType;
 use crate::tag::TagControlFlow;
 use std::str::FromStr;
 use structopt::clap::AppSettings::{
-    self, AllArgsOverrideSelf, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand,
-    DisableVersion, TrailingVarArg,
+    self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
+    DisableHelpSubcommand, DisableVersion, TrailingVarArg,
 };
 use structopt::StructOpt;
 
@@ -17,6 +17,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
     TrailingVarArg,
     DisableHelpSubcommand,
     DisableVersion,
+    AllowExternalSubcommands,
 ];
 
 macro_rules! def_root {
@@ -100,11 +101,18 @@ pub enum Subs {
     },
     #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
     Alias {
-        #[structopt(requires = "after")]
+        #[structopt(
+            long,
+            short,
+            requires = "before",
+            conflicts_with = "after",
+            help = "Unset an alias."
+        )]
+        unset: bool,
         before: Option<String>,
-        #[structopt(requires = "before")]
         after: Vec<String>,
     },
+
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
         #[structopt(default_value = "-", parse(try_from_str))]

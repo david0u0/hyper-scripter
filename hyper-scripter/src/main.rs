@@ -89,12 +89,41 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Alias {
+            unset: false,
             before: Some(before),
             after,
         } => {
-            conf.alias.insert(before.clone(), after.clone().into());
+            if after.len() > 0 {
+                log::info!("設定別名 {} {:?}", before, after);
+                conf.alias.insert(before.clone(), after.clone().into());
+            } else {
+                log::info!("印出別名 {}", before);
+                let after = conf
+                    .alias
+                    .get(before)
+                    .ok_or(Error::NoAlias(before.clone()))?
+                    .after
+                    .join(" ");
+                println!("{}=\"{}\"", before, after);
+            }
         }
-        Subs::Alias { .. } => {
+        Subs::Alias {
+            unset: true,
+            before: Some(before),
+            ..
+        } => {
+            log::info!("取消別名 {}", before);
+            let ok = conf.alias.remove(before).is_some();
+            if !ok {
+                return Err(Error::NoAlias(before.clone()));
+            }
+        }
+        Subs::Alias {
+            unset: false,
+            before: None,
+            ..
+        } => {
+            log::info!("印出所有別名");
             for (before, alias) in conf.alias.iter() {
                 let after = alias.after.join(" ");
                 println!("{}=\"{}\"", before, after);

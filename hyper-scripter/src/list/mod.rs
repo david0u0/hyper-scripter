@@ -13,28 +13,10 @@ pub enum DisplayIdentStyle {
     Name,
     Normal,
 }
-impl DisplayIdentStyle {
-    fn ident_string(&self, script: &ScriptInfo) -> Result<String> {
-        Ok(match self {
-            DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
-            DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
-            DisplayIdentStyle::Name => script.name.to_string(),
-        })
-    }
-}
 #[derive(Debug, Eq, PartialEq)]
 pub enum DisplayStyle<T, U> {
     Short(DisplayIdentStyle, U),
     Long(T),
-}
-impl<T, U> DisplayStyle<T, U> {
-    pub fn is_long(&self) -> bool {
-        if let DisplayStyle::Long(_) = self {
-            true
-        } else {
-            false
-        }
-    }
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Grouping {

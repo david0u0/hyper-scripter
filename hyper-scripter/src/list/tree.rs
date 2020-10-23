@@ -4,48 +4,84 @@ use super::{
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
 use crate::error::Result;
-use crate::script::{ScriptInfo, ScriptName};
-use chrono::NaiveDateTime;
+use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
-use prettytable::{cell, format, row, Cell, Row, Table};
+use prettytable::{cell, row, Cell, Row, Table};
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::io::Write;
 
-/*
 struct ShortFormatter {
     plain: bool,
     ident_style: DisplayIdentStyle,
     latest_script_id: i64,
 }
-impl<'a, 'b> tree_lib::TreeValue for &'b ScriptInfo<'a> {
-    type Key = NaiveDateTime;
-    fn sort_key(&self) -> Self::Key {
-        self.last_time()
+struct TrimmedScriptInfo<'b, 'a: 'b>(Cow<'b, str>, &'b ScriptInfo<'a>);
+
+fn ident_string<'b, 'a>(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'b, 'a>) -> Result<String> {
+    let TrimmedScriptInfo(name, script) = t;
+    Ok(match style {
+        DisplayIdentStyle::Normal => format!("{}({})", name, script.ty),
+        DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
+        DisplayIdentStyle::Name => name.to_string(),
+    })
+}
+
+impl<'b, 'a: 'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b, 'a> {
+    fn tree_cmp(&self, other: &Self) -> Ordering {
+        other.1.last_time().cmp(&self.1.last_time())
     }
-    fn display_key(&self) -> Cow<str> {
-        self.name.key()
+    fn display_key(&self) -> Cow<'b, str> {
+        match &self.0 {
+            Cow::Borrowed(s) => Cow::Borrowed(s),
+            Cow::Owned(_) => self.1.name.key(),
+        }
     }
 }
-impl<'a, 'b, W: Write> TreeFormatter<'a, &'b ScriptInfo<'a>, W> for ShortFormatter {
-    fn fmt_leaf(&mut self, f: &mut W, t: &&'b ScriptInfo<'a>) -> Result {
-        let ident = self.ident_style.ident_string(t)?;
-        let color = get_color(t)?;
+impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for ShortFormatter {
+    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b, 'a>) -> Result {
+        let TrimmedScriptInfo(_, script) = t;
+        let color = get_color(script)?;
+        let ident = ident_string(self.ident_style, t)?;
         let ident = style(self.plain, ident, |s| s.color(color).bold());
+        if self.latest_script_id == script.id && !self.plain {
+            write!(f, "{}", "*".color(Color::Yellow).bold())?;
+        }
         write!(f, "{}", ident)?;
         Ok(())
     }
     fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
-        write!(f, "{}", t)?;
+        let ident = style(self.plain, t, |s| s.dimmed().italic());
+        write!(f, "{}", ident)?;
         Ok(())
     }
 }
 
-type TreeNode<'a, 'b> = tree_lib::TreeNode<'a, &'b ScriptInfo<'a>>;
+type TreeNode<'a, 'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b, 'a>>;
 
-fn build_tree<'a, 'b>(scripts: Vec<&'b ScriptInfo<'a>>) -> Vec<TreeNode<'a, 'b>> {
-    vec![]
+fn build_tree<'a, 'b>(
+    scripts: Vec<&'b ScriptInfo<'a>>,
+) -> tree_lib::Childs<'b, TrimmedScriptInfo<'b, 'a>> {
+    let mut m = HashMap::new();
+    for script in scripts.into_iter() {
+        let name = script.name.key();
+        let name_key = match name {
+            Cow::Borrowed(s) => s,
+            _ => {
+                m.insert(
+                    (false, name.clone()),
+                    TreeNode::new_leaf(TrimmedScriptInfo(name, script)),
+                );
+                continue;
+            }
+        };
+        let mut path: Vec<_> = name_key.split("/").collect();
+        let name = Cow::Borrowed(path.pop().unwrap());
+        let leaf = TreeNode::new_leaf(TrimmedScriptInfo(name, script));
+        TreeNode::insert_to_map(&mut m, &path, leaf);
+    }
+    m
 }
 
 pub fn fmt<W: Write>(
@@ -53,6 +89,10 @@ pub fn fmt<W: Write>(
     latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
+    let tree = build_tree(scripts);
+    log::debug!("樹狀圖：{:?}", tree);
+    let mut tree: Vec<_> = tree.into_iter().map(|(_, n)| n).collect();
+    tree.sort_by(|a, b| a.cmp(b));
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             panic!();
@@ -63,11 +103,11 @@ pub fn fmt<W: Write>(
                 ident_style: *ident_style,
                 latest_script_id,
             };
-            let mut node = tree_lib::TreeNode::new_leaf(scripts[0]);
-            fmter.fmt(w, &mut node)?;
+            for mut root in tree.into_iter() {
+                fmter.fmt(w, &mut root)?;
+                writeln!(w, "")?;
+            }
         }
     }
     Ok(())
 }
-
-*/

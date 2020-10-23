@@ -1,4 +1,4 @@
-use super::{get_color, style, tree, DisplayStyle, ListOptions};
+use super::{get_color, style, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions};
 use crate::error::Result;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
@@ -9,6 +9,14 @@ use prettytable::{cell, format, row, Cell, Row, Table};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+
+fn ident_string(style: &DisplayIdentStyle, script: &ScriptInfo) -> Result<String> {
+    Ok(match style {
+        DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
+        DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
+        DisplayIdentStyle::Name => script.name.to_string(),
+    })
+}
 
 #[derive(PartialEq, Eq)]
 struct TagsKey(Vec<Tag>);
@@ -107,7 +115,7 @@ pub fn fmt_meta<W: Write>(
             if is_last && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
-            let ident = ident_style.ident_string(script)?;
+            let ident = ident_string(ident_style, script)?;
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
                 if is_last {
@@ -143,36 +151,42 @@ pub fn fmt_list<'a, W: Write>(
         .into_iter()
         .map(|e| &*e.into_inner());
 
-    if opt.grouping.is_none() {
-        let scripts: Vec<_> = scripts_iter.collect();
-        fmt_group(scripts, latest_script_id, &mut opt)?;
-    } else {
-        // TODO: 樹狀
-        let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
-        for script in scripts_iter {
-            let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
-            let v = script_map.entry(key).or_default();
-            v.push(script);
+    match opt.grouping {
+        Grouping::None => {
+            let scripts: Vec<_> = scripts_iter.collect();
+            fmt_group(scripts, latest_script_id, &mut opt)?;
         }
+        Grouping::Tree => {
+            let scripts: Vec<_> = scripts_iter.collect();
+            tree::fmt(scripts, latest_script_id, &mut opt)?;
+        }
+        Grouping::Tag => {
+            let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
+            for script in scripts_iter {
+                let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
+                let v = script_map.entry(key).or_default();
+                v.push(script);
+            }
 
-        let mut scripts: Vec<_> = script_map.into_iter().collect();
+            let mut scripts: Vec<_> = script_map.into_iter().collect();
 
-        scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
-        for (tags, scripts) in scripts.into_iter() {
-            if !opt.grouping.is_none() {
-                let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
-                match &mut opt.display_style {
-                    DisplayStyle::Long(table) => {
-                        table.add_row(Row::new(vec![
-                            Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
-                        ]));
-                    }
-                    DisplayStyle::Short(_, w) => {
-                        write!(w, "{}\n", tags_txt)?;
+            scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
+            for (tags, scripts) in scripts.into_iter() {
+                if !opt.grouping.is_none() {
+                    let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
+                    match &mut opt.display_style {
+                        DisplayStyle::Long(table) => {
+                            table.add_row(Row::new(vec![
+                                Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
+                            ]));
+                        }
+                        DisplayStyle::Short(_, w) => {
+                            write!(w, "{}\n", tags_txt)?;
+                        }
                     }
                 }
+                fmt_group(scripts, latest_script_id, &mut opt)?;
             }
-            fmt_group(scripts, latest_script_id, &mut opt)?;
         }
     }
     if let DisplayStyle::Long(table) = &mut opt.display_style {

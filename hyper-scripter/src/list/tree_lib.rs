@@ -2,6 +2,7 @@ use crate::error::Result;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::io::Write;
 
 pub trait TreeValue<'b> {
@@ -9,20 +10,25 @@ pub trait TreeValue<'b> {
     fn display_key(&self) -> Cow<'b, str>;
 }
 
-#[derive(Debug)]
+pub type Childs<'a, T> = HashMap<(bool, Cow<'a, str>), TreeNode<'a, T>>;
 pub enum TreeNode<'a, T: TreeValue<'a>> {
     Leaf(T),
     NonLeaf {
         value: &'a str,
-        childs: HashMap<Cow<'a, str>, TreeNode<'a, T>>,
+        childs: Childs<'a, T>,
     },
+}
+impl<'a, T: TreeValue<'a>> Debug for TreeNode<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            TreeNode::Leaf(leaf) => write!(f, "[{}]", leaf.display_key()),
+            TreeNode::NonLeaf { value, childs } => write!(f, "`{}` => {:?}", value, childs),
+        }
+    }
 }
 impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
     pub fn new_leaf(t: T) -> Self {
         TreeNode::Leaf(t)
-    }
-    pub fn new_nonleaf(s: &'a str, childs: HashMap<Cow<'a, str>, Self>) -> Self {
-        TreeNode::NonLeaf { value: s, childs }
     }
     pub fn key(&self) -> Cow<'a, str> {
         match self {
@@ -30,7 +36,37 @@ impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
             TreeNode::NonLeaf { value, .. } => Cow::Borrowed(value),
         }
     }
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn get_child_map(&mut self) -> &mut Childs<'a, T> {
+        match self {
+            TreeNode::NonLeaf { childs, .. } => childs,
+            _ => panic!("試圖對葉節點 {:?} 取兒子", self),
+        }
+    }
+    fn next_nonleaf<'s>(map: &'s mut Childs<'a, T>, key: &'a str) -> &'s mut Self {
+        map.entry((false, Cow::Borrowed(key)))
+            .or_insert_with(|| TreeNode::NonLeaf {
+                value: key,
+                childs: Default::default(),
+            })
+    }
+    pub fn insert_to_map(map: &mut Childs<'a, T>, path: &[&'a str], child: Self) {
+        if path.len() == 0 {
+            map.insert((true, child.key()), child);
+        } else {
+            let e = Self::next_nonleaf(map, path[0]);
+            e.insert(&path[1..], child);
+        }
+    }
+    pub fn insert(&mut self, path: &[&'a str], leaf: Self) {
+        let mut cur = self;
+        for p in path {
+            let childs = cur.get_child_map();
+            cur = Self::next_nonleaf(childs, p);
+        }
+        let childs = cur.get_child_map();
+        childs.insert((true, leaf.key()), leaf);
+    }
+    pub fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (TreeNode::NonLeaf { .. }, TreeNode::Leaf(_)) => Ordering::Greater,
             (TreeNode::NonLeaf { value: a, .. }, TreeNode::NonLeaf { value: b, .. }) => a.cmp(b),
@@ -49,12 +85,7 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
     fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result;
 
     #[doc(hidden)]
-    fn fmt_lists(
-        &mut self,
-        f: &mut W,
-        map: &mut HashMap<Cow<'a, str>, TreeNode<'a, T>>,
-        opt: &mut TreeFmtOption,
-    ) -> Result {
+    fn fmt_lists(&mut self, f: &mut W, map: &mut Childs<'a, T>, opt: &mut TreeFmtOption) -> Result {
         if map.len() == 0 {
             panic!("非葉節點至少要有一個兒子！");
         }
@@ -139,10 +170,17 @@ mod test {
     fn n<'a>(s: &'a str, childs: Vec<T<'a>>) -> T<'a> {
         let mut map = HashMap::new();
         for child in childs.into_iter() {
+            let is_leaf = match child {
+                TreeNode::Leaf(_) => true,
+                _ => false,
+            };
             let key = child.key();
-            map.insert(key, child);
+            map.insert((is_leaf, key), child);
         }
-        TreeNode::new_nonleaf(s, map)
+        TreeNode::NonLeaf {
+            value: s,
+            childs: map,
+        }
     }
 
     struct Fmter {

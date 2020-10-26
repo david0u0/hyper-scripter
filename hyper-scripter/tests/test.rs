@@ -236,7 +236,7 @@ fn test_miss_event() {
     run(&format!("-f hide e hidden_first | echo 第一")).unwrap();
     run(&format!("-f hide e hidden_second | echo 第二")).unwrap();
     run(&format!("-f hide e third | echo 第三")).unwrap();
-    assert_eq!("第三", run("-f all -").unwrap());
+    assert_eq!("第三", run("!").unwrap());
     run("first").expect_err("執行了隱藏的腳本？？");
-    assert_eq!("第一", run("-f all -").unwrap(), "沒有記錄到錯過事件？");
+    assert_eq!("第一", run("!").unwrap(), "沒有記錄到錯過事件？");
 }

@@ -60,7 +60,7 @@ pub fn do_script_query<'b, 'a>(
             };
         }
         ScriptQuery::Exact(name) => Ok(script_repo.get_mut(name)),
-        ScriptQuery::Fuzz(name) => fuzzy::fuzz_mut(name, script_repo.iter_mut()),
+        ScriptQuery::Fuzz(name) => fuzzy::fuzz(name, script_repo.iter_mut()),
     }
 }
 pub fn do_script_query_strict<'b, 'a>(
@@ -89,7 +89,7 @@ pub async fn do_script_query_strict_with_missing<'b, 'a>(
             let repo = unsafe { &mut *repo_mut };
             let info = match script_query {
                 ScriptQuery::Exact(name) => repo.get_hidden_mut(name),
-                ScriptQuery::Fuzz(name) => match fuzzy::fuzz_mut(name, repo.iter_hidden_mut()) {
+                ScriptQuery::Fuzz(name) => match fuzzy::fuzz(name, repo.iter_hidden_mut()) {
                     Ok(info) => info,
                     _ => None,
                 },

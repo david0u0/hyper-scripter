@@ -11,10 +11,7 @@ lazy_static::lazy_static! {
 pub trait FuzzKey {
     fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
 }
-pub fn fuzz_mut<'a, T: FuzzKey + 'a>(
-    name: &str,
-    iter: impl Iterator<Item = T>,
-) -> Result<Option<T>> {
+pub fn fuzz<'a, T: FuzzKey + 'a>(name: &str, iter: impl Iterator<Item = T>) -> Result<Option<T>> {
     let mut ans = (0, Vec::<T>::new());
     for data in iter {
         let key_tmp = data.fuzz_key();
@@ -119,16 +116,16 @@ mod test {
         let t3 = ".42".as_script_name().unwrap();
         let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz_mut("測試1", vec.clone().into_iter()).unwrap();
+        let res = fuzz("測試1", vec.clone().into_iter()).unwrap();
         assert_eq!(res, Some(t1));
 
-        let res = fuzz_mut("42", vec.clone().into_iter()).unwrap();
+        let res = fuzz("42", vec.clone().into_iter()).unwrap();
         assert_eq!(res, Some(t3));
 
-        let res = fuzz_mut("找不到", vec.clone().into_iter()).unwrap();
+        let res = fuzz("找不到", vec.clone().into_iter()).unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz_mut("測試", vec.clone().into_iter()).unwrap_err();
+        let err = fuzz("測試", vec.clone().into_iter()).unwrap_err();
         let mut v = match err {
             Error::MultiFuzz(v) => v,
             _ => unreachable!(),
@@ -142,7 +139,7 @@ mod test {
         let t1 = "測試腳本1".as_script_name().unwrap();
         let t2 = "測試腳本234".as_script_name().unwrap();
         let vec = vec![t1.clone(), t2];
-        let res = fuzz_mut("測試", vec.clone().into_iter()).unwrap();
+        let res = fuzz("測試", vec.clone().into_iter()).unwrap();
         assert_eq!(res, Some(t1), "模糊搜尋無法找出較短者");
     }
     #[test]

@@ -1,3 +1,9 @@
+# [HS_USAGE]: Collect scripts in hyper scripter directory.
+# [HS_USAGE]: Scripts not traced will be added, scripts without an actual file will be purged.
+# [HS_USAGE]:
+# [HS_USAGE]: USAGE:
+# [HS_USAGE]:     hs collect
+
 require_relative './common.rb'
 require 'shellwords'
 

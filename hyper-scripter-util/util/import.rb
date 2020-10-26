@@ -1,3 +1,8 @@
+# [HS_USAGE]: Import scripts from another hs directory or git repo.
+# [HS_USAGE]:
+# [HS_USAGE]: USAGE:
+# [HS_USAGE]:     hs import [dirname | git repo address]
+
 if ARGV.length == 0
   puts 'At least one argument is required!'
   exit 1

@@ -113,6 +113,13 @@ pub enum Subs {
         after: Vec<String>,
     },
 
+    #[structopt(about = "View the usage of the script")]
+    Usage {
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_query: ScriptQuery,
+        #[structopt(short, long, help = "Show long message")]
+        long: bool,
+    },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
         #[structopt(default_value = "-", parse(try_from_str))]

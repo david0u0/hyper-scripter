@@ -1,3 +1,5 @@
+set -e
+
 cd $(dirname $0)
 
 while true; do
@@ -13,10 +15,5 @@ while true; do
 done
 
 EXE=$(cat .hs_exe_path)
-
-if [ $? != 0 ]; then
-    echo "Fail to locate hyper script executable" 1>&2
-    exit 1
-fi
 
 echo $CUR:$EXE

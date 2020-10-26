@@ -1,4 +1,4 @@
-# [HS_USAGE]: Collect scripts in hyper scripter directory.
+# [HS_USAGE]: Collect scripts in hyper scripter home.
 # [HS_USAGE]: Scripts not traced will be added, scripts without an actual file will be purged.
 # [HS_USAGE]:
 # [HS_USAGE]: USAGE:

@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::path::get_path;
+use crate::path::get_home;
 use crate::script::ScriptInfo;
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
@@ -157,7 +157,7 @@ pub fn prepare_script(
         if !no_template {
             let content: Vec<_> = content.split(";").collect();
             let info = json!({
-                "script_dir": get_path(),
+                "script_dir": get_home(),
                 "birthplace": birthplace,
                 "name": script.name.key().to_owned(),
                 "content": content,

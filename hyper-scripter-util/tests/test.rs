@@ -48,23 +48,15 @@ fn test_import() {
         .split(" ")
         .filter(|s| s.len() > 0)
         .collect::<Vec<_>>();
-    assert_eq!(15, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
+    assert_eq!(16, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
 }
 
-const GITIGNORE_CONTENT: &'static str = ".script_history.db
-*.db-*
-.hs_exe_path
-";
-fn test_git() {
-    run("-a git init").unwrap();
-    assert_eq!(GITIGNORE_CONTENT, read(&[".gitignore"]));
-}
 fn test_collect() {
-    create_dir_all(get_path().join("this/is/a/collect")).unwrap();
-    let mut file = File::create(get_path().join("this/is/a/collect/test.rb")).unwrap();
+    create_dir_all(get_home().join("this/is/a/collect")).unwrap();
+    let mut file = File::create(get_home().join("this/is/a/collect/test.rb")).unwrap();
     file.write_all("puts '這是一個收集測試'".as_bytes())
         .unwrap();
-    remove_dir_all(get_path().join("my")).unwrap(); // 刪掉 myinnate 和 mytest
+    remove_dir_all(get_home().join("my")).unwrap(); // 刪掉 myinnate 和 mytest
     run("-f innate which myinnate").expect("還沒跑 collect 就壞掉了？");
     run("-f my which mytest").expect("還沒跑 collect 就壞掉了？");
     run("thisisacolltest").expect_err("還沒收集就出現了，嚇死");
@@ -83,6 +75,5 @@ fn test_collect() {
 fn test_utils() {
     let _g = setup_util();
     test_import();
-    test_git();
     test_collect();
 }

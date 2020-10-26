@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const ROOT_PATH: &'static str = "hyper_scripter";
+const HS_HOME_ENV: &'static str = "HYPER_SCRIPTER_HOME";
 pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
 
 lazy_static::lazy_static! {
@@ -15,7 +16,7 @@ lazy_static::lazy_static! {
 
 #[cfg(not(debug_assertions))]
 pub fn get_sys_path() -> Result<PathBuf> {
-    let p = match std::env::var("HYPER_SCRIPTER_PATH") {
+    let p = match std::env::var(HS_HOME_ENV) {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
             p.into()
@@ -42,9 +43,9 @@ fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf
 }
 
 pub fn set_path_from_sys() -> Result<()> {
-    set_path(get_sys_path()?)
+    set_home(get_sys_path()?)
 }
-pub fn set_path<T: AsRef<Path>>(p: T) -> Result {
+pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
     let path = join_path(".", p)?;
     log::debug!("使用路徑：{:?}", path);
     if !path.exists() {
@@ -54,7 +55,7 @@ pub fn set_path<T: AsRef<Path>>(p: T) -> Result {
     *PATH.lock().unwrap() = Some(path);
     Ok(())
 }
-pub fn get_path() -> PathBuf {
+pub fn get_home() -> PathBuf {
     PATH.lock()
         .unwrap()
         .clone()
@@ -63,7 +64,7 @@ pub fn get_path() -> PathBuf {
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {
     let mut ids = vec![];
-    let dir = get_path().join(ANONYMOUS);
+    let dir = get_home().join(ANONYMOUS);
     if !dir.exists() {
         log::info!("找不到匿名腳本資料夾，創建之");
         handle_fs_res(&[&dir], create_dir(&dir))?;
@@ -91,7 +92,7 @@ pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName<'static>, PathB
 }
 pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
     let name = ScriptName::Anonymous(id);
-    let path = get_path().join(name.to_file_path(ty)?);
+    let path = get_home().join(name.to_file_path(ty)?);
     Ok(path)
 }
 
@@ -104,7 +105,7 @@ pub fn open_script<T: ?Sized + AsScriptName>(
     let script_path = match &name {
         ScriptName::Anonymous(id) => open_anonymous(*id, ty)?,
         ScriptName::Named(_) => {
-            let path = get_path().join(name.to_file_path(ty)?);
+            let path = get_home().join(name.to_file_path(ty)?);
             path
         }
     };
@@ -123,7 +124,7 @@ pub fn open_script<T: ?Sized + AsScriptName>(
 mod test {
     use super::*;
     fn setup() {
-        set_path(".test_hyper_scripter").unwrap();
+        set_home(".test_hyper_scripter").unwrap();
     }
     #[test]
     fn test_anonymous_ids() {
@@ -153,7 +154,7 @@ mod test {
         let second = "second".to_owned();
         let second_name = second.as_script_name().unwrap();
         let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();
-        assert_eq!(p, get_path().join("second.rb"));
+        assert_eq!(p, get_home().join("second.rb"));
 
         let p = open_script(".1", &"sh".into(), None).unwrap();
         assert_eq!(
@@ -162,7 +163,7 @@ mod test {
         );
 
         match open_script("not-exist", &"sh".into(), Some(true)).unwrap_err() {
-            Error::PathNotFound(name) => assert_eq!(name, get_path().join("not-exist.sh")),
+            Error::PathNotFound(name) => assert_eq!(name, get_home().join("not-exist.sh")),
             _ => unreachable!(),
         }
     }

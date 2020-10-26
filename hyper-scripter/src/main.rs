@@ -190,7 +190,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 let exe = std::env::current_exe()?;
                 let exe = exe.to_string_lossy();
                 log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
-                util::write_file(&path::get_path().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
+                util::write_file(&path::get_home().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
             }
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
@@ -231,7 +231,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Which { script_query } => {
             let entry = query::do_script_query_strict_with_missing(script_query, &mut repo).await?;
             log::info!("定位 {:?}", entry.name);
-            let p = path::get_path().join(entry.file_path()?);
+            let p = path::get_home().join(entry.file_path()?);
             println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {
@@ -240,7 +240,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             log::info!("打印 {:?}", entry.name);
             let content = util::read_file(&script_path)?;
-            println!("{}", content);
+            print!("{}", content);
             entry.update(|info| info.read()).await?;
         }
         Subs::LS(List {

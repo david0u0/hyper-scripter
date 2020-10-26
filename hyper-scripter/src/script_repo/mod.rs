@@ -104,7 +104,7 @@ impl<'a> ScriptRepo<'a> {
         &self.db_env.historian
     }
     pub async fn new<'b>(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo<'b>> {
-        let historian = Historian::new(path::get_path()).await?;
+        let historian = Historian::new(path::get_home()).await?;
 
         let mut hidden_map = HashMap::<String, ScriptInfo>::new();
         let time_bound = recent.map(|recent| {

@@ -156,7 +156,7 @@ impl ScriptTypeConfig {
                 ext: Some("sh".to_owned()),
                 color: "white".to_owned(),
                 template: split(TMUX_WELCOME_MSG),
-                cmd: Some("sh".to_owned()),
+                cmd: Some("bash".to_owned()),
                 args: vec!["{{path}}".to_owned()],
                 env: vec![],
             },

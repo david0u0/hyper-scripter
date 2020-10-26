@@ -27,8 +27,8 @@ macro_rules! def_root {
         pub struct Root {
             #[structopt(long)]
             pub no_alias: bool,
-            #[structopt(short = "p", long, help = "Path to hyper script root")]
-            pub hs_path: Option<String>,
+            #[structopt(short = "H", long, help = "Path to hyper script home")]
+            pub hs_home: Option<String>,
             #[structopt(
                 short,
                 long,
@@ -209,9 +209,9 @@ pub struct List {
     pub queries: Vec<ListQuery>,
 }
 
-fn set_path(p: &Option<String>) -> Result {
+fn set_home(p: &Option<String>) -> Result {
     match p {
-        Some(p) => path::set_path(p)?,
+        Some(p) => path::set_home(p)?,
         None => path::set_path_from_sys()?,
     }
     Ok(())
@@ -239,7 +239,7 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
             if alias_root.no_alias {
                 log::debug!("不使用別名！");
             } else {
-                set_path(&alias_root.hs_path)?;
+                set_home(&alias_root.hs_home)?;
                 if let Some((before, alias)) = find_alias(&alias_root)? {
                     log::info!("別名 {} => {:?}", before, alias);
                     let mut new_args: Vec<&str> = vec![];
@@ -260,7 +260,7 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
         }
     };
     let root = Root::from_iter(args);
-    set_path(&root.hs_path)?;
+    set_home(&root.hs_home)?;
     Ok(root)
 }
 pub fn handle_args() -> Result<Root> {

@@ -20,16 +20,16 @@ pub fn get_exe_abs() -> String {
         .to_owned()
 }
 
-const PATH: &str = "./.hyper_scripter";
+const HOME: &str = "./.hyper_scripter";
 
-pub fn get_path() -> PathBuf {
-    PATH.into()
+pub fn get_home() -> PathBuf {
+    HOME.into()
 }
 
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
-    match std::fs::remove_dir_all(PATH) {
+    match std::fs::remove_dir_all(HOME) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -43,7 +43,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
     guard
 }
 fn join_path(p: &[&str]) -> PathBuf {
-    let mut file: PathBuf = PATH.into();
+    let mut file = get_home();
     for p in p.iter() {
         file = file.join(p);
     }
@@ -61,10 +61,10 @@ pub fn check_exist(p: &[&str]) -> bool {
     file.exists()
 }
 pub fn run(args: &str) -> Result<String, ExitStatus> {
-    run_with_home(PATH, args)
+    run_with_home(HOME, args)
 }
 pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
-    let mut full_args = vec!["-p", home];
+    let mut full_args = vec!["-H", home];
     let args_vec: Vec<&str> = if args.find("|").is_some() {
         let (first, second) = args.split_once("|").unwrap();
         let mut v: Vec<_> = first.split(" ").filter(|s| s.len() > 0).collect();

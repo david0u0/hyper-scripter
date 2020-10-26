@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
 }
 
 fn config_file() -> PathBuf {
-    path::get_path().join(CONFIG_FILE)
+    path::get_home().join(CONFIG_FILE)
 }
 
 fn is_false(t: &bool) -> bool {

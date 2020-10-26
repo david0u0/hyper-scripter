@@ -1,7 +1,9 @@
-# [HS_USAGE]: Import scripts from another hs directory or git repo.
+# [HS_USAGE]: Import scripts from another hyper scripter home or git repo.
 # [HS_USAGE]:
 # [HS_USAGE]: USAGE:
 # [HS_USAGE]:     hs import [dirname | git repo address]
+
+require 'fileutils'
 
 if ARGV.length == 0
   puts 'At least one argument is required!'
@@ -61,6 +63,13 @@ def import_dir(dir)
       tags_str = script.tags.join(',')
       HS_ENV.do_hs("mv =#{script.name} -t #{tags_str}")
     end
+  end
+
+  src = "#{dir}/.git"
+  dst = "#{HS_ENV.home}/.git"
+  if File.directory?(src) && !File.directory?(dst)
+    puts 'Copying git directory...'
+    FileUtils.cp_r src, dst, verbose: true
   end
 end
 

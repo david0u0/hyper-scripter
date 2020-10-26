@@ -243,6 +243,7 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
                             new_args.push(arg);
                         }
                     }
+                    log::trace!("新的參數為 {:?}", new_args);
                     return Ok(Root::from_iter(new_args));
                 }
             }

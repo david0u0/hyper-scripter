@@ -3,6 +3,7 @@ use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::AsScriptName;
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
+use crate::script_time::ScriptTime;
 use std::collections::HashSet;
 
 pub fn do_list_query<'a, 'b>(
@@ -72,5 +73,37 @@ pub fn do_script_query_strict<'b, 'a>(
             script_query.as_script_name()?.to_string(),
         )),
         Ok(Some(info)) => Ok(info),
+    }
+}
+
+pub async fn do_script_query_strict_with_missing<'b, 'a>(
+    script_query: &ScriptQuery,
+    script_repo: &'b mut ScriptRepo<'a>,
+) -> Result<ScriptRepoEntry<'a, 'b>> {
+    let repo_mut = script_repo as *mut ScriptRepo;
+    // FIXME: 一旦 NLL 進化就修掉這段
+    match do_script_query(script_query, script_repo) {
+        Err(e) => Err(e),
+        Ok(Some(info)) => Ok(info),
+        Ok(None) => {
+            let repo = unsafe { &mut *repo_mut };
+            let info = match script_query {
+                ScriptQuery::Exact(name) => repo.get_hidden_mut(name),
+                ScriptQuery::Fuzz(name) => match fuzzy::fuzz_mut(name, repo.iter_hidden_mut()) {
+                    Ok(info) => info,
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(mut info) = info {
+                info.update(|info| {
+                    info.miss_time = Some(ScriptTime::now(()));
+                })
+                .await?;
+            }
+            Err(Error::ScriptNotFound(
+                script_query.as_script_name()?.to_string(),
+            ))
+        }
     }
 }

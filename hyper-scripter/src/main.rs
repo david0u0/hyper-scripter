@@ -173,7 +173,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Run { script_query, args } => {
-            let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
+            let mut entry =
+                query::do_script_query_strict_with_missing(script_query, &mut repo).await?;
             log::info!("執行 {:?}", entry.name);
             {
                 let exe = std::env::current_exe()?;
@@ -218,13 +219,14 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Which { script_query } => {
-            let entry = query::do_script_query_strict(script_query, &mut repo)?;
+            let entry = query::do_script_query_strict_with_missing(script_query, &mut repo).await?;
             log::info!("定位 {:?}", entry.name);
             let p = path::get_path().join(entry.file_path()?);
             println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {
-            let mut entry = query::do_script_query_strict(script_query, &mut repo)?;
+            let mut entry =
+                query::do_script_query_strict_with_missing(script_query, &mut repo).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             log::info!("打印 {:?}", entry.name);
             let content = util::read_file(&script_path)?;
@@ -282,7 +284,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::CP { origin, new } => {
-            let h = query::do_script_query_strict(origin, &mut repo)?;
+            let h = query::do_script_query_strict_with_missing(origin, &mut repo).await?;
             let new_name = new.as_script_name()?;
             let og_script = path::open_script(&h.name, &h.ty, Some(true))?;
             let new_script = path::open_script(&new_name, &h.ty, Some(false))?;
@@ -303,7 +305,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Some(s) => Some(s.as_script_name()?),
                 None => None,
             };
-            let entry = query::do_script_query_strict(origin, &mut repo)?;
+            let entry = query::do_script_query_strict_with_missing(origin, &mut repo).await?;
             mv(entry, new_name, ty.as_ref(), tags).await?;
         }
         Subs::Tags {

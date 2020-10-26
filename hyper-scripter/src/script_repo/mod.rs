@@ -48,6 +48,15 @@ impl Environment for DBEnv {
                 })
                 .await?;
         }
+        if info.miss_time.as_ref().map_or(false, |t| t.has_changed()) {
+            log::debug!("{:?} 的錯過事件", info.name);
+            self.historian
+                .record(Event {
+                    script_id: info.id,
+                    data: EventData::Miss,
+                })
+                .await?;
+        }
         if let Some(content) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
             log::debug!("{:?} 的執行事件", info.name);
             self.historian
@@ -85,6 +94,12 @@ impl<'a> ScriptRepo<'a> {
             env: &self.db_env,
         }
     }
+    pub fn iter_hidden_mut<'b>(&'b mut self) -> Iter<'a, 'b, DBEnv> {
+        Iter {
+            iter: self.hidden_map.iter_mut(),
+            env: &self.db_env,
+        }
+    }
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
@@ -103,8 +118,10 @@ impl<'a> ScriptRepo<'a> {
             .await?;
         let last_read_records = historian.last_time_of(EventType::Read).await?;
         let last_exec_records = historian.last_time_of(EventType::Exec).await?;
+        let last_miss_records = historian.last_time_of(EventType::Miss).await?;
         let mut last_read: &[_] = &last_read_records;
         let mut last_exec: &[_] = &last_exec_records;
+        let mut last_miss: &[_] = &last_miss_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
             use std::str::FromStr;
@@ -129,6 +146,9 @@ impl<'a> ScriptRepo<'a> {
             .created_time(script.created_time)
             .write_time(script.write_time);
 
+            if let Some(time) = extract_from_time(script.id, &mut last_miss) {
+                builder = builder.miss_time(time);
+            }
             if let Some(time) = extract_from_time(script.id, &mut last_exec) {
                 builder = builder.exec_time(time);
             }

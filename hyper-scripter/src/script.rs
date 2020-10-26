@@ -97,6 +97,7 @@ pub struct ScriptInfo<'a> {
     pub created_time: ScriptTime,
     pub write_time: ScriptTime,
     pub exec_time: Option<ScriptTime<String>>,
+    pub miss_time: Option<ScriptTime>,
     pub id: i64,
     pub name: ScriptName<'a>,
     pub tags: HashSet<Tag>,
@@ -121,10 +122,17 @@ impl<'a> ScriptInfo<'a> {
         }
     }
     pub fn last_time(&self) -> NaiveDateTime {
-        match &self.exec_time {
-            Some(exec_time) => std::cmp::max(*self.read_time, **exec_time),
-            _ => *self.read_time,
+        use std::cmp::max;
+        fn map<T: Clone + std::fmt::Debug>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
+            match time {
+                Some(time) => **time,
+                _ => NaiveDateTime::from_timestamp(1, 0),
+            }
         }
+        max(
+            *self.read_time,
+            max(map(&self.exec_time), map(&self.miss_time)),
+        )
     }
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)
@@ -156,6 +164,7 @@ impl<'a> ScriptInfo<'a> {
             read_time: None,
             created_time: None,
             exec_time: None,
+            miss_time: None,
             write_time: None,
         }
     }
@@ -211,6 +220,7 @@ pub struct ScriptBuilder<'a> {
     read_time: Option<NaiveDateTime>,
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
+    miss_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
     id: i64,
     tags: HashSet<Tag>,
@@ -220,6 +230,10 @@ pub struct ScriptBuilder<'a> {
 impl<'a> ScriptBuilder<'a> {
     pub fn exec_time(mut self, time: NaiveDateTime) -> Self {
         self.exec_time = Some(time);
+        self
+    }
+    pub fn miss_time(mut self, time: NaiveDateTime) -> Self {
+        self.miss_time = Some(time);
         self
     }
     pub fn read_time(mut self, time: NaiveDateTime) -> Self {
@@ -246,6 +260,7 @@ impl<'a> ScriptBuilder<'a> {
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
             created_time,
             exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
+            miss_time: self.miss_time.map(|t| ScriptTime::new(t)),
         }
     }
 }

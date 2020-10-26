@@ -101,6 +101,8 @@ impl Default for RawConfig {
                 gen_alias("l", &["ls"]),
                 gen_alias("e", &["edit"]),
                 gen_alias("purge", &["rm", "--purge"]),
+                gen_alias("banish", &["rm", "--purge", "-f", "removed", "*"]),
+                gen_alias("t", &["ls", "--grouping", "tree"]),
             ]
             .into_iter()
             .collect(),

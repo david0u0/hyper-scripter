@@ -16,6 +16,17 @@ pub struct Historian {
 }
 
 impl Historian {
+    async fn raw_record(&self, script_id: i64, ty: &str, cmd: &str) -> Result<(), DBError> {
+        sqlx::query!(
+            "INSERT INTO events (script_id, type, cmd) VALUES(?, ?, ?)",
+            script_id,
+            ty,
+            cmd
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
     pub async fn new(hyper_scripter_path: impl AsRef<Path>) -> Result<Self, DBError> {
         db::get_pool(hyper_scripter_path)
             .await
@@ -27,15 +38,11 @@ impl Historian {
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
         let ty = event.data.get_type().to_string();
         match &event.data {
+            EventData::Miss => {
+                self.raw_record(event.script_id, &ty, &cmd).await?;
+            }
             EventData::Read => {
-                sqlx::query!(
-                    "INSERT INTO events (script_id, type, cmd) VALUES(?, ?, ?)",
-                    event.script_id,
-                    ty,
-                    cmd
-                )
-                .execute(&self.pool)
-                .await?;
+                self.raw_record(event.script_id, &ty, &cmd).await?;
             }
             EventData::Exec(content) => {
                 let mut content = Some(*content);

@@ -3,6 +3,7 @@ pub enum EventType {
     Exec,
     ExecDone,
     Read,
+    Miss,
 }
 
 #[derive(Debug)]
@@ -10,6 +11,7 @@ pub enum EventData<'a> {
     Exec(&'a str),
     ExecDone(i32),
     Read,
+    Miss,
 }
 
 impl EventData<'_> {
@@ -18,6 +20,7 @@ impl EventData<'_> {
             EventData::Exec(_) => EventType::Exec,
             EventData::ExecDone(_) => EventType::ExecDone,
             EventData::Read => EventType::Read,
+            EventData::Miss => EventType::Miss,
         }
     }
 }

@@ -21,12 +21,12 @@ else
     if [ "$1" == "!" ]; then
         FILE='.config.toml'
     else
-        FILE=$($HS_EXE -H $HS_HOME which $1)
+        FILE=$($HS_EXE --no-alias -H $HS_HOME which $1)
     fi
 fi
 
 set -- $(stty size)
-tmux new-session -s $NAME -d -x "$2" -y "$(($1 - 1))"
+tmux new-session -s $NAME -d -x "$2" -y "$(($1 - 1))" "$HS_EXE -H $HS_HOME --no-alias ls --grouping tree; $SHELL"
 if [ ! -z "$FILE" ]; then
     tmux split-window -h "vim $FILE; $SHELL"
 fi

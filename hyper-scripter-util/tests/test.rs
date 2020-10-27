@@ -55,6 +55,10 @@ fn test_import() {
     assert!(check_exist(&[".gitignore"]));
 
     assert_ls_len(16);
+
+    run("-f util import --namespace imported .tmp").unwrap();
+    assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
+    assert_ls_len(25);
 }
 
 fn test_collect() {
@@ -82,12 +86,12 @@ fn test_collect() {
     assert_eq!(run("-f this thisisacolltest").unwrap(), "這是一個收集測試");
     assert_eq!(run("-f is thisisacolltest").unwrap(), "這是一個收集測試");
     run("-f innate which myinnate").expect_err("跑了 collect 沒有刪成功");
-    run("-f my which mytest").expect_err("跑了 collect 沒有刪成功");
+    run("-f my which =my/test").expect_err("跑了 collect 沒有刪成功");
 
     assert_eq!(run("-f tag youest").unwrap(), "殼已破碎");
     assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(15);
+    assert_ls_len(24);
 }
 
 #[test]

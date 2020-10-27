@@ -24,12 +24,19 @@ def directory_tree(path)
   files
 end
 
+def shoud_collect?(file)
+  file.split('/').each do |path|
+    return false if path.start_with?('.')
+  end
+  true
+end
+
 root = HS_ENV.home
 directory_tree(root).each do |full_path|
   script = full_path.delete_prefix(root).delete_prefix('/')
-  next if script.start_with? '.'
+  next unless shoud_collect?(script)
 
-  name, ext = script.split('.')
+  name, _, ext = script.rpartition('.')
 
   HS_ENV.do_hs("which =#{name} 2>/dev/null")
   next if $?.success?

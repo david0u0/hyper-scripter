@@ -5,6 +5,12 @@
 
 require 'fileutils'
 
+def copy_unless_exists(src_dir, dst_dir, target)
+  src = "#{src_dir}/#{target}"
+  dst = "#{dst_dir}/#{target}"
+  FileUtils.cp_r src, dst, verbose: true if File.exist?(src) && !File.exist?(dst)
+end
+
 if ARGV.length == 0
   puts 'At least one argument is required!'
   exit 1
@@ -65,12 +71,10 @@ def import_dir(dir)
     end
   end
 
-  src = "#{dir}/.git"
-  dst = "#{HS_ENV.home}/.git"
-  if File.directory?(src) && !File.directory?(dst)
-    puts 'Copying git directory...'
-    FileUtils.cp_r src, dst, verbose: true
-  end
+  puts 'Copying git directory...'
+  copy_unless_exists(dir, HS_ENV.home, '.git')
+  puts 'Copying gitignore...'
+  copy_unless_exists(dir, HS_ENV.home, '.gitignore')
 end
 
 def import(arg)

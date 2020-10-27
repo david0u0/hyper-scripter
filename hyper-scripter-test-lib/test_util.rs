@@ -76,7 +76,12 @@ pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
     full_args.extend(&args_vec);
 
     let mut cmd = Command::new(EXE);
-    let mut child = cmd.args(&full_args).stdout(Stdio::piped()).spawn().unwrap();
+    let mut child = cmd
+        .args(&full_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
     let stdout = child.stdout.as_mut().unwrap();
     let mut out_str = vec![];
     let reader = BufReader::new(stdout);

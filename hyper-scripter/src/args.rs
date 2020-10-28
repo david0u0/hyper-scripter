@@ -76,6 +76,14 @@ def_root! {
 pub enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
+    #[structopt(
+        about = "Prints this message, the help of the given subcommand(s), or a script's help message."
+    )]
+    Help {
+        #[structopt(short, long, help = "Show long message")]
+        long: bool,
+        args: Vec<String>,
+    },
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
     #[structopt(about = "Edit hyper script")]
@@ -115,13 +123,6 @@ pub enum Subs {
         after: Vec<String>,
     },
 
-    #[structopt(about = "View the usage of the script")]
-    Usage {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script_query: ScriptQuery,
-        #[structopt(short, long, help = "Show long message")]
-        long: bool,
-    },
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
         #[structopt(default_value = "-", parse(try_from_str))]
@@ -234,6 +235,25 @@ fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'a str, &'static
     }
 }
 
+pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
+    // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
+    let c: structopt::clap::App = Root::clap();
+    let mut clap = &c;
+    let mut had_found = false;
+    for cmd in cmds {
+        let cmd = cmd.as_ref();
+        if let Some(c) = clap.p.subcommands.iter().find(|s| &*s.p.meta.name == cmd) {
+            clap = c;
+            had_found = true;
+        } else if !had_found {
+            return Ok(());
+        }
+    }
+    clap.clone().print_help()?;
+    println!("");
+    std::process::exit(0);
+}
+
 fn handle_alias_args(args: &[String]) -> Result<Root> {
     match alias_mod::Root::from_iter_safe(args) {
         Ok(alias_root) => {
@@ -261,6 +281,7 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
             log::warn!("解析別名參數出錯： {}", e);
         }
     };
+
     let root = Root::from_iter(args);
     set_home(&root.hs_home)?;
     Ok(root)

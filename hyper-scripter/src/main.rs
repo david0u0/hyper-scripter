@@ -1,10 +1,10 @@
 use chrono::Utc;
-use hyper_scripter::args::{self, List, Root, Subs};
+use hyper_scripter::args::{self, print_help, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::extract_usage::extract_usage;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
-use hyper_scripter::query::{self, EditQuery};
+use hyper_scripter::query::{self, EditQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
@@ -195,8 +195,11 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 repo.remove(&name).await?
             }
         }
-        Subs::Usage { script_query, long } => {
-            let entry = query::do_script_query_strict_with_missing(script_query, &mut repo).await?;
+        Subs::Help { args, long } => {
+            print_help(args.iter())?;
+            let script_query: ScriptQuery = FromStr::from_str(&args[0])?;
+            let entry =
+                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;

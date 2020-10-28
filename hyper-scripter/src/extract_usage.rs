@@ -1,4 +1,4 @@
-const KEY: &'static str = "[HS_USAGE]:";
+const KEY: &'static str = "[HS_HELP]:";
 
 fn trim_first_white(s: &str) -> &str {
     if s.starts_with(' ') {
@@ -40,15 +40,15 @@ mod test {
     fn test_extract_usage() {
         let content = "
         // 不要解析我
-        // [HS_USAGE]:   解析我吧  
+        // [HS_HELP]:   解析我吧  
 
-        // [HS_NOTUSAGE]: 不要解析我QQ
-        // [HS_USAGE]:
+        // [HS_NOHELP]: 不要解析我QQ
+        // [HS_HELP]:
         fn this_is_a_test() -> bool {}
 
-        # [HS_USAGE]: 解析我吧，雖然我是個失敗的註解
+        # [HS_HELP]: 解析我吧，雖然我是個失敗的註解
 
-        //  前面有些 垃圾[HS_USAGE]:我是最後一行";
+        //  前面有些 垃圾[HS_HELP]:我是最後一行";
         let short = extract_usage(content, false);
         let long = extract_usage(content, true);
         assert_eq!(short, vec!["  解析我吧  "]);
@@ -74,7 +74,7 @@ mod test {
         // 不要解析我
         fn this_is_a_test() -> bool {}
 
-        // [HS_UASAGE]:我是最後一行，還拼錯字…";
+        // [HS_HOLP]:我是最後一行，還拼錯字…";
         let short = extract_usage(content, false);
         let long = extract_usage(content, true);
         assert_eq!(short.len(), 0);

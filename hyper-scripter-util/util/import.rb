@@ -1,8 +1,8 @@
-# [HS_USAGE]: Import scripts from another hyper scripter home or git repo.
-# [HS_USAGE]: If a namespace is given, scripts will all be in that namespace.
-# [HS_USAGE]:
-# [HS_USAGE]: USAGE:
-# [HS_USAGE]:     hs import [--namespace namespace] [dirname | git repo address]
+# [HS_HELP]: Import scripts from another hyper scripter home or git repo.
+# [HS_HELP]: If a namespace is given, scripts will all be in that namespace.
+# [HS_HELP]:
+# [HS_HELP]: USAGE:
+# [HS_HELP]:     hs import [--namespace namespace] [dirname | git repo address]
 
 require 'getoptlong'
 require 'fileutils'

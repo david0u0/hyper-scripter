@@ -1,9 +1,9 @@
-# [HS_USAGE]: Open hyper scripter home. If a script is given, it will be opened on a splitted editor.
-# [HS_USAGE]:
-# [HS_USAGE]: USAGE:
-# [HS_USAGE]:     hs open-hs [script query]
-# [HS_USAGE]:     OR
-# [HS_USAGE]:     hs open-hs ! # open `.config.toml`
+# [HS_HELP]: Open hyper scripter home. If a script is given, it will be opened on a splitted editor.
+# [HS_HELP]:
+# [HS_HELP]: USAGE:
+# [HS_HELP]:     hs open-hs [script query]
+# [HS_HELP]:     OR
+# [HS_HELP]:     hs open-hs ! # open `.config.toml`
 
 set -e
 

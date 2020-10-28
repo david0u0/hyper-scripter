@@ -112,6 +112,10 @@ pub fn mv(origin: &PathBuf, new: &PathBuf) -> Result<()> {
     handle_fs_res(&[&new, &origin], rename(&origin, &new))
 }
 pub fn cp(origin: &PathBuf, new: &PathBuf) -> Result<()> {
+    // NOTE: 創建資料夾和檔案
+    if let Some(parent) = new.parent() {
+        handle_fs_res(&[parent], create_dir_all(parent))?;
+    }
     let _copied = handle_fs_res(&[&origin, &new], std::fs::copy(&origin, &new))?;
     Ok(())
 }

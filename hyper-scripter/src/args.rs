@@ -89,15 +89,17 @@ pub enum Subs {
         category: Option<ScriptType>,
         #[structopt(long, short)]
         no_template: bool,
-        #[structopt(parse(try_from_str), default_value = ".")]
-        edit_query: EditQuery,
-        content: Option<String>,
+        #[structopt(long, short)]
+        tags: Option<TagControlFlow>,
         #[structopt(
             long,
             requires("content"),
             help = "create script without invoking the editor"
         )]
         fast: bool,
+        #[structopt(parse(try_from_str), default_value = ".")]
+        edit_query: EditQuery,
+        content: Option<String>,
     },
     #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
     Alias {
@@ -263,32 +265,40 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
     set_home(&root.hs_home)?;
     Ok(root)
 }
+
+impl Root {
+    pub fn sanitize(&mut self) -> Result {
+        match &self.subcmd {
+            Some(Subs::Other(args)) => {
+                log::info!("執行模式");
+                let run = Subs::Run {
+                    script_query: FromStr::from_str(&args[0])?,
+                    args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
+                };
+                self.subcmd = Some(run);
+            }
+            None => {
+                log::info!("無參數模式");
+                self.subcmd = Some(Subs::Edit {
+                    edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
+                    category: None,
+                    content: None,
+                    tags: None,
+                    fast: false,
+                    no_template: false,
+                });
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+}
 pub fn handle_args() -> Result<Root> {
     let args: Vec<_> = std::env::args().map(|s| s).collect();
     let mut root = handle_alias_args(&args)?;
     log::debug!("命令行物件：{:?}", root);
 
-    match root.subcmd {
-        Some(Subs::Other(args)) => {
-            log::info!("執行模式");
-            let run = Subs::Run {
-                script_query: FromStr::from_str(&args[0])?,
-                args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
-            };
-            root.subcmd = Some(run);
-        }
-        None => {
-            log::info!("無參數模式");
-            root.subcmd = Some(Subs::Edit {
-                edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
-                category: None,
-                content: None,
-                fast: false,
-                no_template: false,
-            });
-        }
-        _ => (),
-    }
+    root.sanitize()?;
     Ok(root)
 }
 

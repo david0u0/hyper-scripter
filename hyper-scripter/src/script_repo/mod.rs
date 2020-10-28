@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
 use sqlx::SqlitePool;
+use std::collections::hash_map::Entry::{self, *};
 use std::collections::HashMap;
 
 pub mod helper;
@@ -18,6 +19,64 @@ pub struct DBEnv {
 }
 
 pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, DBEnv>;
+
+pub struct ScriptRepoEntryOptional<'a, 'b> {
+    entry: Entry<'b, String, ScriptInfo<'a>>,
+    env: &'b DBEnv,
+}
+impl<'a, 'b> ScriptRepoEntryOptional<'a, 'b> {
+    pub fn is_some(&self) -> bool {
+        match self.entry {
+            Occupied(_) => true,
+            _ => false,
+        }
+    }
+    pub fn into_option(self) -> Option<ScriptRepoEntry<'a, 'b>> {
+        match self.entry {
+            Occupied(entry) => Some(RepoEntry {
+                env: self.env,
+                info: entry.into_mut(),
+            }),
+            _ => None,
+        }
+    }
+    pub async fn or_insert(self, info: ScriptInfo<'a>) -> Result<ScriptRepoEntry<'a, 'b>> {
+        let exist = match &self.entry {
+            Vacant(_) => false,
+            _ => true,
+        };
+        let info = self.entry.or_insert(info);
+        if !exist {
+            log::debug!("往資料庫塞新腳本 {:?}", info);
+            let name_cow = info.name.key();
+            let name = name_cow.as_ref();
+            let category = info.ty.as_ref();
+            let tags = join_tags(info.tags.iter());
+            sqlx::query!(
+                "
+                INSERT INTO script_infos (name, category, tags)
+                VALUES(?, ?, ?)
+                ",
+                name,
+                category,
+                tags,
+            )
+            .execute(&self.env.info_pool)
+            .await?;
+            log::debug!("往資料庫新增腳本成功");
+            let id = sqlx::query!("SELECT last_insert_rowid() as id")
+                .fetch_one(&self.env.info_pool)
+                .await?
+                .id;
+            log::debug!("得到新腳本 id {}", id);
+            info.id = id as i64;
+        }
+        Ok(RepoEntry {
+            info,
+            env: self.env,
+        })
+    }
+}
 
 #[async_trait]
 impl Environment for DBEnv {
@@ -256,50 +315,13 @@ impl<'a> ScriptRepo<'a> {
         }
         Ok(())
     }
-    pub async fn upsert<'b, F: FnOnce() -> ScriptInfo<'a>>(
-        &mut self,
-        name: &ScriptName<'b>,
-        default: F,
-    ) -> Result<ScriptRepoEntry<'a, '_>> {
+    pub fn entry<'z>(&mut self, name: &ScriptName<'z>) -> ScriptRepoEntryOptional<'a, '_> {
+        // TODO: 決定要插 hidden 與否
         let entry = self.map.entry(name.key().into_owned());
-        use std::collections::hash_map::Entry::*;
-        let exist = match &entry {
-            Vacant(_) => false,
-            _ => true,
-        };
-        let mut info = self
-            .map
-            .entry(name.key().into_owned())
-            .or_insert_with(default);
-        if !exist {
-            log::debug!("往資料庫塞新腳本 {:?}", info);
-            let name_cow = info.name.key();
-            let name = name_cow.as_ref();
-            let category = info.ty.as_ref();
-            let tags = join_tags(info.tags.iter());
-            sqlx::query!(
-                "
-                INSERT INTO script_infos (name, category, tags)
-                VALUES(?, ?, ?)
-                ",
-                name,
-                category,
-                tags,
-            )
-            .execute(&self.db_env.info_pool)
-            .await?;
-            log::debug!("往資料庫新增腳本成功");
-            let id = sqlx::query!("SELECT last_insert_rowid() as id")
-                .fetch_one(&self.db_env.info_pool)
-                .await?
-                .id;
-            log::debug!("得到新腳本 id {}", id);
-            info.id = id as i64;
-        }
-        Ok(RepoEntry {
-            info,
+        ScriptRepoEntryOptional {
+            entry,
             env: &self.db_env,
-        })
+        }
     }
     pub fn filter_by_tag(&mut self, filter: &TagFilterGroup) {
         // TODO: 優化

@@ -15,6 +15,11 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+struct EditTagArgs {
+    content: TagControlFlow,
+    force: bool,
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -82,9 +87,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 };
                 let p = path::open_script(&name, &ty, Some(false))?;
                 let entry = repo
-                    .upsert(&name, || {
-                        ScriptInfo::builder(0, name.clone(), ty, tags.into_iter()).build()
-                    })
+                    .entry(&name)
+                    .or_insert(ScriptInfo::builder(0, name.clone(), ty, tags.into_iter()).build())
                     .await?;
                 util::prepare_script(&p, *entry, true, Some(u.content))?;
             }
@@ -134,18 +138,31 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             edit_query,
             category: ty,
             fast,
+            tags,
             content,
             no_template,
         } => {
-            let edit_tags = match root.filter.clone() {
-                None => conf.main_tag_filter.clone().filter,
-                Some(tags) => {
-                    if tags.append {
+            // TODO: 這裡邏輯太複雜了，抽出來測試吧
+            let edit_tags = {
+                // TODO: 不要這麼愛 clone
+                let mut innate_tags = match root.filter.clone() {
+                    None => conf.main_tag_filter.clone().filter,
+                    Some(tags) => {
                         let mut main_tags = conf.main_tag_filter.clone().filter;
                         main_tags.push(tags);
                         main_tags
-                    } else {
-                        tags
+                    }
+                };
+                if let Some(tags) = tags.clone() {
+                    innate_tags.push(tags);
+                    EditTagArgs {
+                        force: true,
+                        content: innate_tags,
+                    }
+                } else {
+                    EditTagArgs {
+                        force: false,
+                        content: innate_tags,
                     }
                 }
             };
@@ -270,7 +287,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::RM { queries, purge } => {
             let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+removed").unwrap());
             let mut to_purge = vec![];
-            for entry in query::do_list_query(&mut repo, queries)?.into_iter() {
+            for mut entry in query::do_list_query(&mut repo, queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 if *purge {
                     log::debug!("真的刪除腳本！");
@@ -282,7 +299,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                         format!("{}-{}", time_str, name)
                     });
                     let new_name = Some(ScriptName::Named(Cow::Owned(new_name)));
-                    mv(entry, new_name, None, &delete_tag).await?;
+                    mv(&mut entry, new_name, None, &delete_tag).await?;
                 }
             }
             for (name, ty) in to_purge.into_iter() {
@@ -303,7 +320,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
             util::cp(&og_script, &new_script)?;
             let new_info = h.cp(new_name.clone());
-            repo.upsert(&new_name, || new_info).await?;
+            repo.entry(&new_name).or_insert(new_info).await?;
         }
         Subs::MV {
             origin,
@@ -315,8 +332,8 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Some(s) => Some(s.as_script_name()?),
                 None => None,
             };
-            let entry = query::do_script_query_strict_with_missing(origin, &mut repo).await?;
-            mv(entry, new_name, ty.as_ref(), tags).await?;
+            let mut entry = query::do_script_query_strict_with_missing(origin, &mut repo).await?;
+            mv(&mut entry, new_name, ty.as_ref(), tags).await?;
         }
         Subs::Tags {
             tag_filter,
@@ -379,7 +396,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
 }
 
 async fn mv<'a, 'b>(
-    mut entry: ScriptRepoEntry<'a, 'b>,
+    entry: &mut ScriptRepoEntry<'a, 'b>,
     new_name: Option<ScriptName<'a>>,
     ty: Option<&ScriptType>,
     tags: &Option<TagControlFlow>,
@@ -417,7 +434,7 @@ async fn edit_or_create<'a, 'b>(
     edit_query: &EditQuery,
     script_repo: &'b mut ScriptRepo<'a>,
     ty: Option<ScriptType>,
-    tags: TagControlFlow,
+    tags: EditTagArgs,
 ) -> Result<(PathBuf, ScriptRepoEntry<'a, 'b>)> {
     let final_ty: ScriptType;
     let mut new_namespaces: Vec<Tag> = vec![];
@@ -464,18 +481,31 @@ async fn edit_or_create<'a, 'b>(
         log::debug!("打開新匿名腳本");
         path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?
     };
+
     log::info!("編輯 {:?}", script_name);
 
-    let entry = script_repo
-        .upsert(&script_name, || {
-            ScriptInfo::builder(
-                0,
-                script_name.clone().into_static(),
-                final_ty,
-                tags.into_allowed_iter().chain(new_namespaces.into_iter()),
+    let entry = script_repo.entry(&script_name);
+    let entry = if entry.is_some() {
+        let mut entry = entry.into_option().unwrap();
+        if tags.force {
+            mv(&mut entry, None, None, &Some(tags.content)).await?;
+        }
+        entry
+    } else {
+        entry
+            .or_insert(
+                ScriptInfo::builder(
+                    0,
+                    script_name.clone().into_static(),
+                    final_ty,
+                    tags.content
+                        .into_allowed_iter()
+                        .chain(new_namespaces.into_iter()),
+                )
+                .build(),
             )
-            .build()
-        })
-        .await?;
+            .await?
+    };
+
     Ok((script_path, entry))
 }

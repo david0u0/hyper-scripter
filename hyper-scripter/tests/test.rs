@@ -105,10 +105,36 @@ fn test_prev() {
 #[test]
 fn test_edit_same_name() {
     let _g = setup();
-    run(&format!("-f hide e i-am-hidden | echo \"{}\"", MSG)).unwrap();
+    run(&format!("e i-am-hidden -t hide | echo \"{}\"", MSG)).unwrap();
     run("-").expect_err("執行了隱藏的腳本？？");
     run("e i-am-hidden yo").expect_err("竟然能編輯撞名的腳本？");
     assert_eq!(MSG, run("-f hide -").unwrap(), "腳本被撞名的編輯搞爛了？");
+}
+
+#[test]
+fn test_edit_with_tag() {
+    let _g = setup();
+
+    fn msg(i: i32) -> String {
+        format!("你好，{}號腳本人！", i)
+    }
+
+    run("tags innate").unwrap();
+
+    run(&format!("e -f tag1 test1 -t tag2 | echo \"{}\"", msg(1))).unwrap();
+    run("-f innate -").expect_err("吃到了不該吃的標籤！");
+    run("-f tag1 -").expect_err("吃到了不該吃的標籤！");
+    assert_eq!(msg(1), run("-f tag2 -").unwrap());
+
+    run(&format!("e -f tag1 test2 -t +tag2 | echo \"{}\"", msg(2))).unwrap();
+    run("-f innate -").expect_err("吃到了不該吃的標籤！");
+    assert_eq!(msg(2), run("-f tag1 -").unwrap());
+    assert_eq!(msg(2), run("-f tag2 -").unwrap());
+
+    run(&format!("e -f +tag1 test3 -t +tag2 | echo \"{}\"", msg(3))).unwrap();
+    assert_eq!(msg(3), run("-f innate -").unwrap());
+    assert_eq!(msg(3), run("-f tag1 -").unwrap());
+    assert_eq!(msg(3), run("-f tag2 -").unwrap());
 }
 
 #[test]
@@ -116,7 +142,7 @@ fn test_multi_filter() {
     let _g = setup();
     run(&format!("e nobody | echo \"{}\"", MSG)).unwrap();
     run(&format!("-f test,pin e test-pin | echo \"{}\"", MSG)).unwrap();
-    run(&format!("-f pin e pin-only | echo \"{}\"", MSG)).unwrap();
+    run(&format!("e -t pin pin-only | echo \"{}\"", MSG)).unwrap();
 
     assert_eq!(MSG, run("pin-only").unwrap());
     assert_eq!(MSG, run("test-pin").unwrap());
@@ -139,7 +165,7 @@ fn test_rm() {
     let _g = setup();
     run("e longlive | echo 矻立不搖").unwrap();
 
-    run(&format!("e test/ya -f test-tag | echo \"{}\"", MSG)).unwrap();
+    run(&format!("e test/ya -t test-tag | echo \"{}\"", MSG)).unwrap();
     assert_eq!(MSG, run("test/ya").unwrap());
     run("e . | echo \"你匿\"").unwrap();
     assert_eq!("你匿", run(".1").unwrap());

@@ -58,6 +58,7 @@ fn test_import() {
 
     run("-f util import --namespace imported .tmp").unwrap();
     assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
+    run("-f imported which").expect_err("命名空間汙染了標籤！");
     assert_ls_len(25);
 }
 

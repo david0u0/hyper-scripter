@@ -111,7 +111,9 @@ pub fn open_script<T: ?Sized + AsScriptName>(
     };
     if let Some(should_exist) = check_sxist {
         if !script_path.exists() && should_exist {
-            return Err(Error::PathNotFound(script_path).context("開腳本失敗：應存在卻不存在"));
+            return Err(
+                Error::PathNotFound(vec![script_path]).context("開腳本失敗：應存在卻不存在")
+            );
         } else if script_path.exists() && !should_exist {
             return Err(Error::ScriptExist(name.key().as_ref().to_owned())
                 .context("開腳本失敗：不應存在卻存在"));
@@ -163,7 +165,7 @@ mod test {
         );
 
         match open_script("not-exist", &"sh".into(), Some(true)).unwrap_err() {
-            Error::PathNotFound(name) => assert_eq!(name, get_home().join("not-exist.sh")),
+            Error::PathNotFound(name) => assert_eq!(name[0], get_home().join("not-exist.sh")),
             _ => unreachable!(),
         }
     }

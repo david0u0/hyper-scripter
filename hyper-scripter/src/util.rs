@@ -125,7 +125,7 @@ pub fn handle_fs_err<P: AsRef<Path>>(path: &[P], err: std::io::Error) -> Error {
     log::warn!("檔案系統錯誤：{:?}, {:?}", p, err);
     match err.kind() {
         std::io::ErrorKind::PermissionDenied => Error::PermissionDenied(p),
-        std::io::ErrorKind::NotFound => Error::PathNotFound(path[0].as_ref().to_owned()),
+        std::io::ErrorKind::NotFound => Error::PathNotFound(p),
         _ => Error::GeneralFS(p, std::sync::Arc::new(err)),
     }
 }

@@ -26,7 +26,7 @@ pub enum Error {
 
     PermissionDenied(Vec<PathBuf>),
     // NOTE: PathNotFound 比 ScriptNotFound 更嚴重，代表歷史記錄中有這支腳本，實際要找卻找不到
-    PathNotFound(PathBuf),
+    PathNotFound(Vec<PathBuf>),
     GeneralFS(Vec<PathBuf>, Arc<std::io::Error>),
 
     ScriptExist(String),

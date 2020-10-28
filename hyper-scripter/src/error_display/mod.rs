@@ -1,5 +1,17 @@
 use crate::error::{Error, Error::*, FormatCode, SysPath};
 use std::fmt::{Display, Formatter, Result};
+use std::path::PathBuf;
+
+fn fmt_multi_path(f: &mut Formatter, msg: &str, mutli_path: &[PathBuf]) -> Result {
+    write!(f, "{}", msg)?;
+    if mutli_path.len() > 0 {
+        writeln!(f, ":")?;
+    }
+    for p in mutli_path.iter() {
+        writeln!(f, "{}", p.to_string_lossy())?;
+    }
+    Ok(())
+}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
@@ -10,16 +22,8 @@ impl Display for Error {
                 "Can not find you're config path. Usually it should be `$HOME/.config`",
             )?,
             SysPathNotFound(SysPath::Home) => write!(f, "Can not find you're home path.")?,
-            PermissionDenied(v) => {
-                write!(f, "Permission denied")?;
-                if v.len() > 0 {
-                    writeln!(f, ":")?;
-                }
-                for p in v.iter() {
-                    writeln!(f, "{}", p.to_string_lossy())?;
-                }
-            }
-            PathNotFound(p) => write!(f, "Path not found: {}", p.to_string_lossy())?,
+            PermissionDenied(v) => fmt_multi_path(f, "Permission denied", v)?,
+            PathNotFound(v) => fmt_multi_path(f, "Path not found", v)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
             CategoryMismatch { expect, actual } => write!(

@@ -6,20 +6,14 @@
 
 require 'getoptlong'
 require 'fileutils'
+require 'shellwords'
+require_relative './common.rb'
 
 def copy_unless_exists(src_dir, dst_dir, target)
   src = "#{src_dir}/#{target}"
   dst = "#{dst_dir}/#{target}"
   FileUtils.cp_r src, dst, verbose: true if File.exist?(src) && !File.exist?(dst)
 end
-
-if ARGV.length == 0
-  puts 'At least one argument is required!'
-  exit 1
-end
-
-require 'shellwords'
-require_relative './common.rb'
 
 class Script
   attr_reader :name, :category, :tags
@@ -74,9 +68,8 @@ def import_dir(dir, namespace)
       content = HS_ENV.do_hs("cat =#{script.name}", [], dir)
       content = Shellwords.escape(content)
 
-      HS_ENV.do_hs("edit =#{new_name} -c #{script.category} --no-template --fast #{content}")
       tags_str = script.tags.join(',')
-      HS_ENV.do_hs("mv =#{new_name} -t #{tags_str}")
+      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -c #{script.category} --no-template --fast #{content}")
     end
   end
 
@@ -113,6 +106,11 @@ opts.each do |opt, arg|
     namespace = arg
     puts "import with namespace #{namespace}"
   end
+end
+
+if ARGV.length == 0
+  puts 'At least one argument is required!'
+  exit 1
 end
 
 ARGV.each do |arg|

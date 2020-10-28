@@ -20,3 +20,8 @@ pub mod script_time;
 pub mod script_type;
 pub mod tag;
 pub mod util;
+
+pub enum Either<T, U> {
+    One(T),
+    Two(U),
+}

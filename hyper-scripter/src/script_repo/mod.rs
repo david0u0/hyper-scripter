@@ -2,6 +2,7 @@ use crate::error::Result;
 use crate::path;
 use crate::script::{AsScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
+use crate::Either;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
@@ -25,19 +26,13 @@ pub struct ScriptRepoEntryOptional<'a, 'b> {
     env: &'b DBEnv,
 }
 impl<'a, 'b> ScriptRepoEntryOptional<'a, 'b> {
-    pub fn is_some(&self) -> bool {
+    pub fn into_either(self) -> Either<ScriptRepoEntry<'a, 'b>, Self> {
         match self.entry {
-            Occupied(_) => true,
-            _ => false,
-        }
-    }
-    pub fn into_option(self) -> Option<ScriptRepoEntry<'a, 'b>> {
-        match self.entry {
-            Occupied(entry) => Some(RepoEntry {
+            Occupied(entry) => Either::One(RepoEntry {
                 env: self.env,
                 info: entry.into_mut(),
             }),
-            _ => None,
+            _ => Either::Two(self),
         }
     }
     pub async fn or_insert(self, info: ScriptInfo<'a>) -> Result<ScriptRepoEntry<'a, 'b>> {

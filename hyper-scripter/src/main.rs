@@ -9,6 +9,7 @@ use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
 use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
+use hyper_scripter::Either;
 use hyper_scripter::{path, util};
 use hyper_scripter_historian::{Event, EventData};
 use std::borrow::Cow;
@@ -17,7 +18,8 @@ use std::str::FromStr;
 
 struct EditTagArgs {
     content: TagControlFlow,
-    force: bool,
+    change_existing: bool,
+    append_namespace: bool,
 }
 
 #[tokio::main]
@@ -154,14 +156,17 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                     }
                 };
                 if let Some(tags) = tags.clone() {
+                    let append_namespace = tags.append;
                     innate_tags.push(tags);
                     EditTagArgs {
-                        force: true,
+                        change_existing: true,
                         content: innate_tags,
+                        append_namespace,
                     }
                 } else {
                     EditTagArgs {
-                        force: false,
+                        change_existing: false,
+                        append_namespace: true,
                         content: innate_tags,
                     }
                 }
@@ -466,11 +471,14 @@ async fn edit_or_create<'a, 'b>(
 
             log::debug!("打開新命名腳本：{:?}", query);
             let name = query.as_script_name()?;
-            new_namespaces = name
-                .namespaces()
-                .iter()
-                .map(|s| Tag::from_str(s))
-                .collect::<Result<Vec<_>>>()?;
+
+            if tags.append_namespace {
+                new_namespaces = name
+                    .namespaces()
+                    .iter()
+                    .map(|s| Tag::from_str(s))
+                    .collect::<Result<Vec<_>>>()?;
+            }
 
             let p = path::open_script(&name, &final_ty, Some(false))
                 .context(format!("打開新命名腳本失敗：{:?}", query))?;
@@ -485,26 +493,28 @@ async fn edit_or_create<'a, 'b>(
     log::info!("編輯 {:?}", script_name);
 
     let entry = script_repo.entry(&script_name);
-    let entry = if entry.is_some() {
-        let mut entry = entry.into_option().unwrap();
-        if tags.force {
-            mv(&mut entry, None, None, &Some(tags.content)).await?;
+    let entry = match entry.into_either() {
+        Either::One(mut entry) => {
+            if tags.change_existing {
+                mv(&mut entry, None, None, &Some(tags.content)).await?;
+            }
+            entry
         }
-        entry
-    } else {
-        entry
-            .or_insert(
-                ScriptInfo::builder(
-                    0,
-                    script_name.clone().into_static(),
-                    final_ty,
-                    tags.content
-                        .into_allowed_iter()
-                        .chain(new_namespaces.into_iter()),
+        Either::Two(entry) => {
+            entry
+                .or_insert(
+                    ScriptInfo::builder(
+                        0,
+                        script_name.clone().into_static(),
+                        final_ty,
+                        tags.content
+                            .into_allowed_iter()
+                            .chain(new_namespaces.into_iter()),
+                    )
+                    .build(),
                 )
-                .build(),
-            )
-            .await?
+                .await?
+        }
     };
 
     Ok((script_path, entry))

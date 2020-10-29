@@ -2,7 +2,7 @@ use crate::error::{
     Contextable, Error, FormatCode::FilterQuery as FilterQueryCode, FormatCode::Regex as RegexCode,
     FormatCode::ScriptQuery as ScriptQueryCode, Result,
 };
-use crate::script::{AsScriptName, ScriptName};
+use crate::script::{IntoScriptName, ScriptName};
 use crate::tag::TagControlFlow;
 use regex::Regex;
 use std::str::FromStr;
@@ -47,17 +47,17 @@ impl FromStr for ListQuery {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ScriptQuery {
     Fuzz(String),
-    Exact(ScriptName<'static>),
+    Exact(ScriptName),
     Prev(usize),
 }
-impl AsScriptName for ScriptQuery {
-    fn as_script_name(&self) -> Result<ScriptName> {
+impl IntoScriptName for ScriptQuery {
+    fn into_script_name(self) -> Result<ScriptName> {
         match self {
-            ScriptQuery::Fuzz(s) => s.as_script_name(),
-            ScriptQuery::Exact(name) => name.as_script_name(),
+            ScriptQuery::Fuzz(s) => s.into_script_name(),
+            ScriptQuery::Exact(name) => Ok(name),
             _ => panic!("歷史查詢沒有名字"),
         }
     }
@@ -88,14 +88,14 @@ impl FromStr for ScriptQuery {
     fn from_str(mut s: &str) -> Result<Self> {
         if s.starts_with('=') {
             s = &s[1..s.len()];
-            let name = s.as_script_name()?.into_static();
+            let name = s.to_owned().into_script_name()?;
             Ok(ScriptQuery::Exact(name))
         } else if s == "-" {
             Ok(ScriptQuery::Prev(1))
         } else if s.starts_with('^') {
             Ok(ScriptQuery::Prev(parse_prev(s)?))
         } else {
-            s.as_script_name().context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
+            ScriptName::valid(s).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
             Ok(ScriptQuery::Fuzz(s.to_owned()))
         }
     }

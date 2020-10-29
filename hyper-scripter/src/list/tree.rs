@@ -24,9 +24,9 @@ struct LongFormatter {
     plain: bool,
     latest_script_id: i64,
 }
-struct TrimmedScriptInfo<'b, 'a: 'b>(Cow<'b, str>, &'b ScriptInfo<'a>);
+struct TrimmedScriptInfo<'b>(Cow<'b, str>, &'b ScriptInfo);
 
-fn ident_string<'b, 'a>(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'b, 'a>) -> Result<String> {
+fn ident_string<'b>(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'b>) -> Result<String> {
     let TrimmedScriptInfo(name, script) = t;
     Ok(match style {
         DisplayIdentStyle::Normal => format!("{}({})", name, script.ty),
@@ -35,7 +35,7 @@ fn ident_string<'b, 'a>(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'b, 'a>)
     })
 }
 
-impl<'b, 'a: 'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b, 'a> {
+impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
     fn tree_cmp(&self, other: &Self) -> Ordering {
         other.1.last_time().cmp(&self.1.last_time())
     }
@@ -46,8 +46,8 @@ impl<'b, 'a: 'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b, 'a> {
         }
     }
 }
-impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for ShortFormatter {
-    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b, 'a>) -> Result {
+impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatter {
+    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let color = get_color(script)?;
         let ident = ident_string(self.ident_style, t)?;
@@ -64,8 +64,8 @@ impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for S
         Ok(())
     }
 }
-impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for LongFormatter {
-    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b, 'a>) -> Result {
+impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter {
+    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(name, script) = t;
         let color = get_color(script)?;
         let ident = style(self.plain, name, |s| s.color(color).bold());
@@ -88,9 +88,9 @@ impl<'b, 'a: 'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b, 'a>, W> for L
     }
 }
 
-type TreeNode<'a, 'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b, 'a>>;
+type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>>;
 
-fn build_forest<'a, 'b>(scripts: Vec<&'b ScriptInfo<'a>>) -> Vec<TreeNode<'a, 'b>> {
+fn build_forest(scripts: Vec<&ScriptInfo>) -> Vec<TreeNode<'_>> {
     let mut m = HashMap::new();
     for script in scripts.into_iter() {
         let name = script.name.key();
@@ -151,10 +151,10 @@ pub fn fmt<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::AsScriptName;
+    use crate::script::IntoScriptName;
     use chrono::NaiveDateTime;
 
-    fn build(v: Vec<(&'static str, &'static str)>) -> Vec<ScriptInfo<'static>> {
+    fn build(v: Vec<(&'static str, &'static str)>) -> Vec<ScriptInfo> {
         v.into_iter()
             .enumerate()
             .map(|(id, (name, ty))| {
@@ -162,7 +162,7 @@ mod test {
                 let time = NaiveDateTime::from_timestamp(id, 0);
                 ScriptInfo::builder(
                     id,
-                    name.as_script_name().unwrap(),
+                    name.into_script_name().unwrap(),
                     ty.into(),
                     vec![].into_iter(),
                 )

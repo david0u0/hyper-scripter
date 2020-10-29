@@ -1,5 +1,5 @@
 use crate::error::{Contextable, Error, Result, SysPath};
-use crate::script::{AsScriptName, ScriptName, ANONYMOUS};
+use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::util::handle_fs_res;
 use std::fs::{canonicalize, create_dir, read_dir};
@@ -85,7 +85,7 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName<'static>, PathBuf)> {
+pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
     Ok((ScriptName::Anonymous(id), open_anonymous(id, ty)?))
@@ -96,12 +96,11 @@ pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
     Ok(path)
 }
 
-pub fn open_script<T: ?Sized + AsScriptName>(
-    name: &T,
+pub fn open_script(
+    name: &ScriptName,
     ty: &ScriptType,
     check_sxist: Option<bool>,
 ) -> Result<PathBuf> {
-    let name = name.as_script_name()?;
     let script_path = match &name {
         ScriptName::Anonymous(id) => open_anonymous(*id, ty)?,
         ScriptName::Named(_) => {
@@ -125,6 +124,7 @@ pub fn open_script<T: ?Sized + AsScriptName>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::script::IntoScriptName;
     fn setup() {
         set_home(".test_hyper_scripter").unwrap();
     }
@@ -154,17 +154,23 @@ mod test {
     fn test_open() {
         setup();
         let second = "second".to_owned();
-        let second_name = second.as_script_name().unwrap();
+        let second_name = second.into_script_name().unwrap();
         let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();
         assert_eq!(p, get_home().join("second.rb"));
 
-        let p = open_script(".1", &"sh".into(), None).unwrap();
+        let p = open_script(&".1".into_script_name().unwrap(), &"sh".into(), None).unwrap();
         assert_eq!(
             p,
             join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
-        match open_script("not-exist", &"sh".into(), Some(true)).unwrap_err() {
+        match open_script(
+            &"not-exist".into_script_name().unwrap(),
+            &"sh".into(),
+            Some(true),
+        )
+        .unwrap_err()
+        {
             Error::PathNotFound(name) => assert_eq!(name[0], get_home().join("not-exist.sh")),
             _ => unreachable!(),
         }

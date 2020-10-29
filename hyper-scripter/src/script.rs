@@ -14,11 +14,34 @@ use std::path::PathBuf;
 pub const ANONYMOUS: &'static str = ".anonymous";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Ord)]
-pub enum ScriptName<'a> {
+pub enum ScriptName {
     Anonymous(u32),
-    Named(Cow<'a, str>),
+    Named(String),
 }
-impl ScriptName<'_> {
+impl ScriptName {
+    pub fn valid(s: &str) -> Result<Option<u32>> {
+        log::debug!("檢查腳本名：{}", s);
+        let reg = regex::Regex::new(r"^\.(\w+)$")?;
+        let m = reg.captures(s);
+        if let Some(m) = m {
+            let id_str = m.get(1).unwrap().as_str();
+            match id_str.parse::<u32>() {
+                Ok(id) => Ok(Some(id)),
+                Err(e) => return Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
+            }
+        } else {
+            if s.starts_with("-")
+                || s.starts_with(".")
+                || s.find("..").is_some()
+                || s.find(" ").is_some()
+                || s.len() == 0
+            {
+                return Err(Error::Format(ScriptNameCode, s.to_owned()))
+                    .context("命名腳本格式有誤");
+            }
+            Ok(None)
+        }
+    }
     pub fn namespaces(&self) -> Vec<&'_ str> {
         match self {
             ScriptName::Anonymous(_) => vec![],
@@ -38,7 +61,7 @@ impl ScriptName<'_> {
     pub fn key(&self) -> Cow<'_, str> {
         match self {
             ScriptName::Anonymous(id) => Cow::Owned(format!(".{}", id)),
-            ScriptName::Named(s) => Cow::Borrowed(&*s),
+            ScriptName::Named(s) => Cow::Borrowed(s),
         }
     }
     pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
@@ -63,14 +86,8 @@ impl ScriptName<'_> {
             }
         }
     }
-    pub fn into_static(self) -> ScriptName<'static> {
-        match self {
-            ScriptName::Anonymous(id) => ScriptName::Anonymous(id),
-            ScriptName::Named(name) => ScriptName::Named(Cow::Owned(name.into_owned())),
-        }
-    }
 }
-impl PartialOrd for ScriptName<'_> {
+impl PartialOrd for ScriptName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (ScriptName::Named(n1), ScriptName::Named(n2)) => n1.partial_cmp(n2),
@@ -80,40 +97,40 @@ impl PartialOrd for ScriptName<'_> {
         }
     }
 }
-impl std::fmt::Display for ScriptName<'_> {
+impl std::fmt::Display for ScriptName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.key())
     }
 }
-impl FuzzKey for ScriptName<'_> {
+impl FuzzKey for ScriptName {
     fn fuzz_key(&self) -> Cow<'_, str> {
         self.key()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ScriptInfo<'a> {
+pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub created_time: ScriptTime,
     pub write_time: ScriptTime,
     pub exec_time: Option<ScriptTime<String>>,
     pub miss_time: Option<ScriptTime>,
     pub id: i64,
-    pub name: ScriptName<'a>,
+    pub name: ScriptName,
     pub tags: HashSet<Tag>,
     pub ty: ScriptType,
 }
-impl FuzzKey for ScriptInfo<'_> {
+impl FuzzKey for ScriptInfo {
     fn fuzz_key(&self) -> Cow<'_, str> {
         self.name.fuzz_key()
     }
 }
 
-impl<'a> ScriptInfo<'a> {
+impl<'a> ScriptInfo {
     pub fn cp(&self, new_name: ScriptName) -> Self {
         let now = ScriptTime::now(());
         ScriptInfo {
-            name: new_name.into_static(),
+            name: new_name,
             read_time: now.clone(),
             write_time: now.clone(),
             created_time: now,
@@ -150,12 +167,12 @@ impl<'a> ScriptInfo<'a> {
         self.exec_time = Some(ScriptTime::now(content));
         self.read_time = ScriptTime::now(());
     }
-    pub fn builder<'b>(
+    pub fn builder(
         id: i64,
-        name: ScriptName<'b>,
+        name: ScriptName,
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
-    ) -> ScriptBuilder<'b> {
+    ) -> ScriptBuilder {
         ScriptBuilder {
             id,
             name,
@@ -170,53 +187,29 @@ impl<'a> ScriptInfo<'a> {
     }
 }
 
-pub trait AsScriptName {
-    fn as_script_name(&self) -> Result<ScriptName<'_>>;
+pub trait IntoScriptName {
+    fn into_script_name(self) -> Result<ScriptName>;
 }
 
-impl<T: AsScriptName> AsScriptName for &T {
-    fn as_script_name(&self) -> Result<ScriptName<'_>> {
-        <T as AsScriptName>::as_script_name(*self)
-    }
-}
-
-impl AsScriptName for str {
-    fn as_script_name(&self) -> Result<ScriptName<'_>> {
+impl IntoScriptName for String {
+    fn into_script_name(self) -> Result<ScriptName> {
         log::debug!("解析腳本名：{}", self);
-        let reg = regex::Regex::new(r"^\.(\w+)$")?;
-        let m = reg.captures(self);
-        if let Some(m) = m {
-            let id_str = m.get(1).unwrap().as_str();
-            match id_str.parse::<u32>() {
-                Ok(id) => Ok(ScriptName::Anonymous(id)),
-                Err(e) => return Err(Error::Format(ScriptNameCode, self.to_owned())).context(e),
-            }
+        if let Some(id) = ScriptName::valid(&self)? {
+            Ok(ScriptName::Anonymous(id))
         } else {
-            if self.starts_with("-")
-                || self.starts_with(".")
-                || self.find("..").is_some()
-                || self.find(" ").is_some()
-                || self.len() == 0
-            {
-                return Err(Error::Format(ScriptNameCode, self.to_owned()))
-                    .context("命名腳本格式有誤");
-            }
-            Ok(ScriptName::Named(Cow::Borrowed(self)))
+            Ok(ScriptName::Named(self))
         }
     }
 }
-impl AsScriptName for ScriptName<'_> {
-    fn as_script_name(&self) -> Result<ScriptName<'_>> {
-        Ok(match self {
-            ScriptName::Anonymous(id) => ScriptName::Anonymous(*id),
-            ScriptName::Named(s) => ScriptName::Named(Cow::Borrowed(&*s)),
-        })
+impl IntoScriptName for ScriptName {
+    fn into_script_name(self) -> Result<ScriptName> {
+        Ok(self)
     }
 }
 
 #[derive(Debug)]
-pub struct ScriptBuilder<'a> {
-    pub name: ScriptName<'a>,
+pub struct ScriptBuilder {
+    pub name: ScriptName,
     read_time: Option<NaiveDateTime>,
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
@@ -227,7 +220,7 @@ pub struct ScriptBuilder<'a> {
     ty: ScriptType,
 }
 
-impl<'a> ScriptBuilder<'a> {
+impl ScriptBuilder {
     pub fn exec_time(mut self, time: NaiveDateTime) -> Self {
         self.exec_time = Some(time);
         self
@@ -248,7 +241,7 @@ impl<'a> ScriptBuilder<'a> {
         self.created_time = Some(time);
         self
     }
-    pub fn build(self) -> ScriptInfo<'a> {
+    pub fn build(self) -> ScriptInfo {
         let now = ScriptTime::now(());
         let created_time = ScriptTime::new_or(self.created_time, now);
         ScriptInfo {

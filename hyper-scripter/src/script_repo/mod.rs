@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::path;
-use crate::script::{AsScriptName, ScriptInfo, ScriptName};
+use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use async_trait::async_trait;
@@ -19,14 +19,14 @@ pub struct DBEnv {
     historian: Historian,
 }
 
-pub type ScriptRepoEntry<'a, 'b> = RepoEntry<'a, 'b, DBEnv>;
+pub type ScriptRepoEntry<'b> = RepoEntry<'b, DBEnv>;
 
-pub struct ScriptRepoEntryOptional<'a, 'b> {
-    entry: Entry<'b, String, ScriptInfo<'a>>,
+pub struct ScriptRepoEntryOptional<'b> {
+    entry: Entry<'b, String, ScriptInfo>,
     env: &'b DBEnv,
 }
-impl<'a, 'b> ScriptRepoEntryOptional<'a, 'b> {
-    pub fn into_either(self) -> Either<ScriptRepoEntry<'a, 'b>, Self> {
+impl<'b> ScriptRepoEntryOptional<'b> {
+    pub fn into_either(self) -> Either<ScriptRepoEntry<'b>, Self> {
         match self.entry {
             Occupied(entry) => Either::One(RepoEntry {
                 env: self.env,
@@ -35,7 +35,7 @@ impl<'a, 'b> ScriptRepoEntryOptional<'a, 'b> {
             _ => Either::Two(self),
         }
     }
-    pub async fn or_insert(self, info: ScriptInfo<'a>) -> Result<ScriptRepoEntry<'a, 'b>> {
+    pub async fn or_insert(self, info: ScriptInfo) -> Result<ScriptRepoEntry<'b>> {
         let exist = match &self.entry {
             Vacant(_) => false,
             _ => true,
@@ -75,7 +75,7 @@ impl<'a, 'b> ScriptRepoEntryOptional<'a, 'b> {
 
 #[async_trait]
 impl Environment for DBEnv {
-    async fn handle_change<'a>(&self, info: &ScriptInfo<'a>) -> Result {
+    async fn handle_change(&self, info: &ScriptInfo) -> Result {
         log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
         let name = name_cow.as_ref();
@@ -131,24 +131,24 @@ fn join_tags<'a, I: Iterator<Item = &'a Tag>>(tags: I) -> String {
 }
 
 #[derive(Debug)]
-pub struct ScriptRepo<'a> {
-    map: HashMap<String, ScriptInfo<'a>>,
-    hidden_map: HashMap<String, ScriptInfo<'a>>,
+pub struct ScriptRepo {
+    map: HashMap<String, ScriptInfo>,
+    hidden_map: HashMap<String, ScriptInfo>,
     latest_name: Option<String>,
     db_env: DBEnv,
 }
 
-impl<'a> ScriptRepo<'a> {
+impl ScriptRepo {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut<'b>(&'b mut self) -> Iter<'a, 'b, DBEnv> {
+    pub fn iter_mut(&mut self) -> Iter<'_, DBEnv> {
         Iter {
             iter: self.map.iter_mut(),
             env: &self.db_env,
         }
     }
-    pub fn iter_hidden_mut<'b>(&'b mut self) -> Iter<'a, 'b, DBEnv> {
+    pub fn iter_hidden_mut(&mut self) -> Iter<'_, DBEnv> {
         Iter {
             iter: self.hidden_map.iter_mut(),
             env: &self.db_env,
@@ -157,7 +157,7 @@ impl<'a> ScriptRepo<'a> {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
-    pub async fn new<'b>(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo<'b>> {
+    pub async fn new(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo> {
         let historian = Historian::new(path::get_home()).await?;
 
         let mut hidden_map = HashMap::<String, ScriptInfo>::new();
@@ -182,7 +182,7 @@ impl<'a> ScriptRepo<'a> {
 
             let name = script.name;
             log::trace!("載入腳本：{} {} {}", name, script.category, script.tags);
-            let script_name = name.as_script_name()?.into_static(); // TODO: 正確實作 from string
+            let script_name = name.clone().into_script_name()?;
 
             let mut builder = ScriptInfo::builder(
                 script.id,
@@ -242,7 +242,7 @@ impl<'a> ScriptRepo<'a> {
     //         None
     //     }
     // }
-    pub fn latest_mut(&mut self, n: usize) -> Option<ScriptRepoEntry<'a, '_>> {
+    pub fn latest_mut(&mut self, n: usize) -> Option<ScriptRepoEntry<'_>> {
         // if let Some(name) = &self.latest_name {
         //     // FIXME: 一旦 rust nll 進化就修掉這段
         //     if self.map.contains_key(name) {
@@ -264,7 +264,7 @@ impl<'a> ScriptRepo<'a> {
             None
         }
     }
-    pub fn get_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
+    pub fn get_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
         match self.map.get_mut(&*name.key()) {
             None => None,
             Some(info) => Some(RepoEntry {
@@ -273,7 +273,7 @@ impl<'a> ScriptRepo<'a> {
             }),
         }
     }
-    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
+    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
         match self.hidden_map.get_mut(&*name.key()) {
             None => None,
             Some(info) => Some(RepoEntry {
@@ -282,7 +282,7 @@ impl<'a> ScriptRepo<'a> {
             }),
         }
     }
-    pub fn get_regardless_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'a, '_>> {
+    pub fn get_regardless_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
         // FIXME: 一旦 NLL 進化就修掉這段，改用 if let Some(..) = get_mut { } else { get_hidden_mut... }
         match self.map.get_mut(&*name.key()) {
             Some(info) => {
@@ -301,7 +301,7 @@ impl<'a> ScriptRepo<'a> {
             }),
         }
     }
-    pub async fn remove<'c>(&mut self, name: &ScriptName<'c>) -> Result {
+    pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
             sqlx::query!("DELETE from script_infos where id = ?", info.id)
@@ -310,7 +310,7 @@ impl<'a> ScriptRepo<'a> {
         }
         Ok(())
     }
-    pub fn entry<'z>(&mut self, name: &ScriptName<'z>) -> ScriptRepoEntryOptional<'a, '_> {
+    pub fn entry(&mut self, name: &ScriptName) -> ScriptRepoEntryOptional<'_> {
         // TODO: 決定要插 hidden 與否
         let entry = self.map.entry(name.key().into_owned());
         ScriptRepoEntryOptional {

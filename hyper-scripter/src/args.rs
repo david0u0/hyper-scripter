@@ -261,9 +261,12 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
                 if let Some((before, alias)) = find_alias(&alias_root)? {
                     log::info!("別名 {} => {:?}", before, alias);
                     let mut new_args: Vec<&str> = vec![];
-                    for arg in args {
+                    let mut arg_iter = args.iter();
+                    while let Some(arg) = arg_iter.next() {
                         if before == arg {
                             new_args.extend(alias.after.iter().map(|s| s.as_str()));
+                            new_args.extend(arg_iter.map(|s| s.as_str()));
+                            break;
                         } else {
                             new_args.push(arg);
                         }

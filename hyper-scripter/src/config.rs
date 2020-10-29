@@ -1,4 +1,4 @@
-use crate::error::{Error, FormatCode, Result};
+use crate::error::{Error, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagControlFlow, TagFilter, TagFilterGroup};
@@ -118,6 +118,8 @@ impl RawConfig {
     }
     #[cfg(not(test))]
     fn load() -> Result<Self> {
+        use crate::error::FormatCode;
+
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {

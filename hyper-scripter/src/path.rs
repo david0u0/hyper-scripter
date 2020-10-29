@@ -1,4 +1,4 @@
-use crate::error::{Contextable, Error, Result, SysPath};
+use crate::error::{Contextable, Error, Result};
 use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::util::handle_fs_res;
@@ -6,8 +6,6 @@ use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const ROOT_PATH: &'static str = "hyper_scripter";
-const HS_HOME_ENV: &'static str = "HYPER_SCRIPTER_HOME";
 pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
 
 lazy_static::lazy_static! {
@@ -16,6 +14,10 @@ lazy_static::lazy_static! {
 
 #[cfg(not(debug_assertions))]
 pub fn get_sys_path() -> Result<PathBuf> {
+    use crate::error::SysPath;
+    const ROOT_PATH: &'static str = "hyper_scripter";
+    const HS_HOME_ENV: &'static str = "HYPER_SCRIPTER_HOME";
+
     let p = match std::env::var(HS_HOME_ENV) {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);

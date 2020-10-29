@@ -107,13 +107,18 @@ fn recursive_reorder<'a, F: FnMut(&str)>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::AsScriptName;
+    use crate::script::{IntoScriptName, ScriptName};
+    impl<'a> IntoScriptName for &'a str {
+        fn into_script_name(self) -> Result<ScriptName> {
+            self.to_owned().into_script_name()
+        }
+    }
     #[test]
     fn test_fuzz() {
         let _ = env_logger::try_init();
-        let t1 = "測試腳本1".as_script_name().unwrap();
-        let t2 = "測試腳本2".as_script_name().unwrap();
-        let t3 = ".42".as_script_name().unwrap();
+        let t1 = "測試腳本1".into_script_name().unwrap();
+        let t2 = "測試腳本2".into_script_name().unwrap();
+        let t3 = ".42".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2, t3.clone()];
 
         let res = fuzz("測試1", vec.clone().into_iter()).unwrap();
@@ -136,8 +141,8 @@ mod test {
     #[test]
     fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
-        let t1 = "測試腳本1".as_script_name().unwrap();
-        let t2 = "測試腳本234".as_script_name().unwrap();
+        let t1 = "測試腳本1".into_script_name().unwrap();
+        let t2 = "測試腳本234".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2];
         let res = fuzz("測試", vec.clone().into_iter()).unwrap();
         assert_eq!(res, Some(t1), "模糊搜尋無法找出較短者");

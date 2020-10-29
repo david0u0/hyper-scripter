@@ -1,15 +1,15 @@
 use super::{ListQuery, ScriptQuery};
 use crate::error::{Error, Result};
 use crate::fuzzy;
-use crate::script::AsScriptName;
+use crate::script::IntoScriptName;
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_time::ScriptTime;
 use std::collections::HashSet;
 
-pub fn do_list_query<'a, 'b>(
-    repo: &'b mut ScriptRepo<'a>,
+pub fn do_list_query<'a>(
+    repo: &'a mut ScriptRepo,
     queries: &[ListQuery],
-) -> Result<Vec<ScriptRepoEntry<'a, 'b>>> {
+) -> Result<Vec<ScriptRepoEntry<'a>>> {
     if queries.len() == 0 {
         return Ok(repo.iter_mut().collect());
     }
@@ -44,10 +44,10 @@ pub fn do_list_query<'a, 'b>(
     Ok(ret)
 }
 
-pub fn do_script_query<'b, 'a>(
+pub fn do_script_query<'b>(
     script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo<'a>,
-) -> Result<Option<ScriptRepoEntry<'a, 'b>>> {
+    script_repo: &'b mut ScriptRepo,
+) -> Result<Option<ScriptRepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
     match script_query {
         ScriptQuery::Prev(prev) => {
@@ -63,25 +63,25 @@ pub fn do_script_query<'b, 'a>(
         ScriptQuery::Fuzz(name) => fuzzy::fuzz(name, script_repo.iter_mut()),
     }
 }
-pub fn do_script_query_strict<'b, 'a>(
+pub fn do_script_query_strict<'b>(
     script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo<'a>,
-) -> Result<ScriptRepoEntry<'a, 'b>> {
+    script_repo: &'b mut ScriptRepo,
+) -> Result<ScriptRepoEntry<'b>> {
     match do_script_query(script_query, script_repo) {
         Err(e) => Err(e),
         Ok(None) => Err(Error::ScriptNotFound(
-            script_query.as_script_name()?.to_string(),
+            script_query.clone().into_script_name()?.to_string(), // TODO: 簡單點？
         )),
         Ok(Some(info)) => Ok(info),
     }
 }
 
-pub async fn do_script_query_strict_with_missing<'b, 'a>(
+pub async fn do_script_query_strict_with_missing<'b>(
     script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo<'a>,
-) -> Result<ScriptRepoEntry<'a, 'b>> {
+    script_repo: &'b mut ScriptRepo,
+) -> Result<ScriptRepoEntry<'b>> {
     let repo_mut = script_repo as *mut ScriptRepo;
-    // FIXME: 一旦 NLL 進化就修掉這段
+    // FIXME: 一旦 NLL 進化就修掉這段 unsafe
     match do_script_query(script_query, script_repo) {
         Err(e) => Err(e),
         Ok(Some(info)) => Ok(info),
@@ -102,7 +102,7 @@ pub async fn do_script_query_strict_with_missing<'b, 'a>(
                 .await?;
             }
             Err(Error::ScriptNotFound(
-                script_query.as_script_name()?.to_string(),
+                script_query.clone().into_script_name()?.to_string(),
             ))
         }
     }

@@ -2,7 +2,7 @@ use chrono::Utc;
 use hyper_scripter::args::{self, print_help, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::extract_usage::extract_usage;
+use hyper_scripter::extract_help::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, EditQuery, ScriptQuery};
 use hyper_scripter::script::{AsScriptName, ScriptInfo, ScriptName};
@@ -195,7 +195,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
                 repo.remove(&name).await?
             }
         }
-        Subs::Help { args, long } => {
+        Subs::Help { args } => {
             print_help(args.iter())?;
             let script_query: ScriptQuery = FromStr::from_str(&args[0])?;
             let entry =
@@ -203,7 +203,7 @@ async fn main_inner(root: &Root, conf: &mut Config) -> Result<Vec<Error>> {
             log::info!("檢視用法： {:?}", entry.name);
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
-            for msg in extract_usage(&content, *long) {
+            for msg in extract_help(&content, true) {
                 println!("{}", msg);
             }
         }

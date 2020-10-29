@@ -8,7 +8,7 @@ fn trim_first_white(s: &str) -> &str {
     }
 }
 
-pub fn extract_usage(mut content: &str, long: bool) -> Vec<&str> {
+pub fn extract_help(mut content: &str, long: bool) -> Vec<&str> {
     let mut ans = vec![];
     if let Some(pos) = content.find(KEY) {
         content = &content[pos..];
@@ -37,7 +37,7 @@ pub fn extract_usage(mut content: &str, long: bool) -> Vec<&str> {
 mod test {
     use super::*;
     #[test]
-    fn test_extract_usage() {
+    fn test_extract_help() {
         let content = "
         // 不要解析我
         // [HS_HELP]:   解析我吧  
@@ -49,8 +49,8 @@ mod test {
         # [HS_HELP]: 解析我吧，雖然我是個失敗的註解
 
         //  前面有些 垃圾[HS_HELP]:我是最後一行";
-        let short = extract_usage(content, false);
-        let long = extract_usage(content, true);
+        let short = extract_help(content, false);
+        let long = extract_help(content, true);
         assert_eq!(short, vec!["  解析我吧  "]);
         assert_eq!(
             long,
@@ -63,8 +63,8 @@ mod test {
         );
 
         let appended = format!("{}\n 真．最後一行", content);
-        let short2 = extract_usage(&appended, false);
-        let long2 = extract_usage(&appended, true);
+        let short2 = extract_help(&appended, false);
+        let long2 = extract_help(&appended, true);
         assert_eq!(short, short2);
         assert_eq!(long, long2);
     }
@@ -75,8 +75,8 @@ mod test {
         fn this_is_a_test() -> bool {}
 
         // [HS_HOLP]:我是最後一行，還拼錯字…";
-        let short = extract_usage(content, false);
-        let long = extract_usage(content, true);
+        let short = extract_help(content, false);
+        let long = extract_help(content, true);
         assert_eq!(short.len(), 0);
         assert_eq!(long.len(), 0);
     }

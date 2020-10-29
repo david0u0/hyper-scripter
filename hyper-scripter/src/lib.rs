@@ -8,7 +8,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 mod error_display;
-pub mod extract_usage;
+pub mod extract_help;
 pub mod fuzzy;
 pub mod list;
 pub mod migration;

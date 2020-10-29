@@ -79,11 +79,7 @@ pub enum Subs {
     #[structopt(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
-    Help {
-        #[structopt(short, long, help = "Show long message")]
-        long: bool,
-        args: Vec<String>,
-    },
+    Help { args: Vec<String> },
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
     #[structopt(about = "Edit hyper script")]

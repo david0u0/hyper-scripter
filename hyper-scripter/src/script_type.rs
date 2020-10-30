@@ -52,7 +52,7 @@ export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
 tmux new-session -s $NAME -d \"{{{content.0}}}; $SHELL\" || exit 1
-tmux split-window -h \"{{{content.1}}}\"
+tmux split-window -h \"{{{content.1}}}; $SHELL\"
 {{#if content.2}}tmux split-window -v \"{{{content.2}}}; $SHELL\"
 {{/if}}
 tmux -2 attach-session -d";

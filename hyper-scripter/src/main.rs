@@ -318,6 +318,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::CP { origin, new } => {
+            // FIXME: cp 成同一個名字會出錯！！
             let h = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
             let new_name = new.into_script_name()?;
             let og_script = path::open_script(&h.name, &h.ty, Some(true))?;
@@ -412,6 +413,7 @@ async fn mv<'b>(
     ty: Option<ScriptType>,
     tags: Option<TagControlFlow>,
 ) -> Result {
+    // FIXME: mv 成同一個名字會出錯！！
     let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let new_script = path::open_script(
         new_name.as_ref().unwrap_or(&entry.name),

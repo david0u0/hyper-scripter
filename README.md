@@ -1,15 +1,18 @@
-## 編譯 ##
-* 安裝 pkg config
-* 安裝 libssl-dev
+# Hyper Scripter
+_An (over-killing) script managing tool for script lovers._
+
+[![basic demo](https://asciinema.org/a/369039.svg)](https://asciinema.org/a/369039)
+
+----
 
 ## TODO ##
 - [x] 模糊搜尋功能
 - [x] 可以直接打腳本名，像 yarn 一樣
-- [ ] 模糊搜尋分數太低時，幫人補全而不要直接執行
+- [x] 模糊搜尋分數太低時，幫人補全而不要直接執行
 - [x] 不只可直接執行上一個腳本，也可執行上`n`個腳本
 - [x] 腳本分群，標籤
 - [x] mv/rm/cp 功能
-- [ ] 列表美化/充實更多資訊
+- [x] 列表美化/充實更多資訊
     - [x] 根據腳本類別上色
     - [x] 標籤
     - [x] 「最新腳本」，預設會執行的那個
@@ -22,9 +25,9 @@
 - [x] 命名空間的概念
 - [x] 歷史
 - [x] 改用 sqlite 存資料
-- [ ] 別名
+- [x] 別名
 - [x] 用時間篩選
-- [ ] 提供方便小工具
+- [x] 提供方便小工具
 
 ## 標籤篩選語言 ##
 * 簡易版 `all,^hide,^build`

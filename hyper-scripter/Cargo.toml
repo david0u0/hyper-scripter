@@ -5,6 +5,8 @@ authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
 autotests = false
 categories = ["command-line-utilities"]
+license = "MIT OR Apache-2.0"
+description = "The script managing tool for script lovers"
 
 [[test]]
 name = "integration"

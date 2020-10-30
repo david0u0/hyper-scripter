@@ -1,11 +1,13 @@
 # Hyper Scripter
-_An (over-killing) script managing tool for script lovers._
+
+_The (over-killing) script managing tool for script lovers._
 
 [![basic demo](https://asciinema.org/a/369039.svg)](https://asciinema.org/a/369039)
 
-----
+---
 
-## TODO ##
+## TODO
+
 - [x] 模糊搜尋功能
 - [x] 可以直接打腳本名，像 yarn 一樣
 - [x] 模糊搜尋分數太低時，幫人補全而不要直接執行
@@ -13,9 +15,9 @@ _An (over-killing) script managing tool for script lovers._
 - [x] 腳本分群，標籤
 - [x] mv/rm/cp 功能
 - [x] 列表美化/充實更多資訊
-    - [x] 根據腳本類別上色
-    - [x] 標籤
-    - [x] 「最新腳本」，預設會執行的那個
+  - [x] 根據腳本類別上色
+  - [x] 標籤
+  - [x] 「最新腳本」，預設會執行的那個
 - [ ] 補全功能
 - [x] tag 指令
 - [x] 打開的編輯器自動填入好用的變數，例如 birth path
@@ -29,20 +31,25 @@ _An (over-killing) script managing tool for script lovers._
 - [x] 用時間篩選
 - [x] 提供方便小工具
 
-## 標籤篩選語言 ##
-* 簡易版 `all,^hide,^build`
-* 終極版 `"(all & !hide) | (!build & !setup)"`
+## 標籤篩選語言
+
+- 簡易版 `all,^hide,^build`
+- 終極版 `"(all & !hide) | (!build & !setup)"`
 
 > # 定義何謂「相關標籤」
+>
 > 在終極篩選語言中，對其中標籤 `T` 而言，若存在一組標籤集 `S` 使 `T` + `S` 通過篩選而 `S` 不通過，則稱 `T` 為此篩選語言的正相關標籤。
 
-> # 為啥不用階層分群，而是用標籤？ #
+> # 為啥不用階層分群，而是用標籤？
+>
 > 階層的好處是可以容許撞名，從而把名字取短；壞處是一旦嵌套，要做篩選就要打很長了（多個標籤可以選一個打就好，多層分群往往要一路打到底……？）
 > 然而若採用分群而把名字取短了，可能碰到以下問題：
+>
 > ```bash
 > [cb]
 > run code dbtool
 > [is]
 > run code
 > ```
+>
 > 這時我想要執行其中一個 `code`，就一定要加上篩選條件，整個指定的長度跟複雜度大增，還不如名字取長一點用模糊搜尋。

@@ -3,6 +3,8 @@ name = "hyper-scripter-historian"
 version = "0.3.2"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "Database tool for hyper-scripter. Not indetended to be used directly."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

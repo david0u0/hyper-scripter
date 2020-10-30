@@ -1,12 +1,12 @@
 #![feature(str_split_once)]
 
 #[allow(dead_code)]
-#[path = "../../hyper-scripter-test-lib/test_util.rs"]
-mod test_util;
+#[path = "tool.rs"]
+mod tool;
 
 use hyper_scripter::path::HS_EXECUTABLE_INFO_PATH;
 use regex::Regex;
-use test_util::*;
+use tool::*;
 const MSG: &'static str = "你好，腳本人！";
 
 const MSG_JS: &'static str = "你好，爪哇腳本人！";

@@ -1,12 +1,8 @@
 [package]
 name = "hyper-scripter-util"
-version = "0.1.0"
+version = "0.3.2"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
-
-[[test]]
-name = "utils"
-path = "tests/test.rs"
 
 [dependencies]
 lazy_static = "1.4"

@@ -1,15 +1,16 @@
 #[path = "src/migration/mod.rs"]
 mod migration;
 
+use std::path::Path;
+
 #[tokio::main]
 async fn main() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let dir = format!("{}/db_example", manifest);
-    let file = format!("{}/.script_history.db", dir);
+    let out_dir = std::env::var_os("OUT_DIR").unwrap();
+    let file = Path::new(&out_dir).join(".script_history.db");
 
-    let _ = std::fs::remove_dir_all(&dir);
-
-    std::fs::create_dir(dir).unwrap();
     migration::do_migrate(&file).await.unwrap();
-    println!("cargo:rustc-env=DATABASE_URL=sqlite:{}", file);
+    println!(
+        "cargo:rustc-env=DATABASE_URL=sqlite:{}",
+        file.to_string_lossy()
+    );
 }

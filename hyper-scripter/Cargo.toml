@@ -1,17 +1,28 @@
 [package]
 name = "hyper-scripter"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
 autotests = false
+categories = ["command-line-utilities"]
 
 [[test]]
 name = "integration"
-path = "tests/test.rs"
+path = "tests/integration.rs"
+required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵
+
+[[test]]
+name = "util"
+path = "tests/util_test.rs"
+required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵
+
+[[bin]]
+name = "hs"
+path = "src/main.rs"
 
 [features]
 default = []
-prompt_fuzz = []
+no-prompt = []
 
 [dependencies]
 console = "0.13.0"
@@ -33,8 +44,8 @@ colored = "2"
 dirs = "3.0.1"
 handlebars = "3.3.0"
 toml = "0.5.6"
-hyper-scripter-historian = { path = "../hyper-scripter-historian" }
-hyper-scripter-util = { path = "../hyper-scripter-util" }
+hyper-scripter-historian = { version = "0.3.2", path = "../hyper-scripter-historian" }
+hyper-scripter-util = { version = "0.3.2", path = "../hyper-scripter-util" }
 
 [dependencies.openssl]
 version = "0.10.29"

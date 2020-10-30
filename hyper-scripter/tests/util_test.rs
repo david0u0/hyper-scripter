@@ -1,14 +1,14 @@
 #![feature(str_split_once)]
 
 #[allow(dead_code)]
-#[path = "../../hyper-scripter-test-lib/test_util.rs"]
-mod test_util;
+#[path = "tool.rs"]
+mod tool;
 
 use hyper_scripter_util::get_all;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io::prelude::*;
 use std::sync::MutexGuard;
-use test_util::*;
+use tool::*;
 
 pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
     let g = setup();

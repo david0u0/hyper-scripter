@@ -122,7 +122,7 @@ pub async fn do_script_query_strict_with_missing<'b>(
     }
 }
 
-#[cfg(feature = "prompt_fuzz")]
+#[cfg(not(feature = "no-prompt"))]
 fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
     use crate::config::Config;
     use colored::{Color, Colorize};
@@ -157,7 +157,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
     Ok(ok)
 }
 
-#[cfg(not(feature = "prompt_fuzz"))]
+#[cfg(feature = "no-prompt")]
 fn prompt_fuzz_acceptable(_: &ScriptInfo) -> Result<bool> {
     Ok(true)
 }

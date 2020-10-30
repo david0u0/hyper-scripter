@@ -8,9 +8,9 @@ lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
 }
 #[cfg(not(debug_assertions))]
-const EXE: &'static str = "../target/release/hyper-scripter";
+const EXE: &'static str = "../target/release/hs";
 #[cfg(debug_assertions)]
-const EXE: &'static str = "../target/debug/hyper-scripter";
+const EXE: &'static str = "../target/debug/hs";
 
 pub fn get_exe_abs() -> String {
     std::fs::canonicalize(EXE)

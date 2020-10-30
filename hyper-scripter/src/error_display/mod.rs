@@ -15,7 +15,9 @@ fn fmt_multi_path(f: &mut Formatter, msg: &str, mutli_path: &[PathBuf]) -> Resul
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        // LOCALE
         match self {
+            DontFuzz => (),
             Empty => write!(f, "No existing script!")?,
             SysPathNotFound(SysPath::Config) => write!(
                 f,

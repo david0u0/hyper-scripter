@@ -4,6 +4,7 @@ use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagControlFlow, TagFilter, TagFilterGroup};
 use crate::util;
 use chrono::{DateTime, Utc};
+use colored::Color;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -168,6 +169,10 @@ impl Config {
             Ok(c) => Ok(c),
             Err(e) => Err(e.clone()),
         }
+    }
+    pub fn get_color(&self, ty: &ScriptType) -> Result<Color> {
+        let c = self.get_script_conf(ty)?.color.as_str();
+        Ok(Color::from(c))
     }
     pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
         self.categories

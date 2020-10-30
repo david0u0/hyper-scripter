@@ -1,7 +1,7 @@
 use super::{ListQuery, ScriptQuery};
 use crate::error::{Error, Result};
 use crate::fuzzy;
-use crate::script::IntoScriptName;
+use crate::script::{IntoScriptName, ScriptInfo};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_time::ScriptTime;
 use std::collections::HashSet;
@@ -32,7 +32,11 @@ pub fn do_list_query<'a>(
                 }
             }
             ListQuery::Query(query) => {
-                let script = do_script_query_strict(query, repo)?;
+                let script = match do_script_query_strict(query, repo) {
+                    Err(Error::DontFuzz) => continue,
+                    Ok(entry) => entry,
+                    Err(e) => return Err(e),
+                };
                 if mem.contains(&script.id) {
                     continue;
                 }
@@ -60,7 +64,17 @@ pub fn do_script_query<'b>(
             };
         }
         ScriptQuery::Exact(name) => Ok(script_repo.get_mut(name)),
-        ScriptQuery::Fuzz(name) => fuzzy::fuzz(name, script_repo.iter_mut()),
+        ScriptQuery::Fuzz(name) => match fuzzy::fuzz(name, script_repo.iter_mut())? {
+            Some((entry, fuzzy::High)) => Ok(Some(entry)),
+            Some((entry, fuzzy::Low)) => {
+                if prompt_fuzz_acceptable(&*entry)? {
+                    Ok(Some(entry))
+                } else {
+                    Err(Error::DontFuzz)
+                }
+            }
+            _ => Ok(None),
+        },
     }
 }
 pub fn do_script_query_strict<'b>(
@@ -90,7 +104,7 @@ pub async fn do_script_query_strict_with_missing<'b>(
             let info = match script_query {
                 ScriptQuery::Exact(name) => repo.get_hidden_mut(name),
                 ScriptQuery::Fuzz(name) => match fuzzy::fuzz(name, repo.iter_hidden_mut()) {
-                    Ok(info) => info,
+                    Ok(Some((info, _))) => Some(info),
                     _ => None,
                 },
                 _ => None,
@@ -106,4 +120,44 @@ pub async fn do_script_query_strict_with_missing<'b>(
             ))
         }
     }
+}
+
+#[cfg(feature = "prompt_fuzz")]
+fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
+    use crate::config::Config;
+    use colored::{Color, Colorize};
+    use console::{Key, Term};
+
+    let term = Term::stdout();
+
+    let color = Config::get()?.get_color(&script.ty)?;
+    let msg = format!(
+        "{} [Y/N]",
+        format!("{}({})?", script.name, script.ty)
+            .color(color)
+            .bold(),
+    );
+    term.hide_cursor()?;
+    let ok = loop {
+        term.write_str(&msg)?;
+        match term.read_key()? {
+            Key::Char('Y') => break true,
+            Key::Char('y') => break true,
+            Key::Char('N') => break false,
+            Key::Char('n') => break false,
+            Key::Char(ch) => term.write_line(&format!(" Unknown key '{}'", ch))?,
+            _ => break true,
+        }
+    };
+    if ok {
+        term.write_line(&" Y".color(Color::Green).to_string())?;
+    } else {
+        term.write_line(&" N".color(Color::Red).to_string())?;
+    }
+    Ok(ok)
+}
+
+#[cfg(not(feature = "prompt_fuzz"))]
+fn prompt_fuzz_acceptable(_: &ScriptInfo) -> Result<bool> {
+    Ok(true)
 }

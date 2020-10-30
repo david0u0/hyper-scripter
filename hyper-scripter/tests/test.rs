@@ -237,7 +237,7 @@ fn test_append_tags() {
     run("-f no-append e no-append-test | echo 不要給我打標籤").unwrap();
 
     assert_eq!("附加標籤", run("apptest").unwrap());
-    run("no-apptest").expect_err("標籤還是附加上去了？");
+    run("no-appendtest").expect_err("標籤還是附加上去了？");
 
     assert_eq!(
         "附加標籤",

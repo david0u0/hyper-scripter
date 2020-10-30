@@ -2,7 +2,22 @@ use crate::error::{Error, Result};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
 
-const MIN_SCORE: i64 = 400; // TODO: 好好決定這個魔法數字
+const MID_SCORE: i64 = 1000; // TODO: 好好決定這個魔法數字
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum FuzzSimilarity {
+    High,
+    Low,
+}
+pub use FuzzSimilarity::*;
+impl FuzzSimilarity {
+    fn from_score(score: i64) -> Self {
+        match score {
+            0..=MID_SCORE => FuzzSimilarity::Low,
+            _ => FuzzSimilarity::High,
+        }
+    }
+}
 
 lazy_static::lazy_static! {
     static ref MATCHER: SkimMatcherV2 = SkimMatcherV2::default();
@@ -11,7 +26,10 @@ lazy_static::lazy_static! {
 pub trait FuzzKey {
     fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
 }
-pub fn fuzz<'a, T: FuzzKey + 'a>(name: &str, iter: impl Iterator<Item = T>) -> Result<Option<T>> {
+pub fn fuzz<'a, T: FuzzKey + 'a>(
+    name: &str,
+    iter: impl Iterator<Item = T>,
+) -> Result<Option<(T, FuzzSimilarity)>> {
     let mut ans = (0, Vec::<T>::new());
     for data in iter {
         let key_tmp = data.fuzz_key();
@@ -22,12 +40,10 @@ pub fn fuzz<'a, T: FuzzKey + 'a>(name: &str, iter: impl Iterator<Item = T>) -> R
             let len = key.chars().count();
             log::trace!("將分數正交化：{} / {}", score * 100, len);
             score = score * 100 / len as i64;
-            if score > MIN_SCORE {
-                if score > ans.0 {
-                    ans = (score, vec![data]);
-                } else if score == ans.0 {
-                    ans.1.push(data);
-                }
+            if score > ans.0 {
+                ans = (score, vec![data]);
+            } else if score == ans.0 {
+                ans.1.push(data);
             }
         }
     }
@@ -40,7 +56,8 @@ pub fn fuzz<'a, T: FuzzKey + 'a>(name: &str, iter: impl Iterator<Item = T>) -> R
             ans.1.iter().map(|k| k.fuzz_key()).collect::<Vec<_>>()
         );
         let first = ans.1.into_iter().next().unwrap();
-        Ok(Some(first))
+        let similarity = FuzzSimilarity::from_score(ans.0);
+        Ok(Some((first, similarity)))
     } else {
         log::debug!("模糊搜到太多東西");
         Err(Error::MultiFuzz(
@@ -121,11 +138,11 @@ mod test {
         let t3 = ".42".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz("測試1", vec.clone().into_iter()).unwrap();
-        assert_eq!(res, Some(t1));
+        let res = fuzz("測試1", vec.clone().into_iter()).unwrap().unwrap().0;
+        assert_eq!(res, t1);
 
-        let res = fuzz("42", vec.clone().into_iter()).unwrap();
-        assert_eq!(res, Some(t3));
+        let res = fuzz("42", vec.clone().into_iter()).unwrap().unwrap().0;
+        assert_eq!(res, t3);
 
         let res = fuzz("找不到", vec.clone().into_iter()).unwrap();
         assert_eq!(res, None);
@@ -144,8 +161,8 @@ mod test {
         let t1 = "測試腳本1".into_script_name().unwrap();
         let t2 = "測試腳本234".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2];
-        let res = fuzz("測試", vec.clone().into_iter()).unwrap();
-        assert_eq!(res, Some(t1), "模糊搜尋無法找出較短者");
+        let res = fuzz("測試", vec.clone().into_iter()).unwrap().unwrap().0;
+        assert_eq!(res, t1, "模糊搜尋無法找出較短者");
     }
     #[test]
     fn test_reorder() {

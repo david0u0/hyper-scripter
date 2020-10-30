@@ -40,6 +40,7 @@ pub enum Error {
     UnknownCategory(String),
     Format(FormatCode, String),
     ScriptError(i32),
+    DontFuzz,
     Empty,
 }
 

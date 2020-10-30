@@ -1,6 +1,5 @@
-use super::{
-    get_color, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
-};
+use super::{style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions};
+use crate::config::Config;
 use crate::error::Result;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
@@ -92,7 +91,7 @@ pub fn fmt_meta<W: Write>(
     is_last: bool,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let color = get_color(script)?;
+    let color = Config::get()?.get_color(&script.ty)?;
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             let last_txt = if is_last && !opt.plain {

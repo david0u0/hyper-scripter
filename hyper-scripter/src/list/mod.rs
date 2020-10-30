@@ -4,10 +4,8 @@ pub use list::*;
 mod tree;
 mod tree_lib;
 
-use crate::{
-    config::Config, error::Result, query::ListQuery, script::ScriptInfo, script_time::ScriptTime,
-};
-use colored::{Color, ColoredString, Colorize};
+use crate::{query::ListQuery, script_time::ScriptTime};
+use colored::{ColoredString, Colorize};
 use std::borrow::Cow;
 
 fn time_str<T: Clone + std::fmt::Debug>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
@@ -70,8 +68,4 @@ fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
     } else {
         s
     }
-}
-fn get_color(script: &ScriptInfo) -> Result<Color> {
-    let c = Config::get()?.get_script_conf(&script.ty)?.color.as_str();
-    Ok(Color::from(c))
 }

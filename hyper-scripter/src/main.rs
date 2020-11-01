@@ -29,7 +29,7 @@ async fn main() {
         Ok(v) => v,
     };
     for err in errs.iter() {
-        eprintln!("{}", err);
+        eprint!("{}", err);
     }
     if errs.len() > 0 {
         std::process::exit(1);
@@ -292,6 +292,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
+            // FIXME: 若檔案移失，軟刪除會因為不能 mv 而失敗，蠻詭異的
             let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+removed").unwrap());
             let mut to_purge = vec![];
             for mut entry in query::do_list_query(&mut repo, &queries)?.into_iter() {
@@ -318,14 +319,11 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::CP { origin, new } => {
-            // FIXME: cp 成同一個名字會出錯！！
+            // FIXME: 應該要允許 cp 成同個名字
             let h = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
             let new_name = new.into_script_name()?;
             let og_script = path::open_script(&h.name, &h.ty, Some(true))?;
             let new_script = path::open_script(&new_name, &h.ty, Some(false))?;
-            if new_script.exists() {
-                return Err(Error::ScriptExist(new_name.to_string()));
-            }
             util::cp(&og_script, &new_script)?;
             let new_info = h.cp(new_name.clone());
             repo.entry(&new_name).or_insert(new_info).await?;
@@ -413,12 +411,12 @@ async fn mv<'b>(
     ty: Option<ScriptType>,
     tags: Option<TagControlFlow>,
 ) -> Result {
-    // FIXME: mv 成同一個名字會出錯！！
+    // FIXME: 應該要允許 mv 成同個名字
     let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let new_script = path::open_script(
         new_name.as_ref().unwrap_or(&entry.name),
         ty.as_ref().unwrap_or(&entry.ty),
-        None,
+        Some(false),
     )?;
     util::mv(&og_script, &new_script)?;
 

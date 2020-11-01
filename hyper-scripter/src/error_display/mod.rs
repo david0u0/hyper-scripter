@@ -5,10 +5,15 @@ use std::path::PathBuf;
 fn fmt_multi_path(f: &mut Formatter, msg: &str, mutli_path: &[PathBuf]) -> Result {
     write!(f, "{}", msg)?;
     if mutli_path.len() > 0 {
-        writeln!(f, ":")?;
+        write!(f, ":")?;
     }
-    for p in mutli_path.iter() {
-        writeln!(f, "{}", p.to_string_lossy())?;
+    let mut it = mutli_path.iter();
+    if let Some(p) = it.next() {
+        writeln!(f, "")?;
+        write!(f, "{}", p.to_string_lossy())?;
+    }
+    while let Some(p) = it.next() {
+        write!(f, "{}", p.to_string_lossy())?;
     }
     Ok(())
 }
@@ -17,7 +22,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         // LOCALE
         match self {
-            DontFuzz => (),
+            DontFuzz => return Ok(()),
             Empty => write!(f, "No existing script!")?,
             SysPathNotFound(SysPath::Config) => write!(
                 f,
@@ -60,6 +65,6 @@ impl Display for Error {
                 write!(f, "{:?}", self)?;
             }
         }
-        Ok(())
+        writeln!(f, "")
     }
 }

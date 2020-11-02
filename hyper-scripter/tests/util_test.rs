@@ -24,15 +24,6 @@ pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
     g
 }
 
-fn assert_ls_len(expect: usize) {
-    let ls_res = run("ls -f all --grouping none --plain --name").unwrap();
-    let ls_vec = ls_res
-        .split(" ")
-        .filter(|s| s.len() > 0)
-        .collect::<Vec<_>>();
-    assert_eq!(expect, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
-}
-
 fn test_import() {
     run("e copy/test -f +innate | echo 我要留下來").unwrap();
     run("e my/innate -f +innate | cp tests/to_be_import ./.tmp -r").unwrap();

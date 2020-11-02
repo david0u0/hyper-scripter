@@ -2,6 +2,7 @@ use crate::config::{Alias, Config};
 use crate::error::Result;
 use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
+use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagControlFlow;
 use std::str::FromStr;
@@ -152,7 +153,7 @@ pub enum Subs {
     CP {
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
-        new: String,
+        new: ScriptName,
     },
     #[structopt(about = "Move the script to another one")]
     MV {

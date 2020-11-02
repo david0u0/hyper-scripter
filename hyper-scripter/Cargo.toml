@@ -9,6 +9,10 @@ license = "MIT OR Apache-2.0"
 description = "The script managing tool for script lovers"
 
 [[test]]
+name = "issues"
+path = "tests/issues.rs"
+
+[[test]]
 name = "integration"
 path = "tests/integration.rs"
 required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵

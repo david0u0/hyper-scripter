@@ -1,3 +1,4 @@
+use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::ExitStatus;
@@ -13,7 +14,7 @@ const EXE: &'static str = "../target/release/hs";
 const EXE: &'static str = "../target/debug/hs";
 
 pub fn get_exe_abs() -> String {
-    std::fs::canonicalize(EXE)
+    canonicalize(EXE)
         .unwrap()
         .to_string_lossy()
         .as_ref()
@@ -23,7 +24,7 @@ pub fn get_exe_abs() -> String {
 const HOME: &str = "./.hyper_scripter";
 
 pub fn get_home() -> PathBuf {
-    HOME.into()
+    canonicalize(HOME).unwrap()
 }
 
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
@@ -38,6 +39,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
         }
     }
     let _ = std::fs::remove_dir_all(".tmp");
+    std::fs::create_dir(HOME).unwrap();
     run("alias e edit --fast").unwrap();
 
     guard
@@ -61,7 +63,8 @@ pub fn check_exist(p: &[&str]) -> bool {
     file.exists()
 }
 pub fn run(args: &str) -> Result<String, ExitStatus> {
-    run_with_home(HOME, args)
+    let home = get_home();
+    run_with_home(&*home.to_string_lossy(), args)
 }
 pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
     let mut full_args = vec!["-H", home];
@@ -101,4 +104,13 @@ pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
     };
     log::trace!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res
+}
+
+pub fn assert_ls_len(expect: usize) {
+    let ls_res = run("ls -f all --grouping none --plain --name").unwrap();
+    let ls_vec = ls_res
+        .split(" ")
+        .filter(|s| s.len() > 0)
+        .collect::<Vec<_>>();
+    assert_eq!(expect, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
 }

@@ -40,6 +40,7 @@ impl<'b> ScriptRepoEntryOptional<'b> {
             Vacant(_) => false,
             _ => true,
         };
+
         let info = self.entry.or_insert(info);
         if !exist {
             log::debug!("往資料庫塞新腳本 {:?}", info);

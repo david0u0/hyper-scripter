@@ -48,18 +48,15 @@ pub fn fuzz<'a, T: FuzzKey + 'a>(
         }
     }
     if ans.1.len() == 0 {
-        log::warn!("模糊搜沒搜到東西");
+        log::info!("模糊搜沒搜到東西：{}", name);
         Ok(None)
     } else if ans.1.len() == 1 {
-        log::debug!(
-            "模糊搜到一個東西 {:?}",
-            ans.1.iter().map(|k| k.fuzz_key()).collect::<Vec<_>>()
-        );
         let first = ans.1.into_iter().next().unwrap();
+        log::info!("模糊搜到一個東西 {:?}", first.fuzz_key());
         let similarity = FuzzSimilarity::from_score(ans.0);
         Ok(Some((first, similarity)))
     } else {
-        log::debug!("模糊搜到太多東西");
+        log::warn!("模糊搜到太多東西");
         Err(Error::MultiFuzz(
             ans.1
                 .into_iter()

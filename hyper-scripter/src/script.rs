@@ -10,6 +10,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub const ANONYMOUS: &'static str = ".anonymous";
 
@@ -17,6 +18,12 @@ pub const ANONYMOUS: &'static str = ".anonymous";
 pub enum ScriptName {
     Anonymous(u32),
     Named(String),
+}
+impl FromStr for ScriptName {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        s.to_owned().into_script_name()
+    }
 }
 impl ScriptName {
     pub fn valid(s: &str) -> Result<Option<u32>> {

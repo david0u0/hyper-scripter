@@ -291,17 +291,17 @@ impl Root {
     pub fn sanitize(&mut self) -> Result {
         match &self.subcmd {
             Some(Subs::Other(args)) => {
-                log::info!("執行模式");
                 let run = Subs::Run {
                     script_query: FromStr::from_str(&args[0])?,
                     args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
                 };
+                log::info!("執行模式 {:?}", run);
                 self.subcmd = Some(run);
             }
             None => {
                 log::info!("無參數模式");
                 self.subcmd = Some(Subs::Edit {
-                    edit_query: EditQuery::Query(ScriptQuery::Prev(1)),
+                    edit_query: EditQuery::default(),
                     category: None,
                     content: None,
                     tags: None,
@@ -314,6 +314,7 @@ impl Root {
         Ok(())
     }
 }
+
 pub fn handle_args() -> Result<Root> {
     let args: Vec<_> = std::env::args().map(|s| s).collect();
     let mut root = handle_alias_args(&args)?;

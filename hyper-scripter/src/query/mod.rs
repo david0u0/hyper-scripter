@@ -15,6 +15,14 @@ pub enum EditQuery {
     NewAnonimous,
     Query(ScriptQuery),
 }
+impl Default for EditQuery {
+    fn default() -> Self {
+        EditQuery::Query(ScriptQuery {
+            inner: ScriptQueryInner::Prev(1),
+            bang: false,
+        })
+    }
+}
 impl FromStr for EditQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
@@ -48,16 +56,21 @@ impl FromStr for ListQuery {
     }
 }
 #[derive(Debug, Clone)]
-pub enum ScriptQuery {
+pub struct ScriptQuery {
+    inner: ScriptQueryInner,
+    bang: bool,
+}
+#[derive(Debug, Clone)]
+enum ScriptQueryInner {
     Fuzz(String),
     Exact(ScriptName),
     Prev(usize),
 }
 impl IntoScriptName for ScriptQuery {
     fn into_script_name(self) -> Result<ScriptName> {
-        match self {
-            ScriptQuery::Fuzz(s) => s.into_script_name(),
-            ScriptQuery::Exact(name) => Ok(name),
+        match self.inner {
+            ScriptQueryInner::Fuzz(s) => s.into_script_name(),
+            ScriptQueryInner::Exact(name) => Ok(name),
             _ => panic!("歷史查詢沒有名字"),
         }
     }
@@ -86,18 +99,25 @@ fn parse_prev(s: &str) -> Result<usize> {
 impl FromStr for ScriptQuery {
     type Err = Error;
     fn from_str(mut s: &str) -> Result<Self> {
-        if s.starts_with('=') {
+        let bang = if s.ends_with("!") {
+            s = &s[..s.len() - 1];
+            true
+        } else {
+            false
+        };
+        let inner = if s.starts_with('=') {
             s = &s[1..s.len()];
             let name = s.to_owned().into_script_name()?;
-            Ok(ScriptQuery::Exact(name))
+            ScriptQueryInner::Exact(name)
         } else if s == "-" {
-            Ok(ScriptQuery::Prev(1))
+            ScriptQueryInner::Prev(1)
         } else if s.starts_with('^') {
-            Ok(ScriptQuery::Prev(parse_prev(s)?))
+            ScriptQueryInner::Prev(parse_prev(s)?)
         } else {
             ScriptName::valid(s).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
-            Ok(ScriptQuery::Fuzz(s.to_owned()))
-        }
+            ScriptQueryInner::Fuzz(s.to_owned())
+        };
+        Ok(ScriptQuery { inner, bang })
     }
 }
 

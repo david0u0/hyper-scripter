@@ -143,15 +143,21 @@ impl ScriptRepo {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut(&mut self) -> Iter<'_, DBEnv> {
+    pub fn iter_mut(&mut self, all: bool) -> Iter<'_, DBEnv> {
         Iter {
             iter: self.map.iter_mut(),
             env: &self.db_env,
+            iter2: if all {
+                Some(self.hidden_map.iter_mut())
+            } else {
+                None
+            },
         }
     }
     pub fn iter_hidden_mut(&mut self) -> Iter<'_, DBEnv> {
         Iter {
             iter: self.hidden_map.iter_mut(),
+            iter2: None,
             env: &self.db_env,
         }
     }
@@ -243,7 +249,7 @@ impl ScriptRepo {
     //         None
     //     }
     // }
-    pub fn latest_mut(&mut self, n: usize) -> Option<ScriptRepoEntry<'_>> {
+    pub fn latest_mut(&mut self, n: usize, all: bool) -> Option<ScriptRepoEntry<'_>> {
         // if let Some(name) = &self.latest_name {
         //     // FIXME: 一旦 rust nll 進化就修掉這段
         //     if self.map.contains_key(name) {
@@ -252,7 +258,15 @@ impl ScriptRepo {
         //     log::warn!("快取住的最新資訊已經不見了…？重找一次");
         // }
         // self.latest_mut_no_cache()
-        let mut v: Vec<_> = self.map.iter_mut().map(|(_, s)| s).collect();
+        let mut v: Vec<_> = if all {
+            self.map
+                .iter_mut()
+                .chain(self.hidden_map.iter_mut())
+                .map(|(_, s)| s)
+                .collect()
+        } else {
+            self.map.iter_mut().map(|(_, s)| s).collect()
+        };
         v.sort_by_key(|s| s.last_time());
         if v.len() >= n {
             // SAFETY: 從向量中讀一個可變指針安啦
@@ -265,35 +279,20 @@ impl ScriptRepo {
             None
         }
     }
-    pub fn get_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
-        match self.map.get_mut(&*name.key()) {
-            None => None,
-            Some(info) => Some(RepoEntry {
+    pub fn get_mut(&mut self, name: &ScriptName, all: bool) -> Option<ScriptRepoEntry<'_>> {
+        // FIXME: 一旦 NLL 進化就修掉這個 unsafe
+        let map = &mut self.map as *mut HashMap<String, ScriptInfo>;
+        let map = unsafe { &mut *map };
+        match (all, map.get_mut(&*name.key())) {
+            (false, None) => None,
+            (true, None) => self.get_hidden_mut(name),
+            (_, Some(info)) => Some(RepoEntry {
                 info,
                 env: &self.db_env,
             }),
         }
     }
     pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
-        match self.hidden_map.get_mut(&*name.key()) {
-            None => None,
-            Some(info) => Some(RepoEntry {
-                info,
-                env: &self.db_env,
-            }),
-        }
-    }
-    pub fn get_regardless_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
-        // FIXME: 一旦 NLL 進化就修掉這段，改用 if let Some(..) = get_mut { } else { get_hidden_mut... }
-        match self.map.get_mut(&*name.key()) {
-            Some(info) => {
-                return Some(RepoEntry {
-                    info,
-                    env: &self.db_env,
-                })
-            }
-            _ => (),
-        };
         match self.hidden_map.get_mut(&*name.key()) {
             None => None,
             Some(info) => Some(RepoEntry {

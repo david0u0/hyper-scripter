@@ -73,7 +73,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             for u in utils.into_iter() {
                 log::info!("載入小工具 {}", u.name);
                 let name = u.name.to_owned().into_script_name()?;
-                if repo.get_regardless_mut(&name).is_some() {
+                if repo.get_mut(&name, true).is_some() {
                     log::warn!("已存在的小工具 {:?}，跳過", name);
                     continue;
                 }

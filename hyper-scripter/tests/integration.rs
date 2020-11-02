@@ -266,3 +266,28 @@ fn test_miss_event() {
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!("第一", run("!").unwrap(), "沒有記錄到錯過事件？");
 }
+
+#[test]
+fn test_bang() {
+    let _g = setup();
+    let first_file = get_home().join("hidden_first.sh");
+    let fourth_file = get_home().join("fourth.sh");
+
+    run(&format!("-f hide e hidden_first | echo $0")).unwrap();
+    run(&format!("-f hide e hidden_second | echo 第二")).unwrap();
+    run(&format!("-f hide e hidden_third | echo 第三")).unwrap();
+    run(&format!("cp firs! fourth")).unwrap();
+    run(&format!("mv four! -t all")).unwrap();
+
+    run("first").expect_err("執行了隱藏的腳本？？");
+    assert_eq!(first_file.to_string_lossy(), run("firt!").unwrap());
+    assert_eq!("第二", run("seco!").unwrap());
+    assert_eq!("第二", run("-!").unwrap());
+    assert_eq!(fourth_file.to_string_lossy(), run("-").unwrap());
+    assert_eq!("第三", run("=hidden_third!").unwrap());
+    assert_eq!(fourth_file.to_string_lossy(), run("four!").unwrap());
+
+    let s = run("ls --grouping none --plain firs! four").unwrap();
+    let ls_vec = s.split(" ").filter(|s| s.len() > 0).collect::<Vec<_>>();
+    assert_eq!(2, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
+}

@@ -135,7 +135,7 @@ pub fn fmt_list<'a, W: Write>(
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
-    let latest_script_id = match script_repo.latest_mut(1) {
+    let latest_script_id = match script_repo.latest_mut(1, false) {
         Some(script) => script.id,
         None => return Ok(()),
     };

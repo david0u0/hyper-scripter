@@ -11,6 +11,7 @@ pub trait Environment {
 
 pub struct Iter<'b, ENV: Environment> {
     pub(super) iter: HashMapIter<'b, String, ScriptInfo>,
+    pub(super) iter2: Option<HashMapIter<'b, String, ScriptInfo>>,
     pub(super) env: &'b ENV,
 }
 #[derive(Deref)]
@@ -32,10 +33,20 @@ impl<'a, 'b, ENV: Environment> RepoEntry<'b, ENV> {
 impl<'a, 'b, ENV: Environment> Iterator for Iter<'b, ENV> {
     type Item = RepoEntry<'b, ENV>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|(_, info)| RepoEntry {
-            info,
-            env: self.env,
-        })
+        // TODO: 似乎有優化空間？參考標準庫 Chain
+        if let Some((_, info)) = self.iter.next() {
+            Some(RepoEntry {
+                info,
+                env: self.env,
+            })
+        } else if let Some(iter) = self.iter2.as_mut() {
+            iter.next().map(|(_, info)| RepoEntry {
+                info,
+                env: self.env,
+            })
+        } else {
+            None
+        }
     }
 }
 impl<'a, 'b, ENV: Environment> FuzzKey for RepoEntry<'b, ENV> {

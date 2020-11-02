@@ -1,4 +1,4 @@
-use super::{ListQuery, ScriptQuery};
+use super::{ListQuery, ScriptQuery, ScriptQueryInner};
 use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
@@ -11,7 +11,7 @@ pub fn do_list_query<'a>(
     queries: &[ListQuery],
 ) -> Result<Vec<ScriptRepoEntry<'a>>> {
     if queries.len() == 0 {
-        return Ok(repo.iter_mut().collect());
+        return Ok(repo.iter_mut(false).collect());
     }
     let mut mem = HashSet::<i64>::new();
     let mut ret = vec![];
@@ -21,7 +21,7 @@ pub fn do_list_query<'a>(
         let repo = unsafe { &mut *repo_ptr };
         match query {
             ListQuery::Pattern(re) => {
-                for script in repo.iter_mut() {
+                for script in repo.iter_mut(false) {
                     if re.is_match(&script.name.key()) {
                         if mem.contains(&script.id) {
                             continue;
@@ -53,9 +53,10 @@ pub fn do_script_query<'b>(
     script_repo: &'b mut ScriptRepo,
 ) -> Result<Option<ScriptRepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
-    match script_query {
-        ScriptQuery::Prev(prev) => {
-            let latest = script_repo.latest_mut(*prev);
+    let all = script_query.bang;
+    match &script_query.inner {
+        ScriptQueryInner::Prev(prev) => {
+            let latest = script_repo.latest_mut(*prev, all);
             log::trace!("找最新腳本");
             return if latest.is_some() {
                 Ok(latest)
@@ -63,8 +64,8 @@ pub fn do_script_query<'b>(
                 Err(Error::Empty)
             };
         }
-        ScriptQuery::Exact(name) => Ok(script_repo.get_mut(name)),
-        ScriptQuery::Fuzz(name) => match fuzzy::fuzz(name, script_repo.iter_mut())? {
+        ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
+        ScriptQueryInner::Fuzz(name) => match fuzzy::fuzz(name, script_repo.iter_mut(all))? {
             Some((entry, fuzzy::High)) => Ok(Some(entry)),
             Some((entry, fuzzy::Low)) => {
                 if prompt_fuzz_acceptable(&*entry)? {
@@ -101,9 +102,9 @@ pub async fn do_script_query_strict_with_missing<'b>(
         Ok(Some(info)) => Ok(info),
         Ok(None) => {
             let repo = unsafe { &mut *repo_mut };
-            let info = match script_query {
-                ScriptQuery::Exact(name) => repo.get_hidden_mut(name),
-                ScriptQuery::Fuzz(name) => match fuzzy::fuzz(name, repo.iter_hidden_mut()) {
+            let info = match &script_query.inner {
+                ScriptQueryInner::Exact(name) => repo.get_hidden_mut(name),
+                ScriptQueryInner::Fuzz(name) => match fuzzy::fuzz(name, repo.iter_hidden_mut()) {
                     Ok(Some((info, _))) => Some(info),
                     _ => None,
                 },

@@ -2,12 +2,12 @@ use crate::script_type::ScriptType;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SysPath {
     Config,
     Home,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FormatCode {
     Config,
     ScriptName,
@@ -16,6 +16,7 @@ pub enum FormatCode {
     Tag,
     FilterQuery,
 }
+
 #[derive(Debug, Clone)]
 pub enum Error {
     Others(

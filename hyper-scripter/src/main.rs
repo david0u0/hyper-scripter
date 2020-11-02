@@ -457,43 +457,51 @@ async fn edit_or_create<'b>(
 ) -> Result<(PathBuf, ScriptRepoEntry<'b>)> {
     let final_ty: ScriptType;
     let mut new_namespaces: Vec<Tag> = vec![];
+
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        if let Some(entry) = query::do_script_query(&query, script_repo)? {
-            if let Some(ty) = ty {
-                log::warn!("已存在的腳本無需再指定類型");
-                if ty != entry.ty {
-                    return Err(Error::CategoryMismatch {
-                        expect: ty,
-                        actual: entry.ty.clone(),
-                    });
+        macro_rules! new_named {
+            () => {{
+                final_ty = ty.unwrap_or_default();
+                let name = query.into_script_name()?;
+                if script_repo.get_hidden_mut(&name).is_some() {
+                    log::error!("與被篩掉的腳本撞名");
+                    return Err(Error::ScriptExist(name.to_string()));
                 }
-            }
-            final_ty = entry.ty.clone();
-            log::debug!("打開既有命名腳本：{:?}", entry.name);
-            let p = path::open_script(&entry.name, &entry.ty, Some(true))
-                .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-            (entry.name.clone(), p)
-        } else {
-            final_ty = ty.unwrap_or_default();
-            let name = query.into_script_name()?;
-            if script_repo.get_hidden_mut(&name).is_some() {
-                log::error!("與被篩掉的腳本撞名");
-                return Err(Error::ScriptExist(name.to_string()));
-            }
+                log::debug!("打開新命名腳本：{:?}", name);
+                if tags.append_namespace {
+                    new_namespaces = name
+                        .namespaces()
+                        .iter()
+                        .map(|s| Tag::from_str(s))
+                        .collect::<Result<Vec<_>>>()?;
+                }
 
-            log::debug!("打開新命名腳本：{:?}", name);
+                let p = path::open_script(&name, &final_ty, Some(false))
+                    .context(format!("打開新命名腳本失敗：{:?}", name))?;
+                (name, p)
+            }};
+        }
 
-            if tags.append_namespace {
-                new_namespaces = name
-                    .namespaces()
-                    .iter()
-                    .map(|s| Tag::from_str(s))
-                    .collect::<Result<Vec<_>>>()?;
+        match query::do_script_query(&query, script_repo) {
+            Err(Error::DontFuzz) => new_named!(),
+            Ok(None) => new_named!(),
+            Ok(Some(entry)) => {
+                if let Some(ty) = ty {
+                    log::warn!("已存在的腳本無需再指定類型");
+                    if ty != entry.ty {
+                        return Err(Error::CategoryMismatch {
+                            expect: ty,
+                            actual: entry.ty.clone(),
+                        });
+                    }
+                }
+                final_ty = entry.ty.clone();
+                log::debug!("打開既有命名腳本：{:?}", entry.name);
+                let p = path::open_script(&entry.name, &entry.ty, Some(true))
+                    .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+                (entry.name.clone(), p)
             }
-
-            let p = path::open_script(&name, &final_ty, Some(false))
-                .context(format!("打開新命名腳本失敗：{:?}", name))?;
-            (name, p)
+            Err(e) => return Err(e),
         }
     } else {
         final_ty = ty.unwrap_or_default();

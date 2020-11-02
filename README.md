@@ -2,7 +2,7 @@
 
 _The (over-killing) script managing tool for script lovers._
 
-[![basic demo](https://asciinema.org/a/369039.svg)](https://asciinema.org/a/369039)
+[![basic demo](https://asciinema.org/a/369728.svg)](https://asciinema.org/a/369728)
 
 ## Install
 

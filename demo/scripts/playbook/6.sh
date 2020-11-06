@@ -1,3 +1,5 @@
+sudo pkill tmux
+
 echo -e "\
 ---------------------------------
 | Playbook #6                   |

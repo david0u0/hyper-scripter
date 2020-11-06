@@ -4,6 +4,8 @@ _The (over-killing) script managing tool for script lovers._
 
 [![basic demo](https://asciinema.org/a/369977.svg)](https://asciinema.org/a/369977)
 
+[![advanced demo](https://asciinema.org/a/370850.svg)](https://asciinema.org/a/370850)
+
 ## Install
 
 ```sh

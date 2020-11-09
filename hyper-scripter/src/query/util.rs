@@ -150,6 +150,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
             _ => break true,
         }
     };
+    term.show_cursor()?;
     if ok {
         term.write_line(&" Y".color(Color::Green).to_string())?;
     } else {

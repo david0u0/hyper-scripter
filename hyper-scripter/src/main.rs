@@ -498,7 +498,7 @@ async fn edit_or_create<'b>(
                 log::debug!("打開既有命名腳本：{:?}", entry.name);
                 let p = path::open_script(&entry.name, &entry.ty, Some(true))
                     .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-                    // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
+                // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
                 // return Ok((p, entry));
                 let n = entry.name.clone();
                 return Ok((p, script_repo.get_mut(&n, true).unwrap()));

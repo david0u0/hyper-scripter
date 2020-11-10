@@ -1,63 +1,105 @@
-# Hyper Scripter
-
 _The (over-killing) script managing tool for script lovers._
 
 [![basic demo](https://asciinema.org/a/369977.svg)](https://asciinema.org/a/369977)
 
 [![advanced demo](https://asciinema.org/a/370850.svg)](https://asciinema.org/a/370850)
 
-## Install
+# Install
 
 ```sh
 caargo install hyper-scripter
 ```
 
----
+# Quick start
+```bash
+hs edit # edit whatever you want in editor
+hs -    # run the newest script, and voila!
+```
 
-## TODO
+# Key features
+## Edit your scripts anonymously, globally
+## Find your scripts with fewer keys
+`hs` supports two ways of finding scripts: __fuzzy search__ and __time relative search__.
+![search](docs/image/search.png)
 
-- [x] 模糊搜尋功能
-- [x] 可以直接打腳本名，像 yarn 一樣
-- [x] 模糊搜尋分數太低時，幫人補全而不要直接執行
-- [x] 不只可直接執行上一個腳本，也可執行上`n`個腳本
-- [x] 腳本分群，標籤
-- [x] mv/rm/cp 功能
-- [x] 列表美化/充實更多資訊
-  - [x] 根據腳本類別上色
-  - [x] 標籤
-  - [x] 「最新腳本」，預設會執行的那個
-- [ ] 補全功能
-- [x] tag 指令
-- [x] 打開的編輯器自動填入好用的變數，例如 birth path
-- [x] 可以自訂模板
-- [ ] 幫人家的腳本寫描述，甚至寫補全？
-- [ ] 配合 vim 的分頁？
-- [x] 命名空間的概念
-- [x] 歷史
-- [x] 改用 sqlite 存資料
-- [x] 別名
-- [x] 用時間篩選
-- [x] 提供方便小工具
+## Organize your scripts by tags and namespaces
+## Tracable
 
-## 標籤篩選語言
+# How to use
+```bash
+USAGE:
+    hyper-scripter [FLAGS] [OPTIONS] [SUBCOMMAND]
 
-- 簡易版 `all,^hide,^build`
-- 終極版 `"(all & !hide) | (!build & !setup)"`
+FLAGS:
+    -a, --all         Shorthand for `-f=all,^removed`
+    -h, --help        Prints help information
+        --no-alias
+        --timeless    Show scripts of all time.
+    -V, --version     Prints version information
 
-> # 定義何謂「相關標籤」
->
-> 在終極篩選語言中，對其中標籤 `T` 而言，若存在一組標籤集 `S` 使 `T` + `S` 通過篩選而 `S` 不通過，則稱 `T` 為此篩選語言的正相關標籤。
+OPTIONS:
+    -f, --filter <filter>      Filter by tags, e.g. `all,^mytag`
+    -H, --hs-home <hs-home>    Path to hyper script home
+        --recent <recent>      Show scripts within recent days.
 
-> # 為啥不用階層分群，而是用標籤？
->
-> 階層的好處是可以容許撞名，從而把名字取短；壞處是一旦嵌套，要做篩選就要打很長了（多個標籤可以選一個打就好，多層分群往往要一路打到底……？）
-> 然而若採用分群而把名字取短了，可能碰到以下問題：
->
-> ```bash
-> [cb]
-> run code dbtool
-> [is]
-> run code
-> ```
->
-> 這時我想要執行其中一個 `code`，就一定要加上篩選條件，整個指定的長度跟複雜度大增，還不如名字取長一點用模糊搜尋。
+SUBCOMMANDS:
+    alias    Manage alias
+    cat      Print the script to standard output
+    cp       Copy the script to another one
+    edit     Edit hyper script
+    help     Prints this message, the help of the given subcommand(s), or a script's help message.
+    ls       List hyper scripts
+    mv       Move the script to another one
+    rm       Remove the script
+    run      Run the script
+    tags     Manage script tags. If a tag filter is given, set it as default, otherwise show tag information.
+    which    Execute the script query and get the exact file
+```
+
+# Customizing hyper scripter
+You can find the config file at `~/.config/hyper_scripter/.config.toml`. Here's an example:
+```toml
+# Filter out scripts within recent days.
+recent = 999999
+
+# Alias you may find handy
+[alias.la]
+after = ['ls', '-a']
+[alias.gc]
+after = ['rm', '-f', 'removed', '*']
+
+# ...
+# category and tag filters will be discussed later
+```
+
+## Category and templates
+You can add your own script category here. For example, you may want to run ruby scripts with `irb`, rather than simply `ruby`. Here's how you can achieve that:
+```toml
+# Category and templates
+[categories.irb]
+ext = 'rb' # file extensions is same as any ruby scripts.
+color = 'bright red' # colors shown in `hs ls` and other places.
+# tmplate is powred by handlebars
+template = [
+    '# Hello, scripter!',
+    '''Dir.chdir("#{ENV['HOME']}/{{birthplace}}")''',
+    "NAME = '{{name}}'",
+    '',
+    'def {{name}}',
+    '    {{#each content}}{{{this}}}',
+    '    {{/each}} ',
+    'end'
+]
+# the exact program you want to run scripts with
+cmd = 'irb'
+# arguments are also templates
+args = ['-r', '{{path}}']
+# environment variables
+env = []
+```
+
+# Advanced topics
+## tag filters
+## script query
+> ### bang!
+## list query

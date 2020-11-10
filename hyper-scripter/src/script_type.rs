@@ -28,24 +28,6 @@ writeFile('/dev/null', 'some content');
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const VORPAL_WELCOME_MSG: &str = "const name = '{{name}}';
-process.chdir(require('os').homedir());
-{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
-
-let Vorpal = require('vorpal');
-let vorpal = new Vorpal();
-
-vorpal.command('test <arg1> [arg2]', 'this is a teeeest!').action(args => {
-    console.log(`arg1 = ${args.arg1}`);
-    console.log(`arg2 = ${args.arg2}`);
-    return Promise.resolve();
-});
-
-{{#each content}}{{{this}}}
-{{/each}}
-
-vorpal.delimiter('>').show();";
-
 const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
@@ -176,20 +158,6 @@ impl ScriptTypeConfig {
             },
         );
         ret.insert(
-            "vorpal".into(),
-            ScriptTypeConfig {
-                ext: Some("js".to_owned()),
-                color: "bright cyan".to_owned(),
-                template: split(VORPAL_WELCOME_MSG),
-                cmd: Some("node".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![(
-                    "NODE_PATH".to_owned(),
-                    "{{{script_dir}}}/node_modules".to_owned(),
-                )],
-            },
-        );
-        ret.insert(
             "js-i".into(),
             ScriptTypeConfig {
                 ext: Some("js".to_owned()),
@@ -221,8 +189,8 @@ impl ScriptTypeConfig {
                 ext: Some("md".to_owned()),
                 color: "bright black".to_owned(),
                 template: default_template(),
-                cmd: None,
-                args: vec![],
+                cmd: Some("vim".to_owned()),
+                args: vec!["{{path}}".to_owned()],
                 env: vec![],
             },
         );

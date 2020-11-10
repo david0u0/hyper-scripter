@@ -202,7 +202,7 @@ fn test_rm() {
     assert_eq!("矻立不搖", run("longlive").unwrap());
 
     assert!(check_exist(&["longlive.sh"]));
-    run("purge * -f all").expect("未能消滅掉一切（順便測了別名）");
+    run("rm * -f all --purge").expect("未能消滅掉一切");
 
     assert!(!check_exist(&["longlive.sh"]));
     run("-f all which").expect_err("沒有確實消滅掉一切");

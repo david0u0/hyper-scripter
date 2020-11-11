@@ -7,6 +7,7 @@ mod tool;
 use hyper_scripter_util::get_all;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io::prelude::*;
+use std::path::Path;
 use std::sync::MutexGuard;
 use tool::*;
 
@@ -25,13 +26,21 @@ pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
 }
 
 fn test_import() {
+    let out_dir = std::env::var_os("OUT_DIR").unwrap();
+    let dir = Path::new(&out_dir).join("to_be_import");
+    let dir = dir.to_string_lossy();
+
     run("e copy/test -f +innate | echo 我要留下來").unwrap();
-    run("e my/innate -f +innate | cp tests/to_be_import ./.tmp -r").unwrap();
+    run(&format!(
+        "e my/innate -f +innate | cp tests/to_be_import {} -r",
+        dir
+    ))
+    .unwrap();
     run("-f my -").unwrap();
     assert_eq!(run("-f copy -").unwrap(), "我要留下來");
 
     run("tags something-evil").unwrap();
-    run("-f util import .tmp").unwrap();
+    run(&format!("-f util import {}", dir)).unwrap();
     run("-f innate which myinnate").unwrap();
 
     assert_eq!(run("-f my test").unwrap(), "安安，紅寶石");
@@ -47,7 +56,8 @@ fn test_import() {
 
     assert_ls_len(16);
 
-    run("-f util import --namespace imported .tmp").unwrap();
+    run(&format!("-f util import --namespace imported {}", dir)).unwrap();
+    // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
     assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
     run("-f imported which").expect_err("命名空間汙染了標籤！");
     assert_ls_len(25);

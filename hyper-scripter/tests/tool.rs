@@ -38,7 +38,6 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
             }
         }
     }
-    let _ = std::fs::remove_dir_all(".tmp");
     std::fs::create_dir(HOME).unwrap();
     run("alias e edit --fast").unwrap();
 

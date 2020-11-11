@@ -273,11 +273,11 @@ fn test_bang() {
     let first_file = get_home().join("hidden_first.sh");
     let fourth_file = get_home().join("fourth.sh");
 
-    run(&format!("-f hide e hidden_first | echo $0")).unwrap();
-    run(&format!("-f hide e hidden_second | echo 第二")).unwrap();
-    run(&format!("-f hide e hidden_third | echo 第三")).unwrap();
-    run(&format!("cp firs! fourth")).unwrap();
-    run(&format!("mv four! -t all")).unwrap();
+    run("-f hide e hidden_first | echo $0").unwrap();
+    run("-f hide e hidden_second | echo 第二").unwrap();
+    run("-f hide e hidden_third | echo 第三").unwrap();
+    run("cp firs! fourth").unwrap();
+    run("mv four! -t all").unwrap();
 
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!(first_file.to_string_lossy(), run("firt!").unwrap());

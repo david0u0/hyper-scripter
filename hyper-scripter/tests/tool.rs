@@ -28,6 +28,7 @@ pub fn get_home() -> PathBuf {
 }
 
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
+    hyper_scripter::path::set_home(get_home()).unwrap();
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
     match std::fs::remove_dir_all(HOME) {

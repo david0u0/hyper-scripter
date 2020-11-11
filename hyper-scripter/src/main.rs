@@ -4,22 +4,17 @@ use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::extract_help::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
-use hyper_scripter::query::{self, EditQuery, ScriptQuery};
+use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
-use hyper_scripter::script_repo::{ScriptRepo, ScriptRepoEntry};
+use hyper_scripter::script_repo::ScriptRepo;
 use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
-use hyper_scripter::Either;
-use hyper_scripter::{path, util};
+use hyper_scripter::{
+    path,
+    util::{self, main_util::EditTagArgs},
+};
 use hyper_scripter_historian::{Event, EventData};
-use std::path::PathBuf;
 use std::str::FromStr;
-
-struct EditTagArgs {
-    content: TagControlFlow,
-    change_existing: bool,
-    append_namespace: bool,
-}
 
 #[tokio::main]
 async fn main() {
@@ -170,7 +165,8 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     }
                 }
             };
-            let (path, mut entry) = edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
+            let (path, mut entry) =
+                util::main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", entry.name);
                 if path.exists() {
@@ -306,7 +302,8 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     });
                     log::debug!("不要真的刪除腳本，改用標籤隱藏之：{}", new_name);
                     let new_name = Some(ScriptName::Named(new_name));
-                    let res = mv(&mut entry, new_name, None, delete_tag.clone()).await;
+                    let res =
+                        util::main_util::mv(&mut entry, new_name, None, delete_tag.clone()).await;
                     match res {
                         Err(Error::PathNotFound(_)) => {
                             log::warn!("{:?} 實體不存在，消滅之", entry.name);
@@ -345,7 +342,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 None => None,
             };
             let mut entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
-            mv(&mut entry, new_name, ty, tags).await?;
+            util::main_util::mv(&mut entry, new_name, ty, tags).await?;
         }
         Subs::Tags {
             tag_filter,
@@ -409,134 +406,4 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         sub @ _ => unimplemented!("{:?}", sub),
     }
     Ok(res)
-}
-
-async fn mv<'b>(
-    entry: &mut ScriptRepoEntry<'b>,
-    new_name: Option<ScriptName>,
-    ty: Option<ScriptType>,
-    tags: Option<TagControlFlow>,
-) -> Result {
-    // FIXME: 應該要允許 mv 成既存的名字
-    let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
-    if ty.is_some() || new_name.is_some() {
-        let new_script = path::open_script(
-            new_name.as_ref().unwrap_or(&entry.name),
-            ty.as_ref().unwrap_or(&entry.ty),
-            Some(false),
-        )?;
-        util::mv(&og_script, &new_script)?;
-    }
-
-    entry
-        .update(|info| {
-            if let Some(ty) = ty {
-                info.ty = ty;
-            }
-            if let Some(name) = new_name {
-                info.name = name;
-            }
-            if let Some(tags) = tags {
-                if tags.append {
-                    log::debug!("附加上標籤：{:?}", tags);
-                    info.tags.extend(tags.into_allowed_iter());
-                } else {
-                    log::debug!("設定標籤：{:?}", tags);
-                    info.tags = tags.into_allowed_iter().collect();
-                }
-            }
-            info.write();
-        })
-        .await
-}
-async fn edit_or_create<'b>(
-    edit_query: EditQuery,
-    script_repo: &'b mut ScriptRepo,
-    ty: Option<ScriptType>,
-    tags: EditTagArgs,
-) -> Result<(PathBuf, ScriptRepoEntry<'b>)> {
-    let final_ty: ScriptType;
-    let mut new_namespaces: Vec<Tag> = vec![];
-
-    let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        macro_rules! new_named {
-            () => {{
-                final_ty = ty.unwrap_or_default();
-                let name = query.into_script_name()?;
-                if script_repo.get_hidden_mut(&name).is_some() {
-                    log::error!("與被篩掉的腳本撞名");
-                    return Err(Error::ScriptExist(name.to_string()));
-                }
-                log::debug!("打開新命名腳本：{:?}", name);
-                if tags.append_namespace {
-                    new_namespaces = name
-                        .namespaces()
-                        .iter()
-                        .map(|s| Tag::from_str(s))
-                        .collect::<Result<Vec<_>>>()?;
-                }
-
-                let p = path::open_script(&name, &final_ty, Some(false))
-                    .context(format!("打開新命名腳本失敗：{:?}", name))?;
-                (name, p)
-            }};
-        }
-
-        match query::do_script_query(&query, script_repo) {
-            Err(Error::DontFuzz) => new_named!(),
-            Ok(None) => new_named!(),
-            Ok(Some(entry)) => {
-                if let Some(ty) = ty {
-                    log::warn!("已存在的腳本無需再指定類型");
-                    if ty != entry.ty {
-                        return Err(Error::CategoryMismatch {
-                            expect: ty,
-                            actual: entry.ty.clone(),
-                        });
-                    }
-                }
-                log::debug!("打開既有命名腳本：{:?}", entry.name);
-                let p = path::open_script(&entry.name, &entry.ty, Some(true))
-                    .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-                // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
-                // return Ok((p, entry));
-                let n = entry.name.clone();
-                return Ok((p, script_repo.get_mut(&n, true).unwrap()));
-            }
-            Err(e) => return Err(e),
-        }
-    } else {
-        final_ty = ty.unwrap_or_default();
-        log::debug!("打開新匿名腳本");
-        path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?
-    };
-
-    log::info!("編輯 {:?}", script_name);
-
-    let entry = script_repo.entry(&script_name);
-    let entry = match entry.into_either() {
-        Either::One(mut entry) => {
-            if tags.change_existing {
-                mv(&mut entry, None, None, Some(tags.content)).await?;
-            }
-            entry
-        }
-        Either::Two(entry) => {
-            entry
-                .or_insert(
-                    ScriptInfo::builder(
-                        0,
-                        script_name,
-                        final_ty,
-                        tags.content
-                            .into_allowed_iter()
-                            .chain(new_namespaces.into_iter()),
-                    )
-                    .build(),
-                )
-                .await?
-        }
-    };
-
-    Ok((script_path, entry))
 }

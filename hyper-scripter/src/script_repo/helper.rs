@@ -14,7 +14,7 @@ pub struct Iter<'b, ENV: Environment> {
     pub(super) iter2: Option<HashMapIter<'b, String, ScriptInfo>>,
     pub(super) env: &'b ENV,
 }
-#[derive(Deref)]
+#[derive(Deref, Debug)]
 pub struct RepoEntry<'b, ENV: Environment> {
     #[deref]
     pub(super) info: &'b mut ScriptInfo,

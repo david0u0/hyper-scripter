@@ -147,7 +147,7 @@ impl<'a> ScriptInfo {
     }
     pub fn last_time(&self) -> NaiveDateTime {
         use std::cmp::max;
-        fn map<T: Clone + std::fmt::Debug>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
+        fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
             match time {
                 Some(time) => **time,
                 _ => NaiveDateTime::from_timestamp(1, 0),

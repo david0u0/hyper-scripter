@@ -17,8 +17,8 @@ hs -    # run the newest script, and voila!
 ```
 
 # Key features
-## Edit your scripts anonymously, globally
-## Find your scripts with fewer keys
+## Manage your scripts globally
+## Find your scripts with fewer keystrokes
 `hs` supports two ways of finding scripts: __fuzzy search__ and __time relative search__.
 ![search](docs/image/search.png)
 

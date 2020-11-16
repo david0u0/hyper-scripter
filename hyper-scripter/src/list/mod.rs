@@ -8,7 +8,7 @@ use crate::{query::ListQuery, script_time::ScriptTime};
 use colored::{ColoredString, Colorize};
 use std::borrow::Cow;
 
-fn time_str<T: Clone + std::fmt::Debug>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
+fn time_str<T>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
     match time {
         None => Cow::Borrowed("Never"),
         Some(t) => Cow::Owned(t.to_string()),

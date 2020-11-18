@@ -1,7 +1,7 @@
 use crate::error::Result;
+use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::io::Write;
 
@@ -182,7 +182,7 @@ mod test {
         TreeNode::new_leaf(t)
     }
     fn n<'a>(s: &'a str, childs: Vec<T<'a>>) -> T<'a> {
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for child in childs.into_iter() {
             let is_leaf = match child {
                 TreeNode::Leaf(_) => true,

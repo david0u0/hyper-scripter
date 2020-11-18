@@ -1,7 +1,7 @@
 use crate::error::Error;
+use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::str::FromStr;
 
 const SHELL_WELCOME_MSG: &str = "# Hello, scripter! Here are some useful commands to begin with:

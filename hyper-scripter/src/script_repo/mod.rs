@@ -5,10 +5,10 @@ use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
+use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
-use std::collections::HashMap;
 
 pub mod helper;
 use helper::*;
@@ -167,7 +167,7 @@ impl ScriptRepo {
     pub async fn new(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo> {
         let historian = Historian::new(path::get_home()).await?;
 
-        let mut hidden_map = HashMap::<String, ScriptInfo>::new();
+        let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let time_bound = recent.map(|recent| {
             let mut time = Utc::now().naive_utc();
             time -= Duration::days(recent.into());
@@ -322,7 +322,7 @@ impl ScriptRepo {
         // TODO: 優化
         log::debug!("根據標籤 {:?} 進行篩選", filter);
         let drain = self.map.drain();
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for (key, info) in drain {
             let tags_arr: Vec<_> = info.tags.iter().collect();
             if filter.filter(&tags_arr) {

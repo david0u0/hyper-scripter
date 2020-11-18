@@ -7,10 +7,10 @@ use crate::config::Config;
 use crate::error::Result;
 use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
+use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Row, Table};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::io::Write;
 
 const TITLE: &[&str] = &["category", "last write time", "last execute time"];
@@ -92,7 +92,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
 type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>>;
 
 fn build_forest(scripts: Vec<&ScriptInfo>) -> Vec<TreeNode<'_>> {
-    let mut m = HashMap::new();
+    let mut m = HashMap::default();
     for script in scripts.into_iter() {
         let name = script.name.key();
         let name_key = match name {

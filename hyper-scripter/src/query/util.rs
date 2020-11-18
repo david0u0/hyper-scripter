@@ -4,7 +4,7 @@ use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_time::ScriptTime;
-use std::collections::HashSet;
+use fxhash::FxHashSet as HashSet;
 
 pub fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
@@ -13,7 +13,7 @@ pub fn do_list_query<'a>(
     if queries.len() == 0 {
         return Ok(repo.iter_mut(false).collect());
     }
-    let mut mem = HashSet::<i64>::new();
+    let mut mem = HashSet::<i64>::default();
     let mut ret = vec![];
     let repo_ptr = repo as *mut ScriptRepo;
     for query in queries.iter() {

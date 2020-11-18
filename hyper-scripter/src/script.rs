@@ -5,10 +5,10 @@ use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
 use chrono::NaiveDateTime;
+use fxhash::FxHashSet as HashSet;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::str::FromStr;
 

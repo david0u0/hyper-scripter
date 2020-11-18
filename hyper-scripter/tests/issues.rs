@@ -70,7 +70,8 @@ async fn test_edit_existing_bang() {
 
     assert_eq!(p, get_home().join("test.sh"));
 
-    let mut tags = std::collections::HashSet::<Tag>::new();
+    use fxhash::FxHashSet as HashSet;
+    let mut tags = HashSet::<Tag>::default();
     tags.insert(FromStr::from_str("a").unwrap());
     tags.insert(FromStr::from_str("c").unwrap());
     tags.insert(FromStr::from_str("hide").unwrap());

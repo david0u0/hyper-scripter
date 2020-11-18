@@ -6,8 +6,8 @@ use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
 use colored::{Color, Colorize};
+use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 

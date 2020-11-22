@@ -400,7 +400,12 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 if conf.main_tag_filter.obligation {
                     print!(" (obligation)")
                 }
-                println!("")
+                println!("");
+                print!("known tags:\n  ");
+                for t in repo.iter_known_tags() {
+                    print!("{} ", t);
+                }
+                println!("");
             }
         }
         sub @ _ => unimplemented!("{:?}", sub),

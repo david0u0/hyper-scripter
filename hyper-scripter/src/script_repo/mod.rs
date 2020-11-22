@@ -5,7 +5,7 @@ use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
-use fxhash::FxHashMap as HashMap;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
@@ -137,9 +137,13 @@ pub struct ScriptRepo {
     hidden_map: HashMap<String, ScriptInfo>,
     latest_name: Option<String>,
     db_env: DBEnv,
+    known_tags: HashSet<Tag>,
 }
 
 impl ScriptRepo {
+    pub fn iter_known_tags(&self) -> impl Iterator<Item = &Tag> {
+        self.known_tags.iter().map(|tag| tag)
+    }
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
@@ -166,6 +170,7 @@ impl ScriptRepo {
     }
     pub async fn new(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo> {
         let historian = Historian::new(path::get_home()).await?;
+        let mut known_tags: HashSet<Tag> = Default::default();
 
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let time_bound = recent.map(|recent| {
@@ -200,7 +205,11 @@ impl ScriptRepo {
                         None
                     } else {
                         // TODO: 錯誤處理，至少印個警告
-                        Tag::from_str(s).ok()
+                        let t = Tag::from_str(s).ok();
+                        if let Some(t) = &t {
+                            known_tags.insert(t.clone());
+                        }
+                        t
                     }
                 }),
             )
@@ -233,6 +242,7 @@ impl ScriptRepo {
         Ok(ScriptRepo {
             map,
             hidden_map,
+            known_tags,
             latest_name: None,
             db_env: DBEnv {
                 info_pool: pool,

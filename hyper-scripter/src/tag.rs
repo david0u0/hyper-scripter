@@ -1,4 +1,5 @@
 use crate::error::{Error, FormatCode::Tag as TagCode};
+use std::fmt::{Display, Result as FmtResult, Formatter};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -95,6 +96,11 @@ impl Tag {
         &self.0 == "all"
     }
 }
+impl Display for Tag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.0)
+    }
+}
 impl FromStr for Tag {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Error> {
@@ -150,8 +156,8 @@ impl FromStr for TagControlFlow {
     }
 }
 
-impl std::fmt::Display for TagControlFlow {
-    fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TagControlFlow {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult{
         let mut first = true;
         if self.append {
             write!(w, "+")?;

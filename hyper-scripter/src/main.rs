@@ -37,7 +37,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     conf.store()?;
     Ok(res)
 }
-async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
+async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     let pool = hyper_scripter::db::get_pool().await?;
     let recent = if root.timeless {
         None
@@ -51,6 +51,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     let mut res = Vec::<Error>::new();
     {
         let tag_group: TagFilterGroup = if root.all {
+            root.timeless = true;
             TagFilter::from_str("all,^removed").unwrap().into()
         } else {
             let mut group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製

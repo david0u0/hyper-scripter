@@ -38,7 +38,12 @@ macro_rules! def_root {
                 help = "Filter by tags, e.g. `all,^mytag`"
             )]
             pub filter: Option<TagControlFlow>,
-            #[structopt(short, long, global = true, help = "Shorthand for `-f=all,^removed`")]
+            #[structopt(
+                short,
+                long,
+                global = true,
+                help = "Shorthand for `-f=all,^removed --timeless`"
+            )]
             pub all: bool,
             #[structopt(long, global = true, help = "Show scripts within recent days.")]
             pub recent: Option<u32>,

@@ -190,8 +190,6 @@ impl ScriptRepo {
         let mut last_miss: &[_] = &last_miss_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
-            use std::str::FromStr;
-
             let name = script.name;
             log::trace!("載入腳本：{} {} {}", name, script.category, script.tags);
             let script_name = name.clone().into_script_name()?;
@@ -205,7 +203,7 @@ impl ScriptRepo {
                         None
                     } else {
                         // TODO: 錯誤處理，至少印個警告
-                        let t = Tag::from_str(s).ok();
+                        let t: Option<Tag> = s.parse().ok();
                         if let Some(t) = &t {
                             known_tags.insert(t.clone());
                         }

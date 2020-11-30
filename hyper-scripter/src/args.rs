@@ -5,7 +5,6 @@ use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagControlFlow;
-use std::str::FromStr;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
@@ -297,7 +296,7 @@ impl Root {
         match &self.subcmd {
             Some(Subs::Other(args)) => {
                 let run = Subs::Run {
-                    script_query: FromStr::from_str(&args[0])?,
+                    script_query: args[0].parse()?,
                     args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
                 };
                 log::info!("執行模式 {:?}", run);

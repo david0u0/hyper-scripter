@@ -35,19 +35,17 @@ async fn test_edit_existing_bang() {
     use hyper_scripter::script_repo::ScriptRepo;
     use hyper_scripter::tag::{Tag, TagFilter};
     use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
-    use std::str::FromStr;
 
     let pool = hyper_scripter::db::get_pool().await.unwrap();
     let mut repo = ScriptRepo::new(pool, None).await.unwrap();
-    let main_filter = TagFilter::from_str("all,^hide").unwrap();
-    repo.filter_by_tag(&main_filter.into());
+    repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 
     edit_or_create(
-        FromStr::from_str("test").unwrap(),
+        "test".parse().unwrap(),
         &mut repo,
         None,
         EditTagArgs {
-            content: FromStr::from_str("gg").unwrap(),
+            content: "gg".parse().unwrap(),
             change_existing: true,
             append_namespace: true,
         },
@@ -56,11 +54,11 @@ async fn test_edit_existing_bang() {
     .expect_err("沒有 BANG! 就找到編輯的腳本！？");
 
     let (p, e) = edit_or_create(
-        FromStr::from_str("test!").unwrap(),
+        "test!".parse().unwrap(),
         &mut repo,
         None,
         EditTagArgs {
-            content: FromStr::from_str("+a,^b,c").unwrap(),
+            content: "+a,^b,c".parse().unwrap(),
             change_existing: true,
             append_namespace: true,
         },
@@ -72,8 +70,8 @@ async fn test_edit_existing_bang() {
 
     use fxhash::FxHashSet as HashSet;
     let mut tags = HashSet::<Tag>::default();
-    tags.insert(FromStr::from_str("a").unwrap());
-    tags.insert(FromStr::from_str("c").unwrap());
-    tags.insert(FromStr::from_str("hide").unwrap());
+    tags.insert("a".parse().unwrap());
+    tags.insert("c".parse().unwrap());
+    tags.insert("hide".parse().unwrap());
     assert_eq!(tags, e.tags);
 }

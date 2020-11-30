@@ -7,14 +7,12 @@ use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOption
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::ScriptRepo;
-use hyper_scripter::script_type::ScriptType;
 use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
 use hyper_scripter_historian::{Event, EventData};
-use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
@@ -52,7 +50,7 @@ async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     {
         let tag_group: TagFilterGroup = if root.all {
             root.timeless = true;
-            TagFilter::from_str("all,^removed").unwrap().into()
+            "all,^removed".parse::<TagFilter>().unwrap().into()
         } else {
             let mut group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
             if let Some(flow) = root.filter.clone() {
@@ -73,14 +71,11 @@ async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     log::warn!("已存在的小工具 {:?}，跳過", name);
                     continue;
                 }
-                let ty = ScriptType::from_str(u.category)?;
+                let ty = u.category.parse()?;
                 let tags: Vec<Tag> = if u.is_hidden {
-                    vec![
-                        Tag::from_str("util").unwrap(),
-                        Tag::from_str("hide").unwrap(),
-                    ]
+                    vec!["util".parse().unwrap(), "hide".parse().unwrap()]
                 } else {
-                    vec![Tag::from_str("util").unwrap()]
+                    vec!["util".parse().unwrap()]
                 };
                 let p = path::open_script(&name, &ty, Some(false))?;
                 let entry = repo
@@ -192,7 +187,7 @@ async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::Help { args } => {
             print_help(args.iter())?;
-            let script_query: ScriptQuery = FromStr::from_str(&args[0])?;
+            let script_query: ScriptQuery = args[0].parse()?;
             let entry =
                 query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
@@ -289,7 +284,7 @@ async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
-            let delete_tag: Option<TagControlFlow> = Some(FromStr::from_str("+removed").unwrap());
+            let delete_tag: Option<TagControlFlow> = Some("+removed".parse().unwrap());
             let mut to_purge = vec![];
             for mut entry in query::do_list_query(&mut repo, &queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);

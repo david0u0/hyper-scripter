@@ -6,7 +6,6 @@ use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagControlFlow};
 use std::path::PathBuf;
-use std::str::FromStr;
 
 pub struct EditTagArgs {
     pub content: TagControlFlow,
@@ -75,8 +74,8 @@ pub async fn edit_or_create<'b>(
                     new_namespaces = name
                         .namespaces()
                         .iter()
-                        .map(|s| Tag::from_str(s))
-                        .collect::<Result<Vec<_>>>()?;
+                        .map(|s| s.parse())
+                        .collect::<Result<Vec<Tag>>>()?;
                 }
 
                 let p = path::open_script(&name, &final_ty, Some(false))

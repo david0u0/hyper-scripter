@@ -1,7 +1,7 @@
 use crate::error::{Error, FormatCode::Tag as TagCode};
-use std::fmt::{Display, Result as FmtResult, Formatter};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -66,7 +66,7 @@ impl<'de> Deserialize<'de> for TagControlFlow {
     {
         let s: &str = Deserialize::deserialize(deserializer)?;
         // TODO: unwrap?
-        Ok(FromStr::from_str(s).unwrap())
+        Ok(s.parse().unwrap())
     }
 }
 impl Serialize for TagControlFlow {
@@ -122,7 +122,7 @@ impl FromStr for TagControl {
             true
         };
         Ok(TagControl {
-            tag: Tag::from_str(s)?,
+            tag: s.parse()?,
             allow,
         })
     }
@@ -131,7 +131,7 @@ impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(s: &str) -> std::result::Result<Self, Error> {
         Ok(TagFilter {
-            filter: FromStr::from_str(s)?,
+            filter: s.parse()?,
             obligation: false,
         })
     }
@@ -147,7 +147,7 @@ impl FromStr for TagControlFlow {
         };
         let mut tags = vec![];
         for filter in s.split(",") {
-            tags.push(TagControl::from_str(filter)?);
+            tags.push(filter.parse()?);
         }
         if tags.len() == 0 {
             return Err(Error::Format(TagCode, s.to_owned()));
@@ -157,7 +157,7 @@ impl FromStr for TagControlFlow {
 }
 
 impl Display for TagControlFlow {
-    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult{
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let mut first = true;
         if self.append {
             write!(w, "+")?;

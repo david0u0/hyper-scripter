@@ -29,7 +29,7 @@ impl FromStr for EditQuery {
         Ok(if s == "." {
             EditQuery::NewAnonimous
         } else {
-            EditQuery::Query(ScriptQuery::from_str(s)?)
+            EditQuery::Query(s.parse()?)
         })
     }
 }
@@ -51,7 +51,7 @@ impl FromStr for ListQuery {
             })?;
             Ok(ListQuery::Pattern(re))
         } else {
-            Ok(ListQuery::Query(ScriptQuery::from_str(s)?))
+            Ok(ListQuery::Query(s.parse()?))
         }
     }
 }
@@ -136,7 +136,7 @@ impl FromStr for FilterQuery {
                 log::trace!("解析無名篩選器：{}", s);
                 Ok(FilterQuery {
                     name: None,
-                    content: FromStr::from_str(s)?,
+                    content: s.parse()?,
                 })
             }
             &[name, s] => {
@@ -144,7 +144,7 @@ impl FromStr for FilterQuery {
                 let content: TagControlFlow = if s.len() == 0 {
                     Default::default()
                 } else {
-                    FromStr::from_str(s)?
+                    s.parse()?
                 };
                 Ok(FilterQuery {
                     // TODO: 檢查名字

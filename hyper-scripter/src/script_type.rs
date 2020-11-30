@@ -51,7 +51,7 @@ NAME = '{{name}}'
 pub struct ScriptType(String);
 impl From<&str> for ScriptType {
     fn from(s: &str) -> Self {
-        Self::from_str(s).unwrap()
+        s.parse().unwrap()
     }
 }
 impl From<String> for ScriptType {

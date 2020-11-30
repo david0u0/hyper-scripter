@@ -9,7 +9,6 @@ use fxhash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
@@ -78,22 +77,22 @@ impl Default for RawConfig {
         RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
-                    filter: FromStr::from_str("+pin,util").unwrap(),
+                    filter: "+pin,util".parse().unwrap(),
                     obligation: false,
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
-                    filter: FromStr::from_str("+all,^hide").unwrap(),
+                    filter: "+all,^hide".parse().unwrap(),
                     obligation: true,
                     name: "no-hidden".to_owned(),
                 },
                 NamedTagFilter {
-                    filter: FromStr::from_str("+all,^removed").unwrap(),
+                    filter: "+all,^removed".parse().unwrap(),
                     obligation: true,
                     name: "no-removed".to_owned(),
                 },
             ],
-            main_tag_filter: FromStr::from_str("+all").unwrap(),
+            main_tag_filter: "+all".parse().unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             alias: vec![
                 // FIXME: 一旦陣列實作了 intoiterator 就用陣列
@@ -199,7 +198,7 @@ mod test {
     fn test_config_serde() {
         path::set_path_from_sys().unwrap();
         let c1 = RawConfig {
-            main_tag_filter: FromStr::from_str("a,^b,c").unwrap(),
+            main_tag_filter: "a,^b,c".parse().unwrap(),
             ..Default::default()
         };
         let s = to_string_pretty(&c1).unwrap();

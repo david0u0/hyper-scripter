@@ -282,7 +282,7 @@ fn test_bang() {
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!(first_file.to_string_lossy(), run("firt!").unwrap());
     assert_eq!("第二", run("seco!").unwrap());
-    assert_eq!("第二", run("-!").unwrap());
+    assert_eq!("第二", run("!").unwrap());
     assert_eq!(fourth_file.to_string_lossy(), run("-").unwrap());
     assert_eq!("第三", run("=hidden_third!").unwrap());
     assert_eq!(fourth_file.to_string_lossy(), run("four!").unwrap());

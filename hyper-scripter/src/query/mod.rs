@@ -100,6 +100,12 @@ impl FromStr for ScriptQuery {
     type Err = Error;
     fn from_str(mut s: &str) -> Result<Self> {
         let bang = if s.ends_with("!") {
+            if s == "!" {
+                return Ok(ScriptQuery {
+                    inner: ScriptQueryInner::Prev(1),
+                    bang: true,
+                });
+            }
             s = &s[..s.len() - 1];
             true
         } else {

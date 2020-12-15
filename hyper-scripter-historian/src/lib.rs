@@ -33,7 +33,7 @@ impl Historian {
             .map(|pool| Historian { pool })
     }
 
-    pub async fn record(&self, event: Event<'_>) -> Result<(), DBError> {
+    pub async fn record(&self, event: &Event<'_>) -> Result<(), DBError> {
         log::debug!("記錄事件 {:?}", event);
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
         let ty = event.data.get_type().to_string();

@@ -97,7 +97,7 @@ impl Environment for DBEnv {
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
             self.historian
-                .record(Event {
+                .record(&Event {
                     script_id: info.id,
                     data: EventData::Read,
                 })
@@ -106,7 +106,7 @@ impl Environment for DBEnv {
         if info.miss_time.as_ref().map_or(false, |t| t.has_changed()) {
             log::debug!("{:?} 的錯過事件", info.name);
             self.historian
-                .record(Event {
+                .record(&Event {
                     script_id: info.id,
                     data: EventData::Miss,
                 })
@@ -115,7 +115,7 @@ impl Environment for DBEnv {
         if let Some(content) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
             log::debug!("{:?} 的執行事件", info.name);
             self.historian
-                .record(Event {
+                .record(&Event {
                     script_id: info.id,
                     data: EventData::Exec(content),
                 })

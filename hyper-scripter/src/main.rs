@@ -12,7 +12,7 @@ use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
-use hyper_scripter_historian::{Event, EventData};
+use hyper_scripter_historian::{Event, EventData, Historian};
 
 #[tokio::main]
 async fn main() {
@@ -225,22 +225,18 @@ async fn main_inner(mut root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 Err(e) => return Err(e),
                 Ok(_) => ret_code = 0,
             }
-            let res = historian
-                .record(Event {
-                    data: EventData::ExecDone(ret_code),
-                    script_id: entry.id,
-                })
-                .await;
-            match &res {
+            let done_event = Event {
+                data: EventData::ExecDone(ret_code),
+                script_id: entry.id,
+            };
+            match historian.record(&done_event).await {
                 Ok(_) => (),
-                Err(sqlx::error::Error::Database(err)) => {
-                    if err.code().as_ref().map(|s| s.as_ref()) == Some("517") {
-                        log::warn!("資料庫最後被鎖住了！ {:?}", err);
-                    } else {
-                        res?;
-                    }
+                Err(err) => {
+                    log::warn!("資料庫錯誤 {:?}！重連資料庫再試最後一次", err);
+                    // NOTE: 本來想把這段在 Historian 裡面直接搞定，卻爆出魔法般的生命週期問題…什麼 Acquire<'c> 的……
+                    let historian = Historian::new(path::get_home()).await?;
+                    historian.record(&done_event).await?;
                 }
-                Err(_) => res?,
             }
         }
         Subs::Which { script_query } => {

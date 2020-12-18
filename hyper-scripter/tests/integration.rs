@@ -13,10 +13,10 @@ const MSG_JS: &'static str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run(&format!("e . | echo \"{}\"", MSG)).unwrap();
+    run(format!("e . | echo \"{}\"", MSG)).unwrap();
     assert_eq!(MSG, run("-").unwrap());
 
-    run(&format!(
+    run(format!(
         "-f super_tag,hide e test/js -c js | console.log(\"{}\")",
         MSG_JS
     ))
@@ -38,7 +38,7 @@ fn test_tags() {
 fn test_mv() {
     let _g = setup();
 
-    run(&format!("e . -c js --no-template | echo \"{}\"", MSG)).unwrap();
+    run(format!("e . -c js --no-template | echo \"{}\"", MSG)).unwrap();
     run("-").expect_err("用 nodejs 執行 echo ……？");
 
     run("mv 1 -c sh").unwrap();
@@ -58,10 +58,10 @@ const APPEND: &'static str = "第二行";
 #[test]
 fn test_run() {
     let _g = setup();
-    run(&format!("e test-with-args | echo -e \"$1：{}\n$2\"", MSG)).unwrap();
+    run(format!("e test-with-args | echo -e \"$1：{}\n$2\"", MSG)).unwrap();
     assert_eq!(
         format!("{}：{}\n{}", TALKER, MSG, APPEND),
-        run(&format!("- {} {}", TALKER, APPEND)).unwrap(),
+        run(format!("- {} {}", TALKER, APPEND)).unwrap(),
         "沒吃到命令行參數？"
     );
 
@@ -105,7 +105,7 @@ fn test_prev() {
 #[test]
 fn test_edit_same_name() {
     let _g = setup();
-    run(&format!("e i-am-hidden -t hide | echo \"{}\"", MSG)).unwrap();
+    run(format!("e i-am-hidden -t hide | echo \"{}\"", MSG)).unwrap();
     run("-").expect_err("執行了隱藏的腳本？？");
     run("e i-am-hidden yo").expect_err("竟然能編輯撞名的腳本？");
     assert_eq!(MSG, run("-f hide -").unwrap(), "腳本被撞名的編輯搞爛了？");
@@ -121,17 +121,17 @@ fn test_edit_with_tag() {
 
     run("tags innate").unwrap();
 
-    run(&format!("e -f tag1 test1 -t tag2 | echo \"{}\"", msg(1))).unwrap();
+    run(format!("e -f tag1 test1 -t tag2 | echo \"{}\"", msg(1))).unwrap();
     run("-f innate -").expect_err("吃到了不該吃的標籤！");
     run("-f tag1 -").expect_err("吃到了不該吃的標籤！");
     assert_eq!(msg(1), run("-f tag2 -").unwrap());
 
-    run(&format!("e -f tag1 test2 -t +tag2 | echo \"{}\"", msg(2))).unwrap();
+    run(format!("e -f tag1 test2 -t +tag2 | echo \"{}\"", msg(2))).unwrap();
     run("-f innate -").expect_err("吃到了不該吃的標籤！");
     assert_eq!(msg(2), run("-f tag1 -").unwrap());
     assert_eq!(msg(2), run("-f tag2 -").unwrap());
 
-    run(&format!("e -f +tag1 test3 -t +tag2 | echo \"{}\"", msg(3))).unwrap();
+    run(format!("e -f +tag1 test3 -t +tag2 | echo \"{}\"", msg(3))).unwrap();
     assert_eq!(msg(3), run("-f innate -").unwrap());
     assert_eq!(msg(3), run("-f tag1 -").unwrap());
     assert_eq!(msg(3), run("-f tag2 -").unwrap());
@@ -140,9 +140,9 @@ fn test_edit_with_tag() {
 #[test]
 fn test_multi_filter() {
     let _g = setup();
-    run(&format!("e nobody | echo \"{}\"", MSG)).unwrap();
-    run(&format!("-f test,pin e test-pin | echo \"{}\"", MSG)).unwrap();
-    run(&format!("e -t pin pin-only | echo \"{}\"", MSG)).unwrap();
+    run(format!("e nobody | echo \"{}\"", MSG)).unwrap();
+    run(format!("-f test,pin e test-pin | echo \"{}\"", MSG)).unwrap();
+    run(format!("e -t pin pin-only | echo \"{}\"", MSG)).unwrap();
 
     assert_eq!(MSG, run("pin-only").unwrap());
     assert_eq!(MSG, run("test-pin").unwrap());
@@ -165,7 +165,7 @@ fn test_rm() {
     let _g = setup();
     run("e longlive | echo 矻立不搖").unwrap();
 
-    run(&format!("e test/ya -t test-tag | echo \"{}\"", MSG)).unwrap();
+    run(format!("e test/ya -t test-tag | echo \"{}\"", MSG)).unwrap();
     assert_eq!(MSG, run("test/ya").unwrap());
     run("e . | echo \"你匿\"").unwrap();
     assert_eq!("你匿", run(".1").unwrap());
@@ -211,12 +211,12 @@ fn test_rm() {
 #[test]
 fn test_namespace_reorder_search() {
     let _g = setup();
-    run(&format!(
+    run(format!(
         "e my/super/long/namespace-d/test-script | echo \"{}\"",
         MSG
     ))
     .unwrap();
-    run(&format!(
+    run(format!(
         "e a/shorter/script -c js | console.log(\"{}\")",
         MSG_JS
     ))
@@ -233,7 +233,7 @@ fn test_namespace_reorder_search() {
 fn test_append_tags() {
     let _g = setup();
     run("tags global").unwrap();
-    run(&format!("-f +append e append-test | echo 附加標籤")).unwrap();
+    run(format!("-f +append e append-test | echo 附加標籤")).unwrap();
     run("-f no-append e no-append-test | echo 不要給我打標籤").unwrap();
 
     assert_eq!("附加標籤", run("apptest").unwrap());
@@ -259,9 +259,9 @@ fn test_append_tags() {
 #[test]
 fn test_miss_event() {
     let _g = setup();
-    run(&format!("-f hide e hidden_first | echo 第一")).unwrap();
-    run(&format!("-f hide e hidden_second | echo 第二")).unwrap();
-    run(&format!("-f hide e third | echo 第三")).unwrap();
+    run(format!("-f hide e hidden_first | echo 第一")).unwrap();
+    run(format!("-f hide e hidden_second | echo 第二")).unwrap();
+    run(format!("-f hide e third | echo 第三")).unwrap();
     assert_eq!("第三", run("!").unwrap());
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!("第一", run("!").unwrap(), "沒有記錄到錯過事件？");

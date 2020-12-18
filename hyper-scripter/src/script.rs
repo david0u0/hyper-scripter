@@ -14,6 +14,16 @@ use std::str::FromStr;
 
 pub const ANONYMOUS: &'static str = ".anonymous";
 
+macro_rules! max {
+    ($x:expr) => ( $x );
+    ($x:expr, $($xs:expr),+) => {
+        {
+            use std::cmp::max;
+            max($x, max!( $($xs),+ ))
+        }
+    };
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Ord)]
 pub enum ScriptName {
     Anonymous(u32),
@@ -122,6 +132,7 @@ pub struct ScriptInfo {
     pub write_time: ScriptTime,
     pub exec_time: Option<ScriptTime<String>>,
     pub miss_time: Option<ScriptTime>,
+    pub exec_done_time: Option<ScriptTime<i32>>,
     pub id: i64,
     pub name: ScriptName,
     pub tags: HashSet<Tag>,
@@ -146,16 +157,17 @@ impl<'a> ScriptInfo {
         }
     }
     pub fn last_time(&self) -> NaiveDateTime {
-        use std::cmp::max;
         fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
             match time {
                 Some(time) => **time,
                 _ => NaiveDateTime::from_timestamp(1, 0),
             }
         }
-        max(
+        max!(
             *self.read_time,
-            max(map(&self.exec_time), map(&self.miss_time)),
+            map(&self.miss_time),
+            map(&self.exec_time),
+            map(&self.exec_done_time)
         )
     }
     pub fn file_path(&self) -> Result<PathBuf> {
@@ -174,6 +186,10 @@ impl<'a> ScriptInfo {
         self.exec_time = Some(ScriptTime::now(content));
         self.read_time = ScriptTime::now(());
     }
+    pub fn exec_done(&mut self, code: i32) {
+        log::trace!("{:?} 執行結果為 {}", self, code);
+        self.exec_done_time = Some(ScriptTime::now(code));
+    }
     pub fn builder(
         id: i64,
         name: ScriptName,
@@ -190,6 +206,7 @@ impl<'a> ScriptInfo {
             exec_time: None,
             miss_time: None,
             write_time: None,
+            exec_done_time: None,
         }
     }
 }
@@ -222,6 +239,7 @@ pub struct ScriptBuilder {
     write_time: Option<NaiveDateTime>,
     miss_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
+    exec_done_time: Option<NaiveDateTime>,
     id: i64,
     tags: HashSet<Tag>,
     ty: ScriptType,
@@ -230,6 +248,10 @@ pub struct ScriptBuilder {
 impl ScriptBuilder {
     pub fn exec_time(mut self, time: NaiveDateTime) -> Self {
         self.exec_time = Some(time);
+        self
+    }
+    pub fn exec_done_time(mut self, time: NaiveDateTime) -> Self {
+        self.exec_done_time = Some(time);
         self
     }
     pub fn miss_time(mut self, time: NaiveDateTime) -> Self {
@@ -261,6 +283,7 @@ impl ScriptBuilder {
             created_time,
             exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
             miss_time: self.miss_time.map(|t| ScriptTime::new(t)),
+            exec_done_time: self.exec_done_time.map(|t| ScriptTime::new(t)),
         }
     }
 }

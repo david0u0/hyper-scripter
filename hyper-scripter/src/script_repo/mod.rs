@@ -185,9 +185,11 @@ impl ScriptRepo {
         let last_read_records = historian.last_time_of(EventType::Read).await?;
         let last_exec_records = historian.last_time_of(EventType::Exec).await?;
         let last_miss_records = historian.last_time_of(EventType::Miss).await?;
+        let last_exec_done_records = historian.last_time_of(EventType::ExecDone).await?;
         let mut last_read: &[_] = &last_read_records;
         let mut last_exec: &[_] = &last_exec_records;
         let mut last_miss: &[_] = &last_miss_records;
+        let mut last_exec_done: &[_] = &last_exec_done_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
             let name = script.name;
@@ -219,6 +221,9 @@ impl ScriptRepo {
             }
             if let Some(time) = extract_from_time(script.id, &mut last_exec) {
                 builder = builder.exec_time(time);
+            }
+            if let Some(time) = extract_from_time(script.id, &mut last_exec_done) {
+                builder = builder.exec_done_time(time);
             }
             if let Some(time) = extract_from_time(script.id, &mut last_read) {
                 builder = builder.read_time(time);

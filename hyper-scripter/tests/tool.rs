@@ -62,12 +62,13 @@ pub fn check_exist(p: &[&str]) -> bool {
     let file = join_path(p);
     file.exists()
 }
-pub fn run(args: &str) -> Result<String, ExitStatus> {
+pub fn run<T: ToString>(args: T) -> Result<String, ExitStatus> {
     let home = get_home();
     run_with_home(&*home.to_string_lossy(), args)
 }
-pub fn run_with_home(home: &str, args: &str) -> Result<String, ExitStatus> {
+pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitStatus> {
     let mut full_args = vec!["-H", home];
+    let args = args.to_string();
     let args_vec: Vec<&str> = if args.find("|").is_some() {
         let (first, second) = args.split_once("|").unwrap();
         let mut v: Vec<_> = first.split(" ").filter(|s| s.len() > 0).collect();

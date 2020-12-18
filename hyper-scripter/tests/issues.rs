@@ -25,6 +25,24 @@ fn test_rm_non_exist() {
 
     assert_ls_len(1);
 }
+#[test]
+fn test_hs_in_hs() {
+    println!("若腳本甲裡呼叫了本程式去執行腳本乙，完成之後腳本甲的時間應較新");
+    let _g = setup();
+
+    run(format!(
+        "e outer | echo 我在第一層 && {} -H {} inner",
+        get_exe_abs(),
+        get_home().to_string_lossy(),
+    ))
+    .unwrap();
+    run("e inner | echo '我在第幾層？'").unwrap();
+
+    assert_eq!(run("-").unwrap(), "我在第幾層？");
+    assert_eq!(run("outer").unwrap(), "我在第一層\n我在第幾層？");
+    assert_eq!(run("-").unwrap(), "我在第一層\n我在第幾層？");
+    assert_eq!(run("^2").unwrap(), "我在第幾層？");
+}
 #[tokio::test(threaded_scheduler)]
 async fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");

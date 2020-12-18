@@ -16,7 +16,7 @@ pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
     let utils = get_all();
     for u in utils.into_iter() {
         log::info!("載入 {}", u.name);
-        run(&format!(
+        run(format!(
             "e -c {} {} --no-template | {}",
             u.category, u.name, u.content
         ))
@@ -31,7 +31,7 @@ fn test_import() {
     let dir = dir.to_string_lossy();
 
     run("e copy/test -f +innate | echo 我要留下來").unwrap();
-    run(&format!(
+    run(format!(
         "e my/innate -f +innate | cp tests/to_be_import {} -r",
         dir
     ))
@@ -40,7 +40,7 @@ fn test_import() {
     assert_eq!(run("-f copy -").unwrap(), "我要留下來");
 
     run("tags something-evil").unwrap();
-    run(&format!("-f util import {}", dir)).unwrap();
+    run(format!("-f util import {}", dir)).unwrap();
     run("-f innate which myinnate").unwrap();
 
     assert_eq!(run("-f my test").unwrap(), "安安，紅寶石");
@@ -56,7 +56,7 @@ fn test_import() {
 
     assert_ls_len(16);
 
-    run(&format!("-f util import --namespace imported {}", dir)).unwrap();
+    run(format!("-f util import --namespace imported {}", dir)).unwrap();
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
     assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
     run("-f imported which").expect_err("命名空間汙染了標籤！");

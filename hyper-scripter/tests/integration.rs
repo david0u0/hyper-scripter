@@ -4,8 +4,10 @@
 #[path = "tool.rs"]
 mod tool;
 
-use hyper_scripter::path::HS_EXECUTABLE_INFO_PATH;
+use hyper_scripter::path::{HS_EXECUTABLE_INFO_PATH, HS_REDIRECT};
 use regex::Regex;
+use std::fs::{canonicalize, File};
+use std::io::Write;
 use tool::*;
 const MSG: &'static str = "你好，腳本人！";
 
@@ -290,4 +292,21 @@ fn test_bang() {
     let s = run("ls --grouping none --plain firs! four").unwrap();
     let ls_vec = s.split(" ").filter(|s| s.len() > 0).collect::<Vec<_>>();
     assert_eq!(2, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
+}
+
+#[test]
+fn test_redirect() {
+    let _g = setup();
+    let redirected = canonicalize("./")
+        .unwrap()
+        .join(".hyper_scripter_redirect")
+        .to_string_lossy()
+        .into_owned();
+    std::fs::remove_dir_all(&redirected).unwrap();
+    File::create(get_home().join(HS_REDIRECT))
+        .unwrap()
+        .write_all(redirected.as_bytes())
+        .unwrap();
+    run("e --fast test | echo 我在 $(realpath $(dirname $0))").unwrap();
+    assert_eq!(run("-").unwrap(), format!("我在 {}", redirected));
 }

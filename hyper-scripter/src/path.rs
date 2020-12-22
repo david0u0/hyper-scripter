@@ -1,12 +1,13 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
-use crate::util::handle_fs_res;
+use crate::util::{handle_fs_res, read_file};
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
+pub const HS_REDIRECT: &'static str = ".hs_redirect";
 
 lazy_static::lazy_static! {
     static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -53,6 +54,15 @@ pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
     if !path.exists() {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
         handle_fs_res(&[&path], create_dir(&path))?;
+    } else {
+        let redirect = path.join(HS_REDIRECT);
+        if redirect.is_file() {
+            let redirect = read_file(&redirect)?;
+            let redirect = redirect.trim();
+            log::info!("重導向至 {}", redirect);
+            set_home(redirect)?;
+            return Ok(());
+        }
     }
     *PATH.lock().unwrap() = Some(path);
     Ok(())

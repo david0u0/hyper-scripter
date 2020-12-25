@@ -27,13 +27,11 @@ pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
-    setup_home(get_home())
-}
-pub fn setup_home<'a>(home: PathBuf) -> MutexGuard<'a, ()> {
-    hyper_scripter::path::set_home(home).unwrap();
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let home = get_home();
+    hyper_scripter::path::set_home(&home).unwrap();
     let _ = env_logger::try_init();
-    match std::fs::remove_dir_all(HOME) {
+    match std::fs::remove_dir_all(home) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {

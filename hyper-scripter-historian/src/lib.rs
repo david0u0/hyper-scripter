@@ -16,12 +16,28 @@ pub struct Historian {
 }
 
 impl Historian {
-    async fn raw_record(&self, script_id: i64, ty: &str, cmd: &str) -> Result<(), DBError> {
+    async fn raw_record(
+        &self,
+        script_id: i64,
+        ty: &str,
+        cmd: &str,
+        content: Option<&str>,
+    ) -> Result<(), DBError> {
         sqlx::query!(
-            "INSERT INTO events (script_id, type, cmd) VALUES(?, ?, ?)",
+            "INSERT OR REPLACE INTO last_events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
             script_id,
             ty,
-            cmd
+            cmd,
+            content
+        )
+        .execute(&self.pool)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
+            script_id,
+            ty,
+            cmd,
+            content
         )
         .execute(&self.pool)
         .await?;
@@ -39,10 +55,10 @@ impl Historian {
         let ty = event.data.get_type().to_string();
         match &event.data {
             EventData::Miss => {
-                self.raw_record(event.script_id, &ty, &cmd).await?;
+                self.raw_record(event.script_id, &ty, &cmd, None).await?;
             }
             EventData::Read => {
-                self.raw_record(event.script_id, &ty, &cmd).await?;
+                self.raw_record(event.script_id, &ty, &cmd, None).await?;
             }
             EventData::Exec(content) => {
                 let mut content = Some(*content);
@@ -61,27 +77,12 @@ impl Historian {
                         content = None;
                     }
                 }
-                sqlx::query!(
-                    "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
-                    event.script_id,
-                    ty,
-                    cmd,
-                    content,
-                )
-                .execute(&self.pool)
-                .await?;
+                self.raw_record(event.script_id, &ty, &cmd, content).await?;
             }
             EventData::ExecDone(code) => {
                 let code = code.to_string();
-                sqlx::query!(
-                    "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
-                    event.script_id,
-                    ty,
-                    cmd,
-                    code
-                )
-                .execute(&self.pool)
-                .await?;
+                self.raw_record(event.script_id, &ty, &cmd, Some(&code))
+                    .await?;
             }
         }
         Ok(())
@@ -89,17 +90,12 @@ impl Historian {
 
     pub async fn last_time_of(&self, ty: EventType) -> Result<Vec<(i64, NaiveDateTime)>, DBError> {
         let ty = ty.to_string();
-        let records = sqlx::query_as(
-            "
-        SELECT e.script_id, MAX(e.time) as time FROM events e
-        WHERE type = ?
-        GROUP BY e.script_id ORDER BY script_id
-        ",
+        let times = sqlx::query!(
+            "SELECT script_id, time as time FROM last_events WHERE type = ? ORDER BY script_id",
+            ty
         )
-        .bind(ty)
         .fetch_all(&self.pool)
         .await?;
-        Ok(records)
-        // Ok(records.into_iter().map(|r| (r.script_id, r.time)).collect())
+        Ok(times.into_iter().map(|d| (d.script_id, d.time)).collect())
     }
 }

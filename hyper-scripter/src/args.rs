@@ -41,6 +41,7 @@ macro_rules! def_root {
                 short,
                 long,
                 global = true,
+                conflicts_with = "recent",
                 help = "Shorthand for `-f=all,^removed --timeless`"
             )]
             pub all: bool,
@@ -314,6 +315,9 @@ impl Root {
                 });
             }
             _ => (),
+        }
+        if self.all {
+            self.timeless = true;
         }
         Ok(())
     }

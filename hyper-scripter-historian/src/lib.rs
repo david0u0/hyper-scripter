@@ -3,7 +3,7 @@ extern crate derive_more;
 
 use chrono::NaiveDateTime;
 use sqlx::{error::Error as DBError, SqlitePool};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 mod db;
 mod event;
@@ -13,6 +13,7 @@ pub use event::*;
 #[derive(Debug, Clone)]
 pub struct Historian {
     pool: SqlitePool,
+    path: PathBuf,
 }
 
 impl Historian {
@@ -32,6 +33,7 @@ impl Historian {
         )
         .execute(&self.pool)
         .await?;
+
         sqlx::query!(
             "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
             script_id,
@@ -43,10 +45,11 @@ impl Historian {
         .await?;
         Ok(())
     }
-    pub async fn new(hyper_scripter_path: impl AsRef<Path>) -> Result<Self, DBError> {
-        db::get_pool(hyper_scripter_path)
+    pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
+        let path = path.as_ref().to_owned();
+        db::get_pool(&path)
             .await
-            .map(|pool| Historian { pool })
+            .map(|pool| Historian { pool, path })
     }
 
     pub async fn record(&self, event: &Event<'_>) -> Result<(), DBError> {

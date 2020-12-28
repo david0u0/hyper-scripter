@@ -26,7 +26,7 @@ impl<'a, 'b, ENV: Environment> RepoEntry<'b, ENV> {
         handler(self.info);
         self.env.handle_change(self.info).await
     }
-    pub fn into_inner(self) -> &'b mut ScriptInfo {
+    pub fn into_inner(self) -> &'b ScriptInfo {
         self.info
     }
 }

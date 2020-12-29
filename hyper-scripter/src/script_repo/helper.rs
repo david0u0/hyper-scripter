@@ -1,27 +1,23 @@
 use crate::error::Result;
 use crate::fuzzy::FuzzKey;
 use crate::script::ScriptInfo;
-use async_trait::async_trait;
 use std::collections::hash_map::IterMut as HashMapIter;
 
-#[async_trait]
-pub trait Environment {
-    async fn handle_change(&self, info: &ScriptInfo) -> Result;
-}
+use super::DBEnv;
 
-pub struct Iter<'b, ENV: Environment> {
+pub struct Iter<'b> {
     pub(super) iter: HashMapIter<'b, String, ScriptInfo>,
     pub(super) iter2: Option<HashMapIter<'b, String, ScriptInfo>>,
-    pub(super) env: &'b ENV,
+    pub(super) env: &'b DBEnv,
 }
 #[derive(Deref, Debug)]
-pub struct RepoEntry<'b, ENV: Environment> {
+pub struct RepoEntry<'b> {
     #[deref]
     pub(super) info: &'b mut ScriptInfo,
-    pub(super) env: &'b ENV,
+    pub(super) env: &'b DBEnv,
 }
 
-impl<'a, 'b, ENV: Environment> RepoEntry<'b, ENV> {
+impl<'a, 'b> RepoEntry<'b> {
     pub async fn update<F: FnOnce(&mut ScriptInfo)>(&mut self, handler: F) -> Result {
         handler(self.info);
         self.env.handle_change(self.info).await
@@ -30,8 +26,8 @@ impl<'a, 'b, ENV: Environment> RepoEntry<'b, ENV> {
         self.info
     }
 }
-impl<'a, 'b, ENV: Environment> Iterator for Iter<'b, ENV> {
-    type Item = RepoEntry<'b, ENV>;
+impl<'a, 'b> Iterator for Iter<'b> {
+    type Item = RepoEntry<'b>;
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: 似乎有優化空間？參考標準庫 Chain
         if let Some((_, info)) = self.iter.next() {
@@ -49,7 +45,7 @@ impl<'a, 'b, ENV: Environment> Iterator for Iter<'b, ENV> {
         }
     }
 }
-impl<'a, 'b, ENV: Environment> FuzzKey for RepoEntry<'b, ENV> {
+impl<'a, 'b> FuzzKey for RepoEntry<'b> {
     fn fuzz_key<'c>(&'c self) -> std::borrow::Cow<'c, str> {
         self.info.fuzz_key()
     }

@@ -3,7 +3,6 @@ use crate::path;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
-use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter_historian::{Event, EventData, EventType, Historian};
@@ -19,7 +18,7 @@ pub struct DBEnv {
     historian: Historian,
 }
 
-pub type ScriptRepoEntry<'b> = RepoEntry<'b, DBEnv>;
+pub type ScriptRepoEntry<'b> = RepoEntry<'b>;
 
 pub struct ScriptRepoEntryOptional<'b> {
     entry: Entry<'b, String, ScriptInfo>,
@@ -74,8 +73,7 @@ impl<'b> ScriptRepoEntryOptional<'b> {
     }
 }
 
-#[async_trait]
-impl Environment for DBEnv {
+impl DBEnv {
     async fn handle_change(&self, info: &ScriptInfo) -> Result {
         log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
@@ -147,7 +145,7 @@ impl ScriptRepo {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut(&mut self, all: bool) -> Iter<'_, DBEnv> {
+    pub fn iter_mut(&mut self, all: bool) -> Iter<'_> {
         Iter {
             iter: self.map.iter_mut(),
             env: &self.db_env,
@@ -158,7 +156,7 @@ impl ScriptRepo {
             },
         }
     }
-    pub fn iter_hidden_mut(&mut self) -> Iter<'_, DBEnv> {
+    pub fn iter_hidden_mut(&mut self) -> Iter<'_> {
         Iter {
             iter: self.hidden_map.iter_mut(),
             iter2: None,

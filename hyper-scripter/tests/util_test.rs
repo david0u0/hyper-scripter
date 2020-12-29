@@ -70,6 +70,9 @@ fn test_collect() {
     let mut file = File::create(get_home().join("this/is/a/collect/t.est.rb")).unwrap();
     file.write_all("puts '這是一個收集測試'".as_bytes())
         .unwrap();
+    let mut file = File::create(get_home().join(".anonymous/10.sh")).unwrap();
+    file.write_all("echo 這是一個匿名收集測試".as_bytes())
+        .unwrap();
 
     let mut file = File::create(get_home().join("this/is/a/collect/.test.rb")).unwrap();
     file.write_all("puts '這是一個不會被收集到的測試，因為路徑中帶.'".as_bytes())
@@ -87,13 +90,14 @@ fn test_collect() {
     run("collect").unwrap();
     assert_eq!(run("-f this thisisacolltest").unwrap(), "這是一個收集測試");
     assert_eq!(run("-f is thisisacolltest").unwrap(), "這是一個收集測試");
+    assert_eq!(run(".10").unwrap(), "這是一個匿名收集測試");
     run("-f innate which myinnate").expect_err("跑了 collect 沒有刪成功");
     run("-f my which =my/test").expect_err("跑了 collect 沒有刪成功");
 
     assert_eq!(run("-f tag youest").unwrap(), "殼已破碎");
     assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(24);
+    assert_ls_len(25);
 }
 
 #[test]

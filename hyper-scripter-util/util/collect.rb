@@ -25,10 +25,29 @@ def directory_tree(path)
 end
 
 def shoud_collect?(file)
+  first = true
   file.split('/').each do |path|
+    next if first && path == '.anonymous'
+
+    first = false
     return false if path.start_with?('.')
   end
   true
+end
+
+def extract_name(file)
+  name, _, ext = file.rpartition('.')
+  if name.start_with? '.anonymous'
+    name = name.sub(%r{^\.anonymous/}, '')
+    num = name.to_i
+    if num.to_s == name
+      name = '.' + name
+    else
+      # throw err
+      throw "what? #{name}?"
+    end
+  end
+  [name, ext]
 end
 
 root = HS_ENV.home
@@ -36,7 +55,7 @@ directory_tree(root).each do |full_path|
   script = full_path.delete_prefix(root).delete_prefix('/')
   next unless shoud_collect?(script)
 
-  name, _, ext = script.rpartition('.')
+  name, ext = extract_name(script)
 
   HS_ENV.do_hs("which =#{name} 2>/dev/null")
   next if $?.success?

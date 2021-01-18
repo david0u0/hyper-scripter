@@ -1,10 +1,11 @@
 use crate::error::{Contextable, Error, Result};
 use crate::path;
-use crate::query::{self, EditQuery};
+use crate::query::{self, do_script_query_strict_with_missing, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagControlFlow};
+use hyper_scripter_historian::{Event, EventData, Historian};
 use std::path::PathBuf;
 
 pub struct EditTagArgs {
@@ -134,4 +135,49 @@ pub async fn edit_or_create<'b>(
         .await?;
 
     Ok((script_path, entry))
+}
+
+pub async fn run_n_times(
+    n: u64,
+    script_query: &ScriptQuery,
+    script_repo: &mut ScriptRepo,
+    args: &[String],
+    historian: Historian,
+    res: &mut Vec<Error>,
+) -> Result {
+    let mut entry = do_script_query_strict_with_missing(&script_query, script_repo).await?;
+    log::info!("執行 {:?}", entry.name);
+    {
+        let exe = std::env::current_exe()?;
+        let exe = exe.to_string_lossy();
+        log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
+        super::write_file(&path::get_home().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
+    }
+    let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
+    let content = super::read_file(&script_path)?;
+    entry.update(|info| info.exec(content)).await?;
+    for _ in 0..n {
+        let run_res = super::run(
+            &script_path,
+            &*entry,
+            &args,
+            entry.exec_time.as_ref().unwrap().data().unwrap(),
+        );
+        let ret_code: i32;
+        match run_res {
+            Err(Error::ScriptError(code)) => {
+                ret_code = code;
+                res.push(run_res.unwrap_err());
+            }
+            Err(e) => return Err(e),
+            Ok(_) => ret_code = 0,
+        }
+        historian
+            .record(&Event {
+                data: EventData::ExecDone(ret_code),
+                script_id: entry.id,
+            })
+            .await?;
+    }
+    Ok(())
 }

@@ -132,6 +132,15 @@ pub enum Subs {
         #[structopt(help = "Command line args to pass to the script")]
         args: Vec<String>,
     },
+    #[structopt(about = "Repeat the script", settings = NO_FLAG_SETTINGS)]
+    Repeat {
+        #[structopt(about = "The times you want to repeat the script")]
+        times: u64,
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_query: ScriptQuery,
+        #[structopt(help = "Command line args to pass to the script")]
+        args: Vec<String>,
+    },
     #[structopt(about = "Execute the script query and get the exact file")]
     Which {
         #[structopt(default_value = "-", parse(try_from_str))]

@@ -12,7 +12,6 @@ use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
-use hyper_scripter_historian::{Event, EventData};
 
 #[tokio::main]
 async fn main() {
@@ -197,37 +196,30 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::Run { script_query, args } => {
-            let mut entry =
-                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
-            log::info!("執行 {:?}", entry.name);
-            {
-                let exe = std::env::current_exe()?;
-                let exe = exe.to_string_lossy();
-                log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
-                util::write_file(&path::get_home().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
-            }
-            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let content = util::read_file(&script_path)?;
-            entry.update(|info| info.exec(content)).await?;
-            let ret_code: i32;
-            let run_res = util::run(
-                &script_path,
-                &*entry,
+            util::main_util::run_n_times(
+                1,
+                &script_query,
+                &mut repo,
                 &args,
-                entry.exec_time.as_ref().unwrap().data().unwrap(),
-            );
-            match run_res {
-                Err(Error::ScriptError(code)) => {
-                    ret_code = code;
-                    res.push(run_res.unwrap_err());
-                }
-                Err(e) => return Err(e),
-                Ok(_) => ret_code = 0,
-            }
-            historian.record(&Event {
-                data: EventData::ExecDone(ret_code),
-                script_id: entry.id,
-            }).await?;
+                historian.clone(),
+                &mut res,
+            )
+            .await?;
+        }
+        Subs::Repeat {
+            times,
+            script_query,
+            args,
+        } => {
+            util::main_util::run_n_times(
+                times,
+                &script_query,
+                &mut repo,
+                &args,
+                historian.clone(),
+                &mut res,
+            )
+            .await?;
         }
         Subs::Which { script_query } => {
             let entry =

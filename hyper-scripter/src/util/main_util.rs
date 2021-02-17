@@ -181,3 +181,29 @@ pub async fn run_n_times(
     }
     Ok(())
 }
+
+pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
+    let utils = hyper_scripter_util::get_all();
+    for u in utils.into_iter() {
+        log::info!("載入小工具 {}", u.name);
+        let name = u.name.to_owned().into_script_name()?;
+        if script_repo.get_mut(&name, true).is_some() {
+            log::warn!("已存在的小工具 {:?}，跳過", name);
+            continue;
+        }
+        let ty = u.category.parse()?;
+        let tags: Vec<Tag> = if u.is_hidden {
+            vec!["util".parse().unwrap(), "hide".parse().unwrap()]
+        } else {
+            vec!["util".parse().unwrap()]
+        };
+        let p = path::open_script(&name, &ty, Some(false))?;
+        let mut entry = script_repo
+            .entry(&name)
+            .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
+            .await?;
+        super::prepare_script(&p, &*entry, true, Some(u.content))?;
+        entry.update(|info| info.write()).await?;
+    }
+    Ok(())
+}

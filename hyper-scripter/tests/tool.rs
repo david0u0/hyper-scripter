@@ -27,6 +27,11 @@ pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
+    let g = setup_with_utils();
+    run("rm --purge * -f all").unwrap();
+    g
+}
+pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let home = get_home();
     hyper_scripter::path::set_home(&home).unwrap();

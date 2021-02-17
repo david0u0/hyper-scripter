@@ -302,7 +302,16 @@ fn test_redirect() {
         .join(".hyper_scripter_redirect")
         .to_string_lossy()
         .into_owned();
-    std::fs::remove_dir_all(&redirected).unwrap();
+
+    match std::fs::remove_dir_all(&redirected) {
+        Ok(_) => (),
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                panic!("重整重導向用資料夾失敗了……")
+            }
+        }
+    }
+
     File::create(get_home().join(HS_REDIRECT))
         .unwrap()
         .write_all(redirected.as_bytes())

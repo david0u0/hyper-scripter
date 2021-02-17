@@ -195,7 +195,7 @@ mod test {
     use toml::{from_str, to_string_pretty};
     #[test]
     fn test_config_serde() {
-        path::set_path_from_sys().unwrap();
+        path::set_home_from_sys().unwrap();
         let c1 = RawConfig {
             main_tag_filter: "a,^b,c".parse().unwrap(),
             ..Default::default()

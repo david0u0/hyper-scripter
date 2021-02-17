@@ -225,10 +225,9 @@ pub struct List {
 
 fn set_home(p: &Option<String>) -> Result {
     match p {
-        Some(p) => path::set_home(p)?,
-        None => path::set_path_from_sys()?,
+        Some(p) => path::set_home(p),
+        None => path::set_home_from_sys(),
     }
-    Ok(())
 }
 
 fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'a str, &'static Alias)>> {

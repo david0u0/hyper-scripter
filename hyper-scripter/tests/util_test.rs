@@ -4,26 +4,10 @@
 #[path = "tool.rs"]
 mod tool;
 
-use hyper_scripter_util::get_all;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::MutexGuard;
 use tool::*;
-
-pub fn setup_util<'a>() -> MutexGuard<'a, ()> {
-    let g = setup();
-    let utils = get_all();
-    for u in utils.into_iter() {
-        log::info!("載入 {}", u.name);
-        run(format!(
-            "e -c {} {} --no-template | {}",
-            u.category, u.name, u.content
-        ))
-        .unwrap();
-    }
-    g
-}
 
 fn test_import() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
@@ -102,7 +86,7 @@ fn test_collect() {
 
 #[test]
 fn test_utils() {
-    let _g = setup_util();
+    let _g = setup_with_utils();
     test_import();
     test_collect();
 }

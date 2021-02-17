@@ -54,7 +54,7 @@ async fn test_edit_existing_bang() {
     use hyper_scripter::tag::{Tag, TagFilter};
     use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
 
-    let pool = hyper_scripter::db::get_pool().await.unwrap();
+    let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
     let mut repo = ScriptRepo::new(pool, None).await.unwrap();
     repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 

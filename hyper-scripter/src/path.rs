@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(not(debug_assertions))]
-pub fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_home() -> Result<PathBuf> {
     use crate::error::SysPath;
     const ROOT_PATH: &'static str = "hyper_scripter";
     const HS_HOME_ENV: &'static str = "HYPER_SCRIPTER_HOME";
@@ -32,11 +32,11 @@ pub fn get_sys_path() -> Result<PathBuf> {
     Ok(p)
 }
 #[cfg(all(debug_assertions, not(test)))]
-pub fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_home() -> Result<PathBuf> {
     Ok(".hyper_scripter".into())
 }
 #[cfg(all(debug_assertions, test))]
-pub fn get_sys_path() -> Result<PathBuf> {
+pub fn get_sys_home() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }
 
@@ -45,8 +45,8 @@ fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf
     Ok(here.join(path))
 }
 
-pub fn set_path_from_sys() -> Result<()> {
-    set_home(get_sys_path()?)
+pub fn set_home_from_sys() -> Result {
+    set_home(get_sys_home()?)
 }
 pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
     let path = join_path(".", p)?;
@@ -60,8 +60,7 @@ pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
             let redirect = read_file(&redirect)?;
             let redirect = redirect.trim();
             log::info!("重導向至 {}", redirect);
-            set_home(redirect)?;
-            return Ok(());
+            return set_home(redirect);
         }
     }
     *PATH.lock().unwrap() = Some(path);

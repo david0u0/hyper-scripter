@@ -5,13 +5,14 @@ use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::extract_help::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
-use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
+use hyper_scripter::script::{IntoScriptName, ScriptName};
 use hyper_scripter::script_repo::ScriptRepo;
-use hyper_scripter::tag::{Tag, TagControlFlow, TagFilter, TagFilterGroup};
+use hyper_scripter::tag::{TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
+use util::main_util::load_utils;
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +36,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     Ok(res)
 }
 async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
-    let pool = hyper_scripter::db::get_pool().await?;
+    let (pool, init) = hyper_scripter::db::get_pool().await?;
     let recent = if root.timeless {
         None
     } else {
@@ -44,6 +45,12 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     let mut repo = ScriptRepo::new(pool.clone(), recent)
         .await
         .context("讀取歷史記錄失敗")?;
+
+    if init {
+        log::info!("初次使用，載入好用工具");
+        load_utils(&mut repo).await?;
+    }
+
     let historian = repo.historian().clone();
     let mut res = Vec::<Error>::new();
     {
@@ -60,29 +67,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     }
 
     match root.subcmd.unwrap() {
-        Subs::LoadUtils => {
-            let utils = hyper_scripter_util::get_all();
-            for u in utils.into_iter() {
-                log::info!("載入小工具 {}", u.name);
-                let name = u.name.to_owned().into_script_name()?;
-                if repo.get_mut(&name, true).is_some() {
-                    log::warn!("已存在的小工具 {:?}，跳過", name);
-                    continue;
-                }
-                let ty = u.category.parse()?;
-                let tags: Vec<Tag> = if u.is_hidden {
-                    vec!["util".parse().unwrap(), "hide".parse().unwrap()]
-                } else {
-                    vec!["util".parse().unwrap()]
-                };
-                let p = path::open_script(&name, &ty, Some(false))?;
-                let entry = repo
-                    .entry(&name)
-                    .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
-                    .await?;
-                util::prepare_script(&p, *entry, true, Some(u.content))?;
-            }
-        }
+        Subs::LoadUtils => load_utils(&mut repo).await?,
         Subs::Alias {
             unset: false,
             before: Some(before),

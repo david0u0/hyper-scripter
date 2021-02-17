@@ -46,15 +46,6 @@ impl From<Vec<String>> for Alias {
     }
 }
 
-fn gen_alias(from: &str, after: &[&str]) -> (String, Alias) {
-    (
-        from.to_owned(),
-        Alias {
-            after: after.iter().map(|s| s.to_string()).collect(),
-        },
-    )
-}
-
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct RawConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -74,6 +65,14 @@ pub struct Config {
 }
 impl Default for RawConfig {
     fn default() -> Self {
+        fn gen_alias(from: &str, after: &[&str]) -> (String, Alias) {
+            (
+                from.to_owned(),
+                Alias {
+                    after: after.iter().map(|s| s.to_string()).collect(),
+                },
+            )
+        }
         RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
@@ -101,7 +100,8 @@ impl Default for RawConfig {
                 gen_alias("l", &["ls"]),
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--purge", "-f", "removed", "*"]),
-                gen_alias("t", &["ls", "--grouping", "tree"]),
+                gen_alias("tree", &["ls", "--grouping", "tree"]),
+                gen_alias("t", &["tags"]),
             ]
             .into_iter()
             .collect(),

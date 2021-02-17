@@ -346,6 +346,11 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     };
                 }
             } else {
+                print!("known tags:\n  ");
+                for t in repo.iter_known_tags() {
+                    print!("{} ", t);
+                }
+                println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
                     print!("  {} = [{}]", filter.name, filter.filter);
@@ -358,11 +363,6 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 print!("  [{}]", conf.main_tag_filter.filter);
                 if conf.main_tag_filter.obligation {
                     print!(" (obligation)")
-                }
-                println!("");
-                print!("known tags:\n  ");
-                for t in repo.iter_known_tags() {
-                    print!("{} ", t);
                 }
                 println!("");
             }

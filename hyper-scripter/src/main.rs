@@ -297,7 +297,13 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             category: ty,
         } => {
             let new_name = match new {
-                Some(s) => Some(s.into_script_name()?),
+                Some(name) => {
+                    let name = name.into_script_name()?;
+                    if repo.get_mut(&name, true).is_some() {
+                        return Err(Error::ScriptExist(name.to_string()));
+                    }
+                    Some(name)
+                }
                 None => None,
             };
             let mut entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;

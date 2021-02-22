@@ -20,7 +20,6 @@ pub async fn mv<'b>(
     ty: Option<ScriptType>,
     tags: Option<TagControlFlow>,
 ) -> Result {
-    // FIXME: 應該要允許 mv 成既存的名字
     let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {
         let new_name = new_name.as_ref().unwrap_or(&entry.name);

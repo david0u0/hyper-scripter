@@ -21,14 +21,20 @@ pub async fn mv<'b>(
     tags: Option<TagControlFlow>,
 ) -> Result {
     // FIXME: 應該要允許 mv 成既存的名字
-    let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
+    let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {
-        let new_script = path::open_script(
-            new_name.as_ref().unwrap_or(&entry.name),
-            ty.as_ref().unwrap_or(&entry.ty),
-            Some(false),
-        )?;
-        super::mv(&og_script, &new_script)?;
+        let new_name = new_name.as_ref().unwrap_or(&entry.name);
+        let new_ty = ty.as_ref().unwrap_or(&entry.ty);
+        let new_path = path::open_script(new_name, new_ty, None)?;
+        if new_path != og_path {
+            log::debug!("改動腳本檔案：{:?} -> {:?}", og_path, new_path);
+            if new_path.exists() {
+                return Err(Error::PathExist(new_path).context("移動成既存腳本"));
+            }
+            super::mv(&og_path, &new_path)?;
+        } else {
+            log::debug!("相同的腳本檔案：{:?}，不做檔案處理", og_path);
+        }
     }
 
     entry

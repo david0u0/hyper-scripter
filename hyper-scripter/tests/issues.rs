@@ -8,6 +8,22 @@ use std::fs::remove_file;
 use tool::*;
 
 #[test]
+fn test_mv_same_path() {
+    println!("移動腳本時，若前後腳本的路徑相同（腳本分類所致），應順利改動");
+    let _g = setup();
+
+    run("e test | echo 1").unwrap();
+    run("e test2 | echo 2").unwrap();
+
+    run("mv test -c tmux").unwrap();
+    assert_eq!(run("test").unwrap(), "1");
+
+    run("mv test test2").expect_err("移動成撞名的腳本應報錯");
+    assert_eq!(run("test").unwrap(), "1");
+    run("mv test test2 -c rb").expect_err("移動成撞名的腳本，即使分類不同，也應報錯");
+    assert_eq!(run("test").unwrap(), "1");
+}
+#[test]
 fn test_rm_non_exist() {
     println!("若欲刪除的腳本不存在，應直接消滅之。");
     let _g = setup();

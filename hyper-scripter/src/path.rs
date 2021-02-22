@@ -125,8 +125,7 @@ pub fn open_script(
                 Error::PathNotFound(vec![script_path]).context("開腳本失敗：應存在卻不存在")
             );
         } else if script_path.exists() && !should_exist {
-            return Err(Error::ScriptExist(name.key().as_ref().to_owned())
-                .context("開腳本失敗：不應存在卻存在"));
+            return Err(Error::PathExist(script_path).context("開腳本失敗：不應存在卻存在"));
         }
     }
     Ok(script_path)

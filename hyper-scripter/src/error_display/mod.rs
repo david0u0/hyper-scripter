@@ -31,6 +31,7 @@ impl Display for Error {
             SysPathNotFound(SysPath::Home) => write!(f, "Can not find you're home path.")?,
             PermissionDenied(v) => fmt_multi_path(f, "Permission denied", v)?,
             PathNotFound(v) => fmt_multi_path(f, "Path not found", v)?,
+            PathExist(path) => write!(f, "Path already exist: {:?}", path)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
             CategoryMismatch { expect, actual } => write!(

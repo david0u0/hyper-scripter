@@ -30,6 +30,7 @@ pub enum Error {
     PathNotFound(Vec<PathBuf>),
     GeneralFS(Vec<PathBuf>, Arc<std::io::Error>),
 
+    PathExist(PathBuf),
     ScriptExist(String),
     ScriptNotFound(String),
     CategoryMismatch {

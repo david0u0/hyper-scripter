@@ -47,6 +47,7 @@ impl ScriptName {
                 Err(e) => return Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
             }
         } else {
+            // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
             if s.starts_with("-")
                 || s.starts_with(".")
                 || s.find("..").is_some()

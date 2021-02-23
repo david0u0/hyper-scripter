@@ -8,7 +8,7 @@ use std::fs::remove_file;
 use tool::*;
 
 #[test]
-fn test_mv_same_path() {
+fn test_mv_same_name() {
     println!("移動腳本時，若前後腳本的路徑相同（腳本分類所致），應順利改動");
     let _g = setup();
 
@@ -21,6 +21,23 @@ fn test_mv_same_path() {
     run("mv test test2").expect_err("移動成撞名的腳本應報錯");
     assert_eq!(run("test").unwrap(), "1");
     run("mv test test2 -c rb").expect_err("移動成撞名的腳本，即使分類不同，也應報錯");
+    assert_eq!(run("test").unwrap(), "1");
+}
+#[test]
+fn test_cp_same_name() {
+    println!("複製腳本時，若和既存的腳本撞名，應報錯");
+    let _g = setup();
+
+    run("e test -c rb | puts 1").unwrap();
+    run("e test2 | echo 2").unwrap();
+    run("e test3 -c rb | puts 3").unwrap();
+
+    run("cp test test2").expect_err("改成撞名的腳本，即使路徑不同，也應報錯");
+    assert_eq!(run("test2").unwrap(), "2");
+
+    run("cp test test3").expect_err("改成撞名的腳本應報錯");
+    assert_eq!(run("test3").unwrap(), "3");
+
     assert_eq!(run("test").unwrap(), "1");
 }
 #[test]

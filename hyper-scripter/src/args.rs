@@ -182,7 +182,7 @@ pub enum Subs {
         tags: Option<TagControlFlow>,
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
-        new: Option<String>,
+        new: Option<ScriptName>,
     },
     #[structopt(
         about = "Manage script tags. If a tag filter is given, set it as default, otherwise show tag information."

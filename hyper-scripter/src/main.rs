@@ -5,7 +5,7 @@ use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::extract_help::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
-use hyper_scripter::script::{IntoScriptName, ScriptName};
+use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::ScriptRepo;
 use hyper_scripter::tag::{TagControlFlow, TagFilter, TagFilterGroup};
 use hyper_scripter::{
@@ -282,7 +282,9 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             }
         }
         Subs::CP { origin, new } => {
-            // FIXME: 應該要允許 cp 成既存的名字
+            if repo.get_mut(&new, true).is_some() {
+                return Err(Error::ScriptExist(new.to_string()));
+            }
             let entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let new_script = path::open_script(&new, &entry.ty, Some(false))?;
@@ -298,7 +300,6 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         } => {
             let new_name = match new {
                 Some(name) => {
-                    let name = name.into_script_name()?;
                     if repo.get_mut(&name, true).is_some() {
                         return Err(Error::ScriptExist(name.to_string()));
                     }

@@ -185,7 +185,7 @@ pub enum Subs {
         new: Option<ScriptName>,
     },
     #[structopt(
-        about = "Manage script tags. If a tag filter is given, set it as default, otherwise show tag information."
+        about = "Manage script tags. If a tag filter is given, store it to config, otherwise show tag information."
     )]
     Tags {
         #[structopt(parse(try_from_str))]

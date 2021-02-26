@@ -76,7 +76,7 @@ impl Default for RawConfig {
         RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
-                    filter: "+pin,util".parse().unwrap(),
+                    filter: "+pin".parse().unwrap(),
                     obligation: false,
                     name: "pin".to_owned(),
                 },

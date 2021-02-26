@@ -318,31 +318,36 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 if let Some(name) = filter.name {
                     log::debug!("處理篩選器 {:?}", name);
                     let is_empty = filter.content.is_empty();
+                    // 順便在這個變數中帶上「是否為既有篩選器」的訊息。若找到了既有的篩器，就把 content 的值搶過來
                     let mut content = Some(filter.content);
-                    let tag_filters = &mut conf.tag_filters;
-                    for (i, f) in tag_filters.iter_mut().enumerate() {
-                        if f.name == name {
-                            if is_empty {
-                                log::info!("刪除篩選器 {} {}", name, content.as_ref().unwrap());
-                                tag_filters.remove(i);
-                            } else {
-                                log::info!("修改篩選器 {} {}", name, content.as_ref().unwrap());
-                                f.obligation = obligation;
-                                f.filter = content.take().unwrap();
-                            }
-                            break;
+                    let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
+                    if let Some((i, existing_filter)) = tag_filters
+                        .iter_mut()
+                        .enumerate()
+                        .find(|(_, f)| f.name == name)
+                    {
+                        let content = content.take().unwrap();
+                        if is_empty {
+                            log::info!("刪除篩選器 {} {}", name, content);
+                            tag_filters.remove(i);
+                        } else {
+                            log::info!("修改篩選器 {} {}", name, content);
+                            existing_filter.obligation = obligation;
+                            existing_filter.filter = content;
                         }
                     }
+
+                    // 若 content == None 代表該值已經用在既有篩選器上了，底下就不用做
                     if let Some(content) = content {
                         if !is_empty {
                             log::info!("新增篩選器 {} {}", name, content);
-                            conf.tag_filters.push(NamedTagFilter {
+                            tag_filters.push(NamedTagFilter {
                                 filter: content,
                                 obligation,
                                 name,
                             });
                         } else {
-                            log::warn!("試著刪除不存在的篩選器 {:?}", name);
+                            log::error!("試著刪除不存在的篩選器 {:?}", name); // TODO: 應該報錯上去？
                         }
                     }
                 } else {

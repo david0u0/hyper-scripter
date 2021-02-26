@@ -123,7 +123,7 @@ pub fn cp(origin: &PathBuf, new: &PathBuf) -> Result<()> {
 pub fn handle_fs_err<P: AsRef<Path>>(path: &[P], err: std::io::Error) -> Error {
     use std::sync::Arc;
     let p = path.iter().map(|p| p.as_ref().to_owned()).collect();
-    log::warn!("檔案系統錯誤：{:?}, {:?}", p, err);
+    log::debug!("檔案系統錯誤：{:?}, {:?}", p, err);
     match err.kind() {
         std::io::ErrorKind::PermissionDenied => Error::PermissionDenied(p),
         std::io::ErrorKind::NotFound => Error::PathNotFound(p),

@@ -12,10 +12,11 @@ use std::path::PathBuf;
 
 const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
-    static ref CONFIG: Result<Config> = RawConfig::load().map(|c| {
+    static ref CONFIG: Result<Config> = RawConfig::load().map(|(raw_config, read_from_file)| {
         Config {
+            read_from_file,
+            raw_config,
             changed: false,
-            raw_config: c,
             open_time: Utc::now(),
         }
     });
@@ -58,6 +59,7 @@ pub struct RawConfig {
 }
 #[derive(Debug, Clone, Deref)]
 pub struct Config {
+    read_from_file: bool,
     changed: bool,
     open_time: DateTime<Utc>,
     #[deref]
@@ -111,21 +113,25 @@ impl Default for RawConfig {
 }
 impl RawConfig {
     #[cfg(test)]
-    fn load() -> Result<Self> {
-        Ok(Self::default())
+    fn load() -> Result<(Self, bool)> {
+        Ok((Self::default(), false))
     }
     #[cfg(not(test))]
-    fn load() -> Result<Self> {
+    fn load() -> Result<(Self, bool)> {
         use crate::error::FormatCode;
 
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
-            Ok(s) => toml::from_str(&s)
-                .map_err(|_| Error::Format(FormatCode::Config, path.to_string_lossy().into())),
+            Ok(s) => {
+                let conf = toml::from_str(&s).map_err(|_| {
+                    Error::Format(FormatCode::Config, path.to_string_lossy().into())
+                })?;
+                Ok((conf, true))
+            }
             Err(Error::PathNotFound(_)) => {
                 log::debug!("找不到設定檔，使用預設值");
-                Ok(Default::default())
+                Ok((Default::default(), false))
             }
             Err(e) => Err(e),
         }
@@ -141,9 +147,16 @@ impl Config {
     pub fn store(&self) -> Result<()> {
         log::info!("寫入設定檔…");
         let path = config_file();
-        if !self.changed && path.exists() {
-            log::info!("設定檔未改變，不寫入");
-            return Ok(());
+        if !self.changed {
+            if path.exists() {
+                log::info!("設定檔未改變，不寫入");
+                return Ok(());
+            } else if self.read_from_file {
+                log::info!("設定檔中途被刪掉，且未改變，不寫入");
+                return Ok(());
+            } else {
+                log::info!("把憑空變出來的設定檔寫入檔案");
+            }
         }
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {

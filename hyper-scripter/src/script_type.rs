@@ -183,12 +183,12 @@ impl ScriptTypeConfig {
         );
 
         ret.insert(
-            "md".into(),
+            "txt".into(),
             ScriptTypeConfig {
-                ext: Some("md".to_owned()),
+                ext: None,
                 color: "bright black".to_owned(),
                 template: default_template(),
-                cmd: Some("vim".to_owned()),
+                cmd: Some("cat".to_owned()),
                 args: vec!["{{path}}".to_owned()],
                 env: vec![],
             },

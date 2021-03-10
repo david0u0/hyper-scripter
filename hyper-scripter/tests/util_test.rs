@@ -1,5 +1,3 @@
-#![feature(str_split_once)]
-
 #[allow(dead_code)]
 #[path = "tool.rs"]
 mod tool;

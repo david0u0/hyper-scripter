@@ -2,7 +2,7 @@ use chrono::Utc;
 use hyper_scripter::args::{self, print_help, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::extract_help::extract_help;
+use hyper_scripter::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
@@ -174,9 +174,9 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             let entry =
                 query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
-            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let content = util::read_file(&script_path)?;
-            for msg in extract_help(&content, true) {
+
+            extract_help!(helps, entry, true);
+            for msg in helps {
                 println!("{}", msg);
             }
         }

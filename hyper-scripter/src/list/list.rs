@@ -1,6 +1,7 @@
 use super::{style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions};
 use crate::config::Config;
 use crate::error::Result;
+use crate::extract_help;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
@@ -105,8 +106,11 @@ pub fn fmt_meta<W: Write>(
                 style(opt.plain, script.name.key(), |s| s.color(color).bold()),
             );
             let ty_txt = style(opt.plain, &script.ty, |s| s.color(color).bold());
-            let row =
-                row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time)];
+
+            extract_help!(help_msg, script, false);
+            let help_msg = help_msg.into_iter().next().unwrap_or_default();
+
+            let row = row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, w) => {
@@ -127,7 +131,13 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-const TITLE: &[&str] = &["name", "category", "last write time", "last execute time"];
+const TITLE: &[&str] = &[
+    "name",
+    "category",
+    "last write time",
+    "last execute time",
+    "help message",
+];
 pub fn fmt_list<'a, W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,

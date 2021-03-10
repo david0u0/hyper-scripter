@@ -24,3 +24,12 @@ pub enum Either<T, U> {
     One(T),
     Two(U),
 }
+
+#[macro_export]
+macro_rules! extract_help {
+    ($res_name:ident, $script:expr, $long:expr) => {
+        let script_path = $crate::path::open_script(&$script.name, &$script.ty, Some(true))?;
+        let content = $crate::util::read_file(&script_path)?;
+        let $res_name = $crate::extract_help::extract_help_from_content(&content, $long);
+    };
+}

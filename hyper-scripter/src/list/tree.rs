@@ -5,6 +5,7 @@ use super::{
 };
 use crate::config::Config;
 use crate::error::Result;
+use crate::extract_help;
 use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
@@ -13,7 +14,12 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::io::Write;
 
-const TITLE: &[&str] = &["category", "last write time", "last execute time"];
+const TITLE: &[&str] = &[
+    "category",
+    "last write time",
+    "last execute time",
+    "help message",
+];
 
 struct ShortFormatter {
     plain: bool,
@@ -75,7 +81,11 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
             write!(f, "{}", "*".color(Color::Yellow).bold())?;
         }
         write!(f, "{}", ident)?;
-        let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time)];
+
+        extract_help!(help_msg, script, false);
+        let help_msg = help_msg.into_iter().next().unwrap_or_default();
+
+        let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
         self.table.add_row(row);
         Ok(())
     }
@@ -182,7 +192,7 @@ mod test {
             ("bbb/ccc/ggg/fff", "tmux"),
             ("aaa", "sh"),
             ("bbb/ccc/ddd/eee", "tmux"),
-            (".2", "md"),
+            (".2", "txt"),
             ("bbb/ccc/yyy", "js"),
             ("bbb/ccc/ddd/www", "rb"),
             ("bbb/ccc/ggg/xxx", "tmux"),
@@ -195,7 +205,7 @@ mod test {
             latest_script_id: 1,
         };
         let ans = "
-.2(md)
+.2(txt)
 aaa(sh)
 aaa
 └── bbb(rb)

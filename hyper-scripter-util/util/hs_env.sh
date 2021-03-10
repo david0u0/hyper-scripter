@@ -14,6 +14,12 @@ while true; do
     cd ..
 done
 
-EXE=$(cat .hs_exe_path)
-
-echo $CUR:$EXE
+if [ "$1" == "home" ]; then
+    echo $CUR
+elif [ "$2" == "exe" ]; then
+    EXE=$(cat .hs_exe_path)
+    echo $EXE
+else
+    EXE=$(cat .hs_exe_path)
+    echo $CUR:$EXE
+fi

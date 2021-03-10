@@ -4,7 +4,7 @@ use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-const SHELL_WELCOME_MSG: &str = "# Hello, scripter! Here are some useful commands to begin with:
+const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
@@ -13,8 +13,7 @@ cd ~/{{birthplace}}
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const JS_WELCOME_MSG: &str =
-    "// Hello, scripter! Here are some information you may be intrested in:
+const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 
 const name = '{{name}}';
 process.chdir(require('os').homedir());
@@ -28,7 +27,7 @@ writeFile('/dev/null', 'some content');
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const TMUX_WELCOME_MSG: &str = "# Hello, scripter!
+const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 export NAME=\"{{name}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
@@ -39,7 +38,7 @@ tmux split-window -h \"{{{content.1}}}; $SHELL\"
 {{/if}}
 tmux -2 attach-session -d";
 
-const RB_WELCOME_MSG: &str = "# Hello, scripter!
+const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 NAME = '{{name}}'
 

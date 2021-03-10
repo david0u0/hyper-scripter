@@ -129,7 +129,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
     use colored::{Color, Colorize};
     use console::{Key, Term};
 
-    let term = Term::stdout();
+    let term = Term::stderr();
 
     let color = Config::get()?.get_color(&script.ty)?;
     let msg = format!(

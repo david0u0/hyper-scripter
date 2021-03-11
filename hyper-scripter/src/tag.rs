@@ -8,7 +8,7 @@ use std::str::FromStr;
 pub struct TagFilterGroup(Vec<TagFilter>);
 impl TagFilterGroup {
     pub fn push(&mut self, filter: TagFilter) {
-        if filter.filter.append {
+        if filter.append {
             self.0.push(filter);
         } else {
             self.0 = vec![filter];
@@ -34,32 +34,14 @@ impl From<TagFilter> for TagFilterGroup {
         TagFilterGroup(vec![t])
     }
 }
-impl From<TagControlFlow> for TagFilter {
-    fn from(t: TagControlFlow) -> Self {
-        TagFilter {
-            filter: t,
-            obligation: false,
-        }
-    }
-}
-
-fn is_false(t: &bool) -> bool {
-    !t
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TagFilter {
-    pub filter: TagControlFlow,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub obligation: bool,
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct TagControlFlow {
+pub struct TagFilter {
     tags: Vec<TagControl>,
     pub append: bool,
+    pub obligation: bool,
 }
-impl<'de> Deserialize<'de> for TagControlFlow {
+impl<'de> Deserialize<'de> for TagFilter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -69,7 +51,7 @@ impl<'de> Deserialize<'de> for TagControlFlow {
         Ok(s.parse().unwrap())
     }
 }
-impl Serialize for TagControlFlow {
+impl Serialize for TagFilter {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -127,24 +109,24 @@ impl FromStr for TagControl {
         })
     }
 }
+const OBLIGATION_PREFIX: &'static str = "o/";
 impl FromStr for TagFilter {
-    type Err = Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Error> {
-        Ok(TagFilter {
-            filter: s.parse()?,
-            obligation: false,
-        })
-    }
-}
-impl FromStr for TagControlFlow {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
         let append = if s.starts_with("+") {
-            s = &s[1..s.len()];
+            s = &s[1..];
             true
         } else {
             false
         };
+
+        let obligation = if s.starts_with(OBLIGATION_PREFIX) {
+            s = &s[OBLIGATION_PREFIX.len()..];
+            true
+        } else {
+            false
+        };
+
         let mut tags = vec![];
         for filter in s.split(",") {
             tags.push(filter.parse()?);
@@ -152,15 +134,22 @@ impl FromStr for TagControlFlow {
         if tags.len() == 0 {
             return Err(Error::Format(TagCode, s.to_owned()));
         }
-        Ok(TagControlFlow { tags, append })
+        Ok(TagFilter {
+            tags,
+            append,
+            obligation,
+        })
     }
 }
 
-impl Display for TagControlFlow {
+impl Display for TagFilter {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let mut first = true;
         if self.append {
             write!(w, "+")?;
+        }
+        if self.obligation {
+            write!(w, "o/")?;
         }
         for f in self.tags.iter() {
             if !first {
@@ -175,7 +164,7 @@ impl Display for TagControlFlow {
         Ok(())
     }
 }
-impl TagControlFlow {
+impl TagFilter {
     pub fn is_empty(&self) -> bool {
         self.tags.is_empty()
     }
@@ -200,7 +189,7 @@ impl TagControlFlow {
 impl TagFilter {
     pub fn filter(&self, tags: &[&Tag]) -> Option<bool> {
         let mut pass: Option<bool> = None;
-        for filter in self.filter.tags.iter() {
+        for filter in self.tags.iter() {
             // TODO: 優化
             if filter.tag.match_all() || tags.contains(&&filter.tag) {
                 pass = Some(filter.allow);

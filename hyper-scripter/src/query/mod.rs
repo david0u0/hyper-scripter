@@ -3,7 +3,7 @@ use crate::error::{
     FormatCode::ScriptQuery as ScriptQueryCode, Result,
 };
 use crate::script::{IntoScriptName, ScriptName};
-use crate::tag::TagControlFlow;
+use crate::tag::TagFilter;
 use regex::Regex;
 use std::str::FromStr;
 
@@ -130,7 +130,7 @@ impl FromStr for ScriptQuery {
 #[derive(Debug)]
 pub struct FilterQuery {
     pub name: Option<String>,
-    pub content: TagControlFlow,
+    pub content: TagFilter,
 }
 
 impl FromStr for FilterQuery {
@@ -147,7 +147,7 @@ impl FromStr for FilterQuery {
             }
             &[name, s] => {
                 log::trace!("解析有名篩選器：{} = {}", name, s);
-                let content: TagControlFlow = if s.len() == 0 {
+                let content: TagFilter = if s.len() == 0 {
                     Default::default()
                 } else {
                     s.parse()?

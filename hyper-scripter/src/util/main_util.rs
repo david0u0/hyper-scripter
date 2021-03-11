@@ -4,12 +4,12 @@ use crate::query::{self, do_script_query_strict_with_missing, EditQuery, ScriptQ
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_type::ScriptType;
-use crate::tag::{Tag, TagControlFlow};
+use crate::tag::{Tag, TagFilter};
 use hyper_scripter_historian::{Event, EventData, Historian};
 use std::path::PathBuf;
 
 pub struct EditTagArgs {
-    pub content: TagControlFlow,
+    pub content: TagFilter,
     pub change_existing: bool,
     pub append_namespace: bool,
 }
@@ -18,7 +18,7 @@ pub async fn mv<'b>(
     entry: &mut ScriptRepoEntry<'b>,
     new_name: Option<ScriptName>,
     ty: Option<ScriptType>,
-    tags: Option<TagControlFlow>,
+    tags: Option<TagFilter>,
 ) -> Result {
     let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {

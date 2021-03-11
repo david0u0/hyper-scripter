@@ -7,7 +7,7 @@ use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOption
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::ScriptRepo;
-use hyper_scripter::tag::{TagControlFlow, TagFilter, TagFilterGroup};
+use hyper_scripter::tag::{TagFilter, TagFilterGroup};
 use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
@@ -120,10 +120,11 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             // TODO: 這裡邏輯太複雜了，抽出來測試吧
             let edit_tags = {
                 // TODO: 不要這麼愛 clone
+                // TODO: 真的需要考慮到 root.filter 嗎？
                 let mut innate_tags = match root.filter {
-                    None => conf.main_tag_filter.clone().filter,
+                    None => conf.main_tag_filter.clone(),
                     Some(tags) => {
-                        let mut main_tags = conf.main_tag_filter.clone().filter;
+                        let mut main_tags = conf.main_tag_filter.clone();
                         main_tags.push(tags);
                         main_tags
                     }
@@ -247,7 +248,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
-            let delete_tag: Option<TagControlFlow> = Some("+removed".parse().unwrap());
+            let delete_tag: Option<TagFilter> = Some("+removed".parse().unwrap());
             let mut to_purge = vec![];
             for mut entry in query::do_list_query(&mut repo, &queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
@@ -310,10 +311,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             let mut entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
             util::main_util::mv(&mut entry, new_name, ty, tags).await?;
         }
-        Subs::Tags {
-            tag_filter,
-            obligation,
-        } => {
+        Subs::Tags { tag_filter } => {
             if let Some(filter) = tag_filter {
                 if let Some(name) = filter.name {
                     log::debug!("處理篩選器 {:?}", name);
@@ -332,8 +330,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                             tag_filters.remove(i);
                         } else {
                             log::info!("修改篩選器 {} {}", name, content);
-                            existing_filter.obligation = obligation;
-                            existing_filter.filter = content;
+                            existing_filter.content = content;
                         }
                     }
 
@@ -341,21 +338,14 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     if let Some(content) = content {
                         if !is_empty {
                             log::info!("新增篩選器 {} {}", name, content);
-                            tag_filters.push(NamedTagFilter {
-                                filter: content,
-                                obligation,
-                                name,
-                            });
+                            tag_filters.push(NamedTagFilter { content, name });
                         } else {
                             log::error!("試著刪除不存在的篩選器 {:?}", name); // TODO: 應該報錯上去？
                         }
                     }
                 } else {
                     log::info!("加入主篩選器 {:?}", filter);
-                    conf.main_tag_filter = TagFilter {
-                        filter: filter.content.clone(),
-                        obligation,
-                    };
+                    conf.main_tag_filter = filter.content;
                 }
             } else {
                 print!("known tags:\n  ");
@@ -365,14 +355,15 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
-                    print!("  {} = [{}]", filter.name, filter.filter);
-                    if filter.obligation {
+                    let content = &filter.content;
+                    print!("  {} = [{}]", filter.name, content);
+                    if content.obligation {
                         print!(" (obligation)")
                     }
                     println!("")
                 }
                 println!("main tag filter:");
-                print!("  [{}]", conf.main_tag_filter.filter);
+                print!("  [{}]", conf.main_tag_filter);
                 if conf.main_tag_filter.obligation {
                     print!(" (obligation)")
                 }

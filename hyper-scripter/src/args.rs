@@ -4,7 +4,7 @@ use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
-use crate::tag::TagControlFlow;
+use crate::tag::TagFilter;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
@@ -36,7 +36,7 @@ macro_rules! def_root {
                 parse(try_from_str),
                 help = "Filter by tags, e.g. `all,^mytag`"
             )]
-            pub filter: Option<TagControlFlow>,
+            pub filter: Option<TagFilter>,
             #[structopt(
                 short,
                 long,
@@ -62,7 +62,7 @@ macro_rules! def_root {
 }
 
 mod alias_mod {
-    use super::{AllArgsOverrideSelf, AllowLeadingHyphen, StructOpt, TagControlFlow};
+    use super::{AllArgsOverrideSelf, AllowLeadingHyphen, StructOpt, TagFilter};
     #[derive(StructOpt, Debug)]
     pub enum Subs {
         #[structopt(external_subcommand)]
@@ -100,7 +100,7 @@ pub enum Subs {
         #[structopt(long, short)]
         no_template: bool,
         #[structopt(long, short)]
-        tags: Option<TagControlFlow>,
+        tags: Option<TagFilter>,
         #[structopt(
             long,
             requires("content"),
@@ -179,7 +179,7 @@ pub enum Subs {
         )]
         category: Option<ScriptType>,
         #[structopt(short, long)]
-        tags: Option<TagControlFlow>,
+        tags: Option<TagFilter>,
         #[structopt(parse(try_from_str))]
         origin: ScriptQuery,
         new: Option<ScriptName>,
@@ -190,8 +190,6 @@ pub enum Subs {
     Tags {
         #[structopt(parse(try_from_str))]
         tag_filter: Option<FilterQuery>,
-        #[structopt(long, short, help = "Set the filter to obligation")]
-        obligation: bool, // FIXME: 這邊下 requires 不知為何會炸掉 clap
     },
 }
 

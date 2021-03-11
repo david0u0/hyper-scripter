@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
-use crate::tag::{TagControlFlow, TagFilter, TagFilterGroup};
+use crate::tag::{TagFilter, TagFilterGroup};
 use crate::util;
 use chrono::{DateTime, Utc};
 use colored::Color;
@@ -26,14 +26,9 @@ fn config_file() -> PathBuf {
     path::get_home().join(CONFIG_FILE)
 }
 
-fn is_false(t: &bool) -> bool {
-    !t
-}
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct NamedTagFilter {
-    pub filter: TagControlFlow,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub obligation: bool,
+    pub content: TagFilter,
     pub name: String,
 }
 
@@ -78,18 +73,15 @@ impl Default for RawConfig {
         RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
-                    filter: "+pin".parse().unwrap(),
-                    obligation: false,
+                    content: "+pin".parse().unwrap(),
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
-                    filter: "+all,^hide".parse().unwrap(),
-                    obligation: true,
+                    content: "+o/all,^hide".parse().unwrap(),
                     name: "no-hidden".to_owned(),
                 },
                 NamedTagFilter {
-                    filter: "+all,^removed".parse().unwrap(),
-                    obligation: true,
+                    content: "+o/all,^removed".parse().unwrap(),
                     name: "no-removed".to_owned(),
                 },
             ],
@@ -192,10 +184,7 @@ impl Config {
     pub fn get_tag_filter_group(&self) -> TagFilterGroup {
         let mut group = TagFilterGroup::default();
         for f in self.tag_filters.iter() {
-            group.push(TagFilter {
-                obligation: f.obligation,
-                filter: f.filter.clone(),
-            });
+            group.push(f.content.clone());
         }
         group.push(self.main_tag_filter.clone());
         group

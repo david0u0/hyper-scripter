@@ -80,7 +80,7 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
         v.push(second.trim());
         v
     } else {
-        args.split(" ").collect()
+        args.split_whitespace().collect()
     };
     full_args.extend(&args_vec);
 
@@ -112,11 +112,30 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
     res
 }
 
-pub fn assert_ls_len(expect: usize) {
-    let ls_res = run("ls -f all --grouping none --plain --name").unwrap();
-    let ls_vec = ls_res
+fn get_ls(filter: Option<&str>) -> Vec<String> {
+    let ls_res = run(format!(
+        "ls {} --grouping none --plain --name",
+        filter.map(|f| format!("-f {}", f)).unwrap_or_default()
+    ))
+    .unwrap();
+    ls_res
         .split(" ")
-        .filter(|s| s.len() > 0)
-        .collect::<Vec<_>>();
-    assert_eq!(expect, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
+        .filter_map(|s| {
+            if s.len() > 0 {
+                Some(s.to_owned())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+}
+pub fn assert_ls_len(expect: usize, filter: Option<&str>) {
+    let res = get_ls(filter);
+    assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", filter, res);
+}
+pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>) {
+    expect.sort();
+    let mut res = get_ls(filter);
+    res.sort();
+    assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);
 }

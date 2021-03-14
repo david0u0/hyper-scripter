@@ -317,3 +317,20 @@ fn test_redirect() {
     run("e --fast test | echo 我在 $(realpath $(dirname $0))").unwrap();
     assert_eq!(run("-").unwrap(), format!("我在 {}", redirected));
 }
+
+#[test]
+fn test_mandatory_tags() {
+    let _g = setup();
+    run("e prj1/t | echo prj1/src").unwrap();
+    run("e prj2/t | echo prj2/src").unwrap();
+    run("e prj1/src/t | echo prj1/src").unwrap();
+    run("e prj2/src/t | echo prj2/src").unwrap();
+
+    assert_ls(vec!["prj1/t", "prj1/src/t", "prj2/t", "prj2/src/t"], None);
+
+    run("tags prj1").unwrap();
+    assert_ls(vec!["prj1/t", "prj1/src/t"], None);
+    assert_ls(vec!["prj1/src/t", "prj2/src/t"], Some("src"));
+    assert_ls(vec!["prj1/t", "prj2/src/t", "prj1/src/t"], Some("+src"));
+    assert_ls(vec!["prj1/src/t"], Some("+m/src"));
+}

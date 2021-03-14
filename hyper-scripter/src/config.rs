@@ -77,11 +77,11 @@ impl Default for RawConfig {
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
-                    content: "+o/all,^hide".parse().unwrap(),
+                    content: "+m/all,^hide".parse().unwrap(),
                     name: "no-hidden".to_owned(),
                 },
                 NamedTagFilter {
-                    content: "+o/all,^removed".parse().unwrap(),
+                    content: "+m/all,^removed".parse().unwrap(),
                     name: "no-removed".to_owned(),
                 },
             ],

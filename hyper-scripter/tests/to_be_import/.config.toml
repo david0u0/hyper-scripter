@@ -8,11 +8,11 @@ content = '+pin,util'
 name = 'pin'
 
 [[tag_filters]]
-content = '+o/all,^hide'
+content = '+m/all,^hide'
 name = 'no-hidden'
 
 [[tag_filters]]
-content = '+o/all,^removed'
+content = '+m/all,^removed'
 name = 'no-removed'
 [categories.js-i]
 ext = 'js'

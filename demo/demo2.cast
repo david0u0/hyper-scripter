@@ -751,7 +751,7 @@
 [138.830927, "o", "[30m\u001b(B\u001b[m"]
 [138.831099, "o", "\u001b[?2004l"]
 [138.831656, "o", "\u001b]0;hs /home/why8ther/Workspace/demo\u0007\u001b[30m\u001b(B\u001b[m\r"]
-[138.850741, "o", "tag filters:\r\n  no-hidden = [+all,^hide] (obligation)\r\n  no-removed = [+all,^removed] (obligation)\r\nmain tag filter:\r\n  [demo-tag]\r\n"]
+[138.850741, "o", "tag filters:\r\n  no-hidden = [+all,^hide] (mandatory)\r\n  no-removed = [+all,^removed] (mandatory)\r\nmain tag filter:\r\n  [demo-tag]\r\n"]
 [138.852304, "o", "\u001b[2m⏎\u001b(B\u001b[m                                                                                                                       \r⏎ \r\u001b[K"]
 [138.85246, "o", "\u001b[?2004h"]
 [138.857022, "o", "\u001b]0;fish /home/why8ther/Works"]

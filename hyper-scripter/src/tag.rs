@@ -18,7 +18,7 @@ impl TagFilterGroup {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.filter(tags);
-            if f.obligation {
+            if f.mandatory {
                 if res != Some(true) {
                     return false;
                 }
@@ -39,7 +39,7 @@ impl From<TagFilter> for TagFilterGroup {
 pub struct TagFilter {
     tags: Vec<TagControl>,
     pub append: bool,
-    pub obligation: bool,
+    pub mandatory: bool,
 }
 impl<'de> Deserialize<'de> for TagFilter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -47,8 +47,7 @@ impl<'de> Deserialize<'de> for TagFilter {
         D: serde::Deserializer<'de>,
     {
         let s: &str = Deserialize::deserialize(deserializer)?;
-        // TODO: unwrap?
-        Ok(s.parse().unwrap())
+        s.parse().map_err(serde::de::Error::custom)
     }
 }
 impl Serialize for TagFilter {
@@ -109,7 +108,7 @@ impl FromStr for TagControl {
         })
     }
 }
-const OBLIGATION_PREFIX: &'static str = "o/";
+const OBLIGATION_PREFIX: &'static str = "m/";
 impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
@@ -120,7 +119,7 @@ impl FromStr for TagFilter {
             false
         };
 
-        let obligation = if s.starts_with(OBLIGATION_PREFIX) {
+        let mandatory = if s.starts_with(OBLIGATION_PREFIX) {
             s = &s[OBLIGATION_PREFIX.len()..];
             true
         } else {
@@ -137,7 +136,7 @@ impl FromStr for TagFilter {
         Ok(TagFilter {
             tags,
             append,
-            obligation,
+            mandatory,
         })
     }
 }
@@ -148,8 +147,8 @@ impl Display for TagFilter {
         if self.append {
             write!(w, "+")?;
         }
-        if self.obligation {
-            write!(w, "o/")?;
+        if self.mandatory {
+            write!(w, "m/")?;
         }
         for f in self.tags.iter() {
             if !first {

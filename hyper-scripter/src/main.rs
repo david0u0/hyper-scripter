@@ -357,15 +357,15 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 for filter in conf.tag_filters.iter() {
                     let content = &filter.content;
                     print!("  {} = [{}]", filter.name, content);
-                    if content.obligation {
-                        print!(" (obligation)")
+                    if content.mandatory {
+                        print!(" (mandatory)")
                     }
                     println!("")
                 }
                 println!("main tag filter:");
                 print!("  [{}]", conf.main_tag_filter);
-                if conf.main_tag_filter.obligation {
-                    print!(" (obligation)")
+                if conf.main_tag_filter.mandatory {
+                    print!(" (mandatory)")
                 }
                 println!("");
             }

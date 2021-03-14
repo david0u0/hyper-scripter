@@ -73,19 +73,19 @@ impl Default for RawConfig {
         RawConfig {
             tag_filters: vec![
                 NamedTagFilter {
-                    content: "+pin".parse().unwrap(),
+                    content: "pin".parse().unwrap(),
                     name: "pin".to_owned(),
                 },
                 NamedTagFilter {
-                    content: "+m/all,^hide".parse().unwrap(),
+                    content: "m/all,^hide".parse().unwrap(),
                     name: "no-hidden".to_owned(),
                 },
                 NamedTagFilter {
-                    content: "+m/all,^removed".parse().unwrap(),
+                    content: "m/all,^removed".parse().unwrap(),
                     name: "no-removed".to_owned(),
                 },
             ],
-            main_tag_filter: "+all".parse().unwrap(),
+            main_tag_filter: "all".parse().unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
             alias: vec![
                 // FIXME: 一旦陣列實作了 intoiterator 就用陣列

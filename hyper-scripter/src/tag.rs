@@ -4,14 +4,17 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
 
+const MANDATORY_PREFIX: &'static str = "m/";
+const OVERWRITE_PREFIX: &'static str = "o/";
+
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TagFilterGroup(Vec<TagFilter>);
 impl TagFilterGroup {
     pub fn push(&mut self, filter: TagFilter) {
-        if filter.append {
-            self.0.push(filter);
-        } else {
+        if filter.overwrite {
             self.0 = vec![filter];
+        } else {
+            self.0.push(filter);
         }
     }
     pub fn filter(&self, tags: &[&Tag]) -> bool {
@@ -38,7 +41,7 @@ impl From<TagFilter> for TagFilterGroup {
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TagFilter {
     tags: Vec<TagControl>,
-    pub append: bool,
+    pub overwrite: bool,
     pub mandatory: bool,
 }
 impl<'de> Deserialize<'de> for TagFilter {
@@ -108,23 +111,29 @@ impl FromStr for TagControl {
         })
     }
 }
-const OBLIGATION_PREFIX: &'static str = "m/";
 impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
-        let append = if s.starts_with("+") {
-            s = &s[1..];
-            true
-        } else {
-            false
-        };
+        let mut overwrite = false;
+        let mut mandatory: bool = false;
+        loop {
+            let mut changed = false;
+            if s.starts_with(OVERWRITE_PREFIX) {
+                s = &s[OVERWRITE_PREFIX.len()..];
+                changed = true;
+                overwrite = true;
+            };
 
-        let mandatory = if s.starts_with(OBLIGATION_PREFIX) {
-            s = &s[OBLIGATION_PREFIX.len()..];
-            true
-        } else {
-            false
-        };
+            if s.starts_with(MANDATORY_PREFIX) {
+                s = &s[MANDATORY_PREFIX.len()..];
+                changed = true;
+                mandatory = true
+            };
+
+            if !changed {
+                break;
+            }
+        }
 
         let mut tags = vec![];
         for filter in s.split(",") {
@@ -135,7 +144,7 @@ impl FromStr for TagFilter {
         }
         Ok(TagFilter {
             tags,
-            append,
+            overwrite,
             mandatory,
         })
     }
@@ -144,11 +153,11 @@ impl FromStr for TagFilter {
 impl Display for TagFilter {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let mut first = true;
-        if self.append {
-            write!(w, "+")?;
+        if self.overwrite {
+            write!(w, "{}", OVERWRITE_PREFIX)?;
         }
         if self.mandatory {
-            write!(w, "m/")?;
+            write!(w, "{}", MANDATORY_PREFIX)?;
         }
         for f in self.tags.iter() {
             if !first {
@@ -168,10 +177,10 @@ impl TagFilter {
         self.tags.is_empty()
     }
     pub fn push(&mut self, flow: Self) {
-        if flow.append {
-            self.tags.extend(flow.tags.into_iter());
-        } else {
+        if flow.overwrite {
             *self = flow
+        } else {
+            self.tags.extend(flow.tags.into_iter());
         }
     }
     pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {

@@ -130,7 +130,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                     }
                 };
                 if let Some(tags) = tags {
-                    let append_namespace = tags.append;
+                    let append_namespace = !tags.overwrite;
                     innate_tags.push(tags);
                     EditTagArgs {
                         change_existing: true,
@@ -248,7 +248,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
         }
         Subs::RM { queries, purge } => {
-            let delete_tag: Option<TagFilter> = Some("+removed".parse().unwrap());
+            let delete_tag: Option<TagFilter> = Some("removed".parse().unwrap());
             let mut to_purge = vec![];
             for mut entry in query::do_list_query(&mut repo, &queries)?.into_iter() {
                 log::info!("刪除 {:?}", *entry);

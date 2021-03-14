@@ -45,12 +45,12 @@ pub async fn mv<'b>(
                 info.name = name;
             }
             if let Some(tags) = tags {
-                if tags.append {
+                if tags.overwrite {
+                    log::debug!("附寫標籤：{:?}", tags);
+                    info.tags = tags.into_allowed_iter().collect();
+                } else {
                     log::debug!("附加上標籤：{:?}", tags);
                     info.tags.extend(tags.into_allowed_iter());
-                } else {
-                    log::debug!("設定標籤：{:?}", tags);
-                    info.tags = tags.into_allowed_iter().collect();
                 }
             }
             info.write();

@@ -48,13 +48,13 @@ fn test_rm_non_exist() {
     assert_eq!(run("test").unwrap(), "刪我啊");
     let file = get_home().join("test.sh");
     remove_file(&file).unwrap();
-    assert_ls_len(2, None);
+    assert_ls_len(2, Some("o/all"));
     assert_eq!(run("which test").unwrap(), file.to_string_lossy()); // TODO: 應該允許 which 嗎？
 
     run("test").expect_err("刪掉的腳本還能執行！？");
     run("rm *").expect("rm 應該要消滅掉不存在的腳本");
 
-    assert_ls_len(1, Some("all"));
+    assert_ls_len(1, Some("o/all"));
 }
 #[test]
 fn test_hs_in_hs() {
@@ -79,7 +79,7 @@ async fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");
     let _g = setup();
 
-    run("e test -t hide | echo 躲貓貓").unwrap();
+    run("e test -t o/hide | echo 躲貓貓").unwrap();
 
     use hyper_scripter::script_repo::ScriptRepo;
     use hyper_scripter::tag::{Tag, TagFilter};
@@ -107,7 +107,7 @@ async fn test_edit_existing_bang() {
         &mut repo,
         None,
         EditTagArgs {
-            content: "+a,^b,c".parse().unwrap(),
+            content: "a,^b,c".parse().unwrap(),
             change_existing: true,
             append_namespace: true,
         },

@@ -28,7 +28,7 @@ pub fn get_home() -> PathBuf {
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();
-    run("rm --purge * -f all").unwrap();
+    run("rm --purge * -f o/all").unwrap();
     g
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {

@@ -15,7 +15,7 @@ class HSEnv
   end
 
   def do_hs(arg, tags = [], path = @hs_home)
-    tags = ['all'] if tags.length == 0
+    tags = ['o/all'] if tags.length == 0
     tags_str = tags.join(',')
     `#{@hs_exe} --no-alias --timeless -H #{path} -f #{tags_str} #{arg}`
   end

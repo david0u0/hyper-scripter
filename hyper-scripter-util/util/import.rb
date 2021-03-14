@@ -69,7 +69,7 @@ def import_dir(dir, namespace)
       content = Shellwords.escape(content)
 
       tags_str = script.tags.join(',')
-      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -c #{script.category} --no-template --fast #{content}")
+      HS_ENV.do_hs("edit =#{new_name} -t o/#{tags_str} -c #{script.category} --no-template --fast #{content}")
     end
   end
 

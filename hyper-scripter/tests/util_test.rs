@@ -21,13 +21,18 @@ fn test_import() {
     run("-f o/my -").unwrap();
     assert_eq!(run("-f o/copy -").unwrap(), "我要留下來");
 
+    assert_ls_len(7, Some("o/all"));
+
     run("tags something-evil").unwrap();
     run(format!("-f util import {}", dir)).unwrap();
     run("-f o/innate which myinnate").unwrap();
 
     assert_eq!(run("-f o/my test").unwrap(), "安安，紅寶石");
     assert_eq!(run("-f o/tag mytest").unwrap(), "安安，紅寶石");
-    assert_eq!(run("-f o/tag youtest").unwrap(), "殼已破碎");
+    assert_eq!(
+        run("-f o/tag youtest").expect("被刪掉的腳本也要匯入啊"),
+        "殼已破碎"
+    );
     assert_eq!(run("-f o/nameless -").unwrap(), "安安，匿名殼");
     assert_eq!(run("-f o/copy -").unwrap(), "我要留下來");
 
@@ -42,7 +47,7 @@ fn test_import() {
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
     assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
     run("-f o/imported which").expect_err("命名空間汙染了標籤！");
-    assert_ls_len(25, Some("all"));
+    assert_ls_len(25, Some("o/all"));
 }
 
 fn test_collect() {
@@ -82,7 +87,7 @@ fn test_collect() {
     assert_eq!(run("-f o/tag youest").unwrap(), "殼已破碎");
     assert_eq!(run("-f o/nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(25, Some("all"));
+    assert_ls_len(25, Some("o/all"));
 }
 
 #[test]

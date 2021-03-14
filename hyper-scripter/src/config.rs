@@ -93,7 +93,7 @@ impl Default for RawConfig {
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls"]),
                 gen_alias("e", &["edit"]),
-                gen_alias("gc", &["rm", "--purge", "-f", "removed", "*"]),
+                gen_alias("gc", &["rm", "--purge", "-f", "o/removed", "*"]),
                 gen_alias("tree", &["ls", "--grouping", "tree"]),
                 gen_alias("t", &["tags"]),
             ]

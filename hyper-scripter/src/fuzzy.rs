@@ -1,6 +1,8 @@
 use crate::error::{Error, Result};
+use futures::future::join_all;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
+use tokio::task::spawn_blocking;
 
 const MID_SCORE: i64 = 1000; // TODO: 好好決定這個魔法數字
 
@@ -24,22 +26,54 @@ lazy_static::lazy_static! {
 }
 
 pub trait FuzzKey {
-    fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
+    fn fuzz_key(&self) -> Cow<'_, str>;
 }
-pub fn fuzz<'a, T: FuzzKey + 'a>(
+#[derive(Copy, Clone)]
+struct MyRaw(*const str);
+unsafe impl Send for MyRaw {}
+impl MyRaw {
+    fn new(s: &str) -> Self {
+        MyRaw(s.as_ref() as *const str)
+    }
+    unsafe fn get(&self) -> &'static str {
+        &*self.0
+    }
+}
+
+pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
 ) -> Result<Option<(T, FuzzSimilarity)>> {
     let mut ans = (0, Vec::<T>::new());
-    for data in iter {
-        let key_tmp = data.fuzz_key();
-        let key = key_tmp.as_ref();
-        let score = my_fuzz(&key, name);
-        // let score = MATCHER.fuzzy_match(&key, name);
-        if let Some(mut score) = score {
-            let len = key.chars().count();
-            log::trace!("將分數正交化：{} / {}", score * 100, len);
-            score = score * 100 / len as i64;
+    let raw_name = MyRaw::new(name);
+    let data_vec: Vec<_> = iter.collect();
+    // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
+    let keys: Vec<_> = data_vec.iter().map(|data| data.fuzz_key()).collect();
+    let score_fut: Vec<_> = keys
+        .iter()
+        .map(|key| {
+            let key = MyRaw::new(key.as_ref());
+            spawn_blocking(move || {
+                // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
+                let key = unsafe { key.get() };
+                let score = my_fuzz(key, unsafe { raw_name.get() });
+
+                if let Some(mut score) = score {
+                    let len = key.chars().count();
+                    log::trace!("將分數正交化：{} / {}", score * 100, len);
+                    score = score * 100 / len as i64;
+                    Some(score)
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    let scores = join_all(score_fut).await;
+
+    for (data, score) in data_vec.into_iter().zip(scores.into_iter()) {
+        if let Some(score) = score? {
             if score > ans.0 {
                 ans = (score, vec![data]);
             } else if score == ans.0 {
@@ -121,30 +155,37 @@ fn recursive_reorder<'a, F: FnMut(&str)>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::{IntoScriptName, ScriptName};
-    impl<'a> IntoScriptName for &'a str {
-        fn into_script_name(self) -> Result<ScriptName> {
-            self.to_owned().into_script_name()
+    impl<'a> FuzzKey for &'a str {
+        fn fuzz_key(&self) -> Cow<'a, str> {
+            Cow::Borrowed(self)
         }
     }
-    #[test]
-    fn test_fuzz() {
+    #[tokio::test(threaded_scheduler)]
+    async fn test_fuzz() {
         let _ = env_logger::try_init();
-        let t1 = "測試腳本1".into_script_name().unwrap();
-        let t2 = "測試腳本2".into_script_name().unwrap();
-        let t3 = ".42".into_script_name().unwrap();
+        let t1 = "測試腳本1";
+        let t2 = "測試腳本2";
+        let t3 = ".42";
         let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz("測試1", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("測試1", vec.clone().into_iter())
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
         assert_eq!(res, t1);
 
-        let res = fuzz("42", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("42", vec.clone().into_iter())
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
         assert_eq!(res, t3);
 
-        let res = fuzz("找不到", vec.clone().into_iter()).unwrap();
+        let res = fuzz("找不到", vec.clone().into_iter()).await.unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz("測試", vec.clone().into_iter()).unwrap_err();
+        let err = fuzz("測試", vec.clone().into_iter()).await.unwrap_err();
         let mut v = match err {
             Error::MultiFuzz(v) => v,
             _ => unreachable!(),
@@ -152,13 +193,17 @@ mod test {
         v.sort();
         assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
     }
-    #[test]
-    fn test_fuzz_with_len() {
+    #[tokio::test(threaded_scheduler)]
+    async fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
-        let t1 = "測試腳本1".into_script_name().unwrap();
-        let t2 = "測試腳本234".into_script_name().unwrap();
+        let t1 = "測試腳本1";
+        let t2 = "測試腳本234";
         let vec = vec![t1.clone(), t2];
-        let res = fuzz("測試", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("測試", vec.clone().into_iter())
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
         assert_eq!(res, t1, "模糊搜尋無法找出較短者");
     }
     #[test]

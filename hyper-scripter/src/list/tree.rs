@@ -173,7 +173,7 @@ mod test {
                 let time = NaiveDateTime::from_timestamp(id, 0);
                 ScriptInfo::builder(
                     id,
-                    name.into_script_name().unwrap(),
+                    name.to_owned().into_script_name().unwrap(),
                     ty.into(),
                     vec![].into_iter(),
                 )

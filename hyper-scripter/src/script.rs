@@ -1,6 +1,5 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode, Result};
-use crate::fuzzy::FuzzKey;
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
@@ -120,11 +119,6 @@ impl std::fmt::Display for ScriptName {
         write!(f, "{}", self.key())
     }
 }
-impl FuzzKey for ScriptName {
-    fn fuzz_key(&self) -> Cow<'_, str> {
-        self.key()
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct ScriptInfo {
@@ -139,13 +133,8 @@ pub struct ScriptInfo {
     pub tags: HashSet<Tag>,
     pub ty: ScriptType,
 }
-impl FuzzKey for ScriptInfo {
-    fn fuzz_key(&self) -> Cow<'_, str> {
-        self.name.fuzz_key()
-    }
-}
 
-impl<'a> ScriptInfo {
+impl ScriptInfo {
     pub fn cp(&self, new_name: ScriptName) -> Self {
         let now = ScriptTime::now(());
         ScriptInfo {

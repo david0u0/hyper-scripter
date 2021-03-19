@@ -138,10 +138,10 @@ const TITLE: &[&str] = &[
     "last execute time",
     "help message",
 ];
-pub fn fmt_list<'a, W: Write>(
+pub async fn fmt_list<'a, W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,
-    opt: &ListOptions,
+    opt: &ListOptions<'a>,
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
@@ -157,7 +157,8 @@ pub fn fmt_list<'a, W: Write>(
         table.set_format(*format::consts::FORMAT_CLEAN);
     }
 
-    let scripts_iter = do_list_query(script_repo, &opt.queries)?
+    let scripts_iter = do_list_query(script_repo, &opt.queries)
+        .await?
         .into_iter()
         .map(|e| &*e.into_inner());
 

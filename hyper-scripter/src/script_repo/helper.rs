@@ -17,7 +17,7 @@ pub struct RepoEntry<'b> {
     pub(super) env: &'b DBEnv,
 }
 
-impl<'a, 'b> RepoEntry<'b> {
+impl<'b> RepoEntry<'b> {
     pub async fn update<F: FnOnce(&mut ScriptInfo)>(&mut self, handler: F) -> Result {
         handler(self.info);
         self.env.handle_change(self.info).await
@@ -26,7 +26,7 @@ impl<'a, 'b> RepoEntry<'b> {
         self.info
     }
 }
-impl<'a, 'b> Iterator for Iter<'b> {
+impl<'b> Iterator for Iter<'b> {
     type Item = RepoEntry<'b>;
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: 似乎有優化空間？參考標準庫 Chain
@@ -45,8 +45,9 @@ impl<'a, 'b> Iterator for Iter<'b> {
         }
     }
 }
-impl<'a, 'b> FuzzKey for RepoEntry<'b> {
-    fn fuzz_key<'c>(&'c self) -> std::borrow::Cow<'c, str> {
-        self.info.fuzz_key()
+
+impl<'b> FuzzKey for RepoEntry<'b> {
+    fn fuzz_key(&self) -> std::borrow::Cow<'_, str> {
+        self.info.name.key()
     }
 }

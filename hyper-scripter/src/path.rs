@@ -164,18 +164,23 @@ mod test {
     fn test_open() {
         setup();
         let second = "second".to_owned();
-        let second_name = second.into_script_name().unwrap();
+        let second_name = second.to_owned().into_script_name().unwrap();
         let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();
         assert_eq!(p, get_home().join("second.rb"));
 
-        let p = open_script(&".1".into_script_name().unwrap(), &"sh".into(), None).unwrap();
+        let p = open_script(
+            &".1".to_owned().into_script_name().unwrap(),
+            &"sh".into(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             p,
             join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
         match open_script(
-            &"not-exist".into_script_name().unwrap(),
+            &"not-exist".to_owned().into_script_name().unwrap(),
             &"sh".into(),
             Some(true),
         )

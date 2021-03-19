@@ -1,6 +1,7 @@
 use crate::error::{Error, Result};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
+use tokio::task::spawn_blocking;
 
 const MID_SCORE: i64 = 1000; // TODO: 好好決定這個魔法數字
 
@@ -26,16 +27,18 @@ lazy_static::lazy_static! {
 pub trait FuzzKey {
     fn fuzz_key<'a>(&'a self) -> Cow<'a, str>;
 }
-pub fn fuzz<'a, T: FuzzKey + 'a>(
+pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
 ) -> Result<Option<(T, FuzzSimilarity)>> {
     let mut ans = (0, Vec::<T>::new());
-    for data in iter {
+    let fut = iter.map(|data| spawn_blocking(move || {
         let key_tmp = data.fuzz_key();
         let key = key_tmp.as_ref();
-        let score = my_fuzz(&key, name);
-        // let score = MATCHER.fuzzy_match(&key, name);
+        (data, my_fuzz(&key, name))
+    }));
+    let computed = tokio::futures::future::join_all(fut).await;
+    for (data, score) in computed {
         if let Some(mut score) = score {
             let len = key.chars().count();
             log::trace!("將分數正交化：{} / {}", score * 100, len);
@@ -127,24 +130,24 @@ mod test {
             self.to_owned().into_script_name()
         }
     }
-    #[test]
-    fn test_fuzz() {
+    #[tokio::test(threaded_scheduler)]
+    async fn test_fuzz() {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1".into_script_name().unwrap();
         let t2 = "測試腳本2".into_script_name().unwrap();
         let t3 = ".42".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz("測試1", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("測試1", vec.clone().into_iter()).await.unwrap().unwrap().0;
         assert_eq!(res, t1);
 
-        let res = fuzz("42", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("42", vec.clone().into_iter()).await.unwrap().unwrap().0;
         assert_eq!(res, t3);
 
-        let res = fuzz("找不到", vec.clone().into_iter()).unwrap();
+        let res = fuzz("找不到", vec.clone().into_iter()).await.unwrap();
         assert_eq!(res, None);
 
-        let err = fuzz("測試", vec.clone().into_iter()).unwrap_err();
+        let err = fuzz("測試", vec.clone().into_iter()).await.unwrap_err();
         let mut v = match err {
             Error::MultiFuzz(v) => v,
             _ => unreachable!(),
@@ -152,13 +155,13 @@ mod test {
         v.sort();
         assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
     }
-    #[test]
-    fn test_fuzz_with_len() {
+    #[tokio::test(threaded_scheduler)]
+    async fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1".into_script_name().unwrap();
         let t2 = "測試腳本234".into_script_name().unwrap();
         let vec = vec![t1.clone(), t2];
-        let res = fuzz("測試", vec.clone().into_iter()).unwrap().unwrap().0;
+        let res = fuzz("測試", vec.clone().into_iter()).await.unwrap().unwrap().0;
         assert_eq!(res, t1, "模糊搜尋無法找出較短者");
     }
     #[test]

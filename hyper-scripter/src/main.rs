@@ -245,12 +245,12 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 display_style,
             };
             let stdout = std::io::stdout();
-            fmt_list(&mut stdout.lock(), &mut repo, &opt)?;
+            fmt_list(&mut stdout.lock(), &mut repo, &opt).await?;
         }
         Subs::RM { queries, purge } => {
             let delete_tag: Option<TagFilter> = Some("removed".parse().unwrap());
             let mut to_purge = vec![];
-            for mut entry in query::do_list_query(&mut repo, &queries)?.into_iter() {
+            for mut entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 if purge {
                     log::debug!("真的刪除腳本！");

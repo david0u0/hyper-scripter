@@ -36,7 +36,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let home: PathBuf = HOME.into();
     hyper_scripter::path::set_home(&home).unwrap();
     let _ = env_logger::try_init();
-    match std::fs::remove_dir_all(home) {
+    match std::fs::remove_dir_all(&home) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -44,7 +44,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
             }
         }
     }
-    std::fs::create_dir(HOME).unwrap();
+    std::fs::create_dir(home).unwrap();
     run("alias e edit --fast").unwrap();
 
     guard
@@ -112,10 +112,11 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
     res
 }
 
-fn get_ls(filter: Option<&str>) -> Vec<String> {
+fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
     let ls_res = run(format!(
-        "ls {} --grouping none --plain --name",
-        filter.map(|f| format!("-f {}", f)).unwrap_or_default()
+        "ls {} --grouping none --plain --name {}",
+        filter.map(|f| format!("-f {}", f)).unwrap_or_default(),
+        query.unwrap_or_default()
     ))
     .unwrap();
     ls_res
@@ -129,13 +130,13 @@ fn get_ls(filter: Option<&str>) -> Vec<String> {
         })
         .collect::<Vec<_>>()
 }
-pub fn assert_ls_len(expect: usize, filter: Option<&str>) {
-    let res = get_ls(filter);
+pub fn assert_ls_len(expect: usize, filter: Option<&str>, query: Option<&str>) {
+    let res = get_ls(filter, query);
     assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", filter, res);
 }
-pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>) {
+pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str>) {
     expect.sort();
-    let mut res = get_ls(filter);
+    let mut res = get_ls(filter, query);
     res.sort();
     assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);
 }

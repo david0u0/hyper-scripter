@@ -14,10 +14,12 @@ class HSEnv
     @hs_home
   end
 
-  def do_hs(arg, tags = [], path = @hs_home)
-    tags = ['all'] if tags.length == 0
-    tags_str = tags.join(',')
-    `#{@hs_exe} --no-alias --timeless -H #{path} -f #{tags_str} #{arg}`
+  def do_hs(arg, all = true, path = @hs_home)
+    tags_str = ''
+    if all
+      tags_str = "-f all"
+    end
+    `#{@hs_exe} --no-alias --timeless -H #{path} #{tags_str} #{arg}`
   end
 end
 

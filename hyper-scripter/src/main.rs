@@ -7,7 +7,7 @@ use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOption
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::ScriptRepo;
-use hyper_scripter::tag::{TagFilter, TagFilterGroup};
+use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},

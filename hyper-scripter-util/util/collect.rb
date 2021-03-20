@@ -65,7 +65,7 @@ directory_tree(root).each do |full_path|
   file = File.open(full_path)
   content = Shellwords.escape(file.read)
   File.delete(full_path)
-  HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template")
+  HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template", false)
 end
 
 HS_ENV.do_hs('ls --grouping=none --name --plain').split(' ').each do |name|

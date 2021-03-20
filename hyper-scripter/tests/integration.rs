@@ -17,7 +17,7 @@ fn test_tags() {
     assert_eq!(MSG, run("-").unwrap());
 
     run(format!(
-        "-f super_tag,hide e test/js -c js | console.log(\"{}\")",
+        "e -t +super_tag,hide test/js -c js | console.log(\"{}\")",
         MSG_JS
     ))
     .unwrap();
@@ -121,27 +121,21 @@ fn test_edit_with_tag() {
 
     run("tags innate").unwrap();
 
-    run(format!("e -f tag1 test1 -t tag2 | echo \"{}\"", msg(1))).unwrap();
+    run(format!("e test1 -t tag2 | echo \"{}\"", msg(1))).unwrap();
     run("-f innate -").expect_err("吃到了不該吃的標籤！");
-    run("-f tag1 -").expect_err("吃到了不該吃的標籤！");
     assert_eq!(msg(1), run("-f tag2 -").unwrap());
 
-    run(format!("e -f tag1 test2 -t +tag2 | echo \"{}\"", msg(2))).unwrap();
-    run("-f innate -").expect_err("吃到了不該吃的標籤！");
-    assert_eq!(msg(2), run("-f tag1 -").unwrap());
+    run(format!("e test2 -t +tag2,tag3 | echo \"{}\"", msg(2))).unwrap();
+    assert_eq!(msg(2), run("-f innate -").unwrap());
     assert_eq!(msg(2), run("-f tag2 -").unwrap());
-
-    run(format!("e -f +tag1 test3 -t +tag2 | echo \"{}\"", msg(3))).unwrap();
-    assert_eq!(msg(3), run("-f innate -").unwrap());
-    assert_eq!(msg(3), run("-f tag1 -").unwrap());
-    assert_eq!(msg(3), run("-f tag2 -").unwrap());
+    assert_eq!(msg(2), run("-f tag3 -").unwrap());
 }
 
 #[test]
 fn test_multi_filter() {
     let _g = setup();
     run(format!("e nobody | echo \"{}\"", MSG)).unwrap();
-    run(format!("-f test,pin e test-pin | echo \"{}\"", MSG)).unwrap();
+    run(format!("e -t test,pin test-pin | echo \"{}\"", MSG)).unwrap();
     run(format!("e -t pin pin-only | echo \"{}\"", MSG)).unwrap();
 
     assert_eq!(MSG, run("pin-only").unwrap());
@@ -233,8 +227,8 @@ fn test_namespace_reorder_search() {
 fn test_append_tags() {
     let _g = setup();
     run("tags global").unwrap();
-    run(format!("-f +append e append-test | echo 附加標籤")).unwrap();
-    run("-f no-append e no-append-test | echo 不要給我打標籤").unwrap();
+    run(format!("e -t +append append-test | echo 附加標籤")).unwrap();
+    run("e -t no-append no-append-test | echo 不要給我打標籤").unwrap();
 
     assert_eq!("附加標籤", run("apptest").unwrap());
     run("no-appendtest").expect_err("標籤還是附加上去了？");
@@ -259,9 +253,9 @@ fn test_append_tags() {
 #[test]
 fn test_miss_event() {
     let _g = setup();
-    run(format!("-f hide e hidden_first | echo 第一")).unwrap();
-    run(format!("-f hide e hidden_second | echo 第二")).unwrap();
-    run(format!("-f hide e third | echo 第三")).unwrap();
+    run(format!("e -t hide hidden_first | echo 第一")).unwrap();
+    run(format!("e -t hide hidden_second | echo 第二")).unwrap();
+    run(format!("e -t hide third | echo 第三")).unwrap();
     assert_eq!("第三", run("!").unwrap());
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!("第一", run("!").unwrap(), "沒有記錄到錯過事件？");
@@ -273,11 +267,11 @@ fn test_bang() {
     let first_file = get_home().join("hidden_first.sh");
     let fourth_file = get_home().join("fourth.sh");
 
-    run("-f hide e hidden_first | echo $0").unwrap();
-    run("-f hide e hidden_second | echo 第二").unwrap();
-    run("-f hide e hidden_third | echo 第三").unwrap();
+    run("e -t hide hidden_first | echo $0").unwrap();
+    run("e -t hide hidden_second | echo 第二").unwrap();
+    run("e -t hide hidden_third | echo 第三").unwrap();
     run("cp firs! fourth").unwrap();
-    run("mv four! -t all").unwrap();
+    run("mv -f tag4 four! -t all").unwrap();
 
     run("first").expect_err("執行了隱藏的腳本？？");
     assert_eq!(first_file.to_string_lossy(), run("firt!").unwrap());
@@ -287,9 +281,11 @@ fn test_bang() {
     assert_eq!("第三", run("=hidden_third!").unwrap());
     assert_eq!(fourth_file.to_string_lossy(), run("four!").unwrap());
 
-    let s = run("ls --grouping none --plain firs! four").unwrap();
-    let ls_vec = s.split(" ").filter(|s| s.len() > 0).collect::<Vec<_>>();
-    assert_eq!(2, ls_vec.len(), "ls 結果為 {:?}", ls_vec);
+    assert_ls(
+        vec!["hidden_first", "fourth"],
+        Some("+^tag4"),
+        Some("firs! fourth"),
+    );
 }
 
 #[test]
@@ -326,11 +322,19 @@ fn test_mandatory_tags() {
     run("e prj1/src/t | echo prj1/src").unwrap();
     run("e prj2/src/t | echo prj2/src").unwrap();
 
-    assert_ls(vec!["prj1/t", "prj1/src/t", "prj2/t", "prj2/src/t"], None);
+    assert_ls(
+        vec!["prj1/t", "prj1/src/t", "prj2/t", "prj2/src/t"],
+        None,
+        None,
+    );
 
     run("tags prj1").unwrap();
-    assert_ls(vec!["prj1/t", "prj1/src/t"], None);
-    assert_ls(vec!["prj1/src/t", "prj2/src/t"], Some("src"));
-    assert_ls(vec!["prj1/t", "prj2/src/t", "prj1/src/t"], Some("+src"));
-    assert_ls(vec!["prj1/src/t"], Some("+m/src"));
+    assert_ls(vec!["prj1/t", "prj1/src/t"], None, None);
+    assert_ls(vec!["prj1/src/t", "prj2/src/t"], Some("src"), None);
+    assert_ls(
+        vec!["prj1/t", "prj2/src/t", "prj1/src/t"],
+        Some("+src"),
+        None,
+    );
+    assert_ls(vec!["prj1/src/t"], Some("+m/src"), None);
 }

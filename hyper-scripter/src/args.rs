@@ -35,6 +35,7 @@ macro_rules! def_root {
                 global = true,
                 parse(try_from_str),
                 conflicts_with = "all",
+                number_of_values = 1,
                 help = "Filter by tags, e.g. `all,^mytag`"
             )]
             pub filter: Vec<TagFilter>,

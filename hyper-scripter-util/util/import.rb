@@ -51,7 +51,7 @@ end
 def import_dir(dir, namespace)
   dir = File.expand_path(dir)
   puts "import directory #{dir}"
-  out = HS_ENV.do_hs('ls --plain', [], dir)
+  out = HS_ENV.do_hs('ls --plain', true, dir)
   parse(out).each do |script|
     new_name = if namespace.nil? || script.name.start_with?('.')
                  script.name
@@ -65,11 +65,11 @@ def import_dir(dir, namespace)
       next
     else
       puts "importing #{script.name} as #{new_name}..."
-      content = HS_ENV.do_hs("cat =#{script.name}", [], dir)
+      content = HS_ENV.do_hs("cat =#{script.name}", true, dir)
       content = Shellwords.escape(content)
 
       tags_str = script.tags.join(',')
-      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -c #{script.category} --no-template --fast #{content}")
+      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -c #{script.category} --no-template --fast #{content}", false)
     end
   end
 

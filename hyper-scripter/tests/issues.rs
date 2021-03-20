@@ -48,13 +48,13 @@ fn test_rm_non_exist() {
     assert_eq!(run("test").unwrap(), "刪我啊");
     let file = get_home().join("test.sh");
     remove_file(&file).unwrap();
-    assert_ls_len(2, None);
+    assert_ls_len(2, None, None);
     assert_eq!(run("which test").unwrap(), file.to_string_lossy()); // TODO: 應該允許 which 嗎？
 
     run("test").expect_err("刪掉的腳本還能執行！？");
     run("rm *").expect("rm 應該要消滅掉不存在的腳本");
 
-    assert_ls_len(1, Some("all"));
+    assert_ls_len(1, Some("all"), None);
 }
 #[test]
 fn test_hs_in_hs() {
@@ -118,4 +118,8 @@ async fn test_edit_existing_bang() {
     .unwrap();
 
     assert_eq!(p, get_home().join("test.sh"));
+    use fxhash::FxHashSet as HashSet;
+    let mut tags = HashSet::<Tag>::default();
+    tags.insert("hide".parse().unwrap());
+    assert_eq!(tags, e.tags);
 }

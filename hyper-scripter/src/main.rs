@@ -51,18 +51,14 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         load_utils(&mut repo).await?;
     }
 
+    let explicit_filter = root.filter.len() > 0;
     let historian = repo.historian().clone();
     let mut res = Vec::<Error>::new();
     {
-        let tag_group: TagFilterGroup = if root.all {
-            "all,^removed".parse::<TagFilter>().unwrap().into()
-        } else {
-            let mut group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
-            if let Some(flow) = root.filter.clone() {
-                group.push(flow.into());
-            }
-            group
-        };
+        let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
+        for filter in root.filter.into_iter() {
+            tag_group.push(filter);
+        }
         repo.filter_by_tag(&tag_group);
     }
 
@@ -121,25 +117,20 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             let edit_tags = {
                 // TODO: 不要這麼愛 clone
                 // TODO: 真的需要考慮到 root.filter 嗎？
-                let mut innate_tags = match root.filter {
-                    None => conf.main_tag_filter.clone(),
-                    Some(tags) => {
-                        let mut main_tags = conf.main_tag_filter.clone();
-                        main_tags.push(tags);
-                        main_tags
-                    }
-                };
+                let mut innate_tags = conf.main_tag_filter.clone();
                 if let Some(tags) = tags {
                     let append_namespace = tags.append;
                     innate_tags.push(tags);
                     EditTagArgs {
-                        change_existing: true,
+                        explicit_filter,
+                        explicit_tag: true,
                         content: innate_tags,
                         append_namespace,
                     }
                 } else {
                     EditTagArgs {
-                        change_existing: false,
+                        explicit_filter,
+                        explicit_tag: false,
                         append_namespace: true,
                         content: innate_tags,
                     }

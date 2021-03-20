@@ -34,11 +34,6 @@ impl Display for Error {
             PathExist(path) => write!(f, "Path already exist: {:?}", path)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
-            CategoryMismatch { expect, actual } => write!(
-                f,
-                "Script Category mismatch. Expect: {}, Actual: {}",
-                expect, actual
-            )?,
             MultiFuzz(v) => {
                 writeln!(f, "Multiple scripts with same fuzzy score:")?;
                 for name in v {
@@ -61,6 +56,7 @@ impl Display for Error {
             }
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
             NoAlias(alias) => write!(f, "No such alias: {}", alias)?,
+            EditWithRedundantOpt(opt) => write!(f, "Redundant option: {:?}", opt)?,
             _ => {
                 log::warn!("未被正確打印的錯誤：{:?}", self);
                 write!(f, "{:?}", self)?;

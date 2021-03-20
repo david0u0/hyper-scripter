@@ -1,4 +1,3 @@
-use crate::script_type::ScriptType;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -33,15 +32,12 @@ pub enum Error {
     PathExist(PathBuf),
     ScriptExist(String),
     ScriptNotFound(String),
-    CategoryMismatch {
-        expect: ScriptType,
-        actual: ScriptType,
-    },
     MultiFuzz(Vec<String>),
     NoAlias(String),
     UnknownCategory(String),
     Format(FormatCode, String),
     ScriptError(i32),
+    EditWithRedundantOpt(EditWithRedundantOpt),
     DontFuzz,
     Empty,
 }
@@ -88,5 +84,17 @@ impl<T, E: 'static + Send + Sync + std::error::Error> Contextable<T> for std::re
                 Err(e.context(s))
             }
         }
+    }
+}
+#[derive(Debug, Clone)]
+pub enum EditWithRedundantOpt {
+    Category,
+    Tag,
+    Filter,
+}
+
+impl From<EditWithRedundantOpt> for Error {
+    fn from(opt: EditWithRedundantOpt) -> Self {
+        Error::EditWithRedundantOpt(opt)
     }
 }

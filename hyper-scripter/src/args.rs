@@ -34,9 +34,10 @@ macro_rules! def_root {
                 long,
                 global = true,
                 parse(try_from_str),
+                conflicts_with = "all",
                 help = "Filter by tags, e.g. `all,^mytag`"
             )]
-            pub filter: Option<TagFilter>,
+            pub filter: Vec<TagFilter>,
             #[structopt(
                 short,
                 long,
@@ -44,7 +45,7 @@ macro_rules! def_root {
                 conflicts_with = "recent",
                 help = "Shorthand for `-f=all,^removed --timeless`"
             )]
-            pub all: bool,
+            all: bool,
             #[structopt(long, global = true, help = "Show scripts within recent days.")]
             pub recent: Option<u32>,
             #[structopt(
@@ -324,6 +325,7 @@ impl Root {
         }
         if self.all {
             self.timeless = true;
+            self.filter = vec!["all,^removed".parse().unwrap()];
         }
         Ok(())
     }

@@ -95,8 +95,9 @@ async fn test_edit_existing_bang() {
         None,
         EditTagArgs {
             content: "gg".parse().unwrap(),
-            change_existing: true,
             append_namespace: true,
+            explicit_tag: false,
+            explicit_filter: false,
         },
     )
     .await
@@ -108,19 +109,13 @@ async fn test_edit_existing_bang() {
         None,
         EditTagArgs {
             content: "+a,^b,c".parse().unwrap(),
-            change_existing: true,
             append_namespace: true,
+            explicit_tag: false,
+            explicit_filter: false,
         },
     )
     .await
     .unwrap();
 
     assert_eq!(p, get_home().join("test.sh"));
-
-    use fxhash::FxHashSet as HashSet;
-    let mut tags = HashSet::<Tag>::default();
-    tags.insert("a".parse().unwrap());
-    tags.insert("c".parse().unwrap());
-    tags.insert("hide".parse().unwrap());
-    assert_eq!(tags, e.tags);
 }

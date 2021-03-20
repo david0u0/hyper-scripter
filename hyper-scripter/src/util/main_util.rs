@@ -1,4 +1,4 @@
-use crate::error::{Contextable, Error, Result};
+use crate::error::{Contextable, EditWithRedundantOpt, Error, Result};
 use crate::path;
 use crate::query::{self, do_script_query_strict_with_missing, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -10,8 +10,10 @@ use std::path::PathBuf;
 
 pub struct EditTagArgs {
     pub content: TagFilter,
-    pub change_existing: bool,
     pub append_namespace: bool,
+
+    pub explicit_tag: bool,
+    pub explicit_filter: bool,
 }
 
 pub async fn mv<'b>(
@@ -57,6 +59,7 @@ pub async fn mv<'b>(
         })
         .await
 }
+// XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
 pub async fn edit_or_create<'b>(
     edit_query: EditQuery,
     script_repo: &'b mut ScriptRepo,
@@ -69,6 +72,9 @@ pub async fn edit_or_create<'b>(
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         macro_rules! new_named {
             () => {{
+                if tags.explicit_filter {
+                    return Err(EditWithRedundantOpt::Filter.into());
+                }
                 final_ty = ty.unwrap_or_default();
                 let name = query.into_script_name()?;
                 if script_repo.get_hidden_mut(&name).is_some() {
@@ -93,18 +99,12 @@ pub async fn edit_or_create<'b>(
         match query::do_script_query(&query, script_repo).await {
             Err(Error::DontFuzz) => new_named!(),
             Ok(None) => new_named!(),
-            Ok(Some(mut entry)) => {
-                if let Some(ty) = ty {
-                    log::warn!("已存在的腳本無需再指定類型");
-                    if ty != entry.ty {
-                        return Err(Error::CategoryMismatch {
-                            expect: ty,
-                            actual: entry.ty.clone(),
-                        });
-                    }
+            Ok(Some(entry)) => {
+                if let Some(_) = ty {
+                    return Err(EditWithRedundantOpt::Category.into());
                 }
-                if tags.change_existing {
-                    mv(&mut entry, None, None, Some(tags.content)).await?;
+                if tags.explicit_tag {
+                    return Err(EditWithRedundantOpt::Tag.into());
                 }
                 log::debug!("打開既有命名腳本：{:?}", entry.name);
                 let p = path::open_script(&entry.name, &entry.ty, Some(true))

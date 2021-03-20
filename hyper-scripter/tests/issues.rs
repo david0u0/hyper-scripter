@@ -74,52 +74,56 @@ fn test_hs_in_hs() {
     assert_eq!(run("-").unwrap(), "我在第一層\n我在第幾層？");
     assert_eq!(run("^2").unwrap(), "我在第幾層？");
 }
-#[tokio::test(threaded_scheduler)]
-async fn test_edit_existing_bang() {
+#[test]
+fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");
     let _g = setup();
 
     run("e test -t hide | echo 躲貓貓").unwrap();
 
-    use hyper_scripter::script_repo::ScriptRepo;
-    use hyper_scripter::tag::{Tag, TagFilter};
-    use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
+    // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        use hyper_scripter::script_repo::ScriptRepo;
+        use hyper_scripter::tag::{Tag, TagFilter};
+        use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
 
-    let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
-    let mut repo = ScriptRepo::new(pool, None).await.unwrap();
-    repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
+        let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
+        let mut repo = ScriptRepo::new(pool, None).await.unwrap();
+        repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 
-    edit_or_create(
-        "test".parse().unwrap(),
-        &mut repo,
-        None,
-        EditTagArgs {
-            content: "gg".parse().unwrap(),
-            append_namespace: true,
-            explicit_tag: false,
-            explicit_filter: false,
-        },
-    )
-    .await
-    .expect_err("沒有 BANG! 就找到編輯的腳本！？");
+        edit_or_create(
+            "test".parse().unwrap(),
+            &mut repo,
+            None,
+            EditTagArgs {
+                content: "gg".parse().unwrap(),
+                append_namespace: true,
+                explicit_tag: false,
+                explicit_filter: false,
+            },
+        )
+        .await
+        .expect_err("沒有 BANG! 就找到編輯的腳本！？");
 
-    let (p, e) = edit_or_create(
-        "test!".parse().unwrap(),
-        &mut repo,
-        None,
-        EditTagArgs {
-            content: "+a,^b,c".parse().unwrap(),
-            append_namespace: true,
-            explicit_tag: false,
-            explicit_filter: false,
-        },
-    )
-    .await
-    .unwrap();
+        let (p, e) = edit_or_create(
+            "test!".parse().unwrap(),
+            &mut repo,
+            None,
+            EditTagArgs {
+                content: "+a,^b,c".parse().unwrap(),
+                append_namespace: true,
+                explicit_tag: false,
+                explicit_filter: false,
+            },
+        )
+        .await
+        .unwrap();
 
-    assert_eq!(p, get_home().join("test.sh"));
-    use fxhash::FxHashSet as HashSet;
-    let mut tags = HashSet::<Tag>::default();
-    tags.insert("hide".parse().unwrap());
-    assert_eq!(tags, e.tags);
+        assert_eq!(p, get_home().join("test.sh"));
+        use fxhash::FxHashSet as HashSet;
+        let mut tags = HashSet::<Tag>::default();
+        tags.insert("hide".parse().unwrap());
+        assert_eq!(tags, e.tags);
+    });
 }

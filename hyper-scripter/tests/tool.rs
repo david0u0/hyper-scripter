@@ -33,18 +33,18 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
-    let home: PathBuf = HOME.into();
+    let home = get_home();
     hyper_scripter::path::set_home(&home).unwrap();
     let _ = env_logger::try_init();
     match std::fs::remove_dir_all(&home) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
-                panic!("重整測試用資料夾失敗了……")
+                panic!("重整測試用資料夾 {:?} 失敗了……", home);
             }
         }
     }
-    std::fs::create_dir(home).unwrap();
+    std::fs::create_dir(&home).expect(&format!("創建目錄失敗 {:?}", home));
     run("alias e edit --fast").unwrap();
 
     guard

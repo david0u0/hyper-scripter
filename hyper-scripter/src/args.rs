@@ -129,17 +129,10 @@ pub enum Subs {
 
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
+        #[structopt(long, short, default_value = "1")]
+        repeat: u64,
         #[structopt(long, short)]
-        memorize_args: bool,
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script_query: ScriptQuery,
-        #[structopt(help = "Command line args to pass to the script")]
-        args: Vec<String>,
-    },
-    #[structopt(about = "Repeat the script", settings = NO_FLAG_SETTINGS)]
-    Repeat {
-        #[structopt(about = "The times you want to repeat the script")]
-        times: u64,
+        previous_args: bool,
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
         #[structopt(help = "Command line args to pass to the script")]
@@ -307,7 +300,8 @@ impl Root {
         match &self.subcmd {
             Some(Subs::Other(args)) => {
                 let run = Subs::Run {
-                    memorize_args: false,
+                    previous_args: false,
+                    repeat: 1,
                     script_query: args[0].parse()?,
                     args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
                 };

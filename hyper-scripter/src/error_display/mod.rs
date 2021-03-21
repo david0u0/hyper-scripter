@@ -56,7 +56,7 @@ impl Display for Error {
             }
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
             NoAlias(alias) => write!(f, "No such alias: {}", alias)?,
-            EditWithRedundantOpt(opt) => write!(f, "Redundant option: {:?}", opt)?,
+            RedundantOpt(opt) => write!(f, "Redundant option: {:?}", opt)?,
             _ => {
                 log::warn!("未被正確打印的錯誤：{:?}", self);
                 write!(f, "{:?}", self)?;

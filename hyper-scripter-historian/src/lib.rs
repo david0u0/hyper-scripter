@@ -128,6 +128,7 @@ impl Historian {
         Ok(())
     }
 
+    // XXX: 其實可以只回迭代器
     pub async fn last_time_of(&self, ty: EventType) -> Result<Vec<(i64, NaiveDateTime)>, DBError> {
         let ty = ty.to_string();
         let times = sqlx::query!(
@@ -137,5 +138,17 @@ impl Historian {
         .fetch_all(&*self.pool.lock().unwrap())
         .await?;
         Ok(times.into_iter().map(|d| (d.script_id, d.time)).collect())
+    }
+
+    pub async fn last_args(&self, id: i64) -> Result<Option<String>, DBError> {
+        let ty = EventType::Exec.to_string();
+        let res = sqlx::query!(
+            "SELECT args FROM last_events WHERE type = ? AND script_id = ?",
+            ty,
+            id
+        )
+        .fetch_optional(&*self.pool.lock().unwrap())
+        .await?;
+        Ok(res.map(|res| res.args.unwrap_or_default()))
     }
 }

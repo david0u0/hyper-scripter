@@ -173,7 +173,7 @@ impl ScriptInfo {
     }
     pub fn exec(&mut self, content: String, args: &[String]) {
         log::trace!("{:?} 執行內容為 {}", self, content);
-        let args_ser = toml::to_string(args).unwrap();
+        let args_ser = serde_json::to_string(args).unwrap();
         self.exec_time = Some(ScriptTime::now((content, args_ser)));
         self.read_time = ScriptTime::now(());
     }

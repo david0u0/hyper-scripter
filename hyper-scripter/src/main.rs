@@ -175,30 +175,17 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         Subs::Run {
             script_query,
             args,
-            memorize_args: _,
+            previous_args,
+            repeat,
         } => {
             util::main_util::run_n_times(
-                1,
+                repeat,
                 &script_query,
                 &mut repo,
                 &args,
                 historian.clone(),
                 &mut res,
-            )
-            .await?;
-        }
-        Subs::Repeat {
-            times,
-            script_query,
-            args,
-        } => {
-            util::main_util::run_n_times(
-                times,
-                &script_query,
-                &mut repo,
-                &args,
-                historian.clone(),
-                &mut res,
+                previous_args,
             )
             .await?;
         }

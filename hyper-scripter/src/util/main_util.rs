@@ -1,4 +1,4 @@
-use crate::error::{Contextable, EditWithRedundantOpt, Error, Result};
+use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::path;
 use crate::query::{self, do_script_query_strict_with_missing, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -73,7 +73,7 @@ pub async fn edit_or_create<'b>(
         macro_rules! new_named {
             () => {{
                 if tags.explicit_filter {
-                    return Err(EditWithRedundantOpt::Filter.into());
+                    return Err(RedundantOpt::Filter.into());
                 }
                 final_ty = ty.unwrap_or_default();
                 let name = query.into_script_name()?;
@@ -101,10 +101,10 @@ pub async fn edit_or_create<'b>(
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {
                 if let Some(_) = ty {
-                    return Err(EditWithRedundantOpt::Category.into());
+                    return Err(RedundantOpt::Category.into());
                 }
                 if tags.explicit_tag {
-                    return Err(EditWithRedundantOpt::Tag.into());
+                    return Err(RedundantOpt::Tag.into());
                 }
                 log::debug!("打開既有命名腳本：{:?}", entry.name);
                 let p = path::open_script(&entry.name, &entry.ty, Some(true))
@@ -146,9 +146,10 @@ pub async fn run_n_times(
     n: u64,
     script_query: &ScriptQuery,
     script_repo: &mut ScriptRepo,
-    args: &[String],
+    mut args: &[String],
     historian: Historian,
     res: &mut Vec<Error>,
+    previous_args: bool,
 ) -> Result {
     let mut entry = do_script_query_strict_with_missing(&script_query, script_repo).await?;
     log::info!("執行 {:?}", entry.name);
@@ -158,9 +159,28 @@ pub async fn run_n_times(
         log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
         super::write_file(&path::get_home().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
     }
+
+    let previous_arg_vec: Vec<String>;
+    if previous_args {
+        if args.len() > 0 {
+            return Err(RedundantOpt::CommandArgs.into());
+        }
+        match historian.last_args(entry.id).await? {
+            None => return Err(Error::NoPreviousArgs),
+            Some(arg_str) => {
+                log::debug!("撈到前一次呼叫的參數 {}", arg_str);
+                previous_arg_vec =
+                    serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
+                args = &previous_arg_vec;
+                // else 空字串當它是空陣列
+            }
+        }
+    }
+
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
     entry.update(|info| info.exec(content, args)).await?;
+
     for _ in 0..n {
         let run_res = super::run(
             &script_path,

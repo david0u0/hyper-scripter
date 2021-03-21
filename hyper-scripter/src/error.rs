@@ -37,7 +37,8 @@ pub enum Error {
     UnknownCategory(String),
     Format(FormatCode, String),
     ScriptError(i32),
-    EditWithRedundantOpt(EditWithRedundantOpt),
+    RedundantOpt(RedundantOpt),
+    NoPreviousArgs,
     DontFuzz,
     Empty,
 }
@@ -87,14 +88,15 @@ impl<T, E: 'static + Send + Sync + std::error::Error> Contextable<T> for std::re
     }
 }
 #[derive(Debug, Clone)]
-pub enum EditWithRedundantOpt {
+pub enum RedundantOpt {
+    CommandArgs,
     Category,
     Tag,
     Filter,
 }
 
-impl From<EditWithRedundantOpt> for Error {
-    fn from(opt: EditWithRedundantOpt) -> Self {
-        Error::EditWithRedundantOpt(opt)
+impl From<RedundantOpt> for Error {
+    fn from(opt: RedundantOpt) -> Self {
+        Error::RedundantOpt(opt)
     }
 }

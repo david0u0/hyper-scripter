@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS events (
     type varchar(10) NOT NULL,
     cmd text NOT NULL,
     content text,
+    args text,
     time datetime NOT NULL DEFAULT (STRFTIME ('%Y-%m-%d %H:%M:%f', 'NOW'))
 );
 

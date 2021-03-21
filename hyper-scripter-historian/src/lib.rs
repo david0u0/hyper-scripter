@@ -22,13 +22,15 @@ async fn raw_record_event(
     script_id: i64,
     ty: &str,
     cmd: &str,
+    args: Option<&str>,
     content: Option<&str>,
 ) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT INTO events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
+        "INSERT INTO events (script_id, type, cmd, args, content) VALUES(?, ?, ?, ?, ?)",
         script_id,
         ty,
         cmd,
+        args,
         content
     )
     .execute(pool)
@@ -40,13 +42,15 @@ async fn raw_record_last(
     script_id: i64,
     ty: &str,
     cmd: &str,
+    args: Option<&str>,
     content: Option<&str>,
 ) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT OR REPLACE INTO last_events (script_id, type, cmd, content) VALUES(?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content) VALUES(?, ?, ?, ?, ?)",
         script_id,
         ty,
         cmd,
+        args,
         content
     )
     .execute(pool)
@@ -59,20 +63,20 @@ impl Historian {
         script_id: i64,
         ty: &str,
         cmd: &str,
+        args: Option<&str>,
         content: Option<&str>,
     ) -> Result<(), DBError> {
-        let pool = &*self.pool.lock().unwrap();
-        let res = raw_record_last(pool, script_id, ty, cmd, content).await;
+        let pool = &mut *self.pool.lock().unwrap();
+        let res = raw_record_last(pool, script_id, ty, cmd, args, content).await;
         if res.is_err() {
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
-            let new_pool = db::get_pool(&self.path).await?;
-            *self.pool.lock().unwrap() = new_pool;
-            raw_record_last(pool, script_id, ty, cmd, content).await?;
-            raw_record_event(pool, script_id, ty, cmd, content).await?;
+            *pool = db::get_pool(&self.path).await?;
+            raw_record_last(pool, script_id, ty, cmd, args, content).await?;
+            raw_record_event(pool, script_id, ty, cmd, args, content).await?;
             return Ok(());
         }
 
-        raw_record_event(pool, script_id, ty, cmd, content).await
+        raw_record_event(pool, script_id, ty, cmd, args, content).await
     }
     pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
         let path = path.as_ref().to_owned();
@@ -88,12 +92,14 @@ impl Historian {
         let ty = event.data.get_type().to_string();
         match &event.data {
             EventData::Miss => {
-                self.raw_record(event.script_id, &ty, &cmd, None).await?;
+                self.raw_record(event.script_id, &ty, &cmd, None, None)
+                    .await?;
             }
             EventData::Read => {
-                self.raw_record(event.script_id, &ty, &cmd, None).await?;
+                self.raw_record(event.script_id, &ty, &cmd, None, None)
+                    .await?;
             }
-            EventData::Exec(content) => {
+            EventData::Exec { content, args } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
                     "SELECT content FROM events
@@ -106,15 +112,16 @@ impl Historian {
                 .await?;
                 if let Some(last_event) = last_event {
                     if last_event.content.as_ref().map(|s| s.as_str()) == content {
-                        log::debug!("上次執行內容相同，不重覆記錄");
+                        log::debug!("上次執行內容相同，不重複記錄");
                         content = None;
                     }
                 }
-                self.raw_record(event.script_id, &ty, &cmd, content).await?;
+                self.raw_record(event.script_id, &ty, &cmd, Some(args), content)
+                    .await?;
             }
             EventData::ExecDone(code) => {
                 let code = code.to_string();
-                self.raw_record(event.script_id, &ty, &cmd, Some(&code))
+                self.raw_record(event.script_id, &ty, &cmd, None, Some(&code))
                     .await?;
             }
         }

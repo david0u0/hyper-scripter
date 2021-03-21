@@ -33,7 +33,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
-    let home = get_home();
+    let home: PathBuf = HOME.into(); // 不要想用 get_home，因為 canonicalize 若路徑不存在就會炸裂
     hyper_scripter::path::set_home(&home).unwrap();
     let _ = env_logger::try_init();
     match std::fs::remove_dir_all(&home) {

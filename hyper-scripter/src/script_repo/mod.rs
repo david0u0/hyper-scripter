@@ -110,12 +110,12 @@ impl DBEnv {
                 })
                 .await?;
         }
-        if let Some(content) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
+        if let Some((content, args)) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
             log::debug!("{:?} 的執行事件", info.name);
             self.historian
                 .record(&Event {
                     script_id: info.id,
-                    data: EventData::Exec(content),
+                    data: EventData::Exec { content, args },
                 })
                 .await?;
         }

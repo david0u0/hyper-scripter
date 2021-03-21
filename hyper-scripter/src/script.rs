@@ -125,7 +125,7 @@ pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub created_time: ScriptTime,
     pub write_time: ScriptTime,
-    pub exec_time: Option<ScriptTime<String>>,
+    pub exec_time: Option<ScriptTime<(String, String)>>,
     pub miss_time: Option<ScriptTime>,
     pub exec_done_time: Option<ScriptTime<i32>>,
     pub id: i64,
@@ -171,9 +171,10 @@ impl ScriptInfo {
         self.read_time = now.clone();
         self.write_time = now;
     }
-    pub fn exec(&mut self, content: String) {
+    pub fn exec(&mut self, content: String, args: &[String]) {
         log::trace!("{:?} 執行內容為 {}", self, content);
-        self.exec_time = Some(ScriptTime::now(content));
+        let args_ser = toml::to_string(args).unwrap();
+        self.exec_time = Some(ScriptTime::now((content, args_ser)));
         self.read_time = ScriptTime::now(());
     }
     pub fn exec_done(&mut self, code: i32) {

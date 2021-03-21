@@ -160,13 +160,13 @@ pub async fn run_n_times(
     }
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    entry.update(|info| info.exec(content)).await?;
+    entry.update(|info| info.exec(content, args)).await?;
     for _ in 0..n {
         let run_res = super::run(
             &script_path,
             &*entry,
             &args,
-            entry.exec_time.as_ref().unwrap().data().unwrap(),
+            &entry.exec_time.as_ref().unwrap().data().unwrap().0,
         );
         let ret_code: i32;
         match run_res {

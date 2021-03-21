@@ -172,7 +172,11 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 println!("{}", msg);
             }
         }
-        Subs::Run { script_query, args } => {
+        Subs::Run {
+            script_query,
+            args,
+            memorize_args: _,
+        } => {
             util::main_util::run_n_times(
                 1,
                 &script_query,

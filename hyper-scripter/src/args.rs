@@ -329,8 +329,7 @@ impl Root {
     }
 }
 
-pub fn handle_args() -> Result<Root> {
-    let args: Vec<_> = std::env::args().map(|s| s).collect();
+pub fn handle_args(args: &[String]) -> Result<Root> {
     let mut root = handle_alias_args(&args)?;
     log::debug!("命令行物件：{:?}", root);
 
@@ -338,4 +337,24 @@ pub fn handle_args() -> Result<Root> {
     Ok(root)
 }
 
-// TODO: 單元測試！
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn build_args<'a>(v: Vec<&'a str>) -> Vec<String> {
+        v.into_iter().map(|s| s.to_owned()).collect()
+    }
+    #[test]
+    fn test_strange_alias() {
+        let args = build_args(vec!["hs", "-f", "e", "e", "something"]);
+        let args = handle_args(&args).unwrap();
+        assert_eq!(args.filter, vec!["e".parse().unwrap()]);
+        match &args.subcmd {
+            Some(Subs::Edit { edit_query, .. }) => {
+                assert_eq!(edit_query, &"something".parse().unwrap());
+            }
+            _ => {
+                panic!("{:?} should be edit...", args);
+            }
+        }
+    }
+}

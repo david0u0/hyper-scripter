@@ -29,7 +29,8 @@ async fn main() {
     }
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
-    let root = args::handle_args()?;
+    let args: Vec<_> = std::env::args().map(|s| s).collect();
+    let root = args::handle_args(&args)?;
     let mut conf = Config::get()?.clone();
     let res = main_inner(root, &mut conf).await?;
     conf.store()?;

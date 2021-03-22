@@ -10,7 +10,7 @@ use std::str::FromStr;
 mod util;
 pub use util::*;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum EditQuery {
     NewAnonimous,
     Query(ScriptQuery),
@@ -55,12 +55,12 @@ impl FromStr for ListQuery {
         }
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScriptQuery {
     inner: ScriptQueryInner,
     bang: bool,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum ScriptQueryInner {
     Fuzz(String),
     Exact(ScriptName),

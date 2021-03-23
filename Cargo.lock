@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter"
-version = "0.3.3"
+version = "0.3.5"
 dependencies = [
  "chrono",
  "colored",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-historian"
-version = "0.3.2"
+version = "0.3.5"
 dependencies = [
  "chrono",
  "derive_more",
@@ -766,7 +766,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-util"
-version = "0.3.2"
+version = "0.3.5"
 dependencies = [
  "env_logger",
  "lazy_static",

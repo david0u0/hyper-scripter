@@ -211,4 +211,15 @@ pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<bool>
     }
 }
 
+// 如果有需要跳脫的字元就吐 json 格式，否則就照原字串
+pub fn to_display_args(arg: String) -> Result<String> {
+    let escaped: String =
+        serde_json::to_string(&arg).context("超級異常的狀況…把字串轉成 json 也能出錯")?;
+    if !arg.contains(' ') && arg == &escaped[1..escaped.len() - 1] {
+        Ok(arg)
+    } else {
+        Ok(escaped)
+    }
+}
+
 pub mod main_util;

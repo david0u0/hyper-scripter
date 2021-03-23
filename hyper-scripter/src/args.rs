@@ -188,6 +188,14 @@ pub enum Subs {
         #[structopt(parse(try_from_str))]
         tag_filter: Option<FilterQuery>,
     },
+    History {
+        #[structopt(parse(try_from_str))]
+        script: Option<ScriptQuery>,
+        #[structopt(short, long, requires("script"))]
+        limit: Option<u32>,
+        #[structopt(short, long, requires("script"))]
+        offset: Option<u32>,
+    },
 }
 
 #[derive(StructOpt, Debug)]
@@ -225,13 +233,14 @@ fn set_home(p: &Option<String>) -> Result {
     }
 }
 
-fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'a str, &'static Alias)>> {
+fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'static Alias, &'a [String])>> {
     match &root.subcmd {
         Some(alias_mod::Subs::Other(v)) => {
             let first = v.first().unwrap().as_str();
             let conf = Config::get()?;
             if let Some(alias) = conf.alias.get(first) {
-                Ok(Some((first, alias)))
+                log::info!("別名 {} => {:?}", first, alias);
+                Ok(Some((alias, v)))
             } else {
                 Ok(None)
             }
@@ -267,20 +276,14 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
                 log::debug!("不使用別名！");
             } else {
                 set_home(&alias_root.hs_home)?;
-                if let Some((before, alias)) = find_alias(&alias_root)? {
-                    log::info!("別名 {} => {:?}", before, alias);
-                    let mut new_args: Vec<&str> = vec![];
-                    let mut arg_iter = args.iter();
-                    while let Some(arg) = arg_iter.next() {
-                        if before == arg {
-                            new_args.extend(alias.after.iter().map(|s| s.as_str()));
-                            new_args.extend(arg_iter.map(|s| s.as_str()));
-                            break;
-                        } else {
-                            new_args.push(arg);
-                        }
-                    }
-                    log::trace!("新的參數為 {:?}", new_args);
+                if let Some((alias, remaining_args)) = find_alias(&alias_root)? {
+                    let base_len = args.len() - remaining_args.len();
+                    let base_args = args.iter().take(base_len);
+                    let after_args = alias.after.iter();
+                    let remaining_args = remaining_args.iter().skip(1);
+                    let new_args = base_args.chain(after_args).chain(remaining_args);
+
+                    // log::trace!("新的參數為 {:?}", new_args);
                     return Ok(Root::from_iter(new_args));
                 }
             }
@@ -329,8 +332,7 @@ impl Root {
     }
 }
 
-pub fn handle_args() -> Result<Root> {
-    let args: Vec<_> = std::env::args().map(|s| s).collect();
+pub fn handle_args(args: &[String]) -> Result<Root> {
     let mut root = handle_alias_args(&args)?;
     log::debug!("命令行物件：{:?}", root);
 
@@ -338,4 +340,56 @@ pub fn handle_args() -> Result<Root> {
     Ok(root)
 }
 
-// TODO: 單元測試！
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn build_args<'a>(v: Vec<&'a str>) -> Vec<String> {
+        v.into_iter().map(|s| s.to_owned()).collect()
+    }
+    #[test]
+    fn test_strange_alias() {
+        let args = build_args(vec![
+            "hs",
+            "-f",
+            "e",
+            "e",
+            "-t",
+            "e",
+            "something",
+            "-c",
+            "e",
+        ]);
+        let args = handle_args(&args).unwrap();
+        assert_eq!(args.filter, vec!["e".parse().unwrap()]);
+        assert_eq!(args.all, false);
+        match &args.subcmd {
+            Some(Subs::Edit {
+                edit_query,
+                tags,
+                category,
+                ..
+            }) => {
+                assert_eq!(edit_query, &"something".parse().unwrap());
+                assert_eq!(tags, &Some("e".parse().unwrap()));
+                assert_eq!(category, &Some("e".parse().unwrap()));
+            }
+            _ => {
+                panic!("{:?} should be edit...", args);
+            }
+        }
+
+        let args = build_args(vec!["hs", "la", "-l"]);
+        let args = handle_args(&args).unwrap();
+        assert_eq!(args.filter, vec!["all,^removed".parse().unwrap()]);
+        assert_eq!(args.all, true);
+        match &args.subcmd {
+            Some(Subs::LS(opt)) => {
+                assert_eq!(opt.long, true);
+                assert_eq!(opt.queries.len(), 0);
+            }
+            _ => {
+                panic!("{:?} should be edit...", args);
+            }
+        }
+    }
+}

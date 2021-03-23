@@ -188,6 +188,14 @@ pub enum Subs {
         #[structopt(parse(try_from_str))]
         tag_filter: Option<FilterQuery>,
     },
+    History {
+        #[structopt(parse(try_from_str))]
+        script: Option<ScriptQuery>,
+        #[structopt(short, long, requires("script"))]
+        limit: Option<u32>,
+        #[structopt(short, long, requires("script"))]
+        offset: Option<u32>,
+    },
 }
 
 #[derive(StructOpt, Debug)]

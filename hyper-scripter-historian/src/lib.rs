@@ -151,4 +151,25 @@ impl Historian {
         .await?;
         Ok(res.map(|res| res.args.unwrap_or_default()))
     }
+
+    pub async fn last_args_list(
+        &self,
+        id: i64,
+        limit: u32,
+        offset: u32,
+    ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
+        let limit = limit as i64;
+        let offset = offset as i64;
+        let ty = EventType::Exec.to_string();
+        let res = sqlx::query!(
+            "SELECT args FROM events WHERE type = ? AND script_id = ? ORDER BY time DESC LIMIT ? OFFSET ?",
+            ty,
+            id,
+            limit,
+            offset
+        )
+        .fetch_all(&*self.pool.lock().unwrap())
+        .await?;
+        Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
+    }
 }

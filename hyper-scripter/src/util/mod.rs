@@ -211,4 +211,13 @@ pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<bool>
     }
 }
 
+pub fn to_display_args(arg: String) -> Result<String> {
+    let escaped: String = serde_json::from_str(&arg)?;
+    if arg == &escaped[1..escaped.len() - 1] {
+        Ok(arg)
+    } else {
+        Ok(escaped)
+    }
+}
+
 pub mod main_util;

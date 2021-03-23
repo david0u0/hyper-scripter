@@ -162,7 +162,10 @@ impl Historian {
         let offset = offset as i64;
         let ty = EventType::Exec.to_string();
         let res = sqlx::query!(
-            "SELECT args FROM events WHERE type = ? AND script_id = ? ORDER BY time DESC LIMIT ? OFFSET ?",
+            "
+            SELECT DISTINCT args FROM events
+            WHERE type = ? AND script_id = ? ORDER BY time DESC LIMIT ? OFFSET ?
+            ",
             ty,
             id,
             limit,

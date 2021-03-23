@@ -12,7 +12,8 @@ use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
-use util::main_util::load_utils;
+
+const DEFAULT_HISTORY_LIMIT: u32 = 10;
 
 #[tokio::main]
 async fn main() {
@@ -49,7 +50,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
 
     if init {
         log::info!("初次使用，載入好用工具");
-        load_utils(&mut repo).await?;
+        util::main_util::load_utils(&mut repo).await?;
     }
 
     let explicit_filter = root.filter.len() > 0;
@@ -64,7 +65,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
     }
 
     match root.subcmd.unwrap() {
-        Subs::LoadUtils => load_utils(&mut repo).await?,
+        Subs::LoadUtils => util::main_util::load_utils(&mut repo).await?,
         Subs::Alias {
             unset: false,
             before: Some(before),
@@ -349,6 +350,28 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 print!("  [{}]", conf.main_tag_filter);
                 if conf.main_tag_filter.mandatory {
                     print!(" (mandatory)")
+                }
+                println!("");
+            }
+        }
+        Subs::History {
+            script: Some(script),
+            limit,
+            offset,
+        } => {
+            let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
+            let args_list = historian
+                .last_args_list(
+                    entry.id,
+                    limit.unwrap_or(DEFAULT_HISTORY_LIMIT),
+                    offset.unwrap_or_default(),
+                )
+                .await?;
+            for args in args_list {
+                log::debug!("嘗試打印參數 {}", args);
+                let args: Vec<String> = serde_json::from_str(&args)?;
+                for arg in args {
+                    print!("{} ", util::to_display_args(arg)?);
                 }
                 println!("");
             }

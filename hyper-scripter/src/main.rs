@@ -150,8 +150,8 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             let content = content.as_ref().map(|s| s.as_str());
             let created = util::prepare_script(&path, &*entry, no_template, content)?;
             if !fast {
-                let cmd = util::create_cmd("vim", &[&path]);
-                let stat = util::run_cmd("vim", cmd)?;
+                let cmd = util::create_concat_cmd(&conf.editor, &[&path]);
+                let stat = util::run_cmd(cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
             }
             let exist = util::after_script(&path, created)?;

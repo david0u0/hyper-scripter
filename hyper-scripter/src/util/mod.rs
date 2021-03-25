@@ -10,6 +10,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+pub mod main_util;
+
 pub fn run(
     script_path: &PathBuf,
     info: &ScriptInfo,
@@ -38,7 +40,7 @@ pub fn run(
     let env = script_conf.env(&info)?;
     cmd.envs(env);
 
-    let stat = run_cmd(&cmd_str, cmd)?;
+    let stat = run_cmd(cmd)?;
     log::info!("程式執行結果：{:?}", stat);
     if !stat.success() {
         let code = stat.code().unwrap_or_default();
@@ -47,9 +49,11 @@ pub fn run(
         Ok(())
     }
 }
-pub fn run_cmd(cmd_str: &str, mut cmd: Command) -> Result<ExitStatus> {
-    let mut child = handle_fs_res(&[&cmd_str], cmd.spawn())?;
-    handle_fs_res(&[&cmd_str], child.wait())
+pub fn run_cmd(mut cmd: Command) -> Result<ExitStatus> {
+    let res = cmd.spawn();
+    let program = cmd.get_program();
+    let mut child = handle_fs_res(&[program], res)?;
+    handle_fs_res(&[program], child.wait())
 }
 #[cfg(not(target_os = "linux"))]
 pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
@@ -70,10 +74,30 @@ pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
     cmd
 }
 #[cfg(target_os = "linux")]
-pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
+pub fn create_cmd<I, S1, S2>(cmd_str: S2, args: I) -> Command
+where
+    I: IntoIterator<Item = S1>,
+    S1: AsRef<OsStr>,
+    S2: AsRef<OsStr>,
+{
     let mut cmd = Command::new(&cmd_str);
     cmd.args(args);
     cmd
+}
+
+pub fn create_concat_cmd<'a, 'b, I1, S1, I2, S2>(arg1: I1, arg2: I2) -> Command
+where
+    I1: IntoIterator<Item = &'a S1>,
+    I2: IntoIterator<Item = &'b S2>,
+    S1: AsRef<OsStr> + 'a,
+    S2: AsRef<OsStr> + 'b,
+{
+    let mut arg1 = arg1.into_iter();
+    let cmd = arg1.next().unwrap();
+    let remaining = arg1
+        .map(|s| s.as_ref())
+        .chain(arg2.into_iter().map(|s| s.as_ref()));
+    create_cmd(cmd, remaining)
 }
 
 pub fn read_file(path: &PathBuf) -> Result<String> {
@@ -221,5 +245,3 @@ pub fn to_display_args(arg: String) -> Result<String> {
         Ok(escaped)
     }
 }
-
-pub mod main_util;

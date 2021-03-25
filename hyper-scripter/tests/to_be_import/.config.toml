@@ -3,6 +3,8 @@ recent = 1
 
 main_tag_filter = 'none'
 
+editor = ["vim"]
+
 [[tag_filters]]
 content = '+pin,util'
 name = 'pin'

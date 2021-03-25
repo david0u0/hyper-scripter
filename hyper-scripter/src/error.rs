@@ -14,6 +14,7 @@ pub enum FormatCode {
     ScriptQuery,
     Tag,
     FilterQuery,
+    NonEmptyArray,
 }
 
 #[derive(Debug, Clone)]

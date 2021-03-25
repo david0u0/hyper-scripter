@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagFilter, TagFilterGroup};
@@ -20,6 +20,21 @@ lazy_static::lazy_static! {
             open_time: Utc::now(),
         }
     });
+}
+
+fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let v: Vec<T> = Deserialize::deserialize(deserializer)?;
+    if v.len() == 0 {
+        return Err(serde::de::Error::custom(Error::Format(
+            FormatCode::NonEmptyArray,
+            Default::default(),
+        )));
+    }
+    Ok(v)
 }
 
 fn config_file() -> PathBuf {
@@ -47,6 +62,8 @@ pub struct RawConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
+    #[serde(deserialize_with = "de_nonempty_vec")]
+    pub editor: Vec<String>,
     pub tag_filters: Vec<NamedTagFilter>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub alias: HashMap<String, Alias>,
@@ -71,6 +88,7 @@ impl Default for RawConfig {
             )
         }
         RawConfig {
+            editor: vec!["vim".to_string()],
             tag_filters: vec![
                 NamedTagFilter {
                     content: "+pin".parse().unwrap(),
@@ -110,14 +128,15 @@ impl RawConfig {
     }
     #[cfg(not(test))]
     fn load() -> Result<(Self, bool)> {
-        use crate::error::FormatCode;
-
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
             Ok(s) => {
-                let conf = toml::from_str(&s).map_err(|_| {
-                    Error::Format(FormatCode::Config, path.to_string_lossy().into())
+                let conf = toml::from_str(&s).map_err(|err| {
+                    Error::Format(
+                        FormatCode::Config,
+                        format!("{}: {}", path.to_string_lossy(), err),
+                    )
                 })?;
                 Ok((conf, true))
             }

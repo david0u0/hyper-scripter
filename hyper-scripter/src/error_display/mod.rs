@@ -51,6 +51,10 @@ impl Display for Error {
                     ScriptQuery => write!(f, "script query")?,
                     Tag => write!(f, "tag")?,
                     FilterQuery => write!(f, "tag filter")?,
+                    NonEmptyArray => {
+                        write!(f, "non-empty array")?;
+                        return Ok(());
+                    }
                 }
                 write!(f, " '{}'", s)?;
             }

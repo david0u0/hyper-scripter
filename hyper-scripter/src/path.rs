@@ -66,11 +66,16 @@ pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
     *PATH.lock().unwrap() = Some(path);
     Ok(())
 }
+#[cfg(not(test))]
 pub fn get_home() -> PathBuf {
     PATH.lock()
         .unwrap()
         .clone()
         .expect("還沒設定路徑就取路徑，錯誤實作！")
+}
+#[cfg(test)]
+pub fn get_home() -> PathBuf {
+    join_path(".", ".test_hyper_scripter").unwrap()
 }
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {
@@ -135,19 +140,14 @@ pub fn open_script(
 mod test {
     use super::*;
     use crate::script::IntoScriptName;
-    fn setup() {
-        set_home(".test_hyper_scripter").unwrap();
-    }
     #[test]
     fn test_anonymous_ids() {
-        setup();
         let mut ids = get_anonymous_ids().unwrap();
         ids.sort();
         assert_eq!(ids, vec![1, 2, 5]);
     }
     #[test]
     fn test_open_anonymous() {
-        setup();
         let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
         assert_eq!(name, ScriptName::Anonymous(6));
         assert_eq!(
@@ -162,7 +162,6 @@ mod test {
     }
     #[test]
     fn test_open() {
-        setup();
         let second = "second".to_owned();
         let second_name = second.to_owned().into_script_name().unwrap();
         let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();

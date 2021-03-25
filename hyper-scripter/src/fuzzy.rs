@@ -49,26 +49,23 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     let data_vec: Vec<_> = iter.collect();
     // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
     let keys: Vec<_> = data_vec.iter().map(|data| data.fuzz_key()).collect();
-    let score_fut: Vec<_> = keys
-        .iter()
-        .map(|key| {
-            let key = MyRaw::new(key.as_ref());
-            spawn_blocking(move || {
-                // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
-                let key = unsafe { key.get() };
-                let score = my_fuzz(key, unsafe { raw_name.get() });
+    let score_fut = keys.iter().map(|key| {
+        let key = MyRaw::new(key.as_ref());
+        spawn_blocking(move || {
+            // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
+            let key = unsafe { key.get() };
+            let score = my_fuzz(key, unsafe { raw_name.get() });
 
-                if let Some(mut score) = score {
-                    let len = key.chars().count();
-                    log::trace!("將分數正交化：{} / {}", score * 100, len);
-                    score = score * 100 / len as i64;
-                    Some(score)
-                } else {
-                    None
-                }
-            })
+            if let Some(mut score) = score {
+                let len = key.chars().count();
+                log::trace!("將分數正交化：{} / {}", score * 100, len);
+                score = score * 100 / len as i64;
+                Some(score)
+            } else {
+                None
+            }
         })
-        .collect();
+    });
 
     let scores = join_all(score_fut).await;
 

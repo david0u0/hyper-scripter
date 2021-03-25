@@ -14,9 +14,8 @@ const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
     static ref CONFIG: Result<Config> = RawConfig::load().map(|(raw_config, read_from_file)| {
         Config {
-            read_from_file,
             raw_config,
-            changed: false,
+            changed: !read_from_file,
             open_time: Utc::now(),
         }
     });
@@ -71,7 +70,6 @@ pub struct RawConfig {
 }
 #[derive(Debug, Clone, Deref)]
 pub struct Config {
-    read_from_file: bool,
     changed: bool,
     open_time: DateTime<Utc>,
     #[deref]
@@ -159,15 +157,8 @@ impl Config {
         log::info!("寫入設定檔…");
         let path = config_file();
         if !self.changed {
-            if path.exists() {
-                log::info!("設定檔未改變，不寫入");
-                return Ok(());
-            } else if self.read_from_file {
-                log::info!("設定檔中途被刪掉，且未改變，不寫入");
-                return Ok(());
-            } else {
-                log::info!("把憑空變出來的設定檔寫入檔案");
-            }
+            log::info!("設定檔未改變，不寫入");
+            return Ok(());
         }
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {

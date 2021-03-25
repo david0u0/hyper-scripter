@@ -12,10 +12,10 @@ use std::path::PathBuf;
 
 const CONFIG_FILE: &'static str = ".config.toml";
 lazy_static::lazy_static! {
-    static ref CONFIG: Result<Config> = RawConfig::load().map(|(raw_config, read_from_file)| {
+    static ref CONFIG: Result<Config> = RawConfig::load().map(|raw_config| {
         Config {
-            raw_config,
-            changed: !read_from_file,
+            changed: raw_config.is_none(),
+            raw_config: raw_config.unwrap_or_default(),
             open_time: Utc::now(),
         }
     });
@@ -121,11 +121,11 @@ impl Default for RawConfig {
 }
 impl RawConfig {
     #[cfg(test)]
-    fn load() -> Result<(Self, bool)> {
-        Ok((Self::default(), false))
+    fn load() -> Result<Option<Self>> {
+        Ok(Some(Self::default()))
     }
     #[cfg(not(test))]
-    fn load() -> Result<(Self, bool)> {
+    fn load() -> Result<Option<Self>> {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
@@ -136,11 +136,11 @@ impl RawConfig {
                         format!("{}: {}", path.to_string_lossy(), err),
                     )
                 })?;
-                Ok((conf, true))
+                Ok(Some(conf))
             }
             Err(Error::PathNotFound(_)) => {
                 log::debug!("找不到設定檔，使用預設值");
-                Ok((Default::default(), false))
+                Ok(None)
             }
             Err(e) => Err(e),
         }

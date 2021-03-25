@@ -32,12 +32,20 @@ async fn main() {
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().map(|s| s).collect();
     let root = args::handle_args(&args)?;
-    let mut conf = Config::get()?.clone();
-    let res = main_inner(root, &mut conf).await?;
-    conf.store()?;
-    Ok(res)
+    let conf = Config::get()?;
+    let res = main_inner(root, conf).await?;
+    if let Some(conf) = res.conf {
+        conf.store()?;
+    }
+    Ok(res.errs)
 }
-async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
+
+struct MainReturn {
+    conf: Option<Config>,
+    errs: Vec<Error>
+}
+
+async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
     let (pool, init) = hyper_scripter::db::get_pool().await?;
     let recent = if root.timeless {
         None
@@ -55,7 +63,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
 
     let explicit_filter = root.filter.len() > 0;
     let historian = repo.historian().clone();
-    let mut res = Vec::<Error>::new();
+    let mut ret = MainReturn{conf:None, errs: vec![]};
     {
         let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
         for filter in root.filter.into_iter() {
@@ -73,6 +81,8 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         } => {
             if after.len() > 0 {
                 log::info!("設定別名 {} {:?}", before, after);
+                ret.conf = Some(conf.clone());
+                let conf = ret.conf.as_mut().unwrap();
                 conf.alias.insert(before, after.into());
             } else {
                 log::info!("印出別名 {}", before);
@@ -91,6 +101,8 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
             ..
         } => {
             log::info!("取消別名 {}", before);
+            ret.conf = Some(conf.clone());
+            let conf = ret.conf.as_mut().unwrap();
             let ok = conf.alias.remove(&before).is_some();
             if !ok {
                 return Err(Error::NoAlias(before));
@@ -186,7 +198,7 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
                 &mut repo,
                 &args,
                 historian.clone(),
-                &mut res,
+                &mut ret.errs,
                 previous_args,
             )
             .await?;
@@ -297,6 +309,9 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         Subs::Tags { tag_filter } => {
             if let Some(filter) = tag_filter {
+                ret.conf = Some(conf.clone());
+                let conf = ret.conf.as_mut().unwrap();
+
                 if let Some(name) = filter.name {
                     log::debug!("處理篩選器 {:?}", name);
                     let is_empty = filter.content.is_empty();
@@ -378,5 +393,5 @@ async fn main_inner(root: Root, conf: &mut Config) -> Result<Vec<Error>> {
         }
         sub @ _ => unimplemented!("{:?}", sub),
     }
-    Ok(res)
+    Ok(ret)
 }

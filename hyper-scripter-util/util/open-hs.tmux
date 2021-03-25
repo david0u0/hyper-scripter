@@ -1,9 +1,10 @@
-# [HS_HELP]: Open hyper scripter home. If a script is given, it will be opened on a splitted editor.
+# [HS_HELP]: Open hyper scripter home.
+# [HS_HELP]: If a script is given, it will be opened on a splitted editor. Otherwise open config file.
 # [HS_HELP]:
 # [HS_HELP]: USAGE:
 # [HS_HELP]:     hs open-hs [script query]
 # [HS_HELP]:     OR
-# [HS_HELP]:     hs open-hs ! # open `.config.toml`
+# [HS_HELP]:     hs open-hs # open `.config.toml`
 
 set -e
 
@@ -16,13 +17,9 @@ IFS=: read HS_HOME HS_EXE <<< $ENV
 cd $HS_HOME
 
 if [ -z $1 ]; then
-    FILE=
+    FILE='.config.toml'
 else
-    if [ "$1" == "!" ]; then
-        FILE='.config.toml'
-    else
-        FILE=$($HS_EXE --no-alias -H $HS_HOME which $1)
-    fi
+    FILE=$($HS_EXE --no-alias -H $HS_HOME which $@)
 fi
 
 set -- $(stty size)

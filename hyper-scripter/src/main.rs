@@ -1,5 +1,5 @@
 use chrono::Utc;
-use hyper_scripter::args::{self, print_help, List, Root, Subs};
+use hyper_scripter::args::{self, print_help, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
 use hyper_scripter::extract_help;
@@ -12,8 +12,6 @@ use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
-
-const DEFAULT_HISTORY_LIMIT: u32 = 10;
 
 #[tokio::main]
 async fn main() {
@@ -42,7 +40,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
 
 struct MainReturn {
     conf: Option<Config>,
-    errs: Vec<Error>
+    errs: Vec<Error>,
 }
 
 async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
@@ -63,7 +61,10 @@ async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
 
     let explicit_filter = root.filter.len() > 0;
     let historian = repo.historian().clone();
-    let mut ret = MainReturn{conf:None, errs: vec![]};
+    let mut ret = MainReturn {
+        conf: None,
+        errs: vec![],
+    };
     {
         let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
         for filter in root.filter.into_iter() {
@@ -370,18 +371,16 @@ async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
             }
         }
         Subs::History {
-            script: Some(script),
-            limit,
-            offset,
+            subcmd:
+                Some(History::Show {
+                    script,
+                    limit,
+                    offset,
+                }),
         } => {
             let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
-            let args_list = historian
-                .last_args_list(
-                    entry.id,
-                    limit.unwrap_or(DEFAULT_HISTORY_LIMIT),
-                    offset.unwrap_or_default(),
-                )
-                .await?;
+            println!("{}", entry.name.key());
+            let args_list = historian.last_args_list(entry.id, limit, offset).await?;
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);
                 let args: Vec<String> = serde_json::from_str(&args)?;

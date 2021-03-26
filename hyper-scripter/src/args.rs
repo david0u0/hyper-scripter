@@ -188,13 +188,22 @@ pub enum Subs {
         #[structopt(parse(try_from_str))]
         tag_filter: Option<FilterQuery>,
     },
+    #[structopt(about = "Manage script history")]
     History {
+        #[structopt(subcommand)]
+        subcmd: Option<History>,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum History {
+    Show {
         #[structopt(parse(try_from_str))]
-        script: Option<ScriptQuery>,
-        #[structopt(short, long, requires("script"))]
-        limit: Option<u32>,
-        #[structopt(short, long, requires("script"))]
-        offset: Option<u32>,
+        script: ScriptQuery,
+        #[structopt(short, long, requires("script"), default_value = "10")]
+        limit: u32,
+        #[structopt(short, long, requires("script"), default_value = "0")]
+        offset: u32,
     },
 }
 

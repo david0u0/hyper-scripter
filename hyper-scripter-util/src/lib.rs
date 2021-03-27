@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Util {
     pub is_hidden: bool,
@@ -24,11 +22,11 @@ lazy_static::lazy_static! {
 pub fn get_all() -> Vec<Util> {
     get_all_utils::get_all()
         .into_iter()
-        .map(|(name, category, content)| Util {
-            is_hidden: HIDDEN_SET.contains(name),
-            name,
-            category,
-            content,
+        .map(|u| Util {
+            is_hidden: u.is_hidden,
+            name: u.name,
+            category: u.category,
+            content: u.content,
         })
         .collect()
 }

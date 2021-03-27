@@ -191,12 +191,17 @@ pub enum Subs {
     #[structopt(about = "Manage script history")]
     History {
         #[structopt(subcommand)]
-        subcmd: Option<History>,
+        subcmd: History,
     },
 }
 
 #[derive(StructOpt, Debug)]
 pub enum History {
+    RM {
+        #[structopt(parse(try_from_str))]
+        script: ScriptQuery,
+        number: u32,
+    },
     Show {
         #[structopt(parse(try_from_str))]
         script: ScriptQuery,

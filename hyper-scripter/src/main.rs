@@ -50,7 +50,7 @@ async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
     } else {
         root.recent.or(conf.recent)
     };
-    let mut repo = ScriptRepo::new(pool.clone(), recent)
+    let mut repo = ScriptRepo::new(pool, recent)
         .await
         .context("讀取歷史記錄失敗")?;
 
@@ -371,12 +371,18 @@ async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
             }
         }
         Subs::History {
+            subcmd: History::RM { script, number },
+        } => {
+            let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
+            historian.ignore_args(entry.id, number).await?;
+        }
+        Subs::History {
             subcmd:
-                Some(History::Show {
+                History::Show {
                     script,
                     limit,
                     offset,
-                }),
+                },
         } => {
             let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
             println!("{}", entry.name.key());

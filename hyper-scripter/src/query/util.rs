@@ -91,6 +91,7 @@ pub async fn do_script_query_strict<'b>(
     }
 }
 
+/// 尋找腳本，若不存在則報錯則報錯，並且若被篩除者中存在符合模糊搜尋者，記錄一個「錯過事件」
 pub async fn do_script_query_strict_with_missing<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,

@@ -4,7 +4,7 @@ extern crate derive_more;
 use chrono::NaiveDateTime;
 use sqlx::{error::Error as DBError, Pool, Sqlite, SqlitePool};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 mod db;
 mod event;
@@ -13,7 +13,7 @@ pub use event::*;
 
 #[derive(Debug, Clone)]
 pub struct Historian {
-    pool: Arc<Mutex<SqlitePool>>,
+    pool: Arc<RwLock<SqlitePool>>,
     path: PathBuf,
 }
 
@@ -66,7 +66,7 @@ impl Historian {
         args: Option<&str>,
         content: Option<&str>,
     ) -> Result<(), DBError> {
-        let pool = &mut *self.pool.lock().unwrap();
+        let pool = &mut *self.pool.write().unwrap();
         let res = raw_record_last(pool, script_id, ty, cmd, args, content).await;
         if res.is_err() {
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
@@ -81,7 +81,7 @@ impl Historian {
     pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
         let path = path.as_ref().to_owned();
         db::get_pool(&path).await.map(|pool| Historian {
-            pool: Arc::new(Mutex::new(pool)),
+            pool: Arc::new(RwLock::new(pool)),
             path,
         })
     }
@@ -108,7 +108,7 @@ impl Historian {
                     ty,
                     event.script_id
                 )
-                .fetch_optional(&*self.pool.lock().unwrap())
+                .fetch_optional(&*self.pool.read().unwrap())
                 .await?;
                 if let Some(last_event) = last_event {
                     if last_event.content.as_ref().map(|s| s.as_str()) == content {
@@ -135,7 +135,7 @@ impl Historian {
             "SELECT script_id, time as time FROM last_events WHERE type = ? ORDER BY script_id",
             ty
         )
-        .fetch_all(&*self.pool.lock().unwrap())
+        .fetch_all(&*self.pool.read().unwrap())
         .await?;
         Ok(times.into_iter().map(|d| (d.script_id, d.time)).collect())
     }
@@ -143,11 +143,15 @@ impl Historian {
     pub async fn last_args(&self, id: i64) -> Result<Option<String>, DBError> {
         let ty = EventType::Exec.to_string();
         let res = sqlx::query!(
-            "SELECT args FROM last_events WHERE type = ? AND script_id = ?",
+            "
+            SELECT args FROM events
+            WHERE type = ? AND script_id = ? AND NOT ignored
+            ORDER BY time DESC LIMIT 1
+            ",
             ty,
             id
         )
-        .fetch_optional(&*self.pool.lock().unwrap())
+        .fetch_optional(&*self.pool.read().unwrap())
         .await?;
         Ok(res.map(|res| res.args.unwrap_or_default()))
     }
@@ -165,7 +169,7 @@ impl Historian {
             "
             WITH args AS (
                 SELECT args, max(time) as time FROM events
-                WHERE type = ? AND script_id = ?
+                WHERE type = ? AND script_id = ? AND NOT ignored
                 GROUP BY args
                 ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT args FROM args
@@ -175,8 +179,32 @@ impl Historian {
             limit,
             offset
         )
-        .fetch_all(&*self.pool.lock().unwrap())
+        .fetch_all(&*self.pool.read().unwrap())
         .await?;
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
+    }
+
+    pub async fn ignore_args(&self, script_id: i64, number: u32) -> Result<(), DBError> {
+        let ty = EventType::Exec.to_string();
+        let offset = number as i64 - 1;
+        sqlx::query!(
+            "
+            WITH args_table AS (
+                SELECT args, max(time) as time FROM events
+                WHERE type = ? AND script_id = ? AND NOT ignored
+                GROUP BY args
+                ORDER BY time DESC LIMIT 1 OFFSET ?
+            ) 
+            UPDATE events SET ignored = true WHERE args = (
+                SELECT args FROM args_table
+            )
+            ",
+            ty,
+            script_id,
+            offset
+        )
+        .execute(&*self.pool.read().unwrap())
+        .await?;
+        Ok(())
     }
 }

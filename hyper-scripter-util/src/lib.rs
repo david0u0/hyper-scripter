@@ -10,15 +10,6 @@ mod get_all_utils {
     include!(concat!(env!("OUT_DIR"), "/get_all_utils.rs"));
 }
 
-lazy_static::lazy_static! {
-    static ref HIDDEN_SET: HashSet<&'static str> = {
-        let mut set = HashSet::<&str>::new();
-        set.insert("util/common");
-        set.insert("util/hs_env");
-        set
-    };
-}
-
 pub fn get_all() -> Vec<Util> {
     get_all_utils::get_all()
         .into_iter()

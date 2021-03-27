@@ -4,13 +4,13 @@ mod tool;
 
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io::prelude::*;
-use std::path::Path;
 use tool::*;
 
 fn test_import() {
-    let out_dir = std::env::var_os("OUT_DIR").unwrap();
-    let dir = Path::new(&out_dir).join("to_be_import");
+    let tmp_dir = std::env::temp_dir();
+    let dir = tmp_dir.join("to_be_import");
     let dir = dir.to_string_lossy();
+    log::info!("把待匯入的腳本放進 {}", dir);
 
     run("e copy/test -t +innate | echo 我要留下來").unwrap();
     run(format!(

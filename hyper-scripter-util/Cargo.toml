@@ -5,10 +5,3 @@ authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "Tools for hyper-scripter. Not indetended to be used directly."
-
-[dependencies]
-lazy_static = "1.4"
-
-[dev-dependencies]
-env_logger = "0.6.2"
-log = "0.4.8"

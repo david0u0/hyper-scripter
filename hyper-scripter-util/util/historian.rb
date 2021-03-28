@@ -3,40 +3,49 @@
 # [HS_HELP]: e.g.:
 # [HS_HELP]:     hs historian -f hs hs/test --limit 20
 
+require 'json'
 require_relative './common.rb'
 HISTORIAN = 'util/historian'.freeze
+ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query
 # e.g. hs util/historian !
 HS_ENV.prefix("--skip-script #{HISTORIAN}")
 
+arg_obj_str = HS_ENV.do_hs("--dump-args history show #{ARGS}", false)
+exit 1 unless $?.success?
+arg_obj = JSON.parse(arg_obj_str)
+show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
+script = show_obj['script']
+offset = show_obj['offset']
+
 lines = []
 lines_count = 0
-name = ''
 
-load_history = lambda do |args|
-  history = HS_ENV.do_hs("history show #{args}", false)
+load_history = lambda do
+  history = HS_ENV.do_hs("history show #{ARGS}", false)
   exit 1 unless $?.success?
   lines = history.lines.map { |s| s.length > 0 ? s : ' ' }
-  name = lines.slice!(0).strip
 
-  if lines.length == 0
-    puts 'history is empty'
+  lines_count = lines.length
+  if lines_count == 0
+    $stderr.print 'history is empty'
     exit 0
   end
-  lines_count = lines.length
 end
 
-load_history.call(ARGV.join(' '))
+load_history.call
 
 pos = 0
 selected = false
 
 loop do
+  display_pos = offset + pos + 1
   reload = false
   lines.each_with_index do |line, i|
-    leading = i == pos ? '>' : ' '
-    $stderr.print "#{leading} #{i + 1}. #{line}"
+    cur_display_pos = offset + i + 1
+    leading = cur_display_pos == display_pos ? '>' : ' '
+    $stderr.print "#{leading} #{cur_display_pos}. #{line}"
   end
 
   begin
@@ -68,15 +77,15 @@ loop do
   $stderr.print "\r\e[J"
 
   if reload
-    HS_ENV.do_hs("history rm =#{name}! #{pos + 1}", false)
-    load_history.call("=#{name}!")
+    HS_ENV.do_hs("history rm #{script} #{display_pos}", false)
+    load_history.call
   end
 end
 
 $stderr.print "\e[#{lines_count}E"
 
 if selected
-  cmd = "=#{name}! #{lines[pos]}"
-  puts cmd
+  cmd = "#{script} #{lines[pos]}"
+  $stderr.print cmd
   history = HS_ENV.exec_hs(cmd, false)
 end

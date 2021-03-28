@@ -7,7 +7,6 @@ use tool::*;
 fn assert_list(actual: &str, expected: &[&str]) {
     let actual_v: Vec<_> = actual
         .split("\n")
-        .skip(1)
         .filter_map(|s| if s.len() > 0 { Some(s.trim()) } else { None })
         .collect();
     assert_eq!(expected, actual_v);

@@ -390,7 +390,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 },
         } => {
             let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
-            println!("{}", entry.name.key());
             let args_list = historian.last_args_list(entry.id, limit, offset).await?;
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);

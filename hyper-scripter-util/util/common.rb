@@ -1,7 +1,7 @@
 class HSEnv
   def initialize(script_dir)
     find_hs_env(script_dir)
-    puts "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
+    $stderr.print "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
     @prefix = ''
   end
 
@@ -19,7 +19,7 @@ class HSEnv
     @hs_home
   end
 
-  def do_hs(arg, all = true, path = @hs_home)
+  def do_hs(arg, all, path = @hs_home)
     cmd = hs_command_str(arg, all, path)
     `#{cmd}`
   end
@@ -32,9 +32,9 @@ class HSEnv
   private
 
   def hs_command_str(arg, all, path)
-    tags_str = ''
-    tags_str = '-f all' if all
-    "#{@hs_exe} --no-alias --timeless -H #{path} #{tags_str} #{@prefix} #{arg}"
+    access_str = ''
+    access_str = '-f all --timeless' if all
+    "#{@hs_exe} --no-alias -H #{path} #{access_str} #{@prefix} #{arg}"
   end
 end
 

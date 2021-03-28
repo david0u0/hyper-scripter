@@ -15,21 +15,38 @@ HS_ENV.prefix("--skip-script #{HISTORIAN}")
 arg_obj_str = HS_ENV.do_hs("--dump-args history show #{ARGS}", false)
 exit 1 unless $?.success?
 arg_obj = JSON.parse(arg_obj_str)
+filters = arg_obj['filter']
+timeless = arg_obj['timeless']
+recent = arg_obj['recent']
 show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
-script = show_obj['script']
+script_query = show_obj['script']
 offset = show_obj['offset']
+limit = show_obj['limit']
+
+# ask the actual script by ls command
+filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
+time_str = if recent.nil?
+             timeless ? '--timeless' : ''
+           else
+             "--recent #{recent}"
+           end
+script_name = HS_ENV.do_hs(
+  "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
+  false
+).strip
+exit 1 unless $?.success?
 
 lines = []
 lines_count = 0
 
 load_history = lambda do
-  history = HS_ENV.do_hs("history show #{ARGS}", false)
+  history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
   exit 1 unless $?.success?
   lines = history.lines.map { |s| s.length > 0 ? s : ' ' }
 
   lines_count = lines.length
   if lines_count == 0
-    $stderr.print 'history is empty'
+    warn 'history is empty'
     exit 0
   end
 end
@@ -77,7 +94,7 @@ loop do
   $stderr.print "\r\e[J"
 
   if reload
-    HS_ENV.do_hs("history rm #{script} #{display_pos}", false)
+    HS_ENV.do_hs("history rm =#{script_name}! #{display_pos}", false)
     load_history.call
   end
 end
@@ -85,7 +102,7 @@ end
 $stderr.print "\e[#{lines_count}E"
 
 if selected
-  cmd = "#{script} #{lines[pos]}"
-  $stderr.print cmd
+  cmd = "=#{script_name}! #{lines[pos]}"
+  warn cmd
   history = HS_ENV.exec_hs(cmd, false)
 end

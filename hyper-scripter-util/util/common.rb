@@ -1,7 +1,7 @@
 class HSEnv
   def initialize(script_dir)
     find_hs_env(script_dir)
-    $stderr.print "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
+    warn "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
     @prefix = ''
   end
 

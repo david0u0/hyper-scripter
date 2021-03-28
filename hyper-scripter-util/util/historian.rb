@@ -4,6 +4,11 @@
 # [HS_HELP]:     hs historian -f hs hs/test --limit 20
 
 require_relative './common.rb'
+HISTORIAN = 'util/historian'.freeze
+
+# prevent the call to `util/historian` screw up historical query
+# e.g. hs util/historian !
+HS_ENV.prefix("--skip-script #{HISTORIAN}")
 
 lines = []
 lines_count = 0

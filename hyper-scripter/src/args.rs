@@ -25,6 +25,10 @@ macro_rules! def_root {
         #[derive(StructOpt, Debug)]
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
+            #[structopt(long, hidden = true, number_of_values = 1)]
+            pub skip_script: Vec<String>,
+            #[structopt(long, hidden = true)]
+            pub dump_args: bool,
             #[structopt(long)]
             pub no_alias: bool,
             #[structopt(short = "H", long, help = "Path to hyper script home")]
@@ -64,7 +68,7 @@ macro_rules! def_root {
 }
 
 mod alias_mod {
-    use super::{AllArgsOverrideSelf, AllowLeadingHyphen, StructOpt, TagFilter};
+    use super::*;
     #[derive(StructOpt, Debug)]
     pub enum Subs {
         #[structopt(external_subcommand)]

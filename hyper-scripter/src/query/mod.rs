@@ -5,12 +5,13 @@ use crate::error::{
 use crate::script::{IntoScriptName, ScriptName};
 use crate::tag::TagFilter;
 use regex::Regex;
+use serde::Serialize;
 use std::str::FromStr;
 
 mod util;
 pub use util::*;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize)]
 pub enum EditQuery {
     NewAnonimous,
     Query(ScriptQuery),
@@ -33,8 +34,11 @@ impl FromStr for EditQuery {
         })
     }
 }
-#[derive(Debug)]
+
+use crate::util::serialize_to_string;
+#[derive(Debug, Serialize)]
 pub enum ListQuery {
+    #[serde(serialize_with = "serialize_to_string")]
     Pattern(Regex),
     Query(ScriptQuery),
 }
@@ -60,6 +64,29 @@ pub struct ScriptQuery {
     inner: ScriptQueryInner,
     bang: bool,
 }
+impl std::fmt::Display for ScriptQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.inner {
+            ScriptQueryInner::Fuzz(fuzz) => write!(f, "{}", fuzz),
+            ScriptQueryInner::Exact(e) => write!(f, "={}", e),
+            ScriptQueryInner::Prev(p) => write!(f, "^{}", p),
+        }?;
+        if self.bang {
+            write!(f, "!")?;
+        }
+        Ok(())
+    }
+}
+impl Serialize for ScriptQuery {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ScriptQueryInner {
     Fuzz(String),
@@ -127,7 +154,7 @@ impl FromStr for ScriptQuery {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct FilterQuery {
     pub name: Option<String>,
     pub content: TagFilter,

@@ -30,8 +30,12 @@ async fn main() {
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().map(|s| s).collect();
     let root = args::handle_args(&args)?;
-    let conf = Config::get()?;
-    let res = main_inner(root, conf).await?;
+    if root.dump_args {
+        let dumped = serde_json::to_string(&root)?;
+        print!("{}", dumped);
+        return Ok(vec![]);
+    }
+    let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
         conf.store()?;
     }
@@ -43,7 +47,8 @@ struct MainReturn {
     errs: Vec<Error>,
 }
 
-async fn main_inner(root: Root, conf: &Config) -> Result<MainReturn> {
+async fn main_inner(root: Root) -> Result<MainReturn> {
+    let conf = Config::get()?;
     let (pool, init) = hyper_scripter::db::get_pool().await?;
     let recent = if root.timeless {
         None

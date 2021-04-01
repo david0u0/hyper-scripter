@@ -18,11 +18,11 @@ pub struct Historian {
 }
 
 async fn ignore_last_args(pool: &Pool<Sqlite>, script_id: i64) -> Result<(), DBError> {
-    let ty = EventType::Exec.to_string();
+    let exec_ty = EventType::Exec.to_string();
     sqlx::query!(
         "DELETE FROM last_events WHERE script_id = ? AND type = ?",
         script_id,
-        ty,
+        exec_ty,
     )
     .execute(pool)
     .await?;
@@ -33,7 +33,7 @@ async fn ignore_last_args(pool: &Pool<Sqlite>, script_id: i64) -> Result<(), DBE
         WHERE type = ? AND script_id = ? AND NOT ignored
         ORDER BY time DESC LIMIT 1
         ",
-        ty,
+        exec_ty,
         script_id
     )
     .fetch_optional(pool)
@@ -46,7 +46,7 @@ async fn ignore_last_args(pool: &Pool<Sqlite>, script_id: i64) -> Result<(), DBE
             VALUES(?, ?, ?, ?, ?, ?)
             ",
             script_id,
-            ty,
+            exec_ty,
             last_event.cmd,
             last_event.args,
             last_event.content,
@@ -65,14 +65,16 @@ async fn raw_record_event(
     cmd: &str,
     args: Option<&str>,
     content: Option<&str>,
+    time: NaiveDateTime,
 ) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT INTO events (script_id, type, cmd, args, content) VALUES(?, ?, ?, ?, ?)",
+        "INSERT INTO events (script_id, type, cmd, args, content, time) VALUES(?, ?, ?, ?, ?, ?)",
         script_id,
         ty,
         cmd,
         args,
-        content
+        content,
+        time
     )
     .execute(pool)
     .await?;
@@ -85,14 +87,16 @@ async fn raw_record_last(
     cmd: &str,
     args: Option<&str>,
     content: Option<&str>,
+    time: NaiveDateTime,
 ) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content) VALUES(?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content, time) VALUES(?, ?, ?, ?, ?, ?)",
         script_id,
         ty,
         cmd,
         args,
-        content
+        content,
+        time
     )
     .execute(pool)
     .await?;
@@ -106,18 +110,19 @@ impl Historian {
         cmd: &str,
         args: Option<&str>,
         content: Option<&str>,
+        time: NaiveDateTime,
     ) -> Result<(), DBError> {
         let pool = &mut *self.pool.write().unwrap();
-        let res = raw_record_last(pool, script_id, ty, cmd, args, content).await;
+        let res = raw_record_last(pool, script_id, ty, cmd, args, content, time).await;
         if res.is_err() {
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
             *pool = db::get_pool(&self.path).await?;
-            raw_record_last(pool, script_id, ty, cmd, args, content).await?;
-            raw_record_event(pool, script_id, ty, cmd, args, content).await?;
+            raw_record_last(pool, script_id, ty, cmd, args, content, time).await?;
+            raw_record_event(pool, script_id, ty, cmd, args, content, time).await?;
             return Ok(());
         }
 
-        raw_record_event(pool, script_id, ty, cmd, args, content).await
+        raw_record_event(pool, script_id, ty, cmd, args, content, time).await
     }
     pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
         let path = path.as_ref().to_owned();
@@ -131,13 +136,14 @@ impl Historian {
         log::debug!("記錄事件 {:?}", event);
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
         let ty = event.data.get_type().to_string();
+        let time = event.time;
         match &event.data {
             EventData::Miss => {
-                self.raw_record(event.script_id, &ty, &cmd, None, None)
+                self.raw_record(event.script_id, &ty, &cmd, None, None, time)
                     .await?;
             }
             EventData::Read => {
-                self.raw_record(event.script_id, &ty, &cmd, None, None)
+                self.raw_record(event.script_id, &ty, &cmd, None, None, time)
                     .await?;
             }
             EventData::Exec { content, args } => {
@@ -159,12 +165,12 @@ impl Historian {
                         content = None;
                     }
                 }
-                self.raw_record(event.script_id, &ty, &cmd, Some(args), content)
+                self.raw_record(event.script_id, &ty, &cmd, Some(args), content, time)
                     .await?;
             }
             EventData::ExecDone(code) => {
                 let code = code.to_string();
-                self.raw_record(event.script_id, &ty, &cmd, None, Some(&code))
+                self.raw_record(event.script_id, &ty, &cmd, None, Some(&code), time)
                     .await?;
             }
         }
@@ -239,13 +245,14 @@ impl Historian {
                 GROUP BY args
                 ORDER BY time DESC LIMIT 1 OFFSET ?
             ) 
-            UPDATE events SET ignored = true WHERE args = (
-                SELECT args FROM args_table
-            )
+            UPDATE events SET ignored = true
+            WHERE script_id = ?
+            AND args = (SELECT args FROM args_table)
             ",
             ty,
             script_id,
-            offset
+            offset,
+            script_id,
         )
         .execute(&*pool)
         .await?;

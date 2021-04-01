@@ -82,3 +82,47 @@ fn test_history_args_rm() {
     let recorded = run("history show receiver").unwrap();
     assert_list(&recorded, &["second"]);
 }
+
+#[test]
+fn test_history_args_rm_last() {
+    let _g = setup();
+
+    run("e A | echo A$@").unwrap();
+    run("e B | echo B$@").unwrap();
+
+    run("B x").unwrap();
+    run("A x").unwrap(); // removed later
+    run("A y").unwrap();
+    run("B y").unwrap();
+    run("A x").unwrap(); // removed later
+    run("A z").unwrap();
+    run("B z").unwrap();
+
+    run("history rm A 2").unwrap(); // x
+
+    assert_eq!(run("run -p -").unwrap(), "Bz");
+    run("history rm - 1").unwrap(); // Bz
+    assert_eq!(run("run -p -").unwrap(), "By");
+    run("history rm - 1").unwrap(); // By
+    assert_eq!(run("run -p A").unwrap(), "Az");
+
+    // Make some noise HAHA
+    {
+        assert_eq!(run("run B w").unwrap(), "Bw");
+        assert_eq!(run("run A w").unwrap(), "Aw");
+
+        assert_eq!(run("run -p -").unwrap(), "Aw");
+        run("history rm B 1").unwrap(); // Bw
+        assert_eq!(run("run -p B").unwrap(), "Bx");
+        run("history rm A 1").unwrap(); // Aw
+    }
+
+    run("history rm A 1").unwrap(); // Az
+    assert_eq!(run("run -p A").unwrap(), "Ay"); // Ax is removed already
+    run("history rm - 1").unwrap(); // Ay
+    run("run -p A").expect_err("previous args exist !?");
+
+    assert_eq!(run("run -p B").unwrap(), "Bx");
+    run("history rm - 1").unwrap(); // Bx
+    run("run -p B").expect_err("previous args exist !?");
+}

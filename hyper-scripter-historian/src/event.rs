@@ -1,3 +1,5 @@
+use chrono::NaiveDateTime;
+
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
 pub enum EventType {
     Exec,
@@ -29,4 +31,5 @@ impl EventData<'_> {
 pub struct Event<'a> {
     pub data: EventData<'a>,
     pub script_id: i64,
+    pub time: NaiveDateTime,
 }

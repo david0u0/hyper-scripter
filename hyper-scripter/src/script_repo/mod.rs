@@ -98,26 +98,33 @@ impl DBEnv {
                 .record(&Event {
                     script_id: info.id,
                     data: EventData::Read,
+                    time: *info.read_time,
                 })
                 .await?;
         }
-        if info.miss_time.as_ref().map_or(false, |t| t.has_changed()) {
+        if let Some(time) = info.miss_time.as_ref() {
             log::debug!("{:?} 的錯過事件", info.name);
-            self.historian
-                .record(&Event {
-                    script_id: info.id,
-                    data: EventData::Miss,
-                })
-                .await?;
+            if time.has_changed() {
+                self.historian
+                    .record(&Event {
+                        script_id: info.id,
+                        data: EventData::Miss,
+                        time: **time,
+                    })
+                    .await?;
+            }
         }
-        if let Some((content, args)) = info.exec_time.as_ref().map_or(None, |t| t.data()) {
+        if let Some(time) = info.exec_time.as_ref() {
             log::debug!("{:?} 的執行事件", info.name);
-            self.historian
-                .record(&Event {
-                    script_id: info.id,
-                    data: EventData::Exec { content, args },
-                })
-                .await?;
+            if let Some((content, args)) = time.data() {
+                self.historian
+                    .record(&Event {
+                        script_id: info.id,
+                        data: EventData::Exec { content, args },
+                        time: **time,
+                    })
+                    .await?;
+            }
         }
 
         Ok(())

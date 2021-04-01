@@ -5,6 +5,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagFilter};
+use chrono::Utc;
 use hyper_scripter_historian::{Event, EventData, Historian};
 use std::path::PathBuf;
 
@@ -200,6 +201,7 @@ pub async fn run_n_times(
         historian
             .record(&Event {
                 data: EventData::ExecDone(ret_code),
+                time: Utc::now().naive_utc(),
                 script_id: entry.id,
             })
             .await?;

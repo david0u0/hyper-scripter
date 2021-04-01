@@ -17,6 +17,47 @@ pub struct Historian {
     path: PathBuf,
 }
 
+async fn ignore_last_args(pool: &Pool<Sqlite>, script_id: i64) -> Result<(), DBError> {
+    let ty = EventType::Exec.to_string();
+    sqlx::query!(
+        "DELETE FROM last_events WHERE script_id = ? AND type = ?",
+        script_id,
+        ty,
+    )
+    .execute(pool)
+    .await?;
+
+    let last_event = sqlx::query!(
+        "
+        SELECT * FROM events
+        WHERE type = ? AND script_id = ? AND NOT ignored
+        ORDER BY time DESC LIMIT 1
+        ",
+        ty,
+        script_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(last_event) = last_event {
+        sqlx::query!(
+            "
+            INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content, time)
+            VALUES(?, ?, ?, ?, ?, ?)
+            ",
+            script_id,
+            ty,
+            last_event.cmd,
+            last_event.args,
+            last_event.content,
+            last_event.time
+        )
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
+}
 async fn raw_record_event(
     pool: &Pool<Sqlite>,
     script_id: i64,
@@ -102,9 +143,11 @@ impl Historian {
             EventData::Exec { content, args } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
-                    "SELECT content FROM events
-                WHERE type = ? AND script_id = ? AND NOT content IS NULL
-                ORDER BY time DESC LIMIT 1",
+                    "
+                    SELECT content FROM events
+                    WHERE type = ? AND script_id = ? AND NOT content IS NULL
+                    ORDER BY time DESC LIMIT 1
+                    ",
                     ty,
                     event.script_id
                 )
@@ -187,6 +230,7 @@ impl Historian {
     pub async fn ignore_args(&self, script_id: i64, number: u32) -> Result<(), DBError> {
         let ty = EventType::Exec.to_string();
         let offset = number as i64 - 1;
+        let pool = self.pool.read().unwrap();
         sqlx::query!(
             "
             WITH args_table AS (
@@ -203,8 +247,12 @@ impl Historian {
             script_id,
             offset
         )
-        .execute(&*self.pool.read().unwrap())
+        .execute(&*pool)
         .await?;
+        if number == 1 {
+            log::info!("ignore last args");
+            ignore_last_args(&*pool, script_id).await?;
+        }
         Ok(())
     }
 }

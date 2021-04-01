@@ -9,24 +9,42 @@ use std::sync::Mutex;
 pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
 pub const HS_REDIRECT: &'static str = ".hs_redirect";
 
+macro_rules! hs_home_env {
+    () => {
+        "HYPER_SCRIPTER_HOME"
+    };
+}
+
 lazy_static::lazy_static! {
     static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 }
 
+#[cfg(not(feature = "hard-home"))]
+fn get_default_home() -> Result<PathBuf> {
+    const ROOT_PATH: &'static str = "hyper_scripter";
+    use crate::error::SysPath;
+    let home = dirs::config_dir()
+        .ok_or(Error::SysPathNotFound(SysPath::Config))?
+        .join(ROOT_PATH);
+    Ok(home)
+}
+#[cfg(feature = "hard-home")]
+fn get_default_home() -> Result<PathBuf> {
+    let home = env!(
+        hs_home_env!(),
+        concat!("Hardcoded home ", hs_home_env!(), " not provided!",)
+    );
+    Ok(home.into())
+}
+
 #[cfg(not(debug_assertions))]
 pub fn get_sys_home() -> Result<PathBuf> {
-    use crate::error::SysPath;
-    const ROOT_PATH: &'static str = "hyper_scripter";
-    const HS_HOME_ENV: &'static str = "HYPER_SCRIPTER_HOME";
-
-    let p = match std::env::var(HS_HOME_ENV) {
+    let p = match std::env::var(hs_home_env!()) {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
             p.into()
         }
-        Err(std::env::VarError::NotPresent) => dirs::config_dir()
-            .ok_or(Error::SysPathNotFound(SysPath::Config))?
-            .join(ROOT_PATH),
+        Err(std::env::VarError::NotPresent) => get_default_home()?,
         Err(e) => return Err(e.into()),
     };
     Ok(p)

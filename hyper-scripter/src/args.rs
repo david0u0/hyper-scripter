@@ -208,7 +208,7 @@ pub enum History {
         number: u32,
     },
     Show {
-        #[structopt(parse(try_from_str))]
+        #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,
         #[structopt(short, long, requires("script"), default_value = "10")]
         limit: u32,

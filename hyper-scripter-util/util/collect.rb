@@ -57,7 +57,7 @@ directory_tree(root).each do |full_path|
 
   name, ext = extract_name(script)
 
-  HS_ENV.do_hs("which =#{name} 2>/dev/null")
+  HS_ENV.do_hs("which =#{name} 2>/dev/null", true)
   next if $?.success?
 
   puts "collecting script #{script}!"
@@ -68,12 +68,12 @@ directory_tree(root).each do |full_path|
   HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template", false)
 end
 
-HS_ENV.do_hs('ls --grouping=none --name --plain').split(' ').each do |name|
-  file = HS_ENV.do_hs("which =#{name} 2>/dev/null").delete_suffix("\n")
+HS_ENV.do_hs('ls --grouping=none --name --plain', true).split(' ').each do |name|
+  file = HS_ENV.do_hs("which =#{name} 2>/dev/null", true).delete_suffix("\n")
   next unless $?.success?
 
   unless File.exist?(file)
     puts "removing script #{file}!"
-    HS_ENV.do_hs("rm --purge =#{name}")
+    HS_ENV.do_hs("rm --purge =#{name}", true)
   end
 end

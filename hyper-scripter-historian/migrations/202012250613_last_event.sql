@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS last_events (
     type varchar(10) NOT NULL,
     cmd text NOT NULL,
     content text,
-    time datetime NOT NULL DEFAULT (STRFTIME ('%Y-%m-%d %H:%M:%f', 'NOW')),
+    time datetime NOT NULL,
     args text,
     UNIQUE (script_id, TYPE)
 );

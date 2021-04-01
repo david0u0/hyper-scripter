@@ -5,6 +5,7 @@ use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
+use serde::Serialize;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
@@ -22,9 +23,13 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 
 macro_rules! def_root {
     ($sub:ident: $sub_type:ty) => {
-        #[derive(StructOpt, Debug)]
+        #[derive(StructOpt, Debug, Serialize)]
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
+            #[structopt(long, hidden = true, number_of_values = 1)]
+            pub skip_script: Vec<String>,
+            #[structopt(long, hidden = true)]
+            pub dump_args: bool,
             #[structopt(long)]
             pub no_alias: bool,
             #[structopt(short = "H", long, help = "Path to hyper script home")]
@@ -64,8 +69,8 @@ macro_rules! def_root {
 }
 
 mod alias_mod {
-    use super::{AllArgsOverrideSelf, AllowLeadingHyphen, StructOpt, TagFilter};
-    #[derive(StructOpt, Debug)]
+    use super::*;
+    #[derive(StructOpt, Debug, Serialize)]
     pub enum Subs {
         #[structopt(external_subcommand)]
         Other(Vec<String>),
@@ -79,7 +84,7 @@ def_root! {
     subcmd: Subs
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Serialize)]
 #[structopt(settings = &[AllArgsOverrideSelf])]
 pub enum Subs {
     #[structopt(external_subcommand)]
@@ -191,14 +196,19 @@ pub enum Subs {
     #[structopt(about = "Manage script history")]
     History {
         #[structopt(subcommand)]
-        subcmd: Option<History>,
+        subcmd: History,
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Serialize)]
 pub enum History {
-    Show {
+    RM {
         #[structopt(parse(try_from_str))]
+        script: ScriptQuery,
+        number: u32,
+    },
+    Show {
+        #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,
         #[structopt(short, long, requires("script"), default_value = "10")]
         limit: u32,
@@ -207,7 +217,7 @@ pub enum History {
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Serialize)]
 #[structopt(settings = &[AllArgsOverrideSelf])]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項

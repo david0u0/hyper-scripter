@@ -1,7 +1,12 @@
 class HSEnv
   def initialize(script_dir)
     find_hs_env(script_dir)
-    puts "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
+    warn "hyper script home = #{@hs_home}, executable = #{@hs_exe}"
+    @prefix = ''
+  end
+
+  def prefix(pref)
+    @prefix = pref
   end
 
   def find_hs_env(script_dir)
@@ -14,25 +19,23 @@ class HSEnv
     @hs_home
   end
 
-  def do_hs(arg, all = true, path = @hs_home)
+  def do_hs(arg, all, path = @hs_home)
     cmd = hs_command_str(arg, all, path)
     `#{cmd}`
   end
 
   def exec_hs(arg, all = true, path = @hs_home)
     cmd = hs_command_str(arg, all, path)
-    exec "#{cmd}"
+    exec cmd.to_s
   end
 
   private
-  def hs_command_str(arg, all, path)
-    tags_str = ''
-    if all
-      tags_str = "-f all"
-    end
-    "#{@hs_exe} --no-alias --timeless -H #{path} #{tags_str} #{arg}"
-  end
 
+  def hs_command_str(arg, all, path)
+    access_str = ''
+    access_str = '-f all --timeless' if all
+    "#{@hs_exe} --no-alias -H #{path} #{access_str} #{@prefix} #{arg}"
+  end
 end
 
 DIR = File.dirname(__FILE__)

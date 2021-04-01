@@ -59,7 +59,7 @@ def import_dir(dir, namespace)
                  "#{namespace}/#{script.name}"
                end
 
-    HS_ENV.do_hs("which =#{new_name} 2>/dev/null")
+    HS_ENV.do_hs("which =#{new_name} 2>/dev/null", true)
     if $?.success?
       puts "#{new_name} already exists!"
       next

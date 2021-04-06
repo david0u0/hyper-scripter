@@ -107,7 +107,7 @@ impl Default for RawConfig {
                 // FIXME: 一旦陣列實作了 intoiterator 就用陣列
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
-                gen_alias("l", &["ls"]),
+                gen_alias("l", &["ls", "--grouping", "none"]),
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--purge", "-f", "removed", "*"]),
                 gen_alias("tree", &["ls", "--grouping", "tree"]),

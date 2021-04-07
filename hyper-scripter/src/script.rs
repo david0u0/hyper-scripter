@@ -153,12 +153,7 @@ impl ScriptInfo {
                 _ => NaiveDateTime::from_timestamp(1, 0),
             }
         }
-        max!(
-            *self.read_time,
-            map(&self.miss_time),
-            map(&self.exec_time),
-            map(&self.exec_done_time)
-        )
+        max!(*self.read_time, map(&self.miss_time), map(&self.exec_time))
     }
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)
@@ -175,7 +170,7 @@ impl ScriptInfo {
         log::trace!("{:?} 執行內容為 {}", self, content);
         let args_ser = serde_json::to_string(args).unwrap();
         self.exec_time = Some(ScriptTime::now((content, args_ser)));
-        self.read_time = ScriptTime::now(());
+        // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
     }
     pub fn exec_done(&mut self, code: i32) {
         log::trace!("{:?} 執行結果為 {}", self, code);

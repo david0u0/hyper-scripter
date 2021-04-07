@@ -15,17 +15,14 @@ path = "tests/issues.rs"
 [[test]]
 name = "integration"
 path = "tests/integration.rs"
-required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵
 
 [[test]]
 name = "util"
 path = "tests/util_test.rs"
-required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵
 
 [[test]]
 name = "history"
 path = "tests/history.rs"
-required-features = ["no-prompt"] # NOTE: 若沒有此特徵就不會測，並非開啟此特徵
 
 [[bin]]
 name = "hs"
@@ -33,7 +30,6 @@ path = "src/main.rs"
 
 [features]
 default = []
-no-prompt = []
 hard-home = []
 
 [dependencies]

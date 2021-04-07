@@ -5,6 +5,8 @@ main_tag_filter = 'none'
 
 editor = ["vim"]
 
+prompt_level = "Always"
+
 [[tag_filters]]
 content = '+pin,util'
 name = 'pin'

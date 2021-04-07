@@ -1,4 +1,5 @@
 use super::{ListQuery, ScriptQuery, ScriptQueryInner};
+use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
@@ -65,17 +66,30 @@ pub async fn do_script_query<'b>(
             };
         }
         ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
-        ScriptQueryInner::Fuzz(name) => match fuzzy::fuzz(name, script_repo.iter_mut(all)).await? {
-            Some((entry, fuzzy::High)) => Ok(Some(entry)),
-            Some((entry, fuzzy::Low)) => {
-                if prompt_fuzz_acceptable(&*entry)? {
-                    Ok(Some(entry))
-                } else {
-                    Err(Error::DontFuzz)
+        ScriptQueryInner::Fuzz(name) => {
+            let level = Config::get()?.prompt_level;
+            let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all)).await?;
+            let mut need_prompt = false;
+            let entry = match fuzz_res {
+                Some((entry, fuzzy::High)) => {
+                    if level.always() {
+                        need_prompt = true;
+                    }
+                    entry
                 }
+                Some((entry, fuzzy::Low)) => {
+                    if !level.never() {
+                        need_prompt = true;
+                    }
+                    entry
+                }
+                _ => return Ok(None),
+            };
+            if need_prompt {
+                prompt_fuzz_acceptable(&*entry)?;
             }
-            _ => Ok(None),
-        },
+            Ok(Some(entry))
+        }
     }
 }
 pub async fn do_script_query_strict<'b>(
@@ -126,9 +140,7 @@ pub async fn do_script_query_strict_with_missing<'b>(
     }
 }
 
-#[cfg(not(feature = "no-prompt"))]
-fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
-    use crate::config::Config;
+fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
     use colored::{Color, Colorize};
     use console::{Key, Term};
 
@@ -156,13 +168,9 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result<bool> {
     term.show_cursor()?;
     if ok {
         term.write_line(&" Y".color(Color::Green).to_string())?;
+        Ok(())
     } else {
         term.write_line(&" N".color(Color::Red).to_string())?;
+        Err(Error::DontFuzz)
     }
-    Ok(ok)
-}
-
-#[cfg(feature = "no-prompt")]
-fn prompt_fuzz_acceptable(_: &ScriptInfo) -> Result<bool> {
-    Ok(true)
 }

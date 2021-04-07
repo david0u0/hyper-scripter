@@ -56,11 +56,30 @@ impl From<Vec<String>> for Alias {
     }
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum PromptLevel {
+    Always,
+    Never,
+    Smart,
+}
+impl PromptLevel {
+    pub fn always(self) -> bool {
+        self == PromptLevel::Always
+    }
+    pub fn never(self) -> bool {
+        self == PromptLevel::Never
+    }
+    pub fn smart(self) -> bool {
+        self == PromptLevel::Smart
+    }
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct RawConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
+    pub prompt_level: PromptLevel,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
     pub tag_filters: Vec<NamedTagFilter>,
@@ -87,6 +106,7 @@ impl Default for RawConfig {
         }
         RawConfig {
             editor: vec!["vim".to_string()],
+            prompt_level: PromptLevel::Smart,
             tag_filters: vec![
                 NamedTagFilter {
                     content: "+pin".parse().unwrap(),

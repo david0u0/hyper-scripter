@@ -1,3 +1,4 @@
+use hyper_scripter::config::{Config, PromptLevel};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -33,9 +34,8 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
-    let home: PathBuf = HOME.into(); // 不要想用 get_home，因為 canonicalize 若路徑不存在就會炸裂
-    hyper_scripter::path::set_home(&home).unwrap();
     let _ = env_logger::try_init();
+    let home: PathBuf = HOME.into(); // 不要想用 get_home，因為 canonicalize 若路徑不存在就會炸裂
     match std::fs::remove_dir_all(&home) {
         Ok(_) => (),
         Err(e) => {
@@ -44,7 +44,12 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
             }
         }
     }
-    std::fs::create_dir(&home).expect(&format!("創建目錄失敗 {:?}", home));
+
+    hyper_scripter::path::set_home(&home).unwrap();
+
+    let mut conf = Config::get().unwrap().clone();
+    conf.prompt_level = PromptLevel::Never;
+    conf.store().unwrap();
     run("alias e edit --fast").unwrap();
 
     guard

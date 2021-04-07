@@ -18,8 +18,10 @@ pub fn run(
     remaining: &[String],
     content: &str,
 ) -> Result<()> {
+    let conf = Config::get()?;
     let ty = &info.ty;
-    let script_conf = Config::get()?.get_script_conf(ty)?;
+    let name = &info.name.key();
+    let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
     } else {
@@ -28,9 +30,19 @@ pub fn run(
 
     let info: serde_json::Value;
     info = json!({
+        // TODO: hs_home
         "path": script_path,
+        "args": remaining,
+        "name": name,
         "content": content,
     });
+
+    if let Some(pre_run_msg) = conf.pre_run_msg.as_ref() {
+        log::info!("打印執行前訊息 {}", pre_run_msg);
+        let reg = Handlebars::new();
+        let res = reg.render_template(pre_run_msg, &info)?;
+        eprintln!("{}", res);
+    }
 
     let args = script_conf.args(&info)?;
     let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();

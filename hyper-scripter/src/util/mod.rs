@@ -173,8 +173,11 @@ pub fn prepare_script(
         false
     } else {
         let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
+
         let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = birthplace.strip_prefix(home).unwrap_or(&birthplace);
+        let birthplace = birthplace.strip_prefix(&home).unwrap_or(&birthplace);
+        let hs_home = get_home();
+        let hs_home = hs_home.strip_prefix(&home).unwrap_or(&hs_home);
 
         // NOTE: 創建資料夾和檔案
         if let Some(parent) = path.parent() {
@@ -186,9 +189,9 @@ pub fn prepare_script(
         if !no_template {
             let content: Vec<_> = content.split(";").collect();
             let info = json!({
-                "script_dir": get_home(),
                 "birthplace": birthplace,
                 "name": script.name.key().to_owned(),
+                "hs_home": hs_home,
                 "content": content,
             });
             let template = &Config::get()?.get_script_conf(&script.ty)?.template;

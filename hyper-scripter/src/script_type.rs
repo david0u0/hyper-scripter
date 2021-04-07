@@ -7,15 +7,18 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 export NAME=\"{{name}}\"
+export HS_HOME=\"~/{{hs_home}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
 {{#each content}}{{{this}}}
 {{/each}}";
 
+// FIXME: strange birthplace & hs_home for js...
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 
 const name = '{{name}}';
+const hs_home = '{{hs_home}}';
 process.chdir(require('os').homedir());
 {{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
 let spawn = require('child_process').spawnSync;
@@ -29,6 +32,7 @@ writeFile('/dev/null', 'some content');
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 export NAME=\"{{name}}\"
+export HS_HOME=\"~/{{hs_home}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
@@ -41,6 +45,7 @@ tmux -2 attach-session -d";
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 NAME = '{{name}}'
+HS_HOME = \"#{ENV['HOME']}/{{hs_home}}\"
 
 {{#each content}}{{{this}}}
 {{/each}} ";

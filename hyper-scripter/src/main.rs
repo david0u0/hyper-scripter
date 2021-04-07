@@ -38,6 +38,8 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
         conf.store()?;
+    } else {
+        Config::get()?.store()?;
     }
     Ok(res.errs)
 }

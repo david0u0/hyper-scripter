@@ -199,7 +199,7 @@ pub fn prepare_script(
 
         let content = content.unwrap_or_default();
         if !no_template {
-            let content: Vec<_> = content.split(";").collect();
+            let content: Vec<_> = content.split("\n").collect();
             let info = json!({
                 "birthplace": birthplace,
                 "name": script.name.key().to_owned(),

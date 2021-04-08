@@ -362,22 +362,30 @@ pub fn handle_args(args: &[String]) -> Result<Root> {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn build_args<'a>(v: Vec<&'a str>) -> Vec<String> {
-        v.into_iter().map(|s| s.to_owned()).collect()
+    fn build_args<'a>(args: &'a str) -> Vec<String> {
+        args.split(' ').map(|s| s.to_owned()).collect()
+    }
+    #[test]
+    fn test_strange_set_alias() {
+        let args = build_args("hs alias trash -f removed");
+        let args = handle_args(&args).unwrap();
+        assert_eq!(args.filter, vec![]);
+        match &args.subcmd {
+            Some(Subs::Alias {
+                unset,
+                before: Some(before),
+                after,
+            }) => {
+                assert_eq!(*unset, false);
+                assert_eq!(before, "trash");
+                assert_eq!(after, &["-f", "removed"]);
+            },
+            _ => panic!("{:?} should be alias...", args),
+        }
     }
     #[test]
     fn test_strange_alias() {
-        let args = build_args(vec![
-            "hs",
-            "-f",
-            "e",
-            "e",
-            "-t",
-            "e",
-            "something",
-            "-c",
-            "e",
-        ]);
+        let args = build_args("hs -f e e -t e something -c e");
         let args = handle_args(&args).unwrap();
         assert_eq!(args.filter, vec!["e".parse().unwrap()]);
         assert_eq!(args.all, false);
@@ -397,7 +405,7 @@ mod test {
             }
         }
 
-        let args = build_args(vec!["hs", "la", "-l"]);
+        let args = build_args("hs la -l");
         let args = handle_args(&args).unwrap();
         assert_eq!(args.filter, vec!["all,^removed".parse().unwrap()]);
         assert_eq!(args.all, true);

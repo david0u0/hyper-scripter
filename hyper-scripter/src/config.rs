@@ -152,10 +152,14 @@ impl Default for RawConfig {
             .collect(),
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
             // FIXME: 一旦陣列實作了 intoiterator 就用陣列
-            env: vec![("HS_HOME", "{{hs_home}}"), ("NAME", "{{name}}")]
-                .into_iter()
-                .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .collect(),
+            env: vec![
+                ("HS_HOME", "{{hs_home}}"),
+                ("NAME", "{{name}}"),
+                ("HS_SOURCE", "{{hs_home}}/.hs_source"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
         }
     }
 }

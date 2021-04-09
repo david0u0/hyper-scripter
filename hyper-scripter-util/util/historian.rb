@@ -36,13 +36,15 @@ script_name = HS_ENV.do_hs(
 ).strip
 exit 1 unless $?.success?
 
+warn "Historian for #{script_name}"
+
 lines = []
 lines_count = 0
 
 load_history = lambda do
   history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
   exit 1 unless $?.success?
-  lines = history.lines.map { |s| s.length > 0 ? s : ' ' }
+  lines = history.lines.map { |s| s.strip }
 
   lines_count = lines.length
   if lines_count == 0
@@ -55,14 +57,15 @@ load_history.call
 
 pos = 0
 selected = false
+sourcing = false
 
-loop do
+until selected
   display_pos = offset + pos + 1
   reload = false
   lines.each_with_index do |line, i|
     cur_display_pos = offset + i + 1
     leading = cur_display_pos == display_pos ? '>' : ' '
-    $stderr.print "#{leading} #{cur_display_pos}. #{line}"
+    $stderr.print "#{leading} #{cur_display_pos}. #{line}\n"
   end
 
   begin
@@ -78,9 +81,11 @@ loop do
       pos = (pos - 1 + lines_count) % lines_count
     when "\r"
       selected = true
-      break
     when 'd', 'D'
       reload = true
+    when 'c', 'C'
+      selected = true
+      sourcing = true
     end
   ensure
     system('stty -raw echo')
@@ -103,6 +108,17 @@ $stderr.print "\e[#{lines_count}E"
 
 if selected
   cmd = "=#{script_name}! #{lines[pos]}"
-  warn cmd
-  history = HS_ENV.exec_hs(cmd, false)
+  if sourcing
+    File.open(ENV['HS_SOURCE'], 'w') do |file|
+      case ENV['SHELL'].split('/').last
+      when 'fish'
+        file.write("commandline \"#{HS_ENV.exe} #{cmd}\"")
+      else
+        warn "#{ENV['SHELL']} not supported"
+      end
+    end
+  else
+    warn cmd
+    history = HS_ENV.exec_hs(cmd, false)
+  end
 end

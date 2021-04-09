@@ -338,3 +338,19 @@ fn test_mandatory_tags() {
     );
     assert_ls(vec!["prj1/src/t"], Some("+m/src"), None);
 }
+
+#[test]
+fn test_custom_env() {
+    let _g = setup();
+
+    let mut conf = load_conf();
+    conf.env
+        .insert("HOME_N_NAME".to_owned(), "{{hs_home}}::{{name}}".to_owned());
+    conf.store().unwrap();
+
+    run("e myname | echo $HOME_N_NAME").unwrap();
+    assert_eq!(
+        run("-").unwrap(),
+        format!("{}::myname", get_home().to_string_lossy())
+    );
+}

@@ -1,4 +1,4 @@
-use hyper_scripter::config::{Config, PromptLevel};
+use hyper_scripter::config::{Config, PromptLevel, RawConfig};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -27,6 +27,9 @@ const HOME: &str = "./.hyper_scripter";
 pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
+pub fn load_conf() -> Config {
+    RawConfig::load().unwrap().unwrap().0.into()
+}
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();
     run("rm --purge * -f all").unwrap();
@@ -47,10 +50,10 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
 
     hyper_scripter::path::set_home(&home).unwrap();
 
-    let mut conf = Config::get().unwrap().clone();
+    run("alias e edit --fast").unwrap();
+    let mut conf = load_conf();
     conf.prompt_level = PromptLevel::Never;
     conf.store().unwrap();
-    run("alias e edit --fast").unwrap();
 
     guard
 }

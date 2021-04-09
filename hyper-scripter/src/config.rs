@@ -3,23 +3,32 @@ use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagFilter, TagFilterGroup};
 use crate::util;
-use chrono::{DateTime, Utc};
 use colored::Color;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::ops::DerefMut;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 const CONFIG_FILE: &'static str = ".config.toml";
+
+#[cfg(not(test))]
 lazy_static::lazy_static! {
     static ref CONFIG: Result<Config> = RawConfig::load().map(|raw_config| {
-        Config {
-            changed: raw_config.is_none(),
-            raw_config: raw_config.unwrap_or_default(),
-            open_time: Utc::now(),
+        match raw_config {
+            Some((conf, time)) => Config {
+                changed: false,
+                raw_config: conf,
+                last_modified: Some(time),
+            },
+            _ => RawConfig::default().into()
         }
     });
+}
+#[cfg(test)]
+lazy_static::lazy_static! {
+    static ref CONFIG: Result<Config> = Ok(RawConfig::default().into());
 }
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
@@ -95,7 +104,7 @@ pub struct RawConfig {
 #[derive(Debug, Clone, Deref)]
 pub struct Config {
     changed: bool,
-    open_time: DateTime<Utc>,
+    last_modified: Option<SystemTime>,
     #[deref]
     raw_config: RawConfig,
 }
@@ -151,26 +160,24 @@ impl Default for RawConfig {
     }
 }
 impl RawConfig {
-    #[cfg(test)]
-    fn load() -> Result<Option<Self>> {
-        Ok(Some(Self::default()))
-    }
-    #[cfg(not(test))]
-    fn load() -> Result<Option<Self>> {
+    pub fn load() -> Result<Option<(Self, SystemTime)>> {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
             Ok(s) => {
+                let meta = util::handle_fs_res(&[&path], std::fs::metadata(&path))?;
+                let modified = util::handle_fs_res(&[&path], meta.modified())?;
+
                 let conf = toml::from_str(&s).map_err(|err| {
                     Error::Format(
                         FormatCode::Config,
                         format!("{}: {}", path.to_string_lossy(), err),
                     )
                 })?;
-                Ok(Some(conf))
+                Ok(Some((conf, modified)))
             }
             Err(Error::PathNotFound(_)) => {
-                log::debug!("找不到設定檔，使用預設值");
+                log::debug!("找不到設定檔");
                 Ok(None)
             }
             Err(e) => Err(e),
@@ -193,10 +200,19 @@ impl DerefMut for Config {
         &mut self.raw_config
     }
 }
+impl From<RawConfig> for Config {
+    fn from(c: RawConfig) -> Self {
+        Config {
+            changed: false,
+            last_modified: None,
+            raw_config: c,
+        }
+    }
+}
 impl Config {
     pub fn store(&self) -> Result<()> {
-        log::info!("寫入設定檔…");
         let path = config_file();
+        log::info!("寫入設定檔至 {:?}…", path);
         if !self.changed {
             log::info!("設定檔未改變，不寫入");
             return Ok(());
@@ -204,8 +220,7 @@ impl Config {
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {
                 let modified = util::handle_fs_res(&[&path], meta.modified())?;
-                let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
-                if self.open_time.timestamp() < modified as i64 {
+                if self.last_modified.map_or(false, |time| time < modified) {
                     log::info!("設定檔已被修改，不寫入");
                     return Ok(());
                 }

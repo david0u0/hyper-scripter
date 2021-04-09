@@ -21,6 +21,7 @@ pub fn run(
     let conf = Config::get()?;
     let ty = &info.ty;
     let name = &info.name.key();
+    let hs_home = get_home();
     let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
@@ -30,12 +31,14 @@ pub fn run(
 
     let info: serde_json::Value;
     info = json!({
-        // TODO: hs_home
         "path": script_path,
+        "hs_home": hs_home,
         "args": remaining,
         "name": name,
         "content": content,
     });
+
+    // TODO: env vars
 
     if let Some(pre_run_msg) = conf.pre_run_msg.as_ref() {
         log::info!("打印執行前訊息 {}", pre_run_msg);
@@ -49,7 +52,9 @@ pub fn run(
     full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
 
     let mut cmd = create_cmd(&cmd_str, &full_args);
-    let env = script_conf.env(&info)?;
+    let env = script_conf.gen_env(&info)?;
+    cmd.envs(env);
+    let env = conf.gen_env(&info)?;
     cmd.envs(env);
 
     let stat = run_cmd(cmd)?;
@@ -188,8 +193,6 @@ pub fn prepare_script(
 
         let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
         let birthplace = birthplace.strip_prefix(&home).unwrap_or(&birthplace);
-        let hs_home = get_home();
-        let hs_home = hs_home.strip_prefix(&home).unwrap_or(&hs_home);
 
         // NOTE: 創建資料夾和檔案
         if let Some(parent) = path.parent() {
@@ -203,7 +206,6 @@ pub fn prepare_script(
             let info = json!({
                 "birthplace": birthplace,
                 "name": script.name.key().to_owned(),
-                "hs_home": hs_home,
                 "content": content,
             });
             let template = &Config::get()?.get_script_conf(&script.ty)?.template;

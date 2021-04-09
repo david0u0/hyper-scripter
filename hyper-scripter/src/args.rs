@@ -379,7 +379,7 @@ mod test {
                 assert_eq!(*unset, false);
                 assert_eq!(before, "trash");
                 assert_eq!(after, &["-f", "removed"]);
-            },
+            }
             _ => panic!("{:?} should be alias...", args),
         }
     }

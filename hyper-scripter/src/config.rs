@@ -6,6 +6,7 @@ use crate::util;
 use chrono::{DateTime, Utc};
 use colored::Color;
 use fxhash::FxHashMap as HashMap;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::ops::DerefMut;
 use std::path::PathBuf;
@@ -88,6 +89,8 @@ pub struct RawConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub alias: HashMap<String, Alias>,
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub env: HashMap<String, String>,
 }
 #[derive(Debug, Clone, Deref)]
 pub struct Config {
@@ -139,6 +142,11 @@ impl Default for RawConfig {
             .into_iter()
             .collect(),
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
+            // FIXME: 一旦陣列實作了 intoiterator 就用陣列
+            env: vec![("HS_HOME", "{{hs_home}}"), ("NAME", "{{name}}")]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
         }
     }
 }
@@ -167,6 +175,16 @@ impl RawConfig {
             }
             Err(e) => Err(e),
         }
+    }
+    // XXX: extract
+    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>> {
+        let reg = Handlebars::new();
+        let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
+        for (name, e) in self.env.iter() {
+            let res = reg.render_template(e, &info)?;
+            env.push((name.to_owned(), res));
+        }
+        Ok(env)
     }
 }
 impl DerefMut for Config {

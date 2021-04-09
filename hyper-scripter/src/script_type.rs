@@ -7,7 +7,6 @@ use std::str::FromStr;
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 export NAME=\"{{name}}\"
-export HS_HOME=\"~/{{hs_home}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
@@ -18,7 +17,6 @@ cd ~/{{birthplace}}
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 
 const name = '{{name}}';
-const hs_home = '{{hs_home}}';
 process.chdir(require('os').homedir());
 {{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
 let spawn = require('child_process').spawnSync;
@@ -32,7 +30,6 @@ writeFile('/dev/null', 'some content');
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 export NAME=\"{{name}}\"
-export HS_HOME=\"~/{{hs_home}}\"
 export VAR=\"${VAR:-default}\"
 cd ~/{{birthplace}}
 
@@ -45,7 +42,6 @@ tmux -2 attach-session -d";
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 NAME = '{{name}}'
-HS_HOME = \"#{ENV['HOME']}/{{hs_home}}\"
 
 {{#each content}}{{{this}}}
 {{/each}} ";
@@ -105,6 +101,7 @@ fn default_template() -> Vec<String> {
 }
 
 impl ScriptTypeConfig {
+    // XXX: extract
     pub fn args(&self, info: &serde_json::Value) -> Result<Vec<String>, Error> {
         let reg = Handlebars::new();
         let mut args: Vec<String> = Vec::with_capacity(self.args.len());
@@ -114,7 +111,8 @@ impl ScriptTypeConfig {
         }
         Ok(args)
     }
-    pub fn env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>, Error> {
+    // XXX: extract
+    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>, Error> {
         let reg = Handlebars::new();
         let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
         for (name, e) in self.env.iter() {

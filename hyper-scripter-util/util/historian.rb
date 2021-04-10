@@ -5,7 +5,7 @@
 
 require 'json'
 require_relative './common.rb'
-HISTORIAN = 'util/historian'.freeze
+HISTORIAN = ENV['NAME'].freeze
 ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query

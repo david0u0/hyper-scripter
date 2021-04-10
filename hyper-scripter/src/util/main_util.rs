@@ -154,12 +154,6 @@ pub async fn run_n_times(
 ) -> Result {
     let mut entry = do_script_query_strict_with_missing(&script_query, script_repo).await?;
     log::info!("執行 {:?}", entry.name);
-    {
-        let exe = std::env::current_exe()?;
-        let exe = exe.to_string_lossy();
-        log::debug!("將 hs 執行檔的確切位置 {} 記錄起來", exe);
-        super::write_file(&path::get_home().join(path::HS_EXECUTABLE_INFO_PATH), &exe)?;
-    }
 
     let previous_arg_vec: Vec<String>;
     if previous_args {

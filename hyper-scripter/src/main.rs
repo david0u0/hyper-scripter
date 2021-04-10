@@ -1,4 +1,4 @@
-    use chrono::Utc;
+use chrono::Utc;
 use hyper_scripter::args::{self, print_help, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};

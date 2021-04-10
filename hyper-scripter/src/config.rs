@@ -153,8 +153,9 @@ impl Default for RawConfig {
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
             // FIXME: 一旦陣列實作了 intoiterator 就用陣列
             env: vec![
-                ("HS_HOME", "{{hs_home}}"),
                 ("NAME", "{{name}}"),
+                ("HS_HOME", "{{hs_home}}"),
+                ("HS_EXE", "{{hs_exe}}"),
                 ("HS_SOURCE", "{{hs_home}}/.hs_source"),
             ]
             .into_iter()

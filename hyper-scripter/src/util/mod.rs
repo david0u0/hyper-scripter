@@ -22,6 +22,8 @@ pub fn run(
     let ty = &info.ty;
     let name = &info.name.key();
     let hs_home = get_home();
+    let hs_exe = std::env::current_exe()?;
+    let hs_exe = hs_exe.to_string_lossy();
     let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
@@ -33,12 +35,11 @@ pub fn run(
     info = json!({
         "path": script_path,
         "hs_home": hs_home,
+        "hs_exe": hs_exe,
         "args": remaining,
         "name": name,
         "content": content,
     });
-
-    // TODO: env vars
 
     if let Some(pre_run_msg) = conf.pre_run_msg.as_ref() {
         log::info!("打印執行前訊息 {}", pre_run_msg);

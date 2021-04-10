@@ -6,7 +6,6 @@ use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-pub const HS_EXECUTABLE_INFO_PATH: &'static str = ".hs_exe_path";
 pub const HS_REDIRECT: &'static str = ".hs_redirect";
 
 macro_rules! hs_home_env {

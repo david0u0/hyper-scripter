@@ -2,7 +2,7 @@
 #[path = "tool.rs"]
 mod tool;
 
-use hyper_scripter::path::{HS_EXECUTABLE_INFO_PATH, HS_REDIRECT};
+use hyper_scripter::path::HS_REDIRECT;
 use regex::Regex;
 use std::fs::{canonicalize, File};
 use std::io::Write;
@@ -63,12 +63,6 @@ fn test_run() {
         format!("{}：{}\n{}", TALKER, MSG, APPEND),
         run(format!("- {} {}", TALKER, APPEND)).unwrap(),
         "沒吃到命令行參數？"
-    );
-
-    assert_eq!(
-        read(&[HS_EXECUTABLE_INFO_PATH]),
-        get_exe_abs(),
-        "記錄到的執行檔位置有誤"
     );
 }
 

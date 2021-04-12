@@ -92,11 +92,15 @@ fn test_history_args_rm_last() {
     run("e C | echo C$@").unwrap();
 
     run("B x").unwrap();
+    run("cat A").unwrap(); // read !
     run("A x").unwrap(); // removed later
     run("A y").unwrap();
     run("B y").unwrap();
     run("A x").unwrap(); // removed later
+    run("A z").unwrap(); // overwrittern
+    run("B z").unwrap(); // overwrittern
     run("A z").unwrap();
+    run("B zz").unwrap(); // overwrittern
     run("B z").unwrap();
     run("B zz").unwrap();
 
@@ -126,9 +130,10 @@ fn test_history_args_rm_last() {
     run("history rm - 1").unwrap(); // Ay
     run("run -p A").expect_err("previous args exist !?"); // fail, won't affect ordering
 
-    assert_eq!(run("run -p -").unwrap(), "Bx");
+    assert_eq!(run("run -p B").unwrap(), "Bx");
     run("history rm - 1").unwrap(); // Bx
     run("run -p B").expect_err("previous args exist !?");
 
-    assert_eq!(run("run -").unwrap(), "C"); // ordering falls back to create time
+    assert_eq!(run("run -").unwrap(), "A"); // read time
+    assert_eq!(run("run ^^").unwrap(), "C"); // create time
 }

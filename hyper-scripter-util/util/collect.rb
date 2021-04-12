@@ -63,9 +63,7 @@ directory_tree(root).each do |full_path|
   puts "collecting script #{script}!"
 
   file = File.open(full_path)
-  content = Shellwords.escape(file.read)
-  File.delete(full_path)
-  HS_ENV.do_hs("edit =#{name} -c #{ext} --fast #{content} --no-template", false)
+  HS_ENV.do_hs("edit =#{name} -c #{ext} --allow-wild --fast", false)
 end
 
 HS_ENV.do_hs('ls --grouping=none --name --plain', true).split(' ').each do |name|

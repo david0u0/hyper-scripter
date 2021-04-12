@@ -134,6 +134,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             tags,
             content,
             no_template,
+            allow_wild,
         } => {
             // TODO: 這裡邏輯太複雜了，抽出來測試吧
             let edit_tags = {
@@ -158,8 +159,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     }
                 }
             };
-            let (path, mut entry) =
-                util::main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
+            let (path, mut entry, is_wild) =
+                util::main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags, allow_wild)
+                    .await?;
             if content.is_some() {
                 log::info!("帶內容編輯 {:?}", entry.name);
                 if path.exists() {
@@ -169,7 +171,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
             let content = content.as_ref().map(|s| s.as_str());
             let created = util::prepare_script(&path, &*entry, no_template, content)?;
-            if !fast {
+            if !fast && !is_wild {
                 let cmd = util::create_concat_cmd(&conf.editor, &[&path]);
                 let stat = util::run_cmd(cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);

@@ -66,9 +66,11 @@ pub async fn edit_or_create<'b>(
     script_repo: &'b mut ScriptRepo,
     ty: Option<ScriptType>,
     tags: EditTagArgs,
-) -> Result<(PathBuf, ScriptRepoEntry<'b>)> {
+    allow_wild: bool,
+) -> Result<(PathBuf, ScriptRepoEntry<'b>, bool)> {
     let final_ty: ScriptType;
     let mut new_namespaces: Vec<Tag> = vec![];
+    let mut is_wild = false;
 
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         macro_rules! new_named {
@@ -91,8 +93,16 @@ pub async fn edit_or_create<'b>(
                         .collect::<Result<Vec<Tag>>>()?;
                 }
 
-                let p = path::open_script(&name, &final_ty, Some(false))
+                let p = path::open_script(&name, &final_ty, None)
                     .context(format!("打開新命名腳本失敗：{:?}", name))?;
+                if p.exists() {
+                    log::warn!("Find a wild script");
+                    if allow_wild {
+                        is_wild = true;
+                    } else {
+                        return Err(Error::PathExist(p).context("Found wild script"));
+                    }
+                }
                 (name, p)
             }};
         }
@@ -113,7 +123,7 @@ pub async fn edit_or_create<'b>(
                 // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
                 // return Ok((p, entry));
                 let n = entry.name.clone();
-                return Ok((p, script_repo.get_mut(&n, true).unwrap()));
+                return Ok((p, script_repo.get_mut(&n, true).unwrap(), false));
             }
             Err(e) => return Err(e),
         }
@@ -140,7 +150,7 @@ pub async fn edit_or_create<'b>(
         )
         .await?;
 
-    Ok((script_path, entry))
+    Ok((script_path, entry, is_wild))
 }
 
 pub async fn run_n_times(

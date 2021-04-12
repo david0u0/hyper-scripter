@@ -74,6 +74,7 @@ fn test_hs_in_hs() {
     assert_eq!(run("-").unwrap(), "我在第一層\n我在第幾層？");
     assert_eq!(run("^2").unwrap(), "我在第幾層？");
 }
+
 #[test]
 fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");
@@ -102,11 +103,12 @@ fn test_edit_existing_bang() {
                 explicit_tag: false,
                 explicit_filter: false,
             },
+            false,
         )
         .await
         .expect_err("沒有 BANG! 就找到編輯的腳本！？");
 
-        let (p, e) = edit_or_create(
+        let (p, e, is_wild) = edit_or_create(
             "test!".parse().unwrap(),
             &mut repo,
             None,
@@ -116,10 +118,12 @@ fn test_edit_existing_bang() {
                 explicit_tag: false,
                 explicit_filter: false,
             },
+            false,
         )
         .await
         .unwrap();
 
+        assert!(false, is_wild);
         assert_eq!(p, get_home().join("test.sh"));
         use fxhash::FxHashSet as HashSet;
         let mut tags = HashSet::<Tag>::default();
@@ -127,3 +131,5 @@ fn test_edit_existing_bang() {
         assert_eq!(tags, e.tags);
     });
 }
+
+// TODO: edit wild & edit phantom

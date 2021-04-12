@@ -106,13 +106,11 @@ pub enum Subs {
         category: Option<ScriptType>,
         #[structopt(long, short)]
         no_template: bool,
+        #[structopt(long, help = "Allow adding a wild script to the database")]
+        allow_wild: bool,
         #[structopt(long, short)]
         tags: Option<TagFilter>,
-        #[structopt(
-            long,
-            requires("content"),
-            help = "create script without invoking the editor"
-        )]
+        #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
         #[structopt(parse(try_from_str), default_value = ".")]
         edit_query: EditQuery,
@@ -338,6 +336,7 @@ impl Root {
                     content: None,
                     tags: None,
                     fast: false,
+                    allow_wild: false,
                     no_template: false,
                 });
             }

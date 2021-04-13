@@ -179,13 +179,14 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn prepare_script(
+pub fn prepare_script<'a>(
     path: &Path,
     script: &ScriptInfo,
     no_template: bool,
-    content: Option<&str>,
+    content: impl ExactSizeIterator<Item = &'a str>,
 ) -> Result<Option<DateTime<Utc>>> {
     log::info!("開始準備 {} 腳本內容……", script.name);
+    let has_content = content.len() > 0;
     let mut is_new = if path.exists() {
         log::debug!("腳本已存在，不填入預設訊息");
         false
@@ -201,9 +202,10 @@ pub fn prepare_script(
         }
         let mut file = handle_fs_res(&[path], File::create(&path))?;
 
-        let content = content.unwrap_or_default();
+        let content = content.map(|s| s.split("\n")).flatten();
         if !no_template {
-            let content: Vec<_> = content.split("\n").collect();
+            // TODO: or already exist
+            let content: Vec<_> = content.collect();
             let info = json!({
                 "birthplace": birthplace,
                 "name": script.name.key().to_owned(),
@@ -212,11 +214,13 @@ pub fn prepare_script(
             let template = &Config::get()?.get_script_conf(&script.ty)?.template;
             handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
         } else {
-            write!(file, "{}", content)?;
+            for line in content {
+                writeln!(file, "{}", line)?;
+            }
         }
         true
     };
-    if content.is_some() {
+    if has_content {
         is_new = false;
     }
     Ok(if is_new { Some(Utc::now()) } else { None })

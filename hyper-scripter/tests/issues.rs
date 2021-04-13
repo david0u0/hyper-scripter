@@ -123,7 +123,7 @@ fn test_edit_existing_bang() {
         .await
         .unwrap();
 
-        assert!(false, is_wild);
+        assert_eq!(false, is_wild);
         assert_eq!(p, get_home().join("test.sh"));
         use fxhash::FxHashSet as HashSet;
         let mut tags = HashSet::<Tag>::default();

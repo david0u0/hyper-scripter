@@ -162,14 +162,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let (path, mut entry, is_wild) =
                 util::main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags, allow_wild)
                     .await?;
-            if content.is_some() {
+            if !content.is_empty() {
+                // TODO: allow it
                 log::info!("帶內容編輯 {:?}", entry.name);
                 if path.exists() {
                     log::error!("不允許帶內容編輯已存在的腳本");
                     return Err(Error::ScriptExist(entry.name.to_string()));
                 }
             }
-            let content = content.as_ref().map(|s| s.as_str());
+            let content = content.iter().map(|s| s.as_str());
             let created = util::prepare_script(&path, &*entry, no_template, content)?;
             if !fast && !is_wild {
                 let cmd = util::create_concat_cmd(&conf.editor, &[&path]);

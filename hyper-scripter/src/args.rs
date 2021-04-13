@@ -114,7 +114,7 @@ pub enum Subs {
         fast: bool,
         #[structopt(parse(try_from_str), default_value = ".")]
         edit_query: EditQuery,
-        content: Option<String>,
+        content: Vec<String>,
     },
     #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
     Alias {
@@ -333,7 +333,7 @@ impl Root {
                 self.subcmd = Some(Subs::Edit {
                     edit_query: EditQuery::default(),
                     category: None,
-                    content: None,
+                    content: vec![],
                     tags: None,
                     fast: false,
                     allow_wild: false,

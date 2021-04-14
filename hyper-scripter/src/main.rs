@@ -289,7 +289,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
             }
         }
-        Subs::CP { origin, new } => {
+        Subs::CP { origin, new, tags } => {
             if repo.get_mut(&new, true).is_some() {
                 return Err(Error::ScriptExist(new.to_string()));
             }
@@ -297,7 +297,19 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let new_script = path::open_script(&new, &entry.ty, Some(false))?;
             util::cp(&og_script, &new_script)?;
-            let new_info = entry.cp(new.clone());
+            let mut new_info = entry.cp(new.clone());
+
+            if let Some(tags) = tags {
+                // TODO: delete tag
+                if tags.append {
+                    log::debug!("附加上標籤：{:?}", tags);
+                    new_info.tags.extend(tags.into_allowed_iter());
+                } else {
+                    log::debug!("設定標籤：{:?}", tags);
+                    new_info.tags = tags.into_allowed_iter().collect();
+                }
+            }
+
             repo.entry(&new).or_insert(new_info).await?;
         }
         Subs::MV {

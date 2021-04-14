@@ -48,6 +48,7 @@ pub async fn mv<'b>(
                 info.name = name;
             }
             if let Some(tags) = tags {
+                // TODO: delete tag
                 if tags.append {
                     log::debug!("附加上標籤：{:?}", tags);
                     info.tags.extend(tags.into_allowed_iter());

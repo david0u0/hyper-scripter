@@ -22,6 +22,7 @@ pub fn run(
     let ty = &info.ty;
     let name = &info.name.key();
     let hs_home = get_home();
+    let hs_tags: Vec<_> = info.tags.iter().map(|t| t.as_ref()).collect();
     let hs_exe = std::env::current_exe()?;
     let hs_exe = hs_exe.to_string_lossy();
     let script_conf = conf.get_script_conf(ty)?;
@@ -35,6 +36,7 @@ pub fn run(
     info = json!({
         "path": script_path,
         "hs_home": hs_home,
+        "hs_tags": hs_tags,
         "hs_exe": hs_exe,
         "args": remaining,
         "name": name,

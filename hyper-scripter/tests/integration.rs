@@ -35,22 +35,41 @@ fn test_tags() {
 }
 
 #[test]
-fn test_mv() {
+fn test_mv_cp() {
     let _g = setup();
 
-    run(format!("e . -c js --no-template | echo \"{}\"", MSG)).unwrap();
+    run(format!("e -t test . -c js --no-template | echo $HS_TAGS")).unwrap();
     run("-").expect_err("用 nodejs 執行 echo ……？");
 
-    run("mv 1 -c sh").unwrap();
-    assert_eq!(MSG, run("-").unwrap());
+    run("mv 1 -c sh -t test2").unwrap();
+    assert_eq!("test2", run("-").unwrap());
     assert!(check_exist(&[".anonymous", "1.sh"]), "改腳本類型失敗");
     assert!(
         !check_exist(&[".anonymous", "1.js"]),
         "改了腳本類型舊檔案還留著？"
     );
 
-    run("mv 1 -t hide").unwrap();
+    run("mv 1 -t +hide").unwrap();
     run("-").expect_err("用 mv 修改標籤失敗？");
+
+    run("cp -f hide 1 -t +cp .2").unwrap();
+    let mut res: Vec<_> = run("!")
+        .unwrap()
+        .split(" ")
+        .map(|s| s.to_string())
+        .collect();
+    res.sort();
+    assert_eq!(vec!["cp", "hide", "test2"], res);
+
+    run("cp -f hide - -t only .3").unwrap();
+    let res: Vec<_> = run("!")
+        .unwrap()
+        .split(" ")
+        .map(|s| s.to_string())
+        .collect();
+    assert_eq!(vec!["only"], res);
+
+    // TODO: mv and cp existing
 }
 
 const TALKER: &'static str = "--腳本小子";

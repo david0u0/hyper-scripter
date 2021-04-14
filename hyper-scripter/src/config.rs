@@ -155,6 +155,10 @@ impl Default for RawConfig {
             env: vec![
                 ("NAME", "{{name}}"),
                 ("HS_HOME", "{{hs_home}}"),
+                (
+                    "HS_TAGS",
+                    "{{#each hs_tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
+                ),
                 ("HS_EXE", "{{hs_exe}}"),
                 ("HS_SOURCE", "{{hs_home}}/.hs_source"),
             ]

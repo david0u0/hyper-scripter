@@ -165,7 +165,8 @@ pub enum Subs {
     LS(List),
     #[structopt(about = "Copy the script to another one")]
     CP {
-        #[structopt(parse(try_from_str))]
+        #[structopt(long, short)]
+        tags: Option<TagFilter>,
         origin: ScriptQuery,
         new: ScriptName,
     },

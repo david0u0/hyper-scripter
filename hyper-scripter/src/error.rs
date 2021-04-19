@@ -33,7 +33,6 @@ pub enum Error {
     PathExist(PathBuf),
     ScriptExist(String),
     ScriptNotFound(String),
-    MultiFuzz(Vec<String>),
     NoAlias(String),
     UnknownCategory(String),
     Format(FormatCode, String),

@@ -69,23 +69,23 @@ pub async fn do_script_query<'b>(
         ScriptQueryInner::Fuzz(name) => {
             let level = Config::get()?.prompt_level;
             let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all)).await?;
-            let mut need_prompt = false;
+            let need_prompt: bool;
             let entry = match fuzz_res {
-                Some((entry, fuzzy::High)) => {
-                    if level.always() {
-                        need_prompt = true;
-                    }
+                Some(fuzzy::High(entry)) => {
+                    need_prompt = false;
                     entry
                 }
-                Some((entry, fuzzy::Low)) => {
-                    if !level.never() {
-                        need_prompt = true;
-                    }
+                Some(fuzzy::Low(entry)) => {
+                    need_prompt = true;
                     entry
                 }
-                _ => return Ok(None),
+                Some(fuzzy::Multi { ans, .. }) => {
+                    need_prompt = true;
+                    ans
+                }
+                None => return Ok(None),
             };
-            if need_prompt {
+            if (need_prompt && !level.never()) | level.always() {
                 prompt_fuzz_acceptable(&*entry)?;
             }
             Ok(Some(entry))
@@ -121,7 +121,7 @@ pub async fn do_script_query_strict_with_missing<'b>(
                 ScriptQueryInner::Exact(name) => repo.get_hidden_mut(name),
                 ScriptQueryInner::Fuzz(name) => {
                     match fuzzy::fuzz(name, repo.iter_hidden_mut()).await {
-                        Ok(Some((info, _))) => Some(info),
+                        Ok(Some(res)) => Some(res.get_ans()),
                         _ => None,
                     }
                 }

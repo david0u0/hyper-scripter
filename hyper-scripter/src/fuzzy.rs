@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use futures::future::join_all;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
@@ -11,17 +11,28 @@ fn is_multifuzz(score: i64, best_score: i64) -> bool {
     best_score * 7 < score * 10
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum FuzzSimilarity {
-    High,
-    Low,
+#[derive(Debug)]
+pub enum FuzzResult<T> {
+    High(T),
+    Low(T),
+    Multi { ans: T, others: Vec<T> },
 }
-pub use FuzzSimilarity::*;
-impl FuzzSimilarity {
-    fn from_score(score: i64) -> Self {
+pub use FuzzResult::*;
+impl<T> FuzzResult<T> {
+    fn new_single(ans: T, score: i64) -> Self {
         match score {
-            0..=MID_SCORE => FuzzSimilarity::Low,
-            _ => FuzzSimilarity::High,
+            0..=MID_SCORE => Low(ans),
+            _ => High(ans),
+        }
+    }
+    fn new_multi(ans: T, others: Vec<T>) -> Self {
+        Multi { ans, others }
+    }
+    pub fn get_ans(self) -> T {
+        match self {
+            High(t) => t,
+            Low(t) => t,
+            Multi { ans, .. } => ans,
         }
     }
 }
@@ -48,7 +59,7 @@ impl MyRaw {
 pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
-) -> Result<Option<(T, FuzzSimilarity)>> {
+) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
     let mut data_vec: Vec<(i64, T)> = iter.map(|t| (0, t)).collect();
     // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
@@ -79,31 +90,29 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
             *score_mut = score;
         }
     }
+    if best_score == 0 {
+        log::info!("模糊搜沒搜到東西 {}", name);
+        return Ok(None);
+    }
 
+    let mut ans = None;
     let mut multifuzz_vec = vec![];
     for (score, data) in data_vec.into_iter() {
-        if is_multifuzz(score, best_score) {
+        if score == best_score && ans.is_none() {
+            ans = Some(data);
+        } else if is_multifuzz(score, best_score) {
             log::debug!("找到一個分數相近者：{} {}", data.fuzz_key(), score);
             multifuzz_vec.push(data);
         }
     }
 
+    let ans = ans.unwrap();
     if multifuzz_vec.len() == 0 {
-        log::info!("模糊搜沒搜到東西 {}", name);
-        Ok(None)
-    } else if multifuzz_vec.len() == 1 {
-        let first = multifuzz_vec.into_iter().next().unwrap();
-        log::info!("模糊搜到一個東西 {:?}", first.fuzz_key());
-        let similarity = FuzzSimilarity::from_score(best_score);
-        Ok(Some((first, similarity)))
+        log::info!("模糊搜到一個東西 {:?}", ans.fuzz_key());
+        Ok(Some(FuzzResult::new_single(ans, best_score)))
     } else {
         log::warn!("模糊搜到太多東西");
-        Err(Error::MultiFuzz(
-            multifuzz_vec
-                .into_iter()
-                .map(|data| data.fuzz_key().as_ref().to_owned())
-                .collect(),
-        ))
+        Ok(Some(FuzzResult::new_multi(ans, multifuzz_vec)))
     }
 }
 
@@ -167,13 +176,25 @@ mod test {
             Cow::Borrowed(self)
         }
     }
-    fn extract_multifuzz(err: Error) -> Vec<String> {
-        let mut v = match err {
-            Error::MultiFuzz(v) => v,
+    fn extract_multifuzz<T: FuzzKey>(res: FuzzResult<T>) -> Vec<String> {
+        match res {
+            Multi { ans, others } => {
+                let mut ret = vec![];
+                ret.push(ans.fuzz_key().to_string());
+                for data in others.into_iter() {
+                    ret.push(data.fuzz_key().to_string())
+                }
+                ret.sort();
+                ret
+            }
             _ => unreachable!(),
-        };
-        v.sort();
-        v
+        }
+    }
+    fn extract_high<T: FuzzKey>(res: FuzzResult<T>) -> String {
+        match res {
+            High(t) => t.fuzz_key().to_string(),
+            _ => unreachable!(),
+        }
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz() {
@@ -186,27 +207,25 @@ mod test {
         let res = fuzz("測試1", vec.clone().into_iter())
             .await
             .unwrap()
-            .unwrap()
-            .0;
-        assert_eq!(res, t1);
+            .unwrap();
+        assert_eq!(extract_high(res), t1);
 
-        let res = fuzz("42", vec.clone().into_iter())
-            .await
-            .unwrap()
-            .unwrap()
-            .0;
-        assert_eq!(res, t3);
+        let res = fuzz("42", vec.clone().into_iter()).await.unwrap().unwrap();
+        assert_eq!(extract_high(res), t3);
 
         let res = fuzz("找不到", vec.clone().into_iter()).await.unwrap();
-        assert_eq!(res, None);
+        assert!(res.is_none());
 
-        let err = fuzz("測試", vec.clone().into_iter()).await.unwrap_err();
-        let v = extract_multifuzz(err);
+        let res = fuzz("測試", vec.clone().into_iter())
+            .await
+            .unwrap()
+            .unwrap();
+        let v = extract_multifuzz(res);
         assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
 
         let mut vec = vec!["hs_test", "hs_build", "hs_dir", "runhs", "hs_run"];
         vec.sort();
-        let err = fuzz("hs", vec.clone().into_iter()).await.unwrap_err();
+        let err = fuzz("hs", vec.clone().into_iter()).await.unwrap().unwrap();
         let v = extract_multifuzz(err);
         assert_eq!(v, vec);
     }
@@ -219,9 +238,8 @@ mod test {
         let res = fuzz("測試", vec.clone().into_iter())
             .await
             .unwrap()
-            .unwrap()
-            .0;
-        assert_eq!(res, t1, "模糊搜尋無法找出較短者");
+            .unwrap();
+        assert_eq!(extract_high(res), t1, "模糊搜尋無法找出較短者");
     }
     #[test]
     fn test_reorder() {

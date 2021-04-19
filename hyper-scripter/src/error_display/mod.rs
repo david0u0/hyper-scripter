@@ -34,12 +34,6 @@ impl Display for Error {
             PathExist(path) => write!(f, "Path already exist: {:?}", path)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
-            MultiFuzz(v) => {
-                writeln!(f, "Multiple scripts with same fuzzy score:")?;
-                for name in v {
-                    writeln!(f, "{}", name)?;
-                }
-            }
             UnknownCategory(c) => write!(f, "Unknown category: {}", c)?,
             Format(code, s) => {
                 write!(f, "Format error for ")?;

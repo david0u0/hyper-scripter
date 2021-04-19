@@ -116,7 +116,7 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
     } else {
         Err(status)
     };
-    log::trace!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
+    log::info!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res
 }
 

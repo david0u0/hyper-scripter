@@ -6,6 +6,11 @@ use tokio::task::spawn_blocking;
 
 const MID_SCORE: i64 = 1000; // TODO: 好好決定這個魔法數字
 
+fn is_multifuzz(score: i64, best_score: i64) -> bool {
+    // best_score * 0.7 < score
+    best_score * 7 < score * 10
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FuzzSimilarity {
     High,
@@ -44,11 +49,10 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
 ) -> Result<Option<(T, FuzzSimilarity)>> {
-    let mut ans = (0, Vec::<T>::new());
     let raw_name = MyRaw::new(name);
-    let data_vec: Vec<_> = iter.collect();
+    let mut data_vec: Vec<(i64, T)> = iter.map(|t| (0, t)).collect();
     // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
-    let keys: Vec<_> = data_vec.iter().map(|data| data.fuzz_key()).collect();
+    let keys: Vec<_> = data_vec.iter().map(|(_, data)| data.fuzz_key()).collect();
     let score_fut = keys.iter().map(|key| {
         let key = MyRaw::new(key.as_ref());
         spawn_blocking(move || {
@@ -68,28 +72,34 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     });
 
     let scores = join_all(score_fut).await;
-
-    for (data, score) in data_vec.into_iter().zip(scores.into_iter()) {
+    let mut best_score = 0;
+    for (score, (score_mut, _)) in scores.into_iter().zip(data_vec.iter_mut()) {
         if let Some(score) = score? {
-            if score > ans.0 {
-                ans = (score, vec![data]);
-            } else if score == ans.0 {
-                ans.1.push(data);
-            }
+            best_score = std::cmp::max(best_score, score);
+            *score_mut = score;
         }
     }
-    if ans.1.len() == 0 {
-        log::info!("模糊搜沒搜到東西：{}", name);
+
+    let mut multifuzz_vec = vec![];
+    for (score, data) in data_vec.into_iter() {
+        if is_multifuzz(score, best_score) {
+            log::debug!("找到一個分數相近者：{} {}", data.fuzz_key(), score);
+            multifuzz_vec.push(data);
+        }
+    }
+
+    if multifuzz_vec.len() == 0 {
+        log::info!("模糊搜沒搜到東西 {}", name);
         Ok(None)
-    } else if ans.1.len() == 1 {
-        let first = ans.1.into_iter().next().unwrap();
+    } else if multifuzz_vec.len() == 1 {
+        let first = multifuzz_vec.into_iter().next().unwrap();
         log::info!("模糊搜到一個東西 {:?}", first.fuzz_key());
-        let similarity = FuzzSimilarity::from_score(ans.0);
+        let similarity = FuzzSimilarity::from_score(best_score);
         Ok(Some((first, similarity)))
     } else {
         log::warn!("模糊搜到太多東西");
         Err(Error::MultiFuzz(
-            ans.1
+            multifuzz_vec
                 .into_iter()
                 .map(|data| data.fuzz_key().as_ref().to_owned())
                 .collect(),
@@ -157,6 +167,14 @@ mod test {
             Cow::Borrowed(self)
         }
     }
+    fn extract_multifuzz(err: Error) -> Vec<String> {
+        let mut v = match err {
+            Error::MultiFuzz(v) => v,
+            _ => unreachable!(),
+        };
+        v.sort();
+        v
+    }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz() {
         let _ = env_logger::try_init();
@@ -183,18 +201,20 @@ mod test {
         assert_eq!(res, None);
 
         let err = fuzz("測試", vec.clone().into_iter()).await.unwrap_err();
-        let mut v = match err {
-            Error::MultiFuzz(v) => v,
-            _ => unreachable!(),
-        };
-        v.sort();
+        let v = extract_multifuzz(err);
         assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
+
+        let mut vec = vec!["hs_test", "hs_build", "hs_dir", "runhs", "hs_run"];
+        vec.sort();
+        let err = fuzz("hs", vec.clone().into_iter()).await.unwrap_err();
+        let v = extract_multifuzz(err);
+        assert_eq!(v, vec);
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1";
-        let t2 = "測試腳本234";
+        let t2 = "測試腳本23456";
         let vec = vec![t1.clone(), t2];
         let res = fuzz("測試", vec.clone().into_iter())
             .await

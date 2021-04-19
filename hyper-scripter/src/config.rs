@@ -212,7 +212,7 @@ impl DerefMut for Config {
 impl From<RawConfig> for Config {
     fn from(c: RawConfig) -> Self {
         Config {
-            changed: false,
+            changed: true,
             last_modified: None,
             raw_config: c,
         }

@@ -130,6 +130,8 @@ pub enum Subs {
 
     #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
+        #[structopt(long, help = "Add a dummy run history instead of actually running it")]
+        dummy: bool,
         #[structopt(long, short, default_value = "1")]
         repeat: u64,
         #[structopt(long, short)]
@@ -319,6 +321,7 @@ impl Root {
         match &self.subcmd {
             Some(Subs::Other(args)) => {
                 let run = Subs::Run {
+                    dummy: false,
                     previous_args: false,
                     repeat: 1,
                     script_query: args[0].parse()?,

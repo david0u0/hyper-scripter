@@ -1,6 +1,6 @@
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::path;
-use crate::query::{self, do_script_query_strict_with_missing, EditQuery, ScriptQuery};
+use crate::query::{self, EditQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
 use crate::script_type::ScriptType;
@@ -148,15 +148,14 @@ pub async fn edit_or_create<'b>(
 }
 
 pub async fn run_n_times(
-    n: u64,
-    script_query: &ScriptQuery,
-    script_repo: &mut ScriptRepo,
+    repeat: u64,
+    dummy: bool,
+    entry: &mut ScriptRepoEntry<'_>,
     mut args: &[String],
     historian: Historian,
     res: &mut Vec<Error>,
     previous_args: bool,
 ) -> Result {
-    let mut entry = do_script_query_strict_with_missing(&script_query, script_repo).await?;
     log::info!("執行 {:?}", entry.name);
 
     let previous_arg_vec: Vec<String>;
@@ -180,7 +179,12 @@ pub async fn run_n_times(
     let content = super::read_file(&script_path)?;
     entry.update(|info| info.exec(content, args)).await?;
 
-    for _ in 0..n {
+    if dummy {
+        log::info!("--dumy 不用真的執行，提早退出");
+        return Ok(());
+    }
+
+    for _ in 0..repeat {
         let run_res = super::run(
             &script_path,
             &*entry,

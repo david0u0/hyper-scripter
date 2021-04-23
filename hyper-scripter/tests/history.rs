@@ -91,32 +91,46 @@ fn test_history_args_rm_last() {
     run("e B | echo B$@").unwrap();
     run("e C | echo C$@").unwrap();
 
-    run("B x").unwrap();
+    // 來點趣味性=_=
+    let mut rng = rand::thread_rng();
+    let mut maybe_dummy = move |script: &str, arg: &str| {
+        use rand::Rng;
+        let dummy = rng.gen::<u32>() % 3 == 0;
+        let dummy_str = if dummy { "--dummy" } else { "" };
+        let res = run(format!("run {} {} {} ", dummy_str, script, arg)).unwrap();
+        if !dummy {
+            assert_eq!(res, format!("{}{}", script, arg));
+        } else {
+            assert_eq!(res, "");
+        }
+    };
+
+    maybe_dummy("B", "x");
     run("cat A").unwrap(); // read !
-    run("A x").unwrap(); // removed later
-    run("A y").unwrap();
-    run("B y").unwrap();
-    run("A x").unwrap(); // removed later
-    run("A z").unwrap(); // overwrittern
-    run("B z").unwrap(); // overwrittern
-    run("A z").unwrap();
-    run("B zz").unwrap(); // overwrittern
-    run("B z").unwrap();
-    run("B zz").unwrap();
+    maybe_dummy("A", "x"); // removed later
+    maybe_dummy("A", "y");
+    maybe_dummy("B", "y");
+    maybe_dummy("A", "x"); // removed later
+    maybe_dummy("A", "z"); // overwrittern
+    maybe_dummy("B", "z"); // overwrittern
+    maybe_dummy("A", "z");
+    maybe_dummy("B", "zz"); // overwrittern
+    maybe_dummy("B", "z");
+    maybe_dummy("B", "zz");
 
     run("history rm A 2").unwrap(); // x
 
     assert_eq!(run("run -p -").unwrap(), "Bzz");
     run("history rm - 1").unwrap(); // Bzz
     run("history rm - 1").unwrap(); // Bz
-    assert_eq!(run("run -p -").unwrap(), "Az");
+    assert_eq!(run("run --dummy -p -").unwrap(), "");
     run("history rm - 1").unwrap(); // Az
     assert_eq!(run("run -p -").unwrap(), "By");
 
     // Make some noise HAHA
     {
-        assert_eq!(run("run B w").unwrap(), "Bw");
-        assert_eq!(run("run A w").unwrap(), "Aw");
+        maybe_dummy("B", "w");
+        maybe_dummy("A", "w");
 
         assert_eq!(run("run -p -").unwrap(), "Aw");
         run("history rm B 1").unwrap(); // Bw

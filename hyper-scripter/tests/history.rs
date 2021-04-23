@@ -118,12 +118,12 @@ fn test_history_args_rm_last() {
     maybe_dummy("B", "z");
     maybe_dummy("B", "zz");
 
-    run("history rm A 2").unwrap(); // x
+    run("history rm A 2").unwrap(); // Ax
 
     assert_eq!(run("run -p -").unwrap(), "Bzz");
     run("history rm - 1").unwrap(); // Bzz
     run("history rm - 1").unwrap(); // Bz
-    assert_eq!(run("run --dummy -p -").unwrap(), "");
+    assert_eq!(run("run -p").unwrap(), "Az");
     run("history rm - 1").unwrap(); // Az
     assert_eq!(run("run -p -").unwrap(), "By");
 

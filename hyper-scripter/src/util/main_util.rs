@@ -180,7 +180,7 @@ pub async fn run_n_times(
     entry.update(|info| info.exec(content, args)).await?;
 
     if dummy {
-        log::info!("--dumy 不用真的執行，提早退出");
+        log::info!("--dummy 不用真的執行，提早退出");
         return Ok(());
     }
 
@@ -202,7 +202,10 @@ pub async fn run_n_times(
         }
         historian
             .record(&Event {
-                data: EventData::ExecDone(ret_code),
+                data: EventData::ExecDone {
+                    code: ret_code,
+                    main_event_id: entry.last_event_id(),
+                },
                 time: Utc::now().naive_utc(),
                 script_id: entry.id,
             })

@@ -153,7 +153,12 @@ impl ScriptInfo {
                 _ => NaiveDateTime::from_timestamp(1, 0),
             }
         }
-        max!(*self.read_time, map(&self.miss_time), map(&self.exec_time))
+        max!(
+            *self.read_time,
+            map(&self.miss_time),
+            map(&self.exec_time),
+            map(&self.exec_done_time)
+        )
     }
     pub fn file_path(&self) -> Result<PathBuf> {
         self.name.to_file_path(&self.ty)

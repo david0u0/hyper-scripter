@@ -27,10 +27,7 @@ pub struct ScriptRepoEntryOptional<'b> {
 impl<'b> ScriptRepoEntryOptional<'b> {
     pub fn into_either(self) -> Either<ScriptRepoEntry<'b>, Self> {
         match self.entry {
-            Occupied(entry) => Either::One(RepoEntry {
-                env: self.env,
-                info: entry.into_mut(),
-            }),
+            Occupied(entry) => Either::One(RepoEntry::new(entry.into_mut(), self.env)),
             _ => Either::Two(self),
         }
     }
@@ -66,15 +63,12 @@ impl<'b> ScriptRepoEntryOptional<'b> {
             log::debug!("得到新腳本 id {}", id);
             info.id = id as i64;
         }
-        Ok(RepoEntry {
-            info,
-            env: self.env,
-        })
+        Ok(RepoEntry::new(info, self.env))
     }
 }
 
 impl DBEnv {
-    async fn handle_change(&self, info: &ScriptInfo) -> Result {
+    async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         let name_cow = info.name.key();
         let name = name_cow.as_ref();
@@ -92,9 +86,12 @@ impl DBEnv {
         .execute(&self.info_pool)
         .await?;
 
+        let mut last_event_id = 0;
+
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
-            self.historian
+            last_event_id = self
+                .historian
                 .record(&Event {
                     script_id: info.id,
                     data: EventData::Read,
@@ -105,7 +102,8 @@ impl DBEnv {
         if let Some(time) = info.miss_time.as_ref() {
             log::debug!("{:?} 的錯過事件", info.name);
             if time.has_changed() {
-                self.historian
+                last_event_id = self
+                    .historian
                     .record(&Event {
                         script_id: info.id,
                         data: EventData::Miss,
@@ -117,7 +115,8 @@ impl DBEnv {
         if let Some(time) = info.exec_time.as_ref() {
             log::debug!("{:?} 的執行事件", info.name);
             if let Some((content, args)) = time.data() {
-                self.historian
+                last_event_id = self
+                    .historian
                     .record(&Event {
                         script_id: info.id,
                         data: EventData::Exec { content, args },
@@ -127,7 +126,7 @@ impl DBEnv {
             }
         }
 
-        Ok(())
+        Ok(last_event_id)
     }
 }
 
@@ -289,10 +288,7 @@ impl ScriptRepo {
         if v.len() >= n {
             // SAFETY: 從向量中讀一個可變指針安啦
             let t = unsafe { std::ptr::read(&v[v.len() - n]) };
-            Some(RepoEntry {
-                info: t,
-                env: &self.db_env,
-            })
+            Some(RepoEntry::new(t, &self.db_env))
         } else {
             None
         }
@@ -304,19 +300,13 @@ impl ScriptRepo {
         match (all, map.get_mut(&*name.key())) {
             (false, None) => None,
             (true, None) => self.get_hidden_mut(name),
-            (_, Some(info)) => Some(RepoEntry {
-                info,
-                env: &self.db_env,
-            }),
+            (_, Some(info)) => Some(RepoEntry::new(info, &self.db_env)),
         }
     }
     pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
         match self.hidden_map.get_mut(&*name.key()) {
             None => None,
-            Some(info) => Some(RepoEntry {
-                info,
-                env: &self.db_env,
-            }),
+            Some(info) => Some(RepoEntry::new(info, &self.db_env)),
         }
     }
     pub async fn remove(&mut self, name: &ScriptName) -> Result {

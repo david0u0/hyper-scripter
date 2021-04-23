@@ -193,7 +193,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             previous_args,
             repeat,
         } => {
-            let mut entry = query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
+            let mut entry =
+                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
             util::main_util::run_n_times(
                 repeat,
                 dummy,

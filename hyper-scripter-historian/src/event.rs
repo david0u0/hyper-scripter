@@ -11,7 +11,7 @@ pub enum EventType {
 #[derive(Debug)]
 pub enum EventData<'a> {
     Exec { content: &'a str, args: &'a str },
-    ExecDone(i32),
+    ExecDone { code: i32, main_event_id: i64 },
     Read,
     Miss,
 }
@@ -20,7 +20,7 @@ impl EventData<'_> {
     pub fn get_type(&self) -> EventType {
         match self {
             EventData::Exec { .. } => EventType::Exec,
-            EventData::ExecDone(_) => EventType::ExecDone,
+            EventData::ExecDone { .. } => EventType::ExecDone,
             EventData::Read => EventType::Read,
             EventData::Miss => EventType::Miss,
         }

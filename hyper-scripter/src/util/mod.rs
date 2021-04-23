@@ -183,22 +183,31 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
 
 /// 若是不曾存在的腳本，準備之，並回傳創建的時間
 /// 注意若是帶內容編輯則一律視為舊腳本
-pub fn prepare_script<'a>(
+pub fn prepare_script<'a, T: AsRef<str>>(
     path: &Path,
     script: &ScriptInfo,
     no_template: bool,
-    content: impl ExactSizeIterator<Item = &'a str>,
+    content: &[T],
 ) -> Result<Option<DateTime<Utc>>> {
     log::info!("開始準備 {} 腳本內容……", script.name);
     let has_content = content.len() > 0;
     let mut is_new = if path.exists() {
-        log::debug!("腳本已存在，不填入預設訊息");
+        log::debug!("腳本已存在，往後接上給定的訊息");
+        let mut file = handle_fs_res(
+            &[path],
+            std::fs::OpenOptions::new()
+                .append(true)
+                .write(true)
+                .open(path),
+        )?;
+        for content in content.iter() {
+            handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
+        }
         false
     } else {
         let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
-
-        let birthplace = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = birthplace.strip_prefix(&home).unwrap_or(&birthplace);
+        let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
+        let birthplace = birthplace_abs.strip_prefix(&home).ok();
 
         // NOTE: 創建資料夾和檔案
         if let Some(parent) = path.parent() {
@@ -206,12 +215,13 @@ pub fn prepare_script<'a>(
         }
         let mut file = handle_fs_res(&[path], File::create(&path))?;
 
-        let content = content.map(|s| s.split("\n")).flatten();
+        let content = content.iter().map(|s| s.as_ref().split("\n")).flatten();
         if !no_template {
             // TODO: or already exist
             let content: Vec<_> = content.collect();
             let info = json!({
                 "birthplace": birthplace,
+                "birthplace_abs": birthplace,
                 "name": script.name.key().to_owned(),
                 "content": content,
             });

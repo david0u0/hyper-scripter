@@ -6,19 +6,26 @@ use std::str::FromStr;
 
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
-export NAME=\"{{name}}\"
+set -e
 export VAR=\"${VAR:-default}\"
+{{#if birthplace}}
 cd ~/{{birthplace}}
+{{else}}
+cd {{birthplace_abs}}
+{{/if}}
 
 {{#each content}}{{{this}}}
 {{/each}}";
 
-// FIXME: strange birthplace & hs_home for js...
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 
-const name = '{{name}}';
 process.chdir(require('os').homedir());
-{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}
+{{#if birthplace}}
+process.chdir(process.env.HOME);
+process.chdir('{{birthplace}}');
+{{else}}
+process.chdir('{{birthplace_abs}}');
+{{/if}}
 let spawn = require('child_process').spawnSync;
 spawn('test', [], { stdio: 'inherit' });
 
@@ -29,9 +36,14 @@ writeFile('/dev/null', 'some content');
 {{/each}}";
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-export NAME=\"{{name}}\"
+
+set -e
 export VAR=\"${VAR:-default}\"
+{{#if birthplace}}
 cd ~/{{birthplace}}
+{{else}}
+cd {{birthplace_abs}}
+{{/if}}
 
 tmux new-session -s $NAME -d \"{{{content.0}}}; $SHELL\" || exit 1
 tmux split-window -h \"{{{content.1}}}; $SHELL\"
@@ -41,7 +53,11 @@ tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
-NAME = '{{name}}'
+{{#if birthplace}}
+Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
+{{else}}
+Dir.chdir(\"#{ENV['HOME']}/{{birthplace_abs}}\")
+{{/if}}
 
 {{#each content}}{{{this}}}
 {{/each}} ";

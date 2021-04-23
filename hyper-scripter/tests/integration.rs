@@ -120,8 +120,17 @@ fn test_edit_same_name() {
     let _g = setup();
     run(format!("e i-am-hidden -t hide | echo \"{}\"", MSG)).unwrap();
     run("-").expect_err("執行了隱藏的腳本？？");
-    run("e i-am-hidden yo").expect_err("竟然能編輯撞名的腳本？");
+    run("e i-am-hidden yo | echo I'm screwed QQ").expect_err("竟然能編輯撞名的腳本？");
     assert_eq!(MSG, run("-f hide -").unwrap(), "腳本被撞名的編輯搞爛了？");
+}
+
+#[test]
+fn test_edit_append() {
+    let _g = setup();
+
+    run(format!("e -t test test | echo 第一行")).unwrap();
+    run(format!("e - | echo 第二行\necho 第三行")).unwrap();
+    assert_eq!("第一行\n第二行\n第三行", run("-f test -").unwrap());
 }
 
 #[test]

@@ -227,7 +227,7 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             .entry(&name)
             .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
             .await?;
-        super::prepare_script(&p, &*entry, true, std::iter::once(u.content))?;
+        super::prepare_script(&p, &*entry, true, &[u.content])?;
         entry.update(|info| info.write()).await?;
     }
     Ok(())

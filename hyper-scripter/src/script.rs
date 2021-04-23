@@ -126,7 +126,6 @@ pub struct ScriptInfo {
     pub created_time: ScriptTime,
     pub write_time: ScriptTime,
     pub exec_time: Option<ScriptTime<(String, String)>>,
-    pub miss_time: Option<ScriptTime>,
     pub exec_done_time: Option<ScriptTime<i32>>,
     pub id: i64,
     pub name: ScriptName,
@@ -155,7 +154,6 @@ impl ScriptInfo {
         }
         max!(
             *self.read_time,
-            map(&self.miss_time),
             map(&self.exec_time),
             map(&self.exec_done_time)
         )
@@ -195,7 +193,6 @@ impl ScriptInfo {
             read_time: None,
             created_time: None,
             exec_time: None,
-            miss_time: None,
             write_time: None,
             exec_done_time: None,
         }
@@ -228,7 +225,6 @@ pub struct ScriptBuilder {
     read_time: Option<NaiveDateTime>,
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
-    miss_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
     exec_done_time: Option<NaiveDateTime>,
     id: i64,
@@ -243,10 +239,6 @@ impl ScriptBuilder {
     }
     pub fn exec_done_time(mut self, time: NaiveDateTime) -> Self {
         self.exec_done_time = Some(time);
-        self
-    }
-    pub fn miss_time(mut self, time: NaiveDateTime) -> Self {
-        self.miss_time = Some(time);
         self
     }
     pub fn read_time(mut self, time: NaiveDateTime) -> Self {
@@ -273,7 +265,6 @@ impl ScriptBuilder {
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
             created_time,
             exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
-            miss_time: self.miss_time.map(|t| ScriptTime::new(t)),
             exec_done_time: self.exec_done_time.map(|t| ScriptTime::new(t)),
         }
     }

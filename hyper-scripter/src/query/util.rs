@@ -4,7 +4,6 @@ use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
 use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
-use crate::script_time::ScriptTime;
 use fxhash::FxHashSet as HashSet;
 
 pub async fn do_list_query<'a>(
@@ -102,41 +101,6 @@ pub async fn do_script_query_strict<'b>(
             script_query.clone().into_script_name()?.to_string(), // TODO: 簡單點？
         )),
         Ok(Some(info)) => Ok(info),
-    }
-}
-
-/// 尋找腳本，若不存在則報錯則報錯，並且若被篩除者中存在符合模糊搜尋者，記錄一個「錯過事件」
-pub async fn do_script_query_strict_with_missing<'b>(
-    script_query: &ScriptQuery,
-    script_repo: &'b mut ScriptRepo,
-) -> Result<ScriptRepoEntry<'b>> {
-    let repo_mut = script_repo as *mut ScriptRepo;
-    // FIXME: 一旦 NLL 進化就修掉這段 unsafe
-    match do_script_query(script_query, script_repo).await {
-        Err(e) => Err(e),
-        Ok(Some(info)) => Ok(info),
-        Ok(None) => {
-            let repo = unsafe { &mut *repo_mut };
-            let info = match &script_query.inner {
-                ScriptQueryInner::Exact(name) => repo.get_hidden_mut(name),
-                ScriptQueryInner::Fuzz(name) => {
-                    match fuzzy::fuzz(name, repo.iter_hidden_mut()).await {
-                        Ok(Some(res)) => Some(res.get_ans()),
-                        _ => None,
-                    }
-                }
-                _ => None,
-            };
-            if let Some(mut info) = info {
-                info.update(|info| {
-                    info.miss_time = Some(ScriptTime::now(()));
-                })
-                .await?;
-            }
-            Err(Error::ScriptNotFound(
-                script_query.clone().into_script_name()?.to_string(),
-            ))
-        }
     }
 }
 

@@ -99,19 +99,6 @@ impl DBEnv {
                 })
                 .await?;
         }
-        if let Some(time) = info.miss_time.as_ref() {
-            log::debug!("{:?} 的錯過事件", info.name);
-            if time.has_changed() {
-                last_event_id = self
-                    .historian
-                    .record(&Event {
-                        script_id: info.id,
-                        data: EventData::Miss,
-                        time: **time,
-                    })
-                    .await?;
-            }
-        }
         if let Some(time) = info.exec_time.as_ref() {
             log::debug!("{:?} 的執行事件", info.name);
             if let Some((content, args)) = time.data() {
@@ -188,11 +175,9 @@ impl ScriptRepo {
             .await?;
         let last_read_records = historian.last_time_of(EventType::Read).await?;
         let last_exec_records = historian.last_time_of(EventType::Exec).await?;
-        let last_miss_records = historian.last_time_of(EventType::Miss).await?;
         let last_exec_done_records = historian.last_time_of(EventType::ExecDone).await?;
         let mut last_read: &[_] = &last_read_records;
         let mut last_exec: &[_] = &last_exec_records;
-        let mut last_miss: &[_] = &last_miss_records;
         let mut last_exec_done: &[_] = &last_exec_done_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
@@ -220,9 +205,6 @@ impl ScriptRepo {
             .created_time(script.created_time)
             .write_time(script.write_time);
 
-            if let Some(time) = extract_from_time(script.id, &mut last_miss) {
-                builder = builder.miss_time(time);
-            }
             if let Some(time) = extract_from_time(script.id, &mut last_exec) {
                 builder = builder.exec_time(time);
             }

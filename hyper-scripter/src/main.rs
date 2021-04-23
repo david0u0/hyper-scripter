@@ -177,8 +177,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Help { args } => {
             print_help(args.iter())?;
             let script_query: ScriptQuery = args[0].parse()?;
-            let entry =
-                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
+            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
 
             extract_help!(helps, entry, true);
@@ -193,8 +192,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             previous_args,
             repeat,
         } => {
-            let mut entry =
-                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             util::main_util::run_n_times(
                 repeat,
                 dummy,
@@ -207,15 +205,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             .await?;
         }
         Subs::Which { script_query } => {
-            let entry =
-                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
+            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("定位 {:?}", entry.name);
             let p = path::get_home().join(entry.file_path()?);
             println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {
-            let mut entry =
-                query::do_script_query_strict_with_missing(&script_query, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             log::info!("打印 {:?}", entry.name);
             let content = util::read_file(&script_path)?;
@@ -285,7 +281,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             if repo.get_mut(&new, true).is_some() {
                 return Err(Error::ScriptExist(new.to_string()));
             }
-            let entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
+            let entry = query::do_script_query_strict(&origin, &mut repo).await?;
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let new_script = path::open_script(&new, &entry.ty, Some(false))?;
             util::cp(&og_script, &new_script)?;
@@ -319,7 +315,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 None => None,
             };
-            let mut entry = query::do_script_query_strict_with_missing(&origin, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&origin, &mut repo).await?;
             util::main_util::mv(&mut entry, new_name, ty, tags).await?;
         }
         Subs::Tags { tag_filter } => {
@@ -387,7 +383,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd: History::RM { script, number },
         } => {
-            let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
+            let entry = query::do_script_query_strict(&script, &mut repo).await?;
             historian.ignore_args(entry.id, number).await?;
         }
         Subs::History {
@@ -398,7 +394,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     offset,
                 },
         } => {
-            let entry = query::do_script_query_strict_with_missing(&script, &mut repo).await?;
+            let entry = query::do_script_query_strict(&script, &mut repo).await?;
             let args_list = historian.last_args_list(entry.id, limit, offset).await?;
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);

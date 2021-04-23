@@ -106,8 +106,6 @@ pub enum Subs {
         category: Option<ScriptType>,
         #[structopt(long, short)]
         no_template: bool,
-        #[structopt(long, help = "Allow adding a wild script to the database")]
-        allow_wild: bool,
         #[structopt(long, short)]
         tags: Option<TagFilter>,
         #[structopt(long, help = "Create script without invoking the editor")]
@@ -337,7 +335,6 @@ impl Root {
                     content: vec![],
                     tags: None,
                     fast: false,
-                    allow_wild: false,
                     no_template: false,
                 });
             }

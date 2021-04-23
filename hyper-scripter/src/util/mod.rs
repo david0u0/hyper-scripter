@@ -181,6 +181,8 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
+/// 若是不曾存在的腳本，準備之，並回傳創建的時間
+/// 注意若是帶內容編輯則一律視為舊腳本
 pub fn prepare_script<'a>(
     path: &Path,
     script: &ScriptInfo,

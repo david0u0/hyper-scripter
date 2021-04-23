@@ -103,12 +103,11 @@ fn test_edit_existing_bang() {
                 explicit_tag: false,
                 explicit_filter: false,
             },
-            false,
         )
         .await
         .expect_err("沒有 BANG! 就找到編輯的腳本！？");
 
-        let (p, e, is_wild) = edit_or_create(
+        let (p, e) = edit_or_create(
             "test!".parse().unwrap(),
             &mut repo,
             None,
@@ -118,12 +117,10 @@ fn test_edit_existing_bang() {
                 explicit_tag: false,
                 explicit_filter: false,
             },
-            false,
         )
         .await
         .unwrap();
 
-        assert_eq!(false, is_wild);
         assert_eq!(p, get_home().join("test.sh"));
         use fxhash::FxHashSet as HashSet;
         let mut tags = HashSet::<Tag>::default();

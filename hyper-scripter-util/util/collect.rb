@@ -4,13 +4,13 @@
 # [HS_HELP]: USAGE:
 # [HS_HELP]:     hs collect
 
-require_relative './common.rb'
+require_relative './common'
 require 'shellwords'
 
 def directory_tree(path)
   files = []
   Dir.foreach(path) do |entry|
-    next if entry == '..' || entry == '.'
+    next if ['..', '.'].include?(entry)
 
     full_path = File.join(path, entry)
     if File.directory?(full_path)
@@ -63,7 +63,7 @@ directory_tree(root).each do |full_path|
   puts "collecting script #{script}!"
 
   file = File.open(full_path)
-  HS_ENV.do_hs("edit =#{name} -c #{ext} --allow-wild --fast", false)
+  HS_ENV.do_hs("edit =#{name} -c #{ext} --fast", false)
 end
 
 HS_ENV.do_hs('ls --grouping=none --name --plain', true).split(' ').each do |name|

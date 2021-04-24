@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter"
-version = "0.3.5"
+version = "0.4.0"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2018"
 autotests = false
@@ -53,8 +53,8 @@ colored = "2"
 dirs = "3.0.1"
 handlebars = "3.3.0"
 toml = "0.5.6"
-hyper-scripter-historian = { version = "0.3.2", path = "../hyper-scripter-historian" }
-hyper-scripter-util = { version = "0.3.2", path = "../hyper-scripter-util" }
+hyper-scripter-historian = { version = "0.4.0", path = "../hyper-scripter-historian" }
+hyper-scripter-util = { version = "0.4.0", path = "../hyper-scripter-util" }
 
 [dependencies.openssl]
 version = "0.10.29"

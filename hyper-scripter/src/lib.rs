@@ -1,4 +1,5 @@
 #![feature(command_access)]
+#![feature(test)]
 
 #[macro_use]
 extern crate serde_json;

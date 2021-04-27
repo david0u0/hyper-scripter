@@ -129,4 +129,19 @@ fn test_edit_existing_bang() {
     });
 }
 
+#[test]
+fn test_remove_history_in_script() {
+    println!("在腳本執行途中砍掉執行歷史，則該腳本的「執行完畢」事件應該一併消失");
+    let _g = setup();
+
+    run("e test1 | echo 1").unwrap();
+    run("e test2 | echo 2 && $HS_EXE history rm =${NAME}!").unwrap();
+
+    assert_eq!(run("-").unwrap(), "2");
+    assert_eq!(run("-").unwrap(), "2"); // 比較晚創造，所以刪了執行事件還是腳本2先
+    assert_eq!(run("test1").unwrap(), "1");
+    assert_eq!(run("test2").unwrap(), "2");
+    assert_eq!(run("-").unwrap(), "1");
+}
+
 // TODO: edit wild & edit phantom

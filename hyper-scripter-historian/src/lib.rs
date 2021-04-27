@@ -186,6 +186,17 @@ impl Historian {
                 code,
                 main_event_id,
             } => {
+                let exec_ty = EventType::Exec.to_string();
+                let ignored_res = sqlx::query!(
+                    "SELECT ignored FROM events WHERE type = ? AND id = ?",
+                    exec_ty,
+                    main_event_id
+                )
+                .fetch_one(&*self.pool.read().unwrap())
+                .await?;
+                if ignored_res.ignored {
+                    return Ok(0);
+                }
                 let code = code.to_string();
                 self.raw_record(db_event.content(&code).main_event_id(*main_event_id))
                     .await?

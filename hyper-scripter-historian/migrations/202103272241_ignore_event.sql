@@ -1,2 +1,2 @@
-ALTER TABLE events ADD COLUMN ignored boolean DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN ignored boolean NOT NULL DEFAULT FALSE;
 

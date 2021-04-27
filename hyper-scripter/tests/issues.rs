@@ -135,7 +135,7 @@ fn test_remove_history_in_script() {
     let _g = setup();
 
     run("e test1 | echo 1").unwrap();
-    run("e test2 | echo 2 && $HS_EXE history rm =${NAME}!").unwrap();
+    run("e test2 | echo 2 && $HS_EXE -H $HS_HOME history rm =${NAME}! 1").unwrap();
 
     assert_eq!(run("-").unwrap(), "2");
     assert_eq!(run("-").unwrap(), "2"); // 比較晚創造，所以刪了執行事件還是腳本2先

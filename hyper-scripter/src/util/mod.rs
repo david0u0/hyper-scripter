@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::error::{Contextable, Error, Result, SysPath};
+use crate::error::{Contextable, Error, Result};
 use crate::path::get_home;
 use crate::script::ScriptInfo;
 use chrono::{DateTime, Utc};
@@ -205,9 +205,8 @@ pub fn prepare_script<'a, T: AsRef<str>>(
         }
         false
     } else {
-        let home = dirs::home_dir().ok_or(Error::SysPathNotFound(SysPath::Home))?;
         let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = birthplace_abs.strip_prefix(&home).ok();
+        let birthplace = relative_to_home(&birthplace_abs);
 
         // NOTE: 創建資料夾和檔案
         if let Some(parent) = path.parent() {
@@ -217,11 +216,11 @@ pub fn prepare_script<'a, T: AsRef<str>>(
 
         let content = content.iter().map(|s| s.as_ref().split("\n")).flatten();
         if !no_template {
-            // TODO: or already exist
             let content: Vec<_> = content.collect();
             let info = json!({
+                "birthplace_in_home": birthplace.is_some(),
                 "birthplace": birthplace,
-                "birthplace_abs": birthplace,
+                "birthplace_abs": birthplace_abs,
                 "name": script.name.key().to_owned(),
                 "content": content,
             });
@@ -287,4 +286,9 @@ pub fn serialize_to_string<S: serde::Serializer, T: ToString>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     serializer.serialize_str(&t.to_string())
+}
+
+fn relative_to_home(p: &Path) -> Option<&Path> {
+    let home = dirs::home_dir()?;
+    p.strip_prefix(&home).ok()
 }

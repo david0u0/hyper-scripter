@@ -273,17 +273,6 @@ fn test_append_tags() {
 }
 
 #[test]
-fn test_miss_event() {
-    let _g = setup();
-    run(format!("e -t hide hidden_first | echo 第一")).unwrap();
-    run(format!("e -t hide hidden_second | echo 第二")).unwrap();
-    run(format!("e -t hide third | echo 第三")).unwrap();
-    assert_eq!("第三", run("!").unwrap());
-    run("first").expect_err("執行了隱藏的腳本？？");
-    assert_eq!("第一", run("!").unwrap(), "沒有記錄到錯過事件？");
-}
-
-#[test]
 fn test_bang() {
     let _g = setup();
     let first_file = get_home().join("hidden_first.sh");

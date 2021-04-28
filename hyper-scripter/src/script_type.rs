@@ -8,7 +8,7 @@ const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 set -e
 export VAR=\"${VAR:-default}\"
-{{#if birthplace}}
+{{#if birthplace_in_home}}
 cd ~/{{birthplace}}
 {{else}}
 cd {{birthplace_abs}}
@@ -20,7 +20,7 @@ cd {{birthplace_abs}}
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 
 process.chdir(require('os').homedir());
-{{#if birthplace}}
+{{#if birthplace_in_home}}
 process.chdir(process.env.HOME);
 process.chdir('{{birthplace}}');
 {{else}}
@@ -39,7 +39,7 @@ const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 set -e
 export VAR=\"${VAR:-default}\"
-{{#if birthplace}}
+{{#if birthplace_in_home}}
 cd ~/{{birthplace}}
 {{else}}
 cd {{birthplace_abs}}
@@ -52,11 +52,10 @@ tmux split-window -h \"{{{content.1}}}; $SHELL\"
 tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
-{{#if birthplace}}
+{{#if birthplace_in_home}}
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 {{else}}
-Dir.chdir(\"#{ENV['HOME']}/{{birthplace_abs}}\")
+Dir.chdir(\"{{birthplace_abs}}\")
 {{/if}}
 
 {{#each content}}{{{this}}}

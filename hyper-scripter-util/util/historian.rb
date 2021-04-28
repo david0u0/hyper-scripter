@@ -4,8 +4,8 @@
 # [HS_HELP]:     hs historian -f hs hs/test --limit 20
 
 require 'json'
-require_relative './common.rb'
-HISTORIAN = ENV['NAME'].freeze
+require_relative './common'
+HISTORIAN = ENV['NAME']
 ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query
@@ -44,81 +44,37 @@ lines_count = 0
 load_history = lambda do
   history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
   exit 1 unless $?.success?
-  lines = history.lines.map { |s| s.strip }
-
-  lines_count = lines.length
-  if lines_count == 0
-    warn 'history is empty'
-    exit 0
-  end
+  history.lines.map { |s| s.strip }
 end
 
-load_history.call
-
-pos = 0
-selected = false
 sourcing = false
-
-until selected
-  display_pos = offset + pos + 1
-  reload = false
-  lines.each_with_index do |line, i|
-    cur_display_pos = offset + i + 1
-    leading = cur_display_pos == display_pos ? '>' : ' '
-    $stderr.print "#{leading} #{cur_display_pos}. #{line}\n"
-  end
-
-  begin
-    system('stty raw -echo')
-    resp = $stdin.getc
-
-    case resp
-    when 'q', 'Q'
-      break
-    when 'j', 'J'
-      pos = (pos + 1) % lines_count
-    when 'k', 'K'
-      pos = (pos - 1 + lines_count) % lines_count
-    when "\r"
-      selected = true
-    when 'd', 'D'
-      reload = true
-    when 'c', 'C'
-      selected = true
-      sourcing = true
-    end
-  ensure
-    system('stty -raw echo')
-  end
-
-  $stdout.flush
-
-  lines_count.times do
-    $stderr.print "\e[A"
-  end
-  $stderr.print "\r\e[J"
-
-  if reload
-    HS_ENV.do_hs("history rm =#{script_name}! #{display_pos}", false)
-    load_history.call
-  end
+selector = Selector.new(load_history.call, offset)
+selector.register_keys(%w[d D], lambda { |pos, _|
+  HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
+  selector.load(load_history.call)
+})
+selector.register_keys(%w[c C], lambda { |_, _|
+  sourcing = true
+})
+args = begin
+  selector.run.content
+rescue Selector::Empty
+  exit
+rescue Selector::Quit
+  exit
 end
 
-$stderr.print "\e[#{lines_count}E"
-
-if selected
-  cmd = "=#{script_name}! #{lines[pos]}"
-  if sourcing
-    File.open(ENV['HS_SOURCE'], 'w') do |file|
-      case ENV['SHELL'].split('/').last
-      when 'fish'
-        file.write("commandline \"#{HS_ENV.exe} #{cmd}\"")
-      else
-        warn "#{ENV['SHELL']} not supported"
-      end
+cmd = "=#{script_name}! #{args}"
+if sourcing
+  File.open(ENV['HS_SOURCE'], 'w') do |file|
+    case ENV['SHELL'].split('/').last
+    when 'fish'
+      file.write("commandline \"#{HS_ENV.exe} #{cmd}\"")
+    else
+      warn "#{ENV['SHELL']} not supported"
     end
-  else
-    warn cmd
-    history = HS_ENV.exec_hs(cmd, false)
   end
+else
+  warn cmd
+  history = HS_ENV.exec_hs(cmd, false)
 end

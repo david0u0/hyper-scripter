@@ -2,10 +2,9 @@
 #[path = "tool.rs"]
 mod tool;
 
-use hyper_scripter::path::HS_REDIRECT;
+use hyper_scripter::path::{HS_PRE_RUN, HS_REDIRECT};
 use regex::Regex;
-use std::fs::{canonicalize, File};
-use std::io::Write;
+use std::fs::{canonicalize, write};
 use tool::*;
 const MSG: &'static str = "你好，腳本人！";
 
@@ -317,10 +316,7 @@ fn test_redirect() {
         }
     }
 
-    File::create(get_home().join(HS_REDIRECT))
-        .unwrap()
-        .write_all(redirected.as_bytes())
-        .unwrap();
+    write(get_home().join(HS_REDIRECT), redirected.as_bytes()).unwrap();
     run("e --fast test | echo 我在 $(realpath $(dirname $0))").unwrap();
     assert_eq!(run("-").unwrap(), format!("我在 {}", redirected));
 }
@@ -363,5 +359,21 @@ fn test_custom_env() {
     assert_eq!(
         run("-").unwrap(),
         format!("{}::myname", get_home().to_string_lossy())
+    );
+}
+
+#[test]
+fn test_prerun() {
+    let _g = setup();
+
+    write(
+        get_home().join(HS_PRE_RUN),
+        "echo 測試預腳本=_= $NAME $1,$2",
+    )
+    .unwrap();
+    run("e myname | echo 實際執行=_=").unwrap();
+    assert_eq!(
+        run("- 參數1 參數2").unwrap(),
+        "測試預腳本=_= myname 參數1,參數2\n實際執行=_="
     );
 }

@@ -239,3 +239,12 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
     }
     Ok(())
 }
+
+pub fn prepare_pre_run() -> Result {
+    let p = path::get_home().join(path::HS_PRE_RUN);
+    if !p.exists() {
+        log::info!("寫入預執行腳本 {:?}", p);
+        super::write_file(&p, ">&2 echo running $NAME $@")?;
+    }
+    Ok(())
+}

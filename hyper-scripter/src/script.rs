@@ -81,6 +81,7 @@ impl ScriptName {
             ScriptName::Named(s) => Cow::Borrowed(s),
         }
     }
+    /// 回傳值是相對於 HS_HOME 的路徑
     pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
         let mut file_name: String;
         let add_ext = |name: &mut String| -> Result<()> {

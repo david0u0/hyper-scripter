@@ -90,8 +90,6 @@ pub struct RawConfig {
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
     pub prompt_level: PromptLevel,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pre_run_msg: Option<String>,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
     pub tag_filters: Vec<NamedTagFilter>,
@@ -121,7 +119,6 @@ impl Default for RawConfig {
         RawConfig {
             editor: vec!["vim".to_string()],
             prompt_level: PromptLevel::Smart,
-            pre_run_msg: Some("{{name}} {{#each args}}{{{this}}} {{/each}}".to_owned()),
             tag_filters: vec![
                 NamedTagFilter {
                     content: "+pin".parse().unwrap(),

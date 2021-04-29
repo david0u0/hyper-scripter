@@ -37,6 +37,7 @@ pub enum Error {
     UnknownCategory(String),
     Format(FormatCode, String),
     ScriptError(i32),
+    PreRunError(i32),
     RedundantOpt(RedundantOpt),
     NoPreviousArgs,
     DontFuzz,

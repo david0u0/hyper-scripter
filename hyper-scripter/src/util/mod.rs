@@ -12,6 +12,7 @@ use std::process::{Command, ExitStatus};
 
 pub mod main_util;
 
+// XXX: main util?
 pub fn run(
     script_path: &PathBuf,
     info: &ScriptInfo,
@@ -32,32 +33,48 @@ pub fn run(
         return Err(Error::PermissionDenied(vec![script_path.clone()]));
     };
 
+    macro_rules! remaining_iter {
+        () => {
+            remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s))
+        };
+    }
+
     let info: serde_json::Value;
     info = json!({
         "path": script_path,
         "hs_home": hs_home,
         "hs_tags": hs_tags,
         "hs_exe": hs_exe,
-        "args": remaining,
         "name": name,
         "content": content,
     });
+    let env = conf.gen_env(&info)?;
+    let ty_env = script_conf.gen_env(&info)?;
 
-    if let Some(pre_run_msg) = conf.pre_run_msg.as_ref() {
-        log::info!("打印執行前訊息 {}", pre_run_msg);
-        let reg = Handlebars::new();
-        let res = reg.render_template(pre_run_msg, &info)?;
-        eprintln!("{}", res);
+    if let Some(pre_run_script) = find_pre_run() {
+        let args = std::iter::once(pre_run_script.as_ref()).chain(remaining_iter!());
+        let mut cmd = create_cmd("sh", args);
+        cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
+        cmd.envs(env.iter().map(|(a, b)| (a, b)));
+
+        let stat = run_cmd(cmd)?;
+        log::info!("預腳本執行結果：{:?}", stat);
+        if !stat.success() {
+            // TODO: 根據返回值做不同表現
+            let code = stat.code().unwrap_or_default();
+            return Err(Error::PreRunError(code));
+        }
     }
 
     let args = script_conf.args(&info)?;
-    let mut full_args: Vec<&OsStr> = args.iter().map(|s| s.as_ref()).collect();
-    full_args.extend(remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
+    let full_args: Vec<&OsStr> = args
+        .iter()
+        .map(|s| s.as_ref())
+        .chain(remaining_iter!())
+        .collect();
 
     let mut cmd = create_cmd(&cmd_str, &full_args);
-    let env = script_conf.gen_env(&info)?;
-    cmd.envs(env);
-    let env = conf.gen_env(&info)?;
+    cmd.envs(ty_env);
     cmd.envs(env);
 
     let stat = run_cmd(cmd)?;
@@ -291,4 +308,15 @@ pub fn serialize_to_string<S: serde::Serializer, T: ToString>(
 fn relative_to_home(p: &Path) -> Option<&Path> {
     let home = dirs::home_dir()?;
     p.strip_prefix(&home).ok()
+}
+
+fn find_pre_run() -> Option<PathBuf> {
+    use crate::path;
+    let p = path::get_home().join(path::HS_PRE_RUN);
+    if p.exists() {
+        log::info!("找到預執行腳本 {:?}", p);
+        Some(p)
+    } else {
+        None
+    }
 }

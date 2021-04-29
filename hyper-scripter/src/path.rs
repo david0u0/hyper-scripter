@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 pub const HS_REDIRECT: &'static str = ".hs_redirect";
+pub const HS_PRE_RUN: &'static str = ".hs_prerun.sh";
 
 macro_rules! hs_home_env {
     () => {
@@ -14,6 +15,7 @@ macro_rules! hs_home_env {
     };
 }
 
+// XXX: 改成不要用 lazy_static ?
 lazy_static::lazy_static! {
     static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 }
@@ -37,7 +39,7 @@ fn get_default_home() -> Result<PathBuf> {
 }
 
 #[cfg(not(debug_assertions))]
-pub fn get_sys_home() -> Result<PathBuf> {
+fn get_sys_home() -> Result<PathBuf> {
     let p = match std::env::var(hs_home_env!()) {
         Ok(p) => {
             log::debug!("使用環境變數路徑：{}", p);
@@ -49,11 +51,11 @@ pub fn get_sys_home() -> Result<PathBuf> {
     Ok(p)
 }
 #[cfg(all(debug_assertions, not(test)))]
-pub fn get_sys_home() -> Result<PathBuf> {
+fn get_sys_home() -> Result<PathBuf> {
     Ok(".hyper_scripter".into())
 }
 #[cfg(all(debug_assertions, test))]
-pub fn get_sys_home() -> Result<PathBuf> {
+fn get_sys_home() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }
 

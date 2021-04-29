@@ -400,8 +400,14 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);
                 let args: Vec<String> = serde_json::from_str(&args)?;
+                let mut first = true;
                 for arg in args {
-                    print!("{} ", util::to_display_args(arg)?);
+                    if !first {
+                        print!(" ");
+                    } else {
+                        first = false;
+                    }
+                    print!("{}", util::to_display_args(arg)?);
                 }
                 println!("");
             }

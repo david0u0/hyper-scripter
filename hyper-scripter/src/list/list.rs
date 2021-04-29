@@ -89,13 +89,13 @@ fn convert_opt<'a, W: Write>(
 }
 pub fn fmt_meta<W: Write>(
     script: &ScriptInfo,
-    is_last: bool,
+    is_latest: bool,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
     let color = Config::get()?.get_color(&script.ty)?;
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
-            let last_txt = if is_last && !opt.plain {
+            let last_txt = if is_latest && !opt.plain {
                 "*".color(Color::Yellow).bold()
             } else {
                 " ".normal()
@@ -114,13 +114,13 @@ pub fn fmt_meta<W: Write>(
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, w) => {
-            if is_last && !opt.plain {
+            if is_latest && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
             let ident = ident_string(ident_style, script)?;
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
-                if is_last {
+                if is_latest {
                     s.underline()
                 } else {
                     s
@@ -212,6 +212,11 @@ fn fmt_group<W: Write>(
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
     scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
+    let mut scripts = scripts.iter();
+    if let Some(script) = scripts.next() {
+        let is_latest = script.id == latest_script_id;
+        fmt_meta(script, is_latest, opt)?;
+    }
     for script in scripts {
         if let DisplayStyle::Short(_, w) = &mut opt.display_style {
             write!(w, "  ")?;

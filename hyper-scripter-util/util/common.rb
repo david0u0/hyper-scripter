@@ -102,7 +102,7 @@ class Selector
           next unless key == resp
 
           should_break = callback.cb.call(display_pos, @lines[pos])
-          return self.class.make_result(display_pos, @lines[pos]) if should_break
+          return self.class.make_result(display_pos, @lines[pos]) if should_break == true
 
           break
         end

@@ -55,6 +55,7 @@ selector.register_keys(%w[d D], lambda { |pos, _|
 })
 selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
+  true
 })
 args = begin
   selector.run.content

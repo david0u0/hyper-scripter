@@ -71,6 +71,8 @@ fn test_history_args_rm() {
     let recorded = run("history show receiver --offset 2 --limit 999").unwrap();
     assert_list(&recorded, &["third"]);
 
+    run("history rm receiver 0").expect_err("編號從1開始 =_=");
+
     run("history rm receiver 1").unwrap(); // 幹掉 "first"
 
     let recorded = run("history show receiver").unwrap();

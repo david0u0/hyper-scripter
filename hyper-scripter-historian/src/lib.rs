@@ -261,7 +261,12 @@ impl Historian {
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
     }
 
-    pub async fn ignore_args(&self, script_id: i64, number: u32) -> Result<(), DBError> {
+    pub async fn ignore_args(
+        &self,
+        script_id: i64,
+        number: std::num::NonZeroU64,
+    ) -> Result<(), DBError> {
+        let number = number.get();
         let exec_ty = EventType::Exec.to_string();
         let done_ty = EventType::ExecDone.to_string();
         let offset = number as i64 - 1;

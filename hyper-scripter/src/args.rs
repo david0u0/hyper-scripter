@@ -204,7 +204,7 @@ pub enum History {
     RM {
         #[structopt(parse(try_from_str))]
         script: ScriptQuery,
-        number: u32,
+        number: std::num::NonZeroU64,
     },
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]

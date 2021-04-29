@@ -48,7 +48,7 @@ load_history = lambda do
 end
 
 sourcing = false
-selector = Selector.new(load_history.call, offset)
+selector = Selector.new(load_history.call, offset + 1)
 selector.register_keys(%w[d D], lambda { |pos, _|
   HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
   selector.load(load_history.call)

@@ -11,7 +11,7 @@ use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-const CONFIG_FILE: &'static str = ".config.toml";
+const CONFIG_FILE: &str = ".config.toml";
 
 #[cfg(not(test))]
 lazy_static::lazy_static! {
@@ -37,7 +37,7 @@ where
     T: Deserialize<'de>,
 {
     let v: Vec<T> = Deserialize::deserialize(deserializer)?;
-    if v.len() == 0 {
+    if v.is_empty() {
         return Err(serde::de::Error::custom(Error::Format(
             FormatCode::NonEmptyArray,
             Default::default(),
@@ -251,7 +251,7 @@ impl Config {
     pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
         self.categories
             .get(ty)
-            .ok_or(Error::UnknownCategory(ty.to_string()))
+            .ok_or_else(|| Error::UnknownCategory(ty.to_string()))
     }
     pub fn get_tag_filter_group(&self) -> TagFilterGroup {
         let mut group = TagFilterGroup::default();

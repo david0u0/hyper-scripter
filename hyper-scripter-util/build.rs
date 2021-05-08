@@ -36,7 +36,7 @@ fn main() -> std::io::Result<()> {
     let mut file = File::create(dest)?;
     let inner = read_all()?
         .map(|path| {
-            let mut splited = path.rsplitn(2, ".");
+            let mut splited = path.rsplitn(2, '.');
             let category = splited.next().unwrap();
             let name = splited.next().unwrap();
             let hidden = hidden_list.iter().any(|s| s == name);

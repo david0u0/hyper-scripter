@@ -3,14 +3,14 @@ use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
-use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
+use crate::script_repo::{RepoEntry, ScriptRepo};
 use fxhash::FxHashSet as HashSet;
 
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
     queries: &[ListQuery],
-) -> Result<Vec<ScriptRepoEntry<'a>>> {
-    if queries.len() == 0 {
+) -> Result<Vec<RepoEntry<'a>>> {
+    if queries.is_empty() {
         return Ok(repo.iter_mut(false).collect());
     }
     let mut mem = HashSet::<i64>::default();
@@ -51,7 +51,7 @@ pub async fn do_list_query<'a>(
 pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
-) -> Result<Option<ScriptRepoEntry<'b>>> {
+) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
     let all = script_query.bang;
     match &script_query.inner {
@@ -94,7 +94,7 @@ pub async fn do_script_query<'b>(
 pub async fn do_script_query_strict<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
-) -> Result<ScriptRepoEntry<'b>> {
+) -> Result<RepoEntry<'b>> {
     match do_script_query(script_query, script_repo).await {
         Err(e) => Err(e),
         Ok(None) => Err(Error::ScriptNotFound(

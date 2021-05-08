@@ -174,7 +174,7 @@ impl Historian {
                 .fetch_optional(&*self.pool.read().unwrap())
                 .await?;
                 if let Some(last_event) = last_event {
-                    if last_event.content.as_ref().map(|s| s.as_str()) == content {
+                    if last_event.content.as_deref() == content {
                         log::debug!("上次執行內容相同，不重複記錄");
                         content = None;
                     }

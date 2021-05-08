@@ -2,7 +2,7 @@ use chrono::{Local, NaiveDateTime, TimeZone, Utc};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::fmt::Debug;
 
-#[derive(Debug, Clone, Ord, Eq, Deref)]
+#[derive(Debug, Clone, Deref)]
 pub struct ScriptTime<T = ()> {
     changed: Option<T>,
     #[deref]
@@ -18,6 +18,12 @@ impl<T> PartialOrd for ScriptTime<T> {
         self.time.partial_cmp(&other.time)
     }
 }
+impl<T> Ord for ScriptTime<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+impl<T> Eq for ScriptTime<T> {}
 
 impl<T> ScriptTime<T> {
     pub fn now(data: T) -> Self {

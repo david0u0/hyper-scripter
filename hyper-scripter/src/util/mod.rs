@@ -14,7 +14,7 @@ pub mod main_util;
 
 // XXX: main util?
 pub fn run(
-    script_path: &PathBuf,
+    script_path: &Path,
     info: &ScriptInfo,
     remaining: &[String],
     content: &str,
@@ -30,7 +30,7 @@ pub fn run(
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
     } else {
-        return Err(Error::PermissionDenied(vec![script_path.clone()]));
+        return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
     };
 
     macro_rules! remaining_iter {
@@ -137,22 +137,22 @@ where
     create_cmd(cmd, remaining)
 }
 
-pub fn read_file(path: &PathBuf) -> Result<String> {
+pub fn read_file(path: &Path) -> Result<String> {
     let mut file = handle_fs_res(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;
     let mut content = String::new();
     handle_fs_res(&[path], file.read_to_string(&mut content)).context("讀取檔案失敗")?;
     Ok(content)
 }
 
-pub fn write_file(path: &PathBuf, content: &str) -> Result<()> {
+pub fn write_file(path: &Path, content: &str) -> Result<()> {
     let mut file = handle_fs_res(&[path], File::create(path))?;
     handle_fs_res(&[path], file.write_all(content.as_bytes()))
 }
-pub fn remove(script_path: &PathBuf) -> Result<()> {
+pub fn remove(script_path: &Path) -> Result<()> {
     handle_fs_res(&[&script_path], remove_file(&script_path))
 }
 pub fn change_name_only<F: Fn(&str) -> String>(full_name: &str, transform: F) -> String {
-    let mut arr: Vec<_> = full_name.split("/").collect();
+    let mut arr: Vec<_> = full_name.split('/').collect();
     let len = arr.len();
     if len == 0 {
         unreachable!();
@@ -164,7 +164,7 @@ pub fn change_name_only<F: Fn(&str) -> String>(full_name: &str, transform: F) ->
         arr.join("/")
     }
 }
-pub fn mv(origin: &PathBuf, new: &PathBuf) -> Result<()> {
+pub fn mv(origin: &Path, new: &Path) -> Result<()> {
     log::info!("修改 {:?} 為 {:?}", origin, new);
     // NOTE: 創建資料夾和檔案
     if let Some(parent) = new.parent() {
@@ -172,7 +172,7 @@ pub fn mv(origin: &PathBuf, new: &PathBuf) -> Result<()> {
     }
     handle_fs_res(&[&new, &origin], rename(&origin, &new))
 }
-pub fn cp(origin: &PathBuf, new: &PathBuf) -> Result<()> {
+pub fn cp(origin: &Path, new: &Path) -> Result<()> {
     // NOTE: 創建資料夾和檔案
     if let Some(parent) = new.parent() {
         handle_fs_res(&[parent], create_dir_all(parent))?;
@@ -200,14 +200,14 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
 
 /// 若是不曾存在的腳本，準備之，並回傳創建的時間
 /// 注意若是帶內容編輯則一律視為舊腳本
-pub fn prepare_script<'a, T: AsRef<str>>(
+pub fn prepare_script<T: AsRef<str>>(
     path: &Path,
     script: &ScriptInfo,
     no_template: bool,
     content: &[T],
 ) -> Result<Option<DateTime<Utc>>> {
     log::info!("開始準備 {} 腳本內容……", script.name);
-    let has_content = content.len() > 0;
+    let has_content = !content.is_empty();
     let mut is_new = if path.exists() {
         log::debug!("腳本已存在，往後接上給定的訊息");
         let mut file = handle_fs_res(
@@ -231,7 +231,7 @@ pub fn prepare_script<'a, T: AsRef<str>>(
         }
         let mut file = handle_fs_res(&[path], File::create(&path))?;
 
-        let content = content.iter().map(|s| s.as_ref().split("\n")).flatten();
+        let content = content.iter().map(|s| s.as_ref().split('\n')).flatten();
         if !no_template {
             let content: Vec<_> = content.collect();
             let info = json!({
@@ -257,7 +257,7 @@ pub fn prepare_script<'a, T: AsRef<str>>(
 }
 fn write_prepare_script<W: Write>(
     w: W,
-    template: &Vec<String>,
+    template: &[String],
     info: &serde_json::Value,
 ) -> std::io::Result<()> {
     let reg = Handlebars::new();
@@ -291,7 +291,7 @@ pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<bool>
 pub fn to_display_args(arg: String) -> Result<String> {
     let escaped: String =
         serde_json::to_string(&arg).context("超級異常的狀況…把字串轉成 json 也能出錯")?;
-    if !arg.contains(' ') && arg == &escaped[1..escaped.len() - 1] {
+    if !arg.contains(' ') && arg == escaped[1..escaped.len() - 1] {
         Ok(arg)
     } else {
         Ok(escaped)

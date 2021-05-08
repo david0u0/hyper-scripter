@@ -6,8 +6,8 @@ use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-pub const HS_REDIRECT: &'static str = ".hs_redirect";
-pub const HS_PRE_RUN: &'static str = ".hs_prerun.sh";
+pub const HS_REDIRECT: &str = ".hs_redirect";
+pub const HS_PRE_RUN: &str = ".hs_prerun.sh";
 
 macro_rules! hs_home_env {
     () => {
@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
 
 #[cfg(not(feature = "hard-home"))]
 fn get_default_home() -> Result<PathBuf> {
-    const ROOT_PATH: &'static str = "hyper_scripter";
+    const ROOT_PATH: &str = "hyper_scripter";
     use crate::error::SysPath;
     let home = dirs::config_dir()
         .ok_or(Error::SysPathNotFound(SysPath::Config))?
@@ -108,7 +108,7 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
         let name = entry?
             .file_name()
             .to_str()
-            .ok_or(Error::msg("檔案實體為空...?"))?
+            .ok_or_else(|| Error::msg("檔案實體為空...?"))?
             .to_string();
         let re = regex::Regex::new(r"\.\w+$").unwrap();
         let name = re.replace(&name, "");
@@ -138,10 +138,7 @@ pub fn open_script(
 ) -> Result<PathBuf> {
     let script_path = match &name {
         ScriptName::Anonymous(id) => open_anonymous(*id, ty)?,
-        ScriptName::Named(_) => {
-            let path = get_home().join(name.to_file_path(ty)?);
-            path
-        }
+        ScriptName::Named(_) => get_home().join(name.to_file_path(ty)?),
     };
     if let Some(should_exist) = check_sxist {
         if !script_path.exists() && should_exist {

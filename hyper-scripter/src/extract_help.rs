@@ -1,8 +1,8 @@
-const KEY: &'static str = "[HS_HELP]:";
+const KEY: &str = "[HS_HELP]:";
 
 fn trim_first_white(s: &str) -> &str {
-    if s.starts_with(' ') {
-        &s[1..]
+    if let Some(s) = s.strip_prefix(' ') {
+        s
     } else {
         s
     }
@@ -12,7 +12,7 @@ pub fn extract_help_from_content(mut content: &str, long: bool) -> Vec<&str> {
     let mut ans = vec![];
     if let Some(pos) = content.find(KEY) {
         content = &content[pos..];
-        let new_line_pos = content.find("\n").unwrap_or(content.len());
+        let new_line_pos = content.find('\n').unwrap_or_else(|| content.len());
         ans.push(trim_first_white(&content[KEY.len()..new_line_pos]));
         if !long {
             return ans;
@@ -24,7 +24,7 @@ pub fn extract_help_from_content(mut content: &str, long: bool) -> Vec<&str> {
 
     while let Some(pos) = content.find(KEY) {
         content = &content[pos..];
-        let new_line_pos = content.find("\n").unwrap_or(content.len());
+        let new_line_pos = content.find('\n').unwrap_or_else(|| content.len());
         ans.push(trim_first_white(&content[KEY.len()..new_line_pos]));
 
         content = &content[new_line_pos..];

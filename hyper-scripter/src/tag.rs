@@ -85,7 +85,7 @@ impl Display for Tag {
 impl FromStr for Tag {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Error> {
-        let re = Regex::new(&format!(r"^(\w|\d|-|_)+$")).unwrap();
+        let re = Regex::new(r"^(\w|\d|-|_)+$").unwrap();
         if !re.is_match(s) {
             log::error!("標籤格式不符：{}", s);
             return Err(Error::Format(TagCode, s.to_owned()));
@@ -96,7 +96,7 @@ impl FromStr for Tag {
 impl FromStr for TagControl {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
-        let allow = if s.starts_with("^") {
+        let allow = if s.starts_with('^') {
             s = &s[1..s.len()];
             false
         } else {
@@ -108,11 +108,11 @@ impl FromStr for TagControl {
         })
     }
 }
-const OBLIGATION_PREFIX: &'static str = "m/";
+const OBLIGATION_PREFIX: &str = "m/";
 impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
-        let append = if s.starts_with("+") {
+        let append = if s.starts_with('+') {
             s = &s[1..];
             true
         } else {
@@ -127,10 +127,10 @@ impl FromStr for TagFilter {
         };
 
         let mut tags = vec![];
-        for filter in s.split(",") {
+        for filter in s.split(',') {
             tags.push(filter.parse()?);
         }
-        if tags.len() == 0 {
+        if tags.is_empty() {
             return Err(Error::Format(TagCode, s.to_owned()));
         }
         Ok(TagFilter {

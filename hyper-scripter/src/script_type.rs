@@ -106,7 +106,7 @@ pub struct ScriptTypeConfig {
     env: Vec<(String, String)>,
 }
 fn split(s: &str) -> Vec<String> {
-    s.split("\n").map(|s| s.to_owned()).collect()
+    s.split('\n').map(|s| s.to_owned()).collect()
 }
 fn default_template() -> Vec<String> {
     vec![

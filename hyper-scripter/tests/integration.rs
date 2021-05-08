@@ -6,9 +6,9 @@ use hyper_scripter::path::{HS_PRE_RUN, HS_REDIRECT};
 use regex::Regex;
 use std::fs::{canonicalize, write};
 use tool::*;
-const MSG: &'static str = "你好，腳本人！";
+const MSG: &str = "你好，腳本人！";
 
-const MSG_JS: &'static str = "你好，爪哇腳本人！";
+const MSG_JS: &str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
@@ -37,7 +37,7 @@ fn test_tags() {
 fn test_mv_cp() {
     let _g = setup();
 
-    run(format!("e -t test . -c js --no-template | echo $HS_TAGS")).unwrap();
+    run("e -t test . -c js --no-template | echo $HS_TAGS".to_string()).unwrap();
     run("-").expect_err("用 nodejs 執行 echo ……？");
 
     run("mv 1 -c sh -t test2").unwrap();
@@ -54,7 +54,7 @@ fn test_mv_cp() {
     run("cp -f hide 1 -t +cp .2").unwrap();
     let mut res: Vec<_> = run("!")
         .unwrap()
-        .split(" ")
+        .split(' ')
         .map(|s| s.to_string())
         .collect();
     res.sort();
@@ -63,7 +63,7 @@ fn test_mv_cp() {
     run("cp -f hide - -t only .3").unwrap();
     let res: Vec<_> = run("!")
         .unwrap()
-        .split(" ")
+        .split(' ')
         .map(|s| s.to_string())
         .collect();
     assert_eq!(vec!["only"], res);
@@ -71,8 +71,8 @@ fn test_mv_cp() {
     // TODO: mv and cp existing
 }
 
-const TALKER: &'static str = "--腳本小子";
-const APPEND: &'static str = "第二行";
+const TALKER: &str = "--腳本小子";
+const APPEND: &str = "第二行";
 #[test]
 fn test_run() {
     let _g = setup();
@@ -127,8 +127,8 @@ fn test_edit_same_name() {
 fn test_edit_append() {
     let _g = setup();
 
-    run(format!("e -t test test | echo 第一行")).unwrap();
-    run(format!("e - | echo 第二行\necho 第三行")).unwrap();
+    run("e -t test test | echo 第一行".to_string()).unwrap();
+    run("e - | echo 第二行\necho 第三行".to_string()).unwrap();
     assert_eq!("第一行\n第二行\n第三行", run("-f test -").unwrap());
 }
 
@@ -248,7 +248,7 @@ fn test_namespace_reorder_search() {
 fn test_append_tags() {
     let _g = setup();
     run("tags global").unwrap();
-    run(format!("e -t +append append-test | echo 附加標籤")).unwrap();
+    run("e -t +append append-test | echo 附加標籤".to_string()).unwrap();
     run("e -t no-append no-append-test | echo 不要給我打標籤").unwrap();
 
     assert_eq!("附加標籤", run("apptest").unwrap());

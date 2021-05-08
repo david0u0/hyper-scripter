@@ -4,15 +4,15 @@ use std::path::PathBuf;
 
 fn fmt_multi_path(f: &mut Formatter, msg: &str, mutli_path: &[PathBuf]) -> Result {
     write!(f, "{}", msg)?;
-    if mutli_path.len() > 0 {
+    if !mutli_path.is_empty() {
         write!(f, ":")?;
     }
     let mut it = mutli_path.iter();
     if let Some(p) = it.next() {
-        writeln!(f, "")?;
+        writeln!(f)?;
         write!(f, "{}", p.to_string_lossy())?;
     }
-    while let Some(p) = it.next() {
+    for p in it {
         write!(f, "{}", p.to_string_lossy())?;
     }
     Ok(())
@@ -60,6 +60,6 @@ impl Display for Error {
                 write!(f, "{:?}", self)?;
             }
         }
-        writeln!(f, "")
+        writeln!(f)
     }
 }

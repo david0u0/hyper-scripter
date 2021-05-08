@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-pub const ANONYMOUS: &'static str = ".anonymous";
+pub const ANONYMOUS: &str = ".anonymous";
 
 macro_rules! max {
     ($x:expr) => ( $x );
@@ -23,7 +23,7 @@ macro_rules! max {
     };
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScriptName {
     Anonymous(u32),
     Named(String),
@@ -43,15 +43,15 @@ impl ScriptName {
             let id_str = m.get(1).unwrap().as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(Some(id)),
-                Err(e) => return Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
+                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
             }
         } else {
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
-            if s.starts_with("-")
-                || s.starts_with(".")
-                || s.find("..").is_some()
-                || s.find(" ").is_some()
-                || s.len() == 0
+            if s.starts_with('-')
+                || s.starts_with('.')
+                || s.contains("..")
+                || s.contains(' ')
+                || s.is_empty()
             {
                 return Err(Error::Format(ScriptNameCode, s.to_owned()))
                     .context("命名腳本格式有誤");
@@ -63,17 +63,14 @@ impl ScriptName {
         match self {
             ScriptName::Anonymous(_) => vec![],
             ScriptName::Named(s) => {
-                let mut v: Vec<_> = s.split("/").collect();
+                let mut v: Vec<_> = s.split('/').collect();
                 v.pop();
                 v
             }
         }
     }
     pub fn is_anonymous(&self) -> bool {
-        match self {
-            ScriptName::Anonymous(_) => true,
-            _ => false,
-        }
+        matches!(self, ScriptName::Anonymous(_))
     }
     pub fn key(&self) -> Cow<'_, str> {
         match self {
@@ -113,6 +110,11 @@ impl PartialOrd for ScriptName {
             (ScriptName::Named(_), ScriptName::Anonymous(_)) => Some(Ordering::Less),
             (ScriptName::Anonymous(_), ScriptName::Named(_)) => Some(Ordering::Greater),
         }
+    }
+}
+impl Ord for ScriptName {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 impl std::fmt::Display for ScriptName {
@@ -265,8 +267,8 @@ impl ScriptBuilder {
             write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
             created_time,
-            exec_time: self.exec_time.map(|t| ScriptTime::new(t)),
-            exec_done_time: self.exec_done_time.map(|t| ScriptTime::new(t)),
+            exec_time: self.exec_time.map(ScriptTime::new),
+            exec_done_time: self.exec_done_time.map(ScriptTime::new),
         }
     }
 }

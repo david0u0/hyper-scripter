@@ -50,7 +50,7 @@ impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
             })
     }
     pub fn insert_to_map(map: &mut Childs<'a, T>, path: &[&'a str], child: Self) {
-        if path.len() == 0 {
+        if path.is_empty() {
             map.insert((true, child.key()), child);
         } else {
             let e = Self::next_nonleaf(map, path[0]);
@@ -66,7 +66,8 @@ impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
         let childs = cur.get_child_map();
         childs.insert((true, leaf.key()), leaf);
     }
-    pub fn cmp(&self, other: &Self) -> Ordering {
+    // NOTE: 取名 cmp 的話，clippy 會叫你實作 Ord，很麻煩
+    pub fn simple_cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (TreeNode::NonLeaf { .. }, TreeNode::Leaf(_)) => Ordering::Greater,
             (TreeNode::NonLeaf { value: a, .. }, TreeNode::NonLeaf { value: b, .. }) => a.cmp(b),
@@ -87,18 +88,18 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
 
     #[doc(hidden)]
     fn fmt_lists(&mut self, f: &mut W, map: &mut Childs<'a, T>, opt: &mut TreeFmtOption) -> Result {
-        if map.len() == 0 {
+        if map.is_empty() {
             panic!("非葉節點至少要有一個兒子！");
         }
         let mut list: Vec<_> = map.iter_mut().map(|(_, v)| v).collect();
-        list.sort_by(|a, b| a.cmp(&b));
+        list.sort_by(|a, b| a.simple_cmp(b));
         let list_len = list.len();
 
         for node in list.iter_mut().take(list_len - 1) {
-            write!(f, "\n")?;
+            writeln!(f)?;
             self.fmt_with(f, node, opt, false)?;
         }
-        write!(f, "\n")?;
+        writeln!(f)?;
         self.fmt_with(f, list.last_mut().unwrap(), opt, true)?;
         Ok(())
     }
@@ -160,7 +161,7 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
     fn fmt_all(&mut self, f: &mut W, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
         for mut root in forest {
             self.fmt(f, &mut root)?;
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         Ok(())
     }

@@ -49,7 +49,7 @@ struct MyRaw(*const str);
 unsafe impl Send for MyRaw {}
 impl MyRaw {
     fn new(s: &str) -> Self {
-        MyRaw(s.as_ref() as *const str)
+        MyRaw(s as *const str)
     }
     unsafe fn get(&self) -> &'static str {
         &*self.0
@@ -107,7 +107,7 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     }
 
     let ans = ans.unwrap();
-    if multifuzz_vec.len() == 0 {
+    if multifuzz_vec.is_empty() {
         log::info!("模糊搜到一個東西 {:?}", ans.fuzz_key());
         Ok(Some(FuzzResult::new_single(ans, best_score)))
     } else {

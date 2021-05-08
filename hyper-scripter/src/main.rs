@@ -23,12 +23,12 @@ async fn main() {
     for err in errs.iter() {
         eprint!("{}", err);
     }
-    if errs.len() > 0 {
+    if !errs.is_empty() {
         std::process::exit(1);
     }
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
-    let args: Vec<_> = std::env::args().map(|s| s).collect();
+    let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(&args)?;
     if root.dump_args {
         let dumped = serde_json::to_string(&root)?;
@@ -67,7 +67,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         util::main_util::prepare_pre_run()?;
     }
 
-    let explicit_filter = root.filter.len() > 0;
+    let explicit_filter = !root.filter.is_empty();
     let historian = repo.historian().clone();
     let mut ret = MainReturn {
         conf: None,
@@ -88,7 +88,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             before: Some(before),
             after,
         } => {
-            if after.len() > 0 {
+            if !after.is_empty() {
                 log::info!("設定別名 {} {:?}", before, after);
                 ret.conf = Some(conf.clone());
                 let conf = ret.conf.as_mut().unwrap();
@@ -98,7 +98,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 let after = conf
                     .alias
                     .get(&before)
-                    .ok_or(Error::NoAlias(before.clone()))?
+                    .ok_or_else(|| Error::NoAlias(before.clone()))?
                     .after
                     .join(" ");
                 println!("{}=\"{}\"", before, after);
@@ -363,7 +363,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 for t in repo.iter_known_tags() {
                     print!("{} ", t);
                 }
-                println!("");
+                println!();
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
                     let content = &filter.content;
@@ -371,14 +371,14 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     if content.mandatory {
                         print!(" (mandatory)")
                     }
-                    println!("")
+                    println!()
                 }
                 println!("main tag filter:");
                 print!("  [{}]", conf.main_tag_filter);
                 if conf.main_tag_filter.mandatory {
                     print!(" (mandatory)")
                 }
-                println!("");
+                println!();
             }
         }
         Subs::History {
@@ -409,10 +409,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     }
                     print!("{}", util::to_display_args(arg)?);
                 }
-                println!("");
+                println!();
             }
         }
-        sub @ _ => unimplemented!("{:?}", sub),
+        sub => unimplemented!("{:?}", sub),
     }
     Ok(ret)
 }

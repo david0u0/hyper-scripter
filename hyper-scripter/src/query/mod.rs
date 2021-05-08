@@ -45,7 +45,7 @@ pub enum ListQuery {
 impl FromStr for ListQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
-        if s.find("*").is_some() {
+        if s.contains('*') {
             // TODO: 好好檢查
             let s = s.replace(".", r"\.");
             let s = s.replace("*", ".*");
@@ -126,7 +126,7 @@ fn parse_prev(s: &str) -> Result<usize> {
 impl FromStr for ScriptQuery {
     type Err = Error;
     fn from_str(mut s: &str) -> Result<Self> {
-        let bang = if s.ends_with("!") {
+        let bang = if s.ends_with('!') {
             if s == "!" {
                 return Ok(ScriptQuery {
                     inner: ScriptQueryInner::Prev(1),
@@ -163,25 +163,25 @@ pub struct FilterQuery {
 impl FromStr for FilterQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
-        let arr: Vec<&str> = s.split("=").collect();
+        let arr: Vec<&str> = s.split('=').collect();
         match AsRef::<[&str]>::as_ref(&arr) {
-            &[s] => {
+            [s] => {
                 log::trace!("解析無名篩選器：{}", s);
                 Ok(FilterQuery {
                     name: None,
                     content: s.parse()?,
                 })
             }
-            &[name, s] => {
+            [name, s] => {
                 log::trace!("解析有名篩選器：{} = {}", name, s);
-                let content: TagFilter = if s.len() == 0 {
+                let content: TagFilter = if s.is_empty() {
                     Default::default()
                 } else {
                     s.parse()?
                 };
                 Ok(FilterQuery {
                     // TODO: 檢查名字
-                    name: Some(name.to_owned()),
+                    name: Some(name.to_string()),
                     content,
                 })
             }

@@ -12,7 +12,7 @@ lazy_static::lazy_static! {
 #[cfg(not(debug_assertions))]
 const EXE: &'static str = "../target/release/hs";
 #[cfg(debug_assertions)]
-const EXE: &'static str = "../target/debug/hs";
+const EXE: &str = "../target/debug/hs";
 
 pub fn get_exe_abs() -> String {
     canonicalize(EXE)
@@ -82,9 +82,9 @@ pub fn run<T: ToString>(args: T) -> Result<String, ExitStatus> {
 pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitStatus> {
     let mut full_args = vec!["-H", home];
     let args = args.to_string();
-    let args_vec: Vec<&str> = if args.find("|").is_some() {
+    let args_vec: Vec<&str> = if args.find('|').is_some() {
         let (first, second) = args.split_once("|").unwrap();
-        let mut v: Vec<_> = first.split(" ").filter(|s| s.len() > 0).collect();
+        let mut v: Vec<_> = first.split(' ').filter(|s| !s.is_empty()).collect();
         v.push(second.trim());
         v
     } else {
@@ -128,9 +128,9 @@ fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
     ))
     .unwrap();
     ls_res
-        .split(" ")
+        .split(' ')
         .filter_map(|s| {
-            if s.len() > 0 {
+            if !s.is_empty() {
                 Some(s.to_owned())
             } else {
                 None
@@ -143,7 +143,7 @@ pub fn assert_ls_len(expect: usize, filter: Option<&str>, query: Option<&str>) {
     assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", filter, res);
 }
 pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str>) {
-    expect.sort();
+    expect.sort_unstable();
     let mut res = get_ls(filter, query);
     res.sort();
     assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);

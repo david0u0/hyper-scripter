@@ -10,6 +10,7 @@ use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
 
 pub mod helper;
+pub use helper::RepoEntry;
 use helper::*;
 
 #[derive(Clone, Debug)]
@@ -18,25 +19,19 @@ pub struct DBEnv {
     historian: Historian,
 }
 
-pub type ScriptRepoEntry<'b> = RepoEntry<'b>;
-
-pub struct ScriptRepoEntryOptional<'b> {
+pub struct RepoEntryOptional<'b> {
     entry: Entry<'b, String, ScriptInfo>,
     env: &'b DBEnv,
 }
-impl<'b> ScriptRepoEntryOptional<'b> {
-    pub fn into_either(self) -> Either<ScriptRepoEntry<'b>, Self> {
+impl<'b> RepoEntryOptional<'b> {
+    pub fn into_either(self) -> Either<RepoEntry<'b>, Self> {
         match self.entry {
             Occupied(entry) => Either::One(RepoEntry::new(entry.into_mut(), self.env)),
             _ => Either::Two(self),
         }
     }
-    pub async fn or_insert(self, info: ScriptInfo) -> Result<ScriptRepoEntry<'b>> {
-        let exist = match &self.entry {
-            Vacant(_) => false,
-            _ => true,
-        };
-
+    pub async fn or_insert(self, info: ScriptInfo) -> Result<RepoEntry<'b>> {
+        let exist = matches!(&self.entry, Occupied(_));
         let info = self.entry.or_insert(info);
         if !exist {
             log::debug!("往資料庫塞新腳本 {:?}", info);
@@ -133,7 +128,7 @@ pub struct ScriptRepo {
 
 impl ScriptRepo {
     pub fn iter_known_tags(&self) -> impl Iterator<Item = &Tag> {
-        self.known_tags.iter().map(|tag| tag)
+        self.known_tags.iter()
     }
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
@@ -189,8 +184,8 @@ impl ScriptRepo {
                 script.id,
                 script_name,
                 script.category.into(),
-                script.tags.split(",").filter_map(|s| {
-                    if s == "" {
+                script.tags.split(',').filter_map(|s| {
+                    if s.is_empty() {
                         None
                     } else {
                         // TODO: 錯誤處理，至少印個警告
@@ -248,7 +243,7 @@ impl ScriptRepo {
     //         None
     //     }
     // }
-    pub fn latest_mut(&mut self, n: usize, all: bool) -> Option<ScriptRepoEntry<'_>> {
+    pub fn latest_mut(&mut self, n: usize, all: bool) -> Option<RepoEntry<'_>> {
         // if let Some(name) = &self.latest_name {
         //     // FIXME: 一旦 rust nll 進化就修掉這段
         //     if self.map.contains_key(name) {
@@ -275,7 +270,7 @@ impl ScriptRepo {
             None
         }
     }
-    pub fn get_mut(&mut self, name: &ScriptName, all: bool) -> Option<ScriptRepoEntry<'_>> {
+    pub fn get_mut(&mut self, name: &ScriptName, all: bool) -> Option<RepoEntry<'_>> {
         // FIXME: 一旦 NLL 進化就修掉這個 unsafe
         let map = &mut self.map as *mut HashMap<String, ScriptInfo>;
         let map = unsafe { &mut *map };
@@ -285,11 +280,11 @@ impl ScriptRepo {
             (_, Some(info)) => Some(RepoEntry::new(info, &self.db_env)),
         }
     }
-    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<ScriptRepoEntry<'_>> {
-        match self.hidden_map.get_mut(&*name.key()) {
-            None => None,
-            Some(info) => Some(RepoEntry::new(info, &self.db_env)),
-        }
+    pub fn get_hidden_mut(&mut self, name: &ScriptName) -> Option<RepoEntry<'_>> {
+        let db_env = &self.db_env;
+        self.hidden_map
+            .get_mut(&*name.key())
+            .map(|info| RepoEntry::new(info, db_env))
     }
     pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {
@@ -300,10 +295,10 @@ impl ScriptRepo {
         }
         Ok(())
     }
-    pub fn entry(&mut self, name: &ScriptName) -> ScriptRepoEntryOptional<'_> {
+    pub fn entry(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
         // TODO: 決定要插 hidden 與否
         let entry = self.map.entry(name.key().into_owned());
-        ScriptRepoEntryOptional {
+        RepoEntryOptional {
             entry,
             env: &self.db_env,
         }
@@ -331,13 +326,14 @@ fn extract_from_time(cur_id: i64, series: &mut &[(i64, NaiveDateTime)]) -> Optio
     loop {
         match series.first() {
             Some((id, time)) => {
-                if *id == cur_id {
-                    *series = &series[1..series.len()];
-                    return Some(*time);
-                } else if *id < cur_id {
-                    *series = &series[1..series.len()];
-                } else {
-                    return None;
+                use std::cmp::Ordering;
+                match id.cmp(&cur_id) {
+                    Ordering::Equal => {
+                        *series = &series[1..series.len()];
+                        return Some(*time);
+                    }
+                    Ordering::Less => *series = &series[1..series.len()],
+                    Ordering::Greater => return None,
                 }
             }
             None => {

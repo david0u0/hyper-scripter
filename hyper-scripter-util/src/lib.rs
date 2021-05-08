@@ -12,7 +12,7 @@ mod get_all_utils {
 
 pub fn get_all() -> Vec<Util> {
     get_all_utils::get_all()
-        .into_iter()
+        .iter()
         .map(|u| Util {
             is_hidden: u.is_hidden,
             name: u.name,

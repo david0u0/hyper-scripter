@@ -2,7 +2,7 @@ use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::path;
 use crate::query::{self, EditQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
-use crate::script_repo::{ScriptRepo, ScriptRepoEntry};
+use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagFilter};
 use chrono::Utc;
@@ -17,8 +17,8 @@ pub struct EditTagArgs {
     pub explicit_filter: bool,
 }
 
-pub async fn mv<'b>(
-    entry: &mut ScriptRepoEntry<'b>,
+pub async fn mv(
+    entry: &mut RepoEntry<'_>,
     new_name: Option<ScriptName>,
     ty: Option<ScriptType>,
     tags: Option<TagFilter>,
@@ -62,12 +62,12 @@ pub async fn mv<'b>(
         .await
 }
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
-pub async fn edit_or_create<'b>(
+pub async fn edit_or_create(
     edit_query: EditQuery,
-    script_repo: &'b mut ScriptRepo,
+    script_repo: &'_ mut ScriptRepo,
     ty: Option<ScriptType>,
     tags: EditTagArgs,
-) -> Result<(PathBuf, ScriptRepoEntry<'b>)> {
+) -> Result<(PathBuf, RepoEntry<'_>)> {
     let final_ty: ScriptType;
     let mut new_namespaces: Vec<Tag> = vec![];
 
@@ -105,7 +105,7 @@ pub async fn edit_or_create<'b>(
             Err(Error::DontFuzz) => new_named!(),
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {
-                if let Some(_) = ty {
+                if ty.is_some() {
                     return Err(RedundantOpt::Category.into());
                 }
                 if tags.explicit_tag {
@@ -150,7 +150,7 @@ pub async fn edit_or_create<'b>(
 pub async fn run_n_times(
     repeat: u64,
     dummy: bool,
-    entry: &mut ScriptRepoEntry<'_>,
+    entry: &mut RepoEntry<'_>,
     mut args: &[String],
     historian: Historian,
     res: &mut Vec<Error>,
@@ -160,7 +160,7 @@ pub async fn run_n_times(
 
     let previous_arg_vec: Vec<String>;
     if previous_args {
-        if args.len() > 0 {
+        if !args.is_empty() {
             return Err(RedundantOpt::CommandArgs.into());
         }
         match historian.last_args(entry.id).await? {

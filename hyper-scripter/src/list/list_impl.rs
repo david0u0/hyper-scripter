@@ -9,7 +9,7 @@ use crate::tag::Tag;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::io::Write;
 
 fn ident_string(style: &DisplayIdentStyle, script: &ScriptInfo) -> Result<String> {
@@ -20,18 +20,11 @@ fn ident_string(style: &DisplayIdentStyle, script: &ScriptInfo) -> Result<String
     })
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Hash)]
 struct TagsKey(Vec<Tag>);
-impl Hash for TagsKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for tag in self.0.iter() {
-            tag.as_ref().hash(state);
-        }
-    }
-}
 impl std::fmt::Display for TagsKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0.len() == 0 {
+        if self.0.is_empty() {
             write!(f, "(no tag)")?;
             return Ok(());
         }
@@ -57,14 +50,14 @@ impl TagsKey {
     fn partial_cmp(&self, other: &TagsKey) -> Option<std::cmp::Ordering> {
         let mut self_slice: &[_] = &self.0;
         let mut other_slice: &[_] = &other.0;
-        while self_slice.len() > 0 && other_slice.len() > 0 {
+        while !self_slice.is_empty() && !other_slice.is_empty() {
             let (t1, t2) = (&self_slice[0], &other_slice[0]);
             let cmp = t1.partial_cmp(t2);
             if cmp != Some(std::cmp::Ordering::Equal) {
                 return cmp;
             }
-            self_slice = &self_slice[1..self_slice.len()];
-            other_slice = &other_slice[1..other_slice.len()];
+            self_slice = &self_slice[1..];
+            other_slice = &other_slice[1..];
         }
         self.0.len().partial_cmp(&other.0.len())
     }
@@ -138,10 +131,10 @@ const TITLE: &[&str] = &[
     "last execute time",
     "help message",
 ];
-pub async fn fmt_list<'a, W: Write>(
+pub async fn fmt_list<W: Write>(
     w: &mut W,
-    script_repo: &mut ScriptRepo,
-    opt: &ListOptions<'a>,
+    script_repo: &'_ mut ScriptRepo,
+    opt: &ListOptions<'_>,
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
@@ -174,7 +167,7 @@ pub async fn fmt_list<'a, W: Write>(
         Grouping::Tag => {
             let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
             for script in scripts_iter {
-                let key = TagsKey::new(script.tags.iter().map(|t| t.clone()));
+                let key = TagsKey::new(script.tags.iter().cloned());
                 let v = script_map.entry(key).or_default();
                 v.push(script);
             }
@@ -192,7 +185,7 @@ pub async fn fmt_list<'a, W: Write>(
                             ]));
                         }
                         DisplayStyle::Short(_, w) => {
-                            write!(w, "{}\n", tags_txt)?;
+                            writeln!(w, "{}", tags_txt)?;
                         }
                     }
                 }
@@ -211,7 +204,7 @@ fn fmt_group<W: Write>(
     latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    scripts.sort_by(|s1, s2| s2.last_time().cmp(&s1.last_time()));
+    scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
     let mut scripts = scripts.iter();
     if let Some(script) = scripts.next() {
         let is_latest = script.id == latest_script_id;
@@ -225,7 +218,7 @@ fn fmt_group<W: Write>(
         fmt_meta(script, is_latest, opt)?;
     }
     if let DisplayStyle::Short(_, w) = &mut opt.display_style {
-        write!(w, "\n")?;
+        writeln!(w)?;
     }
     Ok(())
 }

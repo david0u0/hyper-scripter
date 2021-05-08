@@ -282,7 +282,7 @@ pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
         }
     }
     clap.clone().print_help()?;
-    println!("");
+    println!();
     std::process::exit(0);
 }
 
@@ -325,7 +325,7 @@ impl Root {
                     previous_args: false,
                     repeat: 1,
                     script_query: args[0].parse()?,
-                    args: args[1..args.len()].iter().map(|s| s.clone()).collect(),
+                    args: args[1..args.len()].to_vec(),
                 };
                 log::info!("執行模式 {:?}", run);
                 self.subcmd = Some(run);

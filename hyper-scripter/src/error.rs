@@ -55,9 +55,8 @@ impl Error {
     }
     pub fn context<T: ToString>(mut self, s: T) -> Self {
         log::debug!("附註：{:?} + {}", self, s.to_string());
-        match &mut self {
-            Error::Others(msg, ..) => msg.push(s.to_string()),
-            _ => (),
+        if let Error::Others(msg, ..) = &mut self {
+            msg.push(s.to_string());
         }
         self
     }

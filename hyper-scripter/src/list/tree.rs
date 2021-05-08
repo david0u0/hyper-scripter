@@ -33,7 +33,7 @@ struct LongFormatter {
 }
 struct TrimmedScriptInfo<'b>(Cow<'b, str>, &'b ScriptInfo);
 
-fn ident_string<'b>(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'b>) -> Result<String> {
+fn ident_string(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'_>) -> Result<String> {
     let TrimmedScriptInfo(name, script) = t;
     Ok(match style {
         DisplayIdentStyle::Normal => format!("{}({})", name, script.ty),
@@ -115,13 +115,13 @@ fn build_forest(scripts: Vec<&ScriptInfo>) -> Vec<TreeNode<'_>> {
                 continue;
             }
         };
-        let mut path: Vec<_> = name_key.split("/").collect();
+        let mut path: Vec<_> = name_key.split('/').collect();
         let name = Cow::Borrowed(path.pop().unwrap());
         let leaf = TreeNode::new_leaf(TrimmedScriptInfo(name, script));
         TreeNode::insert_to_map(&mut m, &path, leaf);
     }
     let mut forest: Vec<_> = m.into_iter().map(|(_, t)| t).collect();
-    forest.sort_by(|a, b| a.cmp(b));
+    forest.sort_by(|a, b| a.simple_cmp(b));
     forest
 }
 
@@ -142,7 +142,7 @@ pub fn fmt<W: Write>(
                 table: right_table,
             };
             let mut left = Vec::<u8>::new();
-            writeln!(left, "")?;
+            writeln!(left)?;
             fmter.fmt_all(&mut left, forest.into_iter())?;
             let left = std::str::from_utf8(&left)?;
             table.add_row(row![left, fmter.table.to_string()]);

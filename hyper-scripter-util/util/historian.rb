@@ -70,7 +70,7 @@ if sourcing
   File.open(ENV['HS_SOURCE'], 'w') do |file|
     case ENV['SHELL'].split('/').last
     when 'fish'
-      file.write("commandline \"#{HS_ENV.exe} #{cmd}\"")
+      file.write("commandline \"#{ENV['HS_CMD']} #{cmd}\"")
     else
       warn "#{ENV['SHELL']} not supported"
     end

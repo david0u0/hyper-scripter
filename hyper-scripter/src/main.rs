@@ -139,7 +139,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             // TODO: 這裡邏輯太複雜了，抽出來測試吧
             let edit_tags = {
                 // TODO: 不要這麼愛 clone
-                // TODO: 真的需要考慮到 root.filter 嗎？
                 let mut innate_tags = conf.main_tag_filter.clone();
                 if let Some(tags) = tags {
                     let append_namespace = tags.append;

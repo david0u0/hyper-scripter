@@ -1,4 +1,5 @@
 use crate::error::{Error, FormatCode::Tag as TagCode};
+use fxhash::FxHashSet as HashSet;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result as FmtResult};
@@ -174,18 +175,31 @@ impl TagFilter {
             *self = flow
         }
     }
-    pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
-        self.tags.into_iter().filter_map(|f| {
-            // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣
-            if f.allow && !f.tag.match_all() {
-                Some(f.tag)
+    pub fn fill_allowed_map<U>(self, set: &mut std::collections::HashSet<Tag, U>)
+    where
+        U: std::hash::BuildHasher,
+    {
+        for control in self.tags.into_iter() {
+            if control.allow {
+                // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣
+                if control.tag.match_all() {
+                    continue;
+                }
+                set.insert(control.tag);
             } else {
-                None
+                if control.tag.match_all() {
+                    set.clear();
+                    continue;
+                }
+                set.remove(&control.tag);
             }
-        })
+        }
     }
-}
-impl TagFilter {
+    pub fn into_allowed_iter(self) -> impl Iterator<Item = Tag> {
+        let mut set = HashSet::default();
+        self.fill_allowed_map(&mut set);
+        set.into_iter()
+    }
     pub fn filter(&self, tags: &[&Tag]) -> Option<bool> {
         let mut pass: Option<bool> = None;
         for filter in self.tags.iter() {

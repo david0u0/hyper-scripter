@@ -51,7 +51,7 @@ pub async fn mv(
                 // TODO: delete tag
                 if tags.append {
                     log::debug!("附加上標籤：{:?}", tags);
-                    info.tags.extend(tags.into_allowed_iter());
+                    tags.fill_allowed_map(&mut info.tags);
                 } else {
                     log::debug!("設定標籤：{:?}", tags);
                     info.tags = tags.into_allowed_iter().collect();

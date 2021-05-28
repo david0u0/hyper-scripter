@@ -1,3 +1,8 @@
+require 'io/console'
+
+RED = "\033[0;31m".freeze
+NC = "\033[0m".freeze
+
 class HSEnv
   def initialize(script_dir)
     find_hs_env(script_dir)
@@ -61,12 +66,14 @@ class Selector
   # @param offset [Integer, #read] the first visual number of the candidates
   def initialize(lines, offset = 1)
     load(lines)
+    @search_string = ''
     @offset = offset
     @callbacks = {}
   end
 
   def run
     pos = 0
+    search_mode = false
     loop do
       lines_count = @lines.length
       raise Empty if lines_count == 0
@@ -75,41 +82,63 @@ class Selector
       @lines.each_with_index do |line, i|
         cur_display_pos = @offset + i
         leading = pos == i ? '>' : ' '
+        line = line.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
         $stderr.print "#{leading} #{cur_display_pos}. #{line}\n"
       end
+      $stderr.print "/#{@search_string}" if search_mode
 
       resp = ' '
-      begin
-        system('stty raw -echo')
-        resp = $stdin.getc
-      ensure
-        system('stty -raw echo')
-      end
+      resp = STDIN.getch
+      exit if resp == "\u0003" # Ctrl-C
 
-      $stdout.flush
-
-      case resp
-      when 'q', 'Q'
-        raise Quit
-      when 'j', 'J'
-        pos = (pos + 1) % lines_count
-      when 'k', 'K'
-        pos = (pos - 1 + lines_count) % lines_count
-      when "\r"
-        return self.class.make_result(display_pos, @lines[pos])
-      else
-        @callbacks.each do |key, callback|
-          next unless key == resp
-
-          should_break = callback.cb.call(display_pos, @lines[pos])
-          return self.class.make_result(display_pos, @lines[pos]) if should_break == true
-
-          break
+      if search_mode
+        case resp
+        when "\b", "\c?"
+          if @search_string.length == 0
+            search_mode = false
+          else
+            @search_string = @search_string[0..-2]
+          end
+        when "\r"
+          search_mode = false
+        else
+          @search_string += resp
+          new_pos = search_index(pos)
+          pos = new_pos unless new_pos.nil?
         end
+      else
+        case resp
+        when 'q', 'Q'
+          raise Quit
+        when 'j', 'J'
+          pos = (pos + 1) % lines_count
+        when 'k', 'K'
+          pos = (pos - 1 + lines_count) % lines_count
+        when 'n'
+          new_pos = search_index(pos + 1)
+          pos = new_pos unless new_pos.nil?
+        when 'N'
+          new_pos = search_index(pos - 1, true)
+          pos = new_pos unless new_pos.nil?
+        when "\r"
+          return self.class.make_result(display_pos, @lines[pos])
+        when '/'
+          search_mode = true
+          @search_string = ''
+        else
+          @callbacks.each do |key, callback|
+            next unless key == resp
 
-        # for lines count change
-        new_lines_count = @lines.length
-        pos = new_lines_count - 1 if pos >= new_lines_count
+            should_break = callback.cb.call(display_pos, @lines[pos])
+            return self.class.make_result(display_pos, @lines[pos]) if should_break == true
+
+            break
+          end
+
+          # for lines count change
+          new_lines_count = @lines.length
+          pos = new_lines_count - 1 if pos >= new_lines_count
+        end
       end
 
       lines_count.times do
@@ -127,5 +156,20 @@ class Selector
   def self.make_callback(cb, content)
     ret = Struct.new(:cb, :content)
     ret.new(cb, content)
+  end
+
+  private
+
+  def search_index(pos, reverse = false)
+    len = @lines.length
+    (0..len).each do |i|
+      i = if reverse
+            (len + pos - i) % len
+          else
+            (i + pos) % len
+          end
+      return i if @lines[i].include?(@search_string)
+    end
+    nil
   end
 end

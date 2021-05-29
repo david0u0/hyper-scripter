@@ -57,6 +57,11 @@ selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
   true
 })
+selector.register_keys(%w[r R], lambda { |pos, _|
+  sourcing = true
+  HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
+  true
+}, 'replce the argument')
 args = begin
   selector.run.content
 rescue Selector::Empty

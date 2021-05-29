@@ -47,7 +47,7 @@ fn sample_name(rng: &mut StdRng, name: &str) -> String {
 }
 
 #[criterion]
-fn becnch_fuzz(c: &mut Criterion) {
+fn bench_fuzz(c: &mut Criterion) {
     let _ = env_logger::try_init();
 
     struct MyStr<'a>(&'a str);
@@ -70,7 +70,7 @@ fn becnch_fuzz(c: &mut Criterion) {
     }
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    c.bench_function("fuzzy", |b| {
+    c.bench_function("fuzzy_func", |b| {
         b.iter(|| {
             rt.block_on(async {
                 for short in shorts.iter() {

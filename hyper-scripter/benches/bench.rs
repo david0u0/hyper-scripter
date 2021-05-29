@@ -1,7 +1,7 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(criterion::runner)]
 
-use criterion::{black_box, Criterion};
+use criterion::{black_box, Bencher, Criterion};
 use criterion_macro::criterion;
 use hyper_scripter::fuzzy::*;
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
@@ -99,7 +99,11 @@ impl TestDate {
         let _ = setup();
         for (name, tag_arr) in self.data.iter() {
             let tag_str = gen_tag_string(tag_arr);
-            run(format!("e -t {} {} | echo $NAME", tag_str, name)).unwrap();
+            run(format!(
+                "e --no-template -t {} {} | echo $NAME",
+                tag_str, name
+            ))
+            .unwrap();
         }
     }
 }
@@ -134,100 +138,66 @@ fn gen_tag_filter_string(rng: &mut StdRng, mut a: [i8; 3]) -> String {
     }
     gen_tag_string(&a)
 }
+fn run_bench<F>(b: &mut Bencher, case_count: usize, epoch: usize, mut gen_arg: F)
+where
+    F: FnMut(&mut StdRng, &str, &[i8; 3]) -> String,
+{
+    // {case_count} scripts, with random tags from [tag1, tag2, tag3] (2^3 posible combinations)
+    let mut rng = StdRng::seed_from_u64(42);
+    let data = TestDate::new(case_count, &mut rng);
+    let period = epoch / 40;
+    let args: Vec<_> = (0..epoch)
+        .into_iter()
+        .map(|i| {
+            if i % period == 0 {
+                let tag_num = (i / period) % 3;
+                return format!("tags +tag{}", tag_num);
+            }
+            let i = rng.gen_range(0..case_count);
+            let data = &data.data[i];
+            gen_arg(&mut rng, &data.0, &data.1)
+        })
+        .collect();
 
-const CASES: usize = 200;
-const ITER_COUNT: usize = 400;
+    b.iter_with_setup(
+        || data.setup(),
+        |_| {
+            for arg in args.iter() {
+                let _ = run(arg);
+            }
+        },
+    );
+}
+
 #[criterion]
 fn bench_massive_fuzzy(c: &mut Criterion) {
-    // 200 scripts, with random tags from [tag1, tag2, tag3] (2^3 posible combinations)
-    // run with random tag, with random (80% right, 20% wrong) fuzzy name
-    let mut rng = StdRng::seed_from_u64(42);
-    let data = TestDate::new(CASES, &mut rng);
-    let args: Vec<_> = (0..ITER_COUNT)
-        .into_iter()
-        .map(|i| {
-            if i % 10 == 0 {
-                let tag_num = (i / 10) % 3;
-                return format!("tags +tag{}", tag_num);
-            }
-            let i = rng.gen_range(0..CASES);
-            let name = sample_name(&mut rng, &data.data[i].0);
-            let filter = gen_tag_filter_string(&mut rng, data.data[i].1.clone());
-            format!("-f +{} {}", filter, name)
-        })
-        .collect();
-
+    // run with random tag, with random fuzzy name
     c.bench_function("massive_fuzzy", |b| {
-        b.iter_with_setup(
-            || data.setup(),
-            |_| {
-                for arg in args.iter() {
-                    let _ = run(arg);
-                }
-            },
-        );
+        run_bench(b, 200, 400, |rng, name, tag_arr| {
+            let name = sample_name(rng, name);
+            let filter = gen_tag_filter_string(rng, tag_arr.clone());
+            format!("-f +{} {}", filter, name)
+        });
     });
 }
-
 #[criterion]
 fn bench_massive_exact(c: &mut Criterion) {
-    // 200 scripts, with random tags from [tag1, tag2, tag3] (2^3 posible combinations)
-    // run with random tag, with random (80% right, 20% wrong) exact name
-    let mut rng = StdRng::seed_from_u64(42);
-    let data = TestDate::new(CASES, &mut rng);
-    let args: Vec<_> = (0..ITER_COUNT)
-        .into_iter()
-        .map(|i| {
-            if i % 10 == 0 {
-                let tag_num = (i / 10) % 3;
-                return format!("tags +tag{}", tag_num);
-            }
-            let i = rng.gen_range(0..CASES);
-            let name = &data.data[i].0;
-            let filter = gen_tag_filter_string(&mut rng, data.data[i].1.clone());
-            format!("-f +{} ={}", filter, name)
-        })
-        .collect();
-
+    // run with random tag, with random exact name
     c.bench_function("massive_exact", |b| {
-        b.iter_with_setup(
-            || data.setup(),
-            |_| {
-                for arg in args.iter() {
-                    let _ = run(arg);
-                }
-            },
-        );
+        run_bench(b, 200, 400, |rng, name, tag_arr| {
+            let filter = gen_tag_filter_string(rng, tag_arr.clone());
+            format!("-f +{} ={}", filter, name)
+        });
     });
 }
-
 #[criterion]
 fn bench_massive_prev(c: &mut Criterion) {
-    // 200 scripts, with random tags from [tag1, tag2, tag3] (2^3 posible combinations)
-    // run with random tag, with random (^1 ~ ^200) previous query
-    let mut rng = StdRng::seed_from_u64(42);
-    let data = TestDate::new(CASES, &mut rng);
-    let args: Vec<_> = (0..ITER_COUNT)
-        .into_iter()
-        .map(|i| {
-            if i % 10 == 0 {
-                let tag_num = (i / 10) % 3;
-                return format!("tags +tag{}", tag_num);
-            }
-            let tag_str = gen_tag_string(&gen_tag_arr(&mut rng, -1, 1));
-            let prev = rng.gen_range(1..=CASES);
-            format!("-f +{} ^{}", tag_str, prev)
-        })
-        .collect();
-
+    // run with random tag, with random exact name
     c.bench_function("massive_prev", |b| {
-        b.iter_with_setup(
-            || data.setup(),
-            |_| {
-                for arg in args.iter() {
-                    let _ = run(arg);
-                }
-            },
-        );
+        run_bench(b, 200, 400, |rng, _, _| {
+            let filter = gen_tag_string(&gen_tag_arr(rng, -1, 1));
+            let prev = rng.gen_range(1..=200);
+            format!("-f +{} ^{}", filter, prev)
+        });
     });
 }

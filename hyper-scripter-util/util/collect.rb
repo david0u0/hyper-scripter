@@ -5,7 +5,6 @@
 # [HS_HELP]:     hs collect
 
 require_relative './common'
-require 'shellwords'
 
 def directory_tree(path)
   files = []

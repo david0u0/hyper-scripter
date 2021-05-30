@@ -5,6 +5,7 @@
 
 require 'json'
 require_relative './common'
+
 HISTORIAN = ENV['NAME']
 ARGS = ARGV.join(' ')
 
@@ -70,12 +71,13 @@ rescue Selector::Quit
   exit
 end
 
-cmd = "=#{script_name}! #{args}"
+cmd = "=#{script_name}! #{args}" # known issue: \n \t \" will not be handled properly
 if sourcing
   File.open(ENV['HS_SOURCE'], 'w') do |file|
     case ENV['SHELL'].split('/').last
     when 'fish'
-      file.write("commandline \"#{ENV['HS_CMD']} #{cmd}\"")
+      cmd = "#{ENV['HS_CMD']} #{cmd}"
+      file.write("commandline #{cmd.inspect}")
     else
       warn "#{ENV['SHELL']} not supported"
     end

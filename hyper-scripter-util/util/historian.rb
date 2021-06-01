@@ -39,9 +39,6 @@ exit 1 unless $?.success?
 
 warn "Historian for #{script_name}"
 
-lines = []
-lines_count = 0
-
 load_history = lambda do
   history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
   exit 1 unless $?.success?

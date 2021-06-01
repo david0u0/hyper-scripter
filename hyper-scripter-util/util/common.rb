@@ -52,8 +52,8 @@ class Selector
   class Quit < StandardError
   end
 
-  def load(lines)
-    @lines = lines
+  def load(options)
+    @options = options
   end
 
   # Handle customized keys
@@ -64,8 +64,8 @@ class Selector
 
   # Initiate the selector
   # @param offset [Integer, #read] the first visual number of the candidates
-  def initialize(lines, offset = 1)
-    load(lines)
+  def initialize(options, offset = 1)
+    load(options)
     @search_string = ''
     @offset = offset
     @callbacks = {}
@@ -75,15 +75,19 @@ class Selector
     pos = 0
     search_mode = false
     loop do
-      lines_count = @lines.length
-      raise Empty if lines_count == 0
+      win_width = IO.console.winsize[1]
+      option_count = @options.length
+      line_count = 0
+      raise Empty if option_count == 0
 
       display_pos = @offset + pos
-      @lines.each_with_index do |line, i|
+      @options.each_with_index do |option, i|
         cur_display_pos = @offset + i
         leading = pos == i ? '>' : ' '
-        line = line.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
-        $stderr.print "#{leading} #{cur_display_pos}. #{line}\n"
+        gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}\n" }
+        line_count += gen_line.call(option).length / win_width # calculate line height without color, since colr will mess up char count
+        option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
+        $stderr.print gen_line.call(option)
       end
       $stderr.print "/#{@search_string}" if search_mode
 
@@ -111,9 +115,9 @@ class Selector
         when 'q', 'Q'
           raise Quit
         when 'j', 'J'
-          pos = (pos + 1) % lines_count
+          pos = (pos + 1) % option_count
         when 'k', 'K'
-          pos = (pos - 1 + lines_count) % lines_count
+          pos = (pos - 1 + option_count) % option_count
         when 'n'
           new_pos = search_index(pos + 1)
           pos = new_pos unless new_pos.nil?
@@ -121,7 +125,7 @@ class Selector
           new_pos = search_index(pos - 1, true)
           pos = new_pos unless new_pos.nil?
         when "\r"
-          return self.class.make_result(display_pos, @lines[pos])
+          return self.class.make_result(display_pos, @options[pos])
         when '/'
           search_mode = true
           @search_string = ''
@@ -129,19 +133,19 @@ class Selector
           @callbacks.each do |key, callback|
             next unless key == resp
 
-            should_break = callback.cb.call(display_pos, @lines[pos])
-            return self.class.make_result(display_pos, @lines[pos]) if should_break == true
+            should_break = callback.cb.call(display_pos, @options[pos])
+            return self.class.make_result(display_pos, @options[pos]) if should_break == true
 
             break
           end
 
-          # for lines count change
-          new_lines_count = @lines.length
-          pos = new_lines_count - 1 if pos >= new_lines_count
+          # for options count change
+          new_options = @options.length
+          pos = new_options - 1 if pos >= new_options
         end
       end
 
-      lines_count.times do
+      option_count.times do
         $stderr.print "\e[A"
       end
       $stderr.print "\r\e[J"
@@ -161,14 +165,14 @@ class Selector
   private
 
   def search_index(pos, reverse = false)
-    len = @lines.length
+    len = @options.length
     (0..len).each do |i|
       i = if reverse
             (len + pos - i) % len
           else
             (i + pos) % len
           end
-      return i if @lines[i].include?(@search_string)
+      return i if @options[i].include?(@search_string)
     end
     nil
   end

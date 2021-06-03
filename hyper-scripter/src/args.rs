@@ -214,6 +214,10 @@ pub enum History {
         #[structopt(short, long, requires("script"), default_value = "0")]
         offset: u32,
     },
+    Tidy {
+        #[structopt(parse(try_from_str))]
+        queries: Vec<ListQuery>,
+    },
 }
 
 #[derive(StructOpt, Debug, Serialize)]

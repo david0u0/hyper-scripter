@@ -387,6 +387,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             historian.ignore_args(entry.id, number).await?;
         }
         Subs::History {
+            subcmd: History::Tidy { queries },
+        } => {
+            for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
+                historian.tidy(entry.id).await?;
+            }
+        }
+        Subs::History {
             subcmd:
                 History::Show {
                     script,

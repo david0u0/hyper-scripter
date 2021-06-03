@@ -322,4 +322,42 @@ impl Historian {
         }
         Ok(())
     }
+
+    pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {
+        let pool = self.pool.read().unwrap();
+        let exec_ty = EventType::Exec.to_string();
+        // XXX: 笑死這啥鬼
+        sqlx::query!(
+            "
+            DELETE FROM events
+            WHERE script_id = ?
+              AND id NOT IN (
+                SELECT
+                  (
+                    SELECT id FROM events
+                    WHERE script_id = ?
+                      AND args = e.args
+                    ORDER BY time DESC
+                    LIMIT 1
+                  )
+                FROM
+                  (
+                    SELECT distinct args
+                    FROM events
+                    WHERE script_id = ?
+                      AND NOT ignored
+                      AND type = ?
+                  ) e
+              )
+            ",
+            script_id,
+            script_id,
+            script_id,
+            exec_ty,
+        )
+        .execute(&*pool)
+        .await?;
+
+        Ok(())
+    }
 }

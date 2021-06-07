@@ -166,8 +166,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 let stat = util::run_cmd(cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
             }
-            let exist = util::after_script(&path, created)?;
-            if exist {
+            let should_keep = util::after_script(&path, created)?;
+            if should_keep {
                 entry.update(|info| info.write()).await?;
             } else {
                 let name = entry.name.clone();

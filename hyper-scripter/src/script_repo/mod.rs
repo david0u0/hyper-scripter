@@ -56,7 +56,7 @@ impl<'b> RepoEntryOptional<'b> {
                 .await?
                 .id;
             log::debug!("得到新腳本 id {}", id);
-            info.id = id as i64;
+            info.set_id(id as i64);
         }
         Ok(RepoEntry::new(info, self.env))
     }
@@ -65,21 +65,23 @@ impl<'b> RepoEntryOptional<'b> {
 impl DBEnv {
     async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
-        let name_cow = info.name.key();
-        let name = name_cow.as_ref();
-        let tags = join_tags(info.tags.iter());
-        let category = info.ty.as_ref();
-        let write_time = *info.write_time;
-        sqlx::query!(
-            "UPDATE script_infos SET name = ?, tags = ?, category = ?, write_time = ? where id = ?",
-            name,
-            tags,
-            category,
-            write_time,
-            info.id,
-        )
-        .execute(&self.info_pool)
-        .await?;
+        if info.changed {
+            let name = info.name.key();
+            let name = name.as_ref();
+            let tags = join_tags(info.tags.iter());
+            let category = info.ty.as_ref();
+            let write_time = *info.write_time;
+            sqlx::query!(
+                "UPDATE script_infos SET name = ?, tags = ?, category = ?, write_time = ? where id = ?",
+                name,
+                tags,
+                category,
+                write_time,
+                info.id,
+            )
+            .execute(&self.info_pool)
+            .await?;
+        }
 
         let mut last_event_id = 0;
 

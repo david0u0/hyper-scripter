@@ -12,10 +12,11 @@ pub struct Iter<'b> {
 }
 #[derive(Deref, Debug)]
 pub struct RepoEntry<'b> {
+    /// 記錄「上一筆創造出來的事件」的 id
     pub(super) last_event_id: i64,
     #[deref]
     pub(super) info: &'b mut ScriptInfo,
-    pub(super) env: &'b DBEnv,
+    pub(super) env: &'b DBEnv, // XXX: 一旦 async trait 可用了就把這裡變成 trait，不要對實作編程
 }
 
 impl<'b> RepoEntry<'b> {

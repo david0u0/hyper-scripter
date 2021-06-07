@@ -8,6 +8,7 @@ use fxhash::FxHashSet as HashSet;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -124,28 +125,50 @@ impl std::fmt::Display for ScriptName {
 }
 
 #[derive(Debug, Clone)]
-pub struct ScriptInfo {
-    pub read_time: ScriptTime,
-    pub created_time: ScriptTime,
-    pub write_time: ScriptTime,
-    pub exec_time: Option<ScriptTime<(String, String)>>,
-    pub exec_done_time: Option<ScriptTime<i32>>,
+pub struct TimelessScriptInfo {
+    pub changed: bool,
     pub id: i64,
     pub name: ScriptName,
     pub tags: HashSet<Tag>,
     pub ty: ScriptType,
+    pub created_time: ScriptTime,
+}
+#[derive(Debug, Deref, Clone)]
+pub struct ScriptInfo {
+    pub read_time: ScriptTime,
+    pub write_time: ScriptTime,
+    pub exec_time: Option<ScriptTime<(String, String)>>,
+    pub exec_done_time: Option<ScriptTime<i32>>,
+    #[deref]
+    /// 用來區隔「時間資料」和「其它元資料」，並偵測其它元資料的修改
+    timeless_info: TimelessScriptInfo,
+}
+impl DerefMut for ScriptInfo {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.timeless_info.changed = true;
+        &mut self.timeless_info
+    }
 }
 
 impl ScriptInfo {
+    pub fn set_id(&mut self, id: i64) {
+        assert_eq!(self.id, 0, "只有 id=0（代表新腳本）時可以設定 id");
+        self.timeless_info.id = id;
+    }
     pub fn cp(&self, new_name: ScriptName) -> Self {
         let now = ScriptTime::now(());
-        ScriptInfo {
+        let timeless_info = TimelessScriptInfo {
+            id: 0,
             name: new_name,
+            created_time: now.clone(),
+            ..self.timeless_info.clone()
+        };
+        ScriptInfo {
             read_time: now.clone(),
             write_time: now.clone(),
-            created_time: now,
             exec_time: None,
-            ..self.clone()
+            exec_done_time: None,
+            timeless_info,
         }
     }
     pub fn last_time(&self) -> NaiveDateTime {
@@ -260,15 +283,18 @@ impl ScriptBuilder {
         let now = ScriptTime::now(());
         let created_time = ScriptTime::new_or(self.created_time, now);
         ScriptInfo {
-            id: self.id,
-            name: self.name,
-            ty: self.ty,
-            tags: self.tags,
             write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
-            created_time,
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
+            timeless_info: TimelessScriptInfo {
+                changed: false,
+                id: self.id,
+                name: self.name,
+                ty: self.ty,
+                tags: self.tags,
+                created_time,
+            },
         }
     }
 }

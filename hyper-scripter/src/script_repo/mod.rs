@@ -289,6 +289,7 @@ impl ScriptRepo {
     pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
+            self.db_env.historian.remove(info.id).await?;
             sqlx::query!("DELETE from script_infos where id = ?", info.id)
                 .execute(&self.db_env.info_pool)
                 .await?;

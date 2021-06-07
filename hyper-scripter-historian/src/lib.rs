@@ -152,6 +152,17 @@ impl Historian {
         })
     }
 
+    pub async fn remove(&self, script_id: i64) -> Result<(), DBError> {
+        let pool = self.pool.read().unwrap();
+        sqlx::query!("DELETE FROM last_events WHERE script_id = ?", script_id,)
+            .execute(&*pool)
+            .await?;
+        sqlx::query!("DELETE FROM events WHERE script_id = ?", script_id,)
+            .execute(&*pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn record(&self, event: &Event<'_>) -> Result<i64, DBError> {
         log::debug!("記錄事件 {:?}", event);
         let ty = event.data.get_type().to_string();

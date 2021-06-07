@@ -6,7 +6,7 @@
 require 'json'
 require_relative './common'
 
-HISTORIAN = ENV['NAME']
+HISTORIAN = HS_ENV.env_var(:name)
 ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query
@@ -70,10 +70,10 @@ end
 
 cmd = "=#{script_name}! #{args}" # known issue: \n \t \" will not be handled properly
 if sourcing
-  File.open(ENV['HS_SOURCE'], 'w') do |file|
+  File.open(HS_ENV.env_var(:source), 'w') do |file|
     case ENV['SHELL'].split('/').last
     when 'fish'
-      cmd = "#{ENV['HS_CMD']} #{cmd}"
+      cmd = "#{HS_ENV.env_var(:cmd)} #{cmd}"
       file.write("commandline #{cmd.inspect}")
     else
       warn "#{ENV['SHELL']} not supported"

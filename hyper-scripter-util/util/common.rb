@@ -4,6 +4,8 @@ RED = "\033[0;31m".freeze
 NC = "\033[0m".freeze
 
 class HSEnv
+  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE' }.freeze
+
   def initialize(script_dir)
     find_hs_env(script_dir)
     warn "hyper script home = #{@home}, executable = #{@exe}"
@@ -25,6 +27,10 @@ class HSEnv
   def do_hs(arg, all, path = @home)
     cmd = hs_command_str(arg, all, path)
     `#{cmd}`
+  end
+
+  def env_var(var_name)
+    ENV_MAP[var_name]
   end
 
   def exec_hs(arg, all = true, path = @home)

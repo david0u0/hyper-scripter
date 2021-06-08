@@ -12,6 +12,7 @@ mod error_display;
 pub mod extract_help;
 pub mod fuzzy;
 pub mod list;
+pub mod main_inner;
 pub mod migration;
 pub mod path;
 pub mod query;

@@ -3,14 +3,22 @@
 
 use criterion::{black_box, Bencher, Criterion};
 use criterion_macro::criterion;
-use hyper_scripter::fuzzy::*;
+use hyper_scripter::{fuzzy::*, main_inner::main_with_args};
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
 use std::borrow::Cow;
 
 #[allow(dead_code)]
 #[path = "../tests/tool.rs"]
 mod tool;
-use tool::*;
+use tool::{get_home, setup};
+
+fn split_args(s: &str) -> Vec<String> {
+    let home = get_home();
+    std::iter::once("hs-bench")
+        .chain(tool::split_args(s, &home))
+        .map(|s| s.to_string())
+        .collect()
+}
 
 const LONG: usize = 20;
 const SHORT: std::ops::Range<usize> = 5..15;
@@ -95,17 +103,6 @@ impl TestDate {
         }
         TestDate { data }
     }
-    fn setup(&self) {
-        let _ = setup();
-        for (name, tag_arr) in self.data.iter() {
-            let tag_str = gen_tag_string(tag_arr);
-            run(format!(
-                "e --no-template -t {} {} | echo $NAME",
-                tag_str, name
-            ))
-            .unwrap();
-        }
-    }
 }
 fn gen_tag_arr(rng: &mut StdRng, min: i8, max: i8) -> [i8; 3] {
     let mut tags = [0; 3];
@@ -150,21 +147,39 @@ where
     let args: Vec<_> = (0..epoch)
         .into_iter()
         .map(|i| {
-            if i % period == 0 {
+            let s = if i % period == 0 {
                 let tag_num = (i / period) % 3;
-                return format!("tags +tag{}", tag_num);
-            }
-            let i = rng.gen_range(0..case_count);
-            let data = &data.data[i];
-            gen_arg(&mut rng, &data.0, &data.1)
+                format!("tags +tag{}", tag_num)
+            } else {
+                let i = rng.gen_range(0..case_count);
+                let data = &data.data[i];
+                gen_arg(&mut rng, &data.0, &data.1)
+            };
+            split_args(&s)
         })
         .collect();
 
+    let mut setup_rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
     b.iter_with_setup(
-        || data.setup(),
+        || {
+            let _ = setup();
+            for (name, tag_arr) in data.data.iter() {
+                let tag_str = gen_tag_string(tag_arr);
+                let args = split_args(&format!(
+                    "e --no-template -t {} {} | echo $NAME",
+                    tag_str, name
+                ));
+                setup_rt.block_on(async {
+                    let _ = main_with_args(&args).await;
+                });
+            }
+        },
         |_| {
             for arg in args.iter() {
-                let _ = run(arg);
+                rt.block_on(async {
+                    let _ = main_with_args(arg).await;
+                });
             }
         },
     );

@@ -70,13 +70,11 @@ impl DBEnv {
             let name = name.as_ref();
             let tags = join_tags(info.tags.iter());
             let ty = info.ty.as_ref();
-            let write_time = *info.write_time;
             sqlx::query!(
-                "UPDATE script_infos SET name = ?, tags = ?, ty = ?, write_time = ? where id = ?",
+                "UPDATE script_infos SET name = ?, tags = ?, ty = ? where id = ?",
                 name,
                 tags,
                 ty,
-                write_time,
                 info.id,
             )
             .execute(&self.info_pool)
@@ -96,9 +94,20 @@ impl DBEnv {
                 })
                 .await?;
         }
+        if info.write_time.has_changed() {
+            log::debug!("{:?} 的寫入事件", info.name);
+            last_event_id = self
+                .historian
+                .record(&Event {
+                    script_id: info.id,
+                    data: EventData::Write,
+                    time: *info.write_time,
+                })
+                .await?;
+        }
         if let Some(time) = info.exec_time.as_ref() {
-            log::debug!("{:?} 的執行事件", info.name);
             if let Some((content, args)) = time.data() {
+                log::debug!("{:?} 的執行事件", info.name);
                 last_event_id = self
                     .historian
                     .record(&Event {
@@ -171,9 +180,11 @@ impl ScriptRepo {
             .fetch_all(&pool)
             .await?;
         let last_read_records = historian.last_time_of(EventType::Read).await?;
+        let last_write_records = historian.last_time_of(EventType::Write).await?;
         let last_exec_records = historian.last_time_of(EventType::Exec).await?;
         let last_exec_done_records = historian.last_time_of(EventType::ExecDone).await?;
         let mut last_read: &[_] = &last_read_records;
+        let mut last_write: &[_] = &last_write_records;
         let mut last_exec: &[_] = &last_exec_records;
         let mut last_exec_done: &[_] = &last_exec_done_records;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
@@ -199,8 +210,7 @@ impl ScriptRepo {
                     }
                 }),
             )
-            .created_time(script.created_time)
-            .write_time(script.write_time);
+            .created_time(script.created_time);
 
             if let Some(time) = extract_from_time(script.id, &mut last_exec) {
                 builder = builder.exec_time(time);
@@ -215,7 +225,14 @@ impl ScriptRepo {
                     "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
                     builder.name
                 );
-                builder = builder.read_time(script.created_time);
+            }
+            if let Some(time) = extract_from_time(script.id, &mut last_write) {
+                builder = builder.write_time(time);
+            } else {
+                log::warn!(
+                    "找不到 {:?} 的寫入時間，可能是資料庫爛了，改用創建時間",
+                    builder.name
+                );
             }
 
             let script = builder.build();

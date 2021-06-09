@@ -180,6 +180,7 @@ impl ScriptInfo {
         }
         max!(
             *self.read_time,
+            *self.write_time,
             map(&self.exec_time),
             map(&self.exec_done_time)
         )
@@ -201,6 +202,7 @@ impl ScriptInfo {
         self.exec_time = Some(ScriptTime::now((content, args_ser)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
     }
+    // XXX: 這函式現在沒用到，看要拿掉還是怎樣
     pub fn exec_done(&mut self, code: i32) {
         log::trace!("{:?} 執行結果為 {}", self, code);
         self.exec_done_time = Some(ScriptTime::now(code));

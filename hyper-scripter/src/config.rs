@@ -252,7 +252,7 @@ impl Config {
     pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
         self.categories
             .get(ty)
-            .ok_or_else(|| Error::UnknownCategory(ty.to_string()))
+            .ok_or_else(|| Error::UnknownType(ty.to_string()))
     }
     pub fn get_tag_filter_group(&self) -> TagFilterGroup {
         let mut group = TagFilterGroup::default();

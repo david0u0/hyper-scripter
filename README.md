@@ -69,13 +69,13 @@ after = ['ls', '-a']
 after = ['rm', '-f', 'removed', '*']
 
 # ...
-# category and tag filters will be discussed later
+# Type and tag filters will be discussed later
 ```
 
-## Category and templates
-You can add your own script category here. For example, you may want to run ruby scripts with `irb`, rather than simply `ruby`. Here's how you can achieve that:
+## Type and templates
+You can add your own script Type here. For example, you may want to run ruby scripts with `irb`, rather than simply `ruby`. Here's how you can achieve that:
 ```toml
-# Category and templates
+# Type and templates
 [categories.irb]
 ext = 'rb' # file extensions is same as any ruby scripts.
 color = 'bright red' # colors shown in `hs ls` and other places.

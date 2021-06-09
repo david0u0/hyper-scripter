@@ -115,7 +115,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::Edit {
             edit_query,
-            category: ty,
+            ty,
             fast,
             tags,
             content,
@@ -289,7 +289,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             origin,
             new,
             tags,
-            category: ty,
+            ty,
         } => {
             let new_name = match new {
                 Some(name) => {

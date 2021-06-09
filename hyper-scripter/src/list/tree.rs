@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 use std::io::Write;
 
 const TITLE: &[&str] = &[
-    "category",
+    "type",
     "last write time",
     "last execute time",
     "help message",

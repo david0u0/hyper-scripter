@@ -37,15 +37,15 @@ impl<'b> RepoEntryOptional<'b> {
             log::debug!("往資料庫塞新腳本 {:?}", info);
             let name_cow = info.name.key();
             let name = name_cow.as_ref();
-            let category = info.ty.as_ref();
+            let ty = info.ty.as_ref();
             let tags = join_tags(info.tags.iter());
             sqlx::query!(
                 "
-                INSERT INTO script_infos (name, category, tags)
+                INSERT INTO script_infos (name, ty, tags)
                 VALUES(?, ?, ?)
                 ",
                 name,
-                category,
+                ty,
                 tags,
             )
             .execute(&self.env.info_pool)
@@ -69,13 +69,13 @@ impl DBEnv {
             let name = info.name.key();
             let name = name.as_ref();
             let tags = join_tags(info.tags.iter());
-            let category = info.ty.as_ref();
+            let ty = info.ty.as_ref();
             let write_time = *info.write_time;
             sqlx::query!(
-                "UPDATE script_infos SET name = ?, tags = ?, category = ?, write_time = ? where id = ?",
+                "UPDATE script_infos SET name = ?, tags = ?, ty = ?, write_time = ? where id = ?",
                 name,
                 tags,
-                category,
+                ty,
                 write_time,
                 info.id,
             )
@@ -179,13 +179,13 @@ impl ScriptRepo {
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
             let name = script.name;
-            log::trace!("載入腳本：{} {} {}", name, script.category, script.tags);
+            log::trace!("載入腳本：{} {} {}", name, script.ty, script.tags);
             let script_name = name.clone().into_script_name()?;
 
             let mut builder = ScriptInfo::builder(
                 script.id,
                 script_name,
-                script.category.into(),
+                script.ty.into(),
                 script.tags.split(',').filter_map(|s| {
                     if s.is_empty() {
                         None

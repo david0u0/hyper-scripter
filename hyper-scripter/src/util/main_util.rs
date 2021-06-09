@@ -106,7 +106,7 @@ pub async fn edit_or_create(
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {
                 if ty.is_some() {
-                    return Err(RedundantOpt::Category.into());
+                    return Err(RedundantOpt::Type.into());
                 }
                 if tags.explicit_tag {
                     return Err(RedundantOpt::Tag.into());
@@ -223,7 +223,7 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             log::warn!("已存在的小工具 {:?}，跳過", name);
             continue;
         }
-        let ty = u.category.parse()?;
+        let ty = u.ty.parse()?;
         let tags: Vec<Tag> = if u.is_hidden {
             vec!["util".parse().unwrap(), "hide".parse().unwrap()]
         } else {

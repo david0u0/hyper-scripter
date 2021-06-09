@@ -99,11 +99,11 @@ pub enum Subs {
     Edit {
         #[structopt(
             long,
-            short,
+            short = "T",
             parse(try_from_str),
-            help = "Category of the script, e.g. `sh`"
+            help = "Type of the script, e.g. `sh`"
         )]
-        category: Option<ScriptType>,
+        ty: Option<ScriptType>,
         #[structopt(long, short)]
         no_template: bool,
         #[structopt(long, short)]
@@ -174,11 +174,11 @@ pub enum Subs {
     MV {
         #[structopt(
             long,
-            short,
+            short = "T",
             parse(try_from_str),
-            help = "Category of the script, e.g. `sh`"
+            help = "Type of the script, e.g. `sh`"
         )]
-        category: Option<ScriptType>,
+        ty: Option<ScriptType>,
         #[structopt(short, long)]
         tags: Option<TagFilter>,
         #[structopt(parse(try_from_str))]
@@ -338,7 +338,7 @@ impl Root {
                 log::info!("無參數模式");
                 self.subcmd = Some(Subs::Edit {
                     edit_query: EditQuery::default(),
-                    category: None,
+                    ty: None,
                     content: vec![],
                     tags: None,
                     fast: false,
@@ -389,7 +389,7 @@ mod test {
     }
     #[test]
     fn test_strange_alias() {
-        let args = build_args("hs -f e e -t e something -c e");
+        let args = build_args("hs -f e e -t e something -T e");
         let args = handle_args(&args).unwrap();
         assert_eq!(args.filter, vec!["e".parse().unwrap()]);
         assert_eq!(args.all, false);
@@ -397,12 +397,12 @@ mod test {
             Some(Subs::Edit {
                 edit_query,
                 tags,
-                category,
+                ty,
                 ..
             }) => {
                 assert_eq!(edit_query, &"something".parse().unwrap());
                 assert_eq!(tags, &Some("e".parse().unwrap()));
-                assert_eq!(category, &Some("e".parse().unwrap()));
+                assert_eq!(ty, &Some("e".parse().unwrap()));
             }
             _ => {
                 panic!("{:?} should be edit...", args);

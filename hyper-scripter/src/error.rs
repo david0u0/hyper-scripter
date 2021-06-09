@@ -34,7 +34,7 @@ pub enum Error {
     ScriptExist(String),
     ScriptNotFound(String),
     NoAlias(String),
-    UnknownCategory(String),
+    UnknownType(String),
     Format(FormatCode, String),
     ScriptError(i32),
     PreRunError(i32),
@@ -90,7 +90,7 @@ impl<T, E: 'static + Send + Sync + std::error::Error> Contextable<T> for std::re
 #[derive(Debug, Clone)]
 pub enum RedundantOpt {
     CommandArgs,
-    Category,
+    Type,
     Tag,
     Filter,
 }

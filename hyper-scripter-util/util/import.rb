@@ -7,7 +7,7 @@
 require 'getoptlong'
 require 'fileutils'
 require 'shellwords'
-require_relative './common.rb'
+require_relative './common'
 
 def copy_unless_exists(src_dir, dst_dir, target)
   src = "#{src_dir}/#{target}"
@@ -16,10 +16,11 @@ def copy_unless_exists(src_dir, dst_dir, target)
 end
 
 class Script
-  attr_reader :name, :category, :tags
-  def initialize(name, category, tags)
+  attr_reader :name, :ty, :tags
+
+  def initialize(name, ty, tags)
     @name = name
-    @category = category
+    @ty = ty
     tags = ['all'] if tags.length == 0
     @tags = tags
   end
@@ -40,8 +41,8 @@ def parse(ls_string)
       end
       tags.push(s[1..-1])
     else
-      match = /(?<name>[^(]+)\((?<category>.+)\)/.match(s)
-      scripts.push(Script.new(match[:name], match[:category], tags)) unless match.nil?
+      match = /(?<name>[^(]+)\((?<ty>.+)\)/.match(s)
+      scripts.push(Script.new(match[:name], match[:ty], tags)) unless match.nil?
     end
   end
   ret.concat(scripts)
@@ -69,7 +70,7 @@ def import_dir(dir, namespace)
       content = Shellwords.escape(content)
 
       tags_str = script.tags.join(',')
-      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -c #{script.category} --no-template --fast #{content}", false)
+      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -T #{script.ty} --no-template --fast #{content}", false)
     end
   end
 

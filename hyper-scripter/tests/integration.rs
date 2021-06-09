@@ -16,7 +16,7 @@ fn test_tags() {
     assert_eq!(MSG, run("-").unwrap());
 
     run(format!(
-        "e -t +super_tag,hide test/js -c js | console.log(\"{}\")",
+        "e -t +super_tag,hide test/js -T js | console.log(\"{}\")",
         MSG_JS
     ))
     .unwrap();
@@ -37,10 +37,10 @@ fn test_tags() {
 fn test_mv_cp() {
     let _g = setup();
 
-    run("e -t test . -c js --no-template | echo $HS_TAGS".to_string()).unwrap();
+    run("e -t test . -T js --no-template | echo $HS_TAGS".to_string()).unwrap();
     run("-").expect_err("用 nodejs 執行 echo ……？");
 
-    run("mv 1 -c sh -t test2").unwrap();
+    run("mv 1 -T sh -t test2").unwrap();
     assert_eq!("test2", run("-").unwrap());
     assert!(check_exist(&[".anonymous", "1.sh"]), "改腳本類型失敗");
     assert!(
@@ -232,7 +232,7 @@ fn test_namespace_reorder_search() {
     ))
     .unwrap();
     run(format!(
-        "e a/shorter/script -c js | console.log(\"{}\")",
+        "e a/shorter/script -T js | console.log(\"{}\")",
         MSG_JS
     ))
     .unwrap();

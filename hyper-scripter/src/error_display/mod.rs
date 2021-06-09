@@ -34,7 +34,7 @@ impl Display for Error {
             PathExist(path) => write!(f, "Path already exist: {:?}", path)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
-            UnknownCategory(c) => write!(f, "Unknown category: {}", c)?,
+            UnknownType(t) => write!(f, "Unknown type: {}", t)?,
             Format(code, s) => {
                 write!(f, "Format error for ")?;
                 use FormatCode::*;

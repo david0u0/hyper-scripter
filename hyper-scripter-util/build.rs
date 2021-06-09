@@ -37,20 +37,20 @@ fn main() -> std::io::Result<()> {
     let inner = read_all()?
         .map(|path| {
             let mut splited = path.rsplitn(2, '.');
-            let category = splited.next().unwrap();
+            let ty = splited.next().unwrap();
             let name = splited.next().unwrap();
             let hidden = hidden_list.iter().any(|s| s == name);
             format!(
                 "
                 RawUtil {{
                     name: \"util/{}\",
-                    category: \"{}\",
+                    ty: \"{}\",
                     content: std::include_str!(r\"{}\"),
                     is_hidden: {},
                 }}
                 ",
                 name,
-                category,
+                ty,
                 join_util(&path),
                 hidden
             )
@@ -60,7 +60,7 @@ fn main() -> std::io::Result<()> {
     file.write_all(
         b"pub struct RawUtil {
             pub name: &'static str,
-            pub category: &'static str,
+            pub ty: &'static str,
             pub content: &'static str,
             pub is_hidden: bool,
         }",

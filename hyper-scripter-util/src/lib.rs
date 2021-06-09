@@ -2,7 +2,7 @@
 pub struct Util {
     pub is_hidden: bool,
     pub name: &'static str,
-    pub category: &'static str,
+    pub ty: &'static str,
     pub content: &'static str,
 }
 
@@ -16,7 +16,7 @@ pub fn get_all() -> Vec<Util> {
         .map(|u| Util {
             is_hidden: u.is_hidden,
             name: u.name,
-            category: u.category,
+            ty: u.ty,
             content: u.content,
         })
         .collect()
@@ -33,7 +33,7 @@ mod test {
             .find(|u| u.name == "util/common")
             .expect("找不到應該存在的工具");
         assert!(comm.is_hidden, "{:?} 有問題", comm);
-        assert_eq!(comm.category, "rb", "{:?} 有問題", comm);
+        assert_eq!(comm.ty, "rb", "{:?} 有問題", comm);
         assert_eq!(include_str!("../util/common.rb"), comm.content);
 
         let import = utils
@@ -41,7 +41,7 @@ mod test {
             .find(|u| u.name == "util/import")
             .expect("找不到應該存在的工具");
         assert!(!import.is_hidden, "{:?} 有問題", import);
-        assert_eq!(import.category, "rb", "{:?} 有問題", import);
+        assert_eq!(import.ty, "rb", "{:?} 有問題", import);
         assert_eq!(include_str!("../util/import.rb"), import.content);
 
         assert_eq!(

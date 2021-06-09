@@ -126,7 +126,7 @@ pub fn fmt_meta<W: Write>(
 }
 const TITLE: &[&str] = &[
     "name",
-    "category",
+    "type",
     "last write time",
     "last execute time",
     "help message",

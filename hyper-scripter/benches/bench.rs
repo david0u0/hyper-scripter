@@ -209,6 +209,13 @@ fn run_criterion(c: &mut Criterion, name: &str, case_count: usize, epoch: usize)
                 format!("-f +{} ^{}", filter, prev)
             });
         });
+    } else if name.contains("ls") {
+        c.bench_function(name, |b| {
+            run_bench_with(b, case_count, epoch, |rng, _, tag_arr| {
+                let filter = gen_tag_filter_string(rng, tag_arr.clone());
+                format!("-f +{} ls", filter)
+            });
+        });
     } else {
         panic!("看不懂 benchmark 的名字 {}", name);
     }
@@ -229,6 +236,10 @@ fn bench_massive_prev(c: &mut Criterion) {
     // run with random tag, with random exact name
     run_criterion(c, "massive_prev", 200, 400);
 }
+#[criterion]
+fn bench_massive_ls(c: &mut Criterion) {
+    run_criterion(c, "massive_ls", 200, 400);
+}
 
 #[criterion]
 fn bench_small_fuzzy(c: &mut Criterion) {
@@ -244,4 +255,8 @@ fn bench_small_exact(c: &mut Criterion) {
 fn bench_small_prev(c: &mut Criterion) {
     // run with random tag, with random exact name
     run_criterion(c, "small_prev", 40, 80);
+}
+#[criterion]
+fn bench_small_ls(c: &mut Criterion) {
+    run_criterion(c, "small_ls", 40, 80);
 }

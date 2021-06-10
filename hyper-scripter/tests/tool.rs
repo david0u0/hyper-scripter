@@ -1,7 +1,7 @@
 use hyper_scripter::config::{Config, PromptLevel, RawConfig};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
@@ -77,27 +77,24 @@ pub fn check_exist(p: &[&str]) -> bool {
 }
 pub fn run<T: ToString>(args: T) -> Result<String, ExitStatus> {
     let home = get_home();
-    run_with_home(&home, args)
+    run_with_home(&*home.to_string_lossy(), args)
 }
-pub fn split_args<'a>(s: &'a str, home: &'a Path) -> Vec<&'a str> {
-    let mut full_args = vec!["-H", home.to_str().unwrap()];
-    let args_vec: Vec<&str> = if s.find('|').is_some() {
-        let (first, second) = s.split_once("|").unwrap();
+pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitStatus> {
+    let mut full_args = vec!["-H", home];
+    let args = args.to_string();
+    let args_vec: Vec<&str> = if args.find('|').is_some() {
+        let (first, second) = args.split_once("|").unwrap();
         let mut v: Vec<_> = first.split(' ').filter(|s| !s.is_empty()).collect();
         v.push(second.trim());
         v
     } else {
-        s.split_whitespace().collect()
+        args.split_whitespace().collect()
     };
     full_args.extend(&args_vec);
-    full_args
-}
-pub fn run_with_home<T: ToString>(home: &Path, args: T) -> Result<String, ExitStatus> {
-    let args = args.to_string();
-    let args = split_args(&args, home);
+
     let mut cmd = Command::new(EXE);
     let mut child = cmd
-        .args(&args)
+        .args(&full_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
@@ -119,7 +116,7 @@ pub fn run_with_home<T: ToString>(home: &Path, args: T) -> Result<String, ExitSt
     } else {
         Err(status)
     };
-    log::info!("執行 {:?} 完畢，結果為 {:?}", args, res);
+    log::info!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res
 }
 

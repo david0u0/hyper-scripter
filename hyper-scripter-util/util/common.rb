@@ -4,7 +4,7 @@ RED = "\033[0;31m".freeze
 NC = "\033[0m".freeze
 
 class HSEnv
-  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE' }.freeze
+  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
 
   def initialize(script_dir)
     find_hs_env(script_dir)
@@ -16,10 +16,9 @@ class HSEnv
     @prefix = pref
   end
 
-  def find_hs_env(script_dir)
-    path_script = File.join(script_dir, 'hs_env.sh')
-    env = `bash #{path_script}`.delete("\n")
-    @home, @exe = env.split(':')
+  def find_hs_env(_script_dir)
+    @home = env_var(:home)
+    @exe = env_var(:exe)
   end
 
   attr_reader :home, :exe
@@ -30,7 +29,7 @@ class HSEnv
   end
 
   def env_var(var_name)
-    ENV_MAP[var_name]
+    ENV[ENV_MAP[var_name]]
   end
 
   def exec_hs(arg, all = true, path = @home)

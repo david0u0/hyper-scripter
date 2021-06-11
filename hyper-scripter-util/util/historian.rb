@@ -46,10 +46,15 @@ load_history = lambda do
 end
 
 sourcing = false
+echoing = false
 selector = Selector.new(load_history.call, offset + 1)
 selector.register_keys(%w[d D], lambda { |pos, _|
   HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
   selector.load(load_history.call)
+})
+selector.register_keys(%w[e E], lambda { |_, _|
+  echoing = true
+  true
 })
 selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
@@ -79,6 +84,8 @@ if sourcing
       warn "#{ENV['SHELL']} not supported"
     end
   end
+elsif echoing
+  puts args
 else
   warn cmd
   history = HS_ENV.exec_hs(cmd, false)

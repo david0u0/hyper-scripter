@@ -72,19 +72,20 @@ class Selector
   def initialize(options, offset = 1)
     load(options)
     @search_string = ''
+    @number = nil
     @offset = offset
     @callbacks = {}
   end
 
   def run
     pos = 0
-    search_mode = false
+    mode = :normal
     loop do
       win_width = IO.console.winsize[1]
       option_count = @options.length
-      line_count = 0
       raise Empty if option_count == 0
 
+      line_count = 0
       display_pos = @offset + pos
       @options.each_with_index do |option, i|
         cur_display_pos = @offset + i
@@ -94,26 +95,47 @@ class Selector
         option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
         $stderr.print gen_line.call(option)
       end
-      $stderr.print "/#{@search_string}" if search_mode
+
+      case mode
+      when :search
+        $stderr.print "/#{@search_string}"
+      when :number
+        $stderr.print ":#{@number}"
+      end
 
       resp = ' '
       resp = STDIN.getch
       exit if resp == "\u0003" # Ctrl-C
 
-      if search_mode
+      if mode == :search
         case resp
         when "\b", "\c?"
           if @search_string.length == 0
-            search_mode = false
+            mode = :normal
           else
             @search_string = @search_string[0..-2]
           end
         when "\r"
-          search_mode = false
+          mode = :normal
         else
           @search_string += resp
           new_pos = search_index(pos)
           pos = new_pos unless new_pos.nil?
+        end
+      elsif mode == :number
+        case resp
+        when "\b", "\c?"
+          if @number == 0
+            mode = :normal
+          else
+            @number /= 10
+          end
+        when "\r"
+          mode = :normal
+          pos = [@number - @offset, 0].max
+          pos = [pos, option_count - 1].min
+        else
+          @number = @number * 10 + resp.to_i if resp =~ /[0-9]/
         end
       else
         case resp
@@ -132,21 +154,27 @@ class Selector
         when "\r"
           return self.class.make_result(display_pos, @options[pos])
         when '/'
-          search_mode = true
+          mode = :search
           @search_string = ''
         else
-          @callbacks.each do |key, callback|
-            next unless key == resp
+          resp_to_i = resp.to_i
+          if resp =~ /[0-9]/
+            mode = :number
+            @number = resp.to_i
+          else
+            @callbacks.each do |key, callback|
+              next unless key == resp
 
-            should_break = callback.cb.call(display_pos, @options[pos])
-            return self.class.make_result(display_pos, @options[pos]) if should_break == true
+              should_break = callback.cb.call(display_pos, @options[pos])
+              return self.class.make_result(display_pos, @options[pos]) if should_break == true
 
-            break
+              break
+            end
+
+            # for options count change
+            new_options = @options.length
+            pos = new_options - 1 if pos >= new_options
           end
-
-          # for options count change
-          new_options = @options.length
-          pos = new_options - 1 if pos >= new_options
         end
       end
 

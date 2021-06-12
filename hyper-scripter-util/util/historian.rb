@@ -51,11 +51,11 @@ selector = Selector.new(load_history.call, offset + 1)
 selector.register_keys(%w[d D], lambda { |pos, _|
   HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
   selector.load(load_history.call)
-})
-selector.register_keys(%w[e E], lambda { |_, _|
+}, 'delete the history')
+selector.register_keys(%w[p P], lambda { |_, _|
   echoing = true
   true
-})
+}, 'print the argument to stdout')
 selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
   true
@@ -68,6 +68,7 @@ selector.register_keys(%w[r R], lambda { |pos, _|
 args = begin
   selector.run.content
 rescue Selector::Empty
+  puts 'History is empty'
   exit
 rescue Selector::Quit
   exit

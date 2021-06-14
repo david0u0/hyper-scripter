@@ -20,12 +20,16 @@ async fn main() {
         Err(e) => vec![e],
         Ok(v) => v,
     };
+    let mut exit_code = 0;
     for err in errs.iter() {
+        match err {
+            Error::ScriptError(c) | Error::PreRunError(c) => exit_code = *c,
+            _ if exit_code == 0 => exit_code = 1,
+            _ => (),
+        }
         eprint!("{}", err);
     }
-    if !errs.is_empty() {
-        std::process::exit(1);
-    }
+    std::process::exit(exit_code);
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();

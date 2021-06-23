@@ -321,7 +321,11 @@ pub fn serialize_to_string<S: serde::Serializer, T: ToString>(
 }
 
 fn relative_to_home(p: &Path) -> Option<&Path> {
+    const CUR_DIR: &str = ".";
     let home = dirs::home_dir()?;
+    if p == home {
+        return Some(CUR_DIR.as_ref());
+    }
     p.strip_prefix(&home).ok()
 }
 

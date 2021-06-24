@@ -53,6 +53,7 @@ colored = "2"
 dirs = "3.0.1"
 handlebars = "3.3.0"
 toml = "0.5.6"
+ctrlc = { version = "3.0", features = ["termination"] }
 hyper-scripter-historian = { version = "0.4.0", path = "../hyper-scripter-historian" }
 hyper-scripter-util = { version = "0.4.0", path = "../hyper-scripter-util" }
 

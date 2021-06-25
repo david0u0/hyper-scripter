@@ -90,10 +90,10 @@ class Selector
       @options.each_with_index do |option, i|
         cur_display_pos = @offset + i
         leading = pos == i ? '>' : ' '
-        gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}\n" }
-        line_count += gen_line.call(option).length / win_width # calculate line height without color, since colr will mess up char count
+        gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
+        line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
         option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
-        $stderr.print gen_line.call(option)
+        $stderr.print gen_line.call(option) + "\n"
       end
 
       case mode
@@ -178,7 +178,7 @@ class Selector
         end
       end
 
-      option_count.times do
+      line_count.times do
         $stderr.print "\e[A"
       end
       $stderr.print "\r\e[J"
@@ -208,5 +208,11 @@ class Selector
       return i if @options[i].include?(@search_string)
     end
     nil
+  end
+
+  def compute_lines(len, win_width)
+    lines = 1 + len / win_width
+    lines -= 1 if len % win_width == 0
+    lines
   end
 end

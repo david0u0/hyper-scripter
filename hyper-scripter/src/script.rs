@@ -282,8 +282,7 @@ impl ScriptBuilder {
         self
     }
     pub fn build(self) -> ScriptInfo {
-        let now = ScriptTime::now(());
-        let created_time = ScriptTime::new_or(self.created_time, now);
+        let created_time = ScriptTime::new_or_else(self.created_time, || ScriptTime::now(()));
         ScriptInfo {
             write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),

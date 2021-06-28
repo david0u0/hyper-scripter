@@ -119,6 +119,21 @@ impl DBEnv {
             }
         }
 
+        let last_time = info.last_time();
+        let exec_time = info.exec_time.as_ref().map(|t| **t);
+        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
+        sqlx::query!(
+            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
+            info.id,
+            last_time,
+            *info.read_time,
+            *info.write_time,
+            exec_time,
+            exec_done_time,
+        )
+        .execute(&self.info_pool)
+        .await?;
+
         Ok(last_event_id)
     }
 }

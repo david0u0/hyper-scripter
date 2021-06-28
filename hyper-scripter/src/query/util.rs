@@ -80,8 +80,11 @@ pub async fn do_script_query<'b>(
                     need_prompt = true;
                     entry
                 }
-                Some(fuzzy::Multi { ans, .. }) => {
+                Some(fuzzy::Multi { ans, others }) => {
                     need_prompt = true;
+                    let ans = others
+                        .into_iter()
+                        .fold(ans, |a, b| std::cmp::max_by_key(a, b, |t| t.last_time()));
                     ans
                 }
                 None => return Ok(None),

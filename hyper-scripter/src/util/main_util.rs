@@ -5,8 +5,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagFilter};
-use chrono::Utc;
-use hyper_scripter_historian::{Event, EventData, Historian};
+use hyper_scripter_historian::Historian;
 use std::path::PathBuf;
 
 pub struct EditTagArgs {
@@ -200,16 +199,7 @@ pub async fn run_n_times(
             Err(e) => return Err(e),
             Ok(_) => ret_code = 0,
         }
-        historian
-            .record(&Event {
-                data: EventData::ExecDone {
-                    code: ret_code,
-                    main_event_id: entry.last_event_id(),
-                },
-                time: Utc::now().naive_utc(),
-                script_id: entry.id,
-            })
-            .await?;
+        entry.update(|info| info.exec_done(ret_code)).await?;
     }
     Ok(())
 }

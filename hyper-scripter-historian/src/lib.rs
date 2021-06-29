@@ -86,7 +86,7 @@ impl Historian {
             return raw_record_event(pool, event).await;
         }
 
-        raw_record_event(pool, event).await
+        res
     }
     pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
         let path = path.as_ref().to_owned();

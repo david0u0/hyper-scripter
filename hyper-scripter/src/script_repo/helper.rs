@@ -32,7 +32,10 @@ impl<'b> RepoEntry<'b> {
     }
     pub async fn update<F: FnOnce(&mut ScriptInfo)>(&mut self, handler: F) -> Result {
         handler(self.info);
-        let last_event_id = self.env.handle_change(self.info).await?;
+        let last_event_id = self
+            .env
+            .handle_change(self.info, self.last_event_id)
+            .await?;
         self.last_event_id = last_event_id;
         Ok(())
     }

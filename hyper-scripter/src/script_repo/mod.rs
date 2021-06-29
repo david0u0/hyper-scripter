@@ -63,7 +63,7 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
-    async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
+    async fn handle_change(&self, info: &ScriptInfo, main_event_id: i64) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
             let name = info.name.key();
@@ -81,7 +81,40 @@ impl DBEnv {
             .await?;
         }
 
+        let last_time = info.last_time();
+        let exec_time = info.exec_time.as_ref().map(|t| **t);
+        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
+        sqlx::query!(
+            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
+            info.id,
+            last_time,
+            *info.read_time,
+            *info.write_time,
+            exec_time,
+            exec_done_time,
+        )
+        .execute(&self.info_pool)
+        .await?;
+
         let mut last_event_id = 0;
+
+        if let Some(time) = info.exec_done_time.as_ref() {
+            if let Some(&code) = time.data() {
+                log::debug!("{:?} 的執行完畢事件", info.name);
+                last_event_id = self
+                    .historian
+                    .record(&Event {
+                        script_id: info.id,
+                        data: EventData::ExecDone {
+                            code,
+                            main_event_id,
+                        },
+                        time: **time,
+                    })
+                    .await?;
+                return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
+            }
+        }
 
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
@@ -118,21 +151,6 @@ impl DBEnv {
                     .await?;
             }
         }
-
-        let last_time = info.last_time();
-        let exec_time = info.exec_time.as_ref().map(|t| **t);
-        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
-        sqlx::query!(
-            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
-            info.id,
-            last_time,
-            *info.read_time,
-            *info.write_time,
-            exec_time,
-            exec_done_time,
-        )
-        .execute(&self.info_pool)
-        .await?;
 
         Ok(last_event_id)
     }

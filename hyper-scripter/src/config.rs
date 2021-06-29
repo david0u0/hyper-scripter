@@ -144,6 +144,8 @@ impl Default for RawConfig {
                 gen_alias("gc", &["rm", "--purge", "-f", "removed", "*"]),
                 gen_alias("tree", &["ls", "--grouping", "tree"]),
                 gen_alias("t", &["tags"]),
+                gen_alias("p", &["run", "-p"]),
+                gen_alias("h", &["=util/historian!"]),
             ]
             .into_iter()
             .collect(),

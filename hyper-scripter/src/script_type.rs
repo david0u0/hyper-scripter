@@ -13,7 +13,6 @@ cd ~/{{birthplace}}
 {{else}}
 cd {{birthplace_abs}}
 {{/if}}
-
 {{#each content}}{{{this}}}
 {{/each}}";
 
@@ -36,6 +35,13 @@ writeFile('/dev/null', 'some content');
 {{/each}}";
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+NAME=${NAME/./_}
+tmux has-session -t $NAME
+if [ $? = 0 ]; then
+    echo attach to existing session
+    tmux -2 attach-session -t $NAME
+    exit
+fi
 
 set -e
 export VAR=\"${VAR:-default}\"
@@ -44,7 +50,6 @@ cd ~/{{birthplace}}
 {{else}}
 cd {{birthplace_abs}}
 {{/if}}
-
 tmux new-session -s $NAME -d \"{{{content.0}}}; $SHELL\" || exit 1
 tmux split-window -h \"{{{content.1}}}; $SHELL\"
 {{#if content.2}}tmux split-window -v \"{{{content.2}}}; $SHELL\"
@@ -57,7 +62,6 @@ Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 {{else}}
 Dir.chdir(\"{{birthplace_abs}}\")
 {{/if}}
-
 {{#each content}}{{{this}}}
 {{/each}} ";
 

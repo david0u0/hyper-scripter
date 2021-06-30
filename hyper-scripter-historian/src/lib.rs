@@ -76,6 +76,12 @@ impl<'a> DBEvent<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct IgnoreResult {
+    pub exec_time: Option<NaiveDateTime>,
+    pub exec_done_time: Option<NaiveDateTime>,
+}
+
 impl Historian {
     async fn raw_record(&self, event: DBEvent<'_>) -> Result<i64, DBError> {
         let pool = &mut *self.pool.write().unwrap();
@@ -205,7 +211,7 @@ impl Historian {
         &self,
         script_id: i64,
         number: std::num::NonZeroU64,
-    ) -> Result<(), DBError> {
+    ) -> Result<Option<IgnoreResult>, DBError> {
         let number = number.get();
         let exec_ty = EventType::Exec.to_string();
         let done_ty = EventType::ExecDone.to_string();
@@ -257,9 +263,33 @@ impl Historian {
 
         if number == 1 {
             log::info!("ignore last args");
-            // FIXME: ignore!
+            let ret = IgnoreResult {
+                exec_time: self.last_time_of(script_id, EventType::Exec).await?,
+                exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
+            };
+            return Ok(Some(ret));
         }
-        Ok(())
+        Ok(None)
+    }
+
+    pub async fn last_time_of(
+        &self,
+        script_id: i64,
+        ty: EventType,
+    ) -> Result<Option<NaiveDateTime>, DBError> {
+        let ty = ty.to_string();
+        let time = sqlx::query!(
+            "
+            SELECT time FROM events
+            WHERE type = ? AND script_id = ? AND NOT ignored
+            ORDER BY time DESC LIMIT 1
+            ",
+            ty,
+            script_id
+        )
+        .fetch_optional(&*self.pool.read().unwrap())
+        .await?;
+        Ok(time.map(|t| t.time))
     }
 
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {

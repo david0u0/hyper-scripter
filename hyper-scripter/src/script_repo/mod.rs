@@ -63,6 +63,23 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
+    async fn update_last_time(&self, info: &ScriptInfo) -> Result {
+        let last_time = info.last_time();
+        let exec_time = info.exec_time.as_ref().map(|t| **t);
+        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
+        sqlx::query!(
+            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
+            info.id,
+            last_time,
+            *info.read_time,
+            *info.write_time,
+            exec_time,
+            exec_done_time,
+        )
+        .execute(&self.info_pool)
+        .await?;
+        Ok(())
+    }
     async fn handle_change(&self, info: &ScriptInfo, main_event_id: i64) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
@@ -81,21 +98,6 @@ impl DBEnv {
             .await?;
         }
 
-        let last_time = info.last_time();
-        let exec_time = info.exec_time.as_ref().map(|t| **t);
-        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
-        sqlx::query!(
-            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
-            info.id,
-            last_time,
-            *info.read_time,
-            *info.write_time,
-            exec_time,
-            exec_done_time,
-        )
-        .execute(&self.info_pool)
-        .await?;
-
         let mut last_event_id = 0;
 
         if let Some(time) = info.exec_done_time.as_ref() {
@@ -112,9 +114,17 @@ impl DBEnv {
                         time: **time,
                     })
                     .await?;
+
+                if last_event_id != 0 {
+                    self.update_last_time(info).await?;
+                } else {
+                    log::info!("{:?} 的執行完畢事件被忽略了", info.name);
+                }
                 return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
             }
         }
+
+        self.update_last_time(info).await?;
 
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);

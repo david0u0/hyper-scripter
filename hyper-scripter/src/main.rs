@@ -7,6 +7,7 @@ use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOption
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::ScriptRepo;
+use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
     path,
@@ -387,8 +388,16 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd: History::RM { script, number },
         } => {
-            let entry = query::do_script_query_strict(&script, &mut repo).await?;
-            historian.ignore_args(entry.id, number).await?;
+            let mut entry = query::do_script_query_strict(&script, &mut repo).await?;
+            let res = historian.ignore_args(entry.id, number).await?;
+            if let Some(res) = res {
+                entry
+                    .update(|info| {
+                        info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
+                        info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                    })
+                    .await?;
+            }
         }
         Subs::History {
             subcmd: History::Tidy { queries },

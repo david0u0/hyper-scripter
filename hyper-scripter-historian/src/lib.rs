@@ -17,47 +17,6 @@ pub struct Historian {
     path: PathBuf,
 }
 
-async fn ignore_last_args(pool: &Pool<Sqlite>, script_id: i64, ty: String) -> Result<(), DBError> {
-    let ty = ty.to_string();
-    sqlx::query!(
-        "DELETE FROM last_events WHERE script_id = ? AND type = ?",
-        script_id,
-        ty,
-    )
-    .execute(pool)
-    .await?;
-
-    let last_event = sqlx::query!(
-        "
-        SELECT * FROM events
-        WHERE type = ? AND script_id = ? AND NOT ignored
-        ORDER BY time DESC LIMIT 1
-        ",
-        ty,
-        script_id
-    )
-    .fetch_optional(pool)
-    .await?;
-
-    if let Some(last_event) = last_event {
-        sqlx::query!(
-            "
-            INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content, time)
-            VALUES(?, ?, ?, ?, ?, ?)
-            ",
-            script_id,
-            ty,
-            last_event.cmd,
-            last_event.args,
-            last_event.content,
-            last_event.time
-        )
-        .execute(pool)
-        .await?;
-    }
-
-    Ok(())
-}
 async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64, DBError> {
     sqlx::query!(
         "
@@ -79,20 +38,6 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         .fetch_one(pool)
         .await?;
     Ok(res.id as i64)
-}
-async fn raw_record_last(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<(), DBError> {
-    sqlx::query!(
-        "INSERT OR REPLACE INTO last_events (script_id, type, cmd, args, content, time) VALUES(?, ?, ?, ?, ?, ?)",
-        event.script_id,
-        event.ty,
-        event.cmd,
-        event.args,
-        event.content,
-        event.time
-    )
-    .execute(pool)
-    .await?;
-    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -131,18 +76,23 @@ impl<'a> DBEvent<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct IgnoreResult {
+    pub exec_time: Option<NaiveDateTime>,
+    pub exec_done_time: Option<NaiveDateTime>,
+}
+
 impl Historian {
     async fn raw_record(&self, event: DBEvent<'_>) -> Result<i64, DBError> {
         let pool = &mut *self.pool.write().unwrap();
-        let res = raw_record_last(pool, event).await;
+        let res = raw_record_event(pool, event).await;
         if res.is_err() {
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
             *pool = db::get_pool(&self.path).await?;
-            raw_record_last(pool, event).await?;
             return raw_record_event(pool, event).await;
         }
 
-        raw_record_event(pool, event).await
+        res
     }
     pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
         let path = path.as_ref().to_owned();
@@ -154,9 +104,6 @@ impl Historian {
 
     pub async fn remove(&self, script_id: i64) -> Result<(), DBError> {
         let pool = self.pool.read().unwrap();
-        sqlx::query!("DELETE FROM last_events WHERE script_id = ?", script_id,)
-            .execute(&*pool)
-            .await?;
         sqlx::query!("DELETE FROM events WHERE script_id = ?", script_id,)
             .execute(&*pool)
             .await?;
@@ -216,18 +163,6 @@ impl Historian {
         Ok(id)
     }
 
-    // XXX: 其實可以只回迭代器
-    pub async fn last_time_of(&self, ty: EventType) -> Result<Vec<(i64, NaiveDateTime)>, DBError> {
-        let ty = ty.to_string();
-        let times = sqlx::query!(
-            "SELECT script_id, time as time FROM last_events WHERE type = ? ORDER BY script_id",
-            ty
-        )
-        .fetch_all(&*self.pool.read().unwrap())
-        .await?;
-        Ok(times.into_iter().map(|d| (d.script_id, d.time)).collect())
-    }
-
     pub async fn last_args(&self, id: i64) -> Result<Option<String>, DBError> {
         let ty = EventType::Exec.to_string();
         let res = sqlx::query!(
@@ -276,7 +211,7 @@ impl Historian {
         &self,
         script_id: i64,
         number: std::num::NonZeroU64,
-    ) -> Result<(), DBError> {
+    ) -> Result<Option<IgnoreResult>, DBError> {
         let number = number.get();
         let exec_ty = EventType::Exec.to_string();
         let done_ty = EventType::ExecDone.to_string();
@@ -328,10 +263,33 @@ impl Historian {
 
         if number == 1 {
             log::info!("ignore last args");
-            ignore_last_args(&*pool, script_id, exec_ty).await?;
-            ignore_last_args(&*pool, script_id, done_ty).await?;
+            let ret = IgnoreResult {
+                exec_time: self.last_time_of(script_id, EventType::Exec).await?,
+                exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
+            };
+            return Ok(Some(ret));
         }
-        Ok(())
+        Ok(None)
+    }
+
+    pub async fn last_time_of(
+        &self,
+        script_id: i64,
+        ty: EventType,
+    ) -> Result<Option<NaiveDateTime>, DBError> {
+        let ty = ty.to_string();
+        let time = sqlx::query!(
+            "
+            SELECT time FROM events
+            WHERE type = ? AND script_id = ? AND NOT ignored
+            ORDER BY time DESC LIMIT 1
+            ",
+            ty,
+            script_id
+        )
+        .fetch_optional(&*self.pool.read().unwrap())
+        .await?;
+        Ok(time.map(|t| t.time))
     }
 
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {

@@ -137,6 +137,7 @@ pub struct TimelessScriptInfo {
 pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
+    /// (content, args)
     pub exec_time: Option<ScriptTime<(String, String)>>,
     pub exec_done_time: Option<ScriptTime<i32>>,
     #[deref]
@@ -202,7 +203,6 @@ impl ScriptInfo {
         self.exec_time = Some(ScriptTime::now((content, args_ser)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
     }
-    // XXX: 這函式現在沒用到，看要拿掉還是怎樣
     pub fn exec_done(&mut self, code: i32) {
         log::trace!("{:?} 執行結果為 {}", self, code);
         self.exec_done_time = Some(ScriptTime::now(code));
@@ -282,8 +282,7 @@ impl ScriptBuilder {
         self
     }
     pub fn build(self) -> ScriptInfo {
-        let now = ScriptTime::now(());
-        let created_time = ScriptTime::new_or(self.created_time, now);
+        let created_time = ScriptTime::new_or_else(self.created_time, || ScriptTime::now(()));
         ScriptInfo {
             write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),

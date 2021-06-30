@@ -3,9 +3,9 @@ use crate::path;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{Duration, Utc};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use hyper_scripter_historian::{Event, EventData, EventType, Historian};
+use hyper_scripter_historian::{Event, EventData, Historian};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
 
@@ -63,7 +63,24 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
-    async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
+    async fn update_last_time(&self, info: &ScriptInfo) -> Result {
+        let last_time = info.last_time();
+        let exec_time = info.exec_time.as_ref().map(|t| **t);
+        let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
+        sqlx::query!(
+            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
+            info.id,
+            last_time,
+            *info.read_time,
+            *info.write_time,
+            exec_time,
+            exec_done_time,
+        )
+        .execute(&self.info_pool)
+        .await?;
+        Ok(())
+    }
+    async fn handle_change(&self, info: &ScriptInfo, main_event_id: i64) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
             let name = info.name.key();
@@ -82,6 +99,32 @@ impl DBEnv {
         }
 
         let mut last_event_id = 0;
+
+        if let Some(time) = info.exec_done_time.as_ref() {
+            if let Some(&code) = time.data() {
+                log::debug!("{:?} 的執行完畢事件", info.name);
+                last_event_id = self
+                    .historian
+                    .record(&Event {
+                        script_id: info.id,
+                        data: EventData::ExecDone {
+                            code,
+                            main_event_id,
+                        },
+                        time: **time,
+                    })
+                    .await?;
+
+                if last_event_id != 0 {
+                    self.update_last_time(info).await?;
+                } else {
+                    log::info!("{:?} 的執行完畢事件被忽略了", info.name);
+                }
+                return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
+            }
+        }
+
+        self.update_last_time(info).await?;
 
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
@@ -176,17 +219,11 @@ impl ScriptRepo {
             time
         });
 
-        let scripts = sqlx::query!("SELECT * from script_infos ORDER BY id")
-            .fetch_all(&pool)
-            .await?;
-        let last_read_records = historian.last_time_of(EventType::Read).await?;
-        let last_write_records = historian.last_time_of(EventType::Write).await?;
-        let last_exec_records = historian.last_time_of(EventType::Exec).await?;
-        let last_exec_done_records = historian.last_time_of(EventType::ExecDone).await?;
-        let mut last_read: &[_] = &last_read_records;
-        let mut last_write: &[_] = &last_write_records;
-        let mut last_exec: &[_] = &last_exec_records;
-        let mut last_exec_done: &[_] = &last_exec_done_records;
+        let scripts = sqlx::query!(
+            "SELECT * FROM script_infos si LEFT JOIN last_events le ON si.id = le.script_id"
+        )
+        .fetch_all(&pool)
+        .await?;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for script in scripts.into_iter() {
             let name = script.name;
@@ -212,27 +249,17 @@ impl ScriptRepo {
             )
             .created_time(script.created_time);
 
-            if let Some(time) = extract_from_time(script.id, &mut last_exec) {
+            if let Some(time) = script.write {
+                builder = builder.write_time(time);
+            }
+            if let Some(time) = script.read {
+                builder = builder.read_time(time);
+            }
+            if let Some(time) = script.exec {
                 builder = builder.exec_time(time);
             }
-            if let Some(time) = extract_from_time(script.id, &mut last_exec_done) {
+            if let Some(time) = script.exec_done {
                 builder = builder.exec_done_time(time);
-            }
-            if let Some(time) = extract_from_time(script.id, &mut last_read) {
-                builder = builder.read_time(time);
-            } else {
-                log::warn!(
-                    "找不到 {:?} 的讀取時間，可能是資料庫爛了，改用創建時間",
-                    builder.name
-                );
-            }
-            if let Some(time) = extract_from_time(script.id, &mut last_write) {
-                builder = builder.write_time(time);
-            } else {
-                log::warn!(
-                    "找不到 {:?} 的寫入時間，可能是資料庫爛了，改用創建時間",
-                    builder.name
-                );
             }
 
             let script = builder.build();
@@ -309,6 +336,9 @@ impl ScriptRepo {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
             self.db_env.historian.remove(info.id).await?;
+            sqlx::query!("DELETE FROM last_events WHERE script_id = ?", info.id)
+                .execute(&self.db_env.info_pool)
+                .await?;
             sqlx::query!("DELETE from script_infos where id = ?", info.id)
                 .execute(&self.db_env.info_pool)
                 .await?;
@@ -339,26 +369,5 @@ impl ScriptRepo {
             }
         }
         self.map = map;
-    }
-}
-
-fn extract_from_time(cur_id: i64, series: &mut &[(i64, NaiveDateTime)]) -> Option<NaiveDateTime> {
-    loop {
-        match series.first() {
-            Some((id, time)) => {
-                use std::cmp::Ordering;
-                match id.cmp(&cur_id) {
-                    Ordering::Equal => {
-                        *series = &series[1..series.len()];
-                        return Some(*time);
-                    }
-                    Ordering::Less => *series = &series[1..series.len()],
-                    Ordering::Greater => return None,
-                }
-            }
-            None => {
-                return None;
-            }
-        }
     }
 }

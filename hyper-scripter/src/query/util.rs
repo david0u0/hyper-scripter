@@ -7,6 +7,8 @@ use crate::script_repo::{RepoEntry, ScriptRepo};
 use fxhash::FxHashSet as HashSet;
 use std::sync::Once;
 
+const SEP: &str = "/";
+
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
     queries: &[ListQuery],
@@ -69,7 +71,7 @@ pub async fn do_script_query<'b>(
         ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
         ScriptQueryInner::Fuzz(name) => {
             let level = Config::get()?.prompt_level;
-            let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all)).await?;
+            let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
             let need_prompt: bool;
             let entry = match fuzz_res {
                 Some(fuzzy::High(entry)) => {
@@ -82,10 +84,19 @@ pub async fn do_script_query<'b>(
                 }
                 Some(fuzzy::Multi { ans, others }) => {
                     need_prompt = true;
-                    let ans = others
+                    // NOTE: 從一堆分數相近者中選出最新的
+                    // 但注意不要是「正解」的前綴，否則使用者可能永遠無法用模糊搜拿到名字比較短的候選者
+                    // 例如 正解：ab 候選：ab1，且候選人較新
+                    let prefix = ans.name.key();
+                    let prefix = prefix.as_ref();
+                    let true_ans = others
                         .into_iter()
-                        .fold(ans, |a, b| std::cmp::max_by_key(a, b, |t| t.last_time()));
-                    ans
+                        .filter(|t| !fuzzy::is_prefix(prefix, t.name.key().as_ref(), SEP))
+                        .max_by_key(|t| t.last_time());
+                    match true_ans {
+                        Some(t) if t.last_time() > ans.last_time() => t,
+                        _ => ans,
+                    }
                 }
                 None => return Ok(None),
             };

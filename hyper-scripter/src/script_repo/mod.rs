@@ -263,6 +263,7 @@ impl ScriptRepo {
             }
 
             let script = builder.build();
+
             if time_bound.map_or(true, |time_bound| script.last_time() > time_bound) {
                 map.insert(name, script);
             } else {

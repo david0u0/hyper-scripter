@@ -59,17 +59,19 @@ impl MyRaw {
 pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
+    sep: &str,
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
     let mut data_vec: Vec<(i64, T)> = iter.map(|t| (0, t)).collect();
     // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
     let keys: Vec<_> = data_vec.iter().map(|(_, data)| data.fuzz_key()).collect();
+    let sep = MyRaw::new(sep);
     let score_fut = keys.iter().map(|key| {
         let key = MyRaw::new(key.as_ref());
         spawn_blocking(move || {
             // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
             let key = unsafe { key.get() };
-            let score = my_fuzz(key, unsafe { raw_name.get() });
+            let score = my_fuzz(key, unsafe { raw_name.get() }, unsafe { sep.get() });
 
             if let Some(mut score) = score {
                 let len = key.chars().count();
@@ -116,9 +118,30 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     }
 }
 
-fn my_fuzz(choice: &str, pattern: &str) -> Option<i64> {
+// TODO: 把這些 sep: &str 換成標準庫的 Pattern
+
+pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
+    if prefix.len() >= target.len() {
+        return false;
+    }
+
+    let mut found = false;
+    foreach_reorder(target, sep, &mut |t| {
+        foreach_reorder(prefix, sep, &mut |p| {
+            if t.starts_with(p) {
+                found = true;
+            }
+            found
+        });
+        found
+    });
+
+    found
+}
+
+fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
     let mut ans_opt = None;
-    foreach_reorder(choice, "/", &mut |choice_reordered| {
+    foreach_reorder(choice, sep, &mut |choice_reordered| {
         let score_opt = MATCHER.fuzzy_match(choice_reordered, pattern);
         log::trace!(
             "模糊搜尋，候選者：{}，重排列成：{}，輸入：{}，分數：{:?}",
@@ -137,23 +160,38 @@ fn my_fuzz(choice: &str, pattern: &str) -> Option<i64> {
     });
     ans_opt
 }
-fn foreach_reorder<F: FnMut(&str)>(choice: &str, sep: &str, handler: &mut F) {
+
+trait StopIndicator: Default {
+    fn should_stop(&self) -> bool {
+        false
+    }
+}
+impl StopIndicator for () {}
+impl StopIndicator for bool {
+    fn should_stop(&self) -> bool {
+        *self
+    }
+}
+fn foreach_reorder<S: StopIndicator, F: FnMut(&str) -> S>(
+    choice: &str,
+    sep: &str,
+    handler: &mut F,
+) {
     let choice_arr: Vec<_> = choice.split(sep).collect();
     let mut mem = vec![false; choice_arr.len()];
     let mut reorederd = Vec::<&str>::with_capacity(mem.len());
     recursive_reorder(&choice_arr, &mut mem, &mut reorederd, sep, handler);
 }
-
-fn recursive_reorder<'a, F: FnMut(&str)>(
+fn recursive_reorder<'a, S: StopIndicator, F: FnMut(&str) -> S>(
     choice_arr: &[&'a str],
     mem: &mut Vec<bool>,
     reorderd: &mut Vec<&'a str>,
     sep: &str,
     handler: &mut F,
-) {
+) -> S {
     if reorderd.len() == mem.len() {
         let new_str = reorderd.join(sep);
-        handler(&new_str);
+        handler(&new_str)
     } else {
         for i in 0..mem.len() {
             if mem[i] {
@@ -161,10 +199,14 @@ fn recursive_reorder<'a, F: FnMut(&str)>(
             }
             mem[i] = true;
             reorderd.push(choice_arr[i]);
-            recursive_reorder(choice_arr, mem, reorderd, sep, handler);
+            let indicator = recursive_reorder(choice_arr, mem, reorderd, sep, handler);
+            if indicator.should_stop() {
+                return indicator;
+            }
             reorderd.pop();
             mem[i] = false;
         }
+        Default::default()
     }
 }
 
@@ -197,6 +239,9 @@ mod test {
             _ => unreachable!(),
         }
     }
+    async fn do_fuzz<'a>(name: &'a str, v: &'a Vec<&'a str>) -> Option<FuzzResult<&'a str>> {
+        fuzz(name, v.clone().into_iter(), "/").await.unwrap()
+    }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz() {
         let _ = env_logger::try_init();
@@ -205,28 +250,22 @@ mod test {
         let t3 = ".42";
         let vec = vec![t1.clone(), t2, t3.clone()];
 
-        let res = fuzz("測試1", vec.clone().into_iter())
-            .await
-            .unwrap()
-            .unwrap();
+        let res = do_fuzz("測試1", &vec).await.unwrap();
         assert_eq!(extract_high(res), t1);
 
-        let res = fuzz("42", vec.clone().into_iter()).await.unwrap().unwrap();
+        let res = do_fuzz("42", &vec).await.unwrap();
         assert_eq!(extract_high(res), t3);
 
-        let res = fuzz("找不到", vec.clone().into_iter()).await.unwrap();
+        let res = do_fuzz("找不到", &vec).await;
         assert!(res.is_none());
 
-        let res = fuzz("測試", vec.clone().into_iter())
-            .await
-            .unwrap()
-            .unwrap();
+        let res = do_fuzz("測試", &vec).await.unwrap();
         let v = extract_multifuzz(res);
         assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
 
         let mut vec = vec!["hs_test", "hs_build", "hs_dir", "runhs", "hs_run"];
         vec.sort();
-        let err = fuzz("hs", vec.clone().into_iter()).await.unwrap().unwrap();
+        let err = do_fuzz("hs", &vec).await.unwrap();
         let v = extract_multifuzz(err);
         assert_eq!(v, vec);
     }
@@ -236,10 +275,7 @@ mod test {
         let t1 = "測試腳本1";
         let t2 = "測試腳本23456";
         let vec = vec![t1.clone(), t2];
-        let res = fuzz("測試", vec.clone().into_iter())
-            .await
-            .unwrap()
-            .unwrap();
+        let res = do_fuzz("測試", &vec).await.unwrap();
         assert_eq!(extract_high(res), t1, "模糊搜尋無法找出較短者");
     }
     #[test]
@@ -261,5 +297,22 @@ mod test {
             ],
             buffer
         );
+    }
+    #[test]
+    fn test_is_prefix() {
+        let sep = "::";
+        assert!(is_prefix("aa", "aabb", sep));
+        assert!(is_prefix("aa::bb", "bb::cc::aa", sep));
+        assert!(is_prefix("c", "bb::cc::aa", sep));
+        assert!(is_prefix("aa::bb", "bb::aa1", sep));
+
+        assert!(is_prefix("aa::b", "bb::cc::aa", sep));
+        assert!(is_prefix("a::bb", "bb::cc::aa", sep));
+
+        assert!(!is_prefix("abb", "aabb", sep));
+        assert!(!is_prefix("aabb", "aa::bb", sep));
+
+        assert!(!is_prefix("aa::bb::cc", "aa::bb", sep));
+        assert!(!is_prefix("aa::dd", "bb::cc::aa", sep));
     }
 }

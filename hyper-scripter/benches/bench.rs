@@ -75,7 +75,7 @@ fn bench_fuzz(c: &mut Criterion) {
             rt.block_on(async {
                 for short in shorts.iter() {
                     let names = names.iter().map(|s| MyStr(s.as_ref()));
-                    let res = fuzz(short, names).await.unwrap();
+                    let res = fuzz(short, names, "/").await.unwrap();
                     black_box(res);
                 }
             });

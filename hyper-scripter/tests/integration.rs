@@ -377,3 +377,42 @@ fn test_prerun() {
         "測試預腳本=_= myname 參數1,參數2\n實際執行=_="
     );
 }
+
+#[test]
+fn test_ls_query() {
+    let _g = setup();
+
+    fn create(name: &str, tag: Option<&str>) {
+        let tag = tag.map(|t| format!("-t {}", t)).unwrap_or_default();
+        run(format!("e ={}! {} | echo dummy", name, tag)).expect(&format!("創建 {} 失敗", name));
+    }
+
+    create("fuzzed/not-shown", None);
+    create("fuzzed/shown", None);
+
+    create("not-shown", None);
+
+    create("wildcard1", None);
+    create("wildcard2", None);
+
+    create("prev", None);
+
+    create("hide/not-shown", Some("hide"));
+    create("hide/exact", Some("hide"));
+    create("hide/fuzz", Some("hide"));
+    create("hide/prev", Some("hide"));
+
+    assert_ls(
+        vec![
+            "fuzzed/shown",
+            "wildcard1",
+            "wildcard2",
+            "prev",
+            "hide/exact",
+            "hide/fuzz",
+            "hide/prev",
+        ],
+        None,
+        Some("showfuz wildcar* - =hide/exact! fzhid! !"),
+    );
+}

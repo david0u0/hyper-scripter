@@ -86,6 +86,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         repo.filter_by_tag(&tag_group);
     }
 
+    macro_rules! conf_mut {
+        () => {{
+            ret.conf = Some(conf.clone());
+            ret.conf.as_mut().unwrap()
+        }};
+    }
+
     match root.subcmd.unwrap() {
         Subs::LoadUtils => util::main_util::load_utils(&mut repo).await?,
         Subs::Alias {
@@ -95,8 +102,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         } => {
             if !after.is_empty() {
                 log::info!("設定別名 {} {:?}", before, after);
-                ret.conf = Some(conf.clone());
-                let conf = ret.conf.as_mut().unwrap();
+                let conf = conf_mut!();
                 conf.alias.insert(before, after.into());
             } else {
                 log::info!("印出別名 {}", before);
@@ -115,8 +121,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             ..
         } => {
             log::info!("取消別名 {}", before);
-            ret.conf = Some(conf.clone());
-            let conf = ret.conf.as_mut().unwrap();
+            let conf = conf_mut!();
             let ok = conf.alias.remove(&before).is_some();
             if !ok {
                 return Err(Error::NoAlias(before));
@@ -323,66 +328,85 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let mut entry = query::do_script_query_strict(&origin, &mut repo).await?;
             util::main_util::mv(&mut entry, new_name, ty, tags).await?;
         }
-        Subs::Tags { tag_filter } => {
-            if let Some(filter) = tag_filter {
-                ret.conf = Some(conf.clone());
-                let conf = ret.conf.as_mut().unwrap();
-
-                if let Some(name) = filter.name {
-                    log::debug!("處理篩選器 {:?}", name);
-                    let is_empty = filter.content.is_empty();
-                    // 順便在這個變數中帶上「是否為既有篩選器」的訊息。若找到了既有的篩器，就把 content 的值搶過來
-                    let mut content = Some(filter.content);
-                    let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
-                    if let Some((i, existing_filter)) = tag_filters
-                        .iter_mut()
-                        .enumerate()
-                        .find(|(_, f)| f.name == name)
-                    {
-                        let content = content.take().unwrap();
-                        if is_empty {
-                            log::info!("刪除篩選器 {} {}", name, content);
-                            tag_filters.remove(i);
-                        } else {
-                            log::info!("修改篩選器 {} {}", name, content);
-                            existing_filter.content = content;
-                        }
-                    }
-
-                    // 若 content == None 代表該值已經用在既有篩選器上了，底下就不用做
-                    if let Some(content) = content {
-                        if !is_empty {
-                            log::info!("新增篩選器 {} {}", name, content);
-                            tag_filters.push(NamedTagFilter { content, name });
-                        } else {
-                            log::error!("試著刪除不存在的篩選器 {:?}", name); // TODO: 應該報錯上去？
-                        }
-                    }
-                } else {
-                    log::info!("加入主篩選器 {:?}", filter);
-                    conf.main_tag_filter = filter.content;
-                }
-            } else {
-                print!("known tags:\n  ");
-                for t in repo.iter_known_tags() {
-                    print!("{} ", t);
-                }
-                println!();
-                println!("tag filters:");
-                for filter in conf.tag_filters.iter() {
-                    let content = &filter.content;
-                    print!("  {} = [{}]", filter.name, content);
-                    if content.mandatory {
-                        print!(" (mandatory)")
-                    }
-                    println!()
-                }
-                println!("main tag filter:");
-                print!("  [{}]", conf.main_tag_filter);
-                if conf.main_tag_filter.mandatory {
+        Subs::Tags {
+            unset: Some(name), ..
+        } => {
+            let conf = conf_mut!();
+            let pos = conf
+                .tag_filters
+                .iter()
+                .position(|f| f.name == name)
+                .ok_or_else(|| {
+                    log::error!("試著刪除不存在的篩選器 {:?}", name);
+                    Error::TagFilterNotFound(name)
+                })?;
+            conf.tag_filters.remove(pos);
+        }
+        Subs::Tags {
+            switch_activated: Some(name),
+            ..
+        } => {
+            let conf = conf_mut!();
+            let filter = conf
+                .tag_filters
+                .iter_mut()
+                .find(|f| f.name == name)
+                .ok_or_else(|| {
+                    log::error!("試著切換不存在的篩選器 {:?}", name);
+                    Error::TagFilterNotFound(name)
+                })?;
+            filter.inactivated = !filter.inactivated;
+        }
+        Subs::Tags {
+            tag_filter: None, ..
+        } => {
+            print!("known tags:\n  ");
+            for t in repo.iter_known_tags() {
+                print!("{} ", t);
+            }
+            println!();
+            println!("tag filters:");
+            for filter in conf.tag_filters.iter() {
+                let content = &filter.content;
+                print!("  {} = [{}]", filter.name, content);
+                if content.mandatory {
                     print!(" (mandatory)")
                 }
-                println!();
+                if filter.inactivated {
+                    print!(" (inactivated)")
+                }
+                println!()
+            }
+            println!("main tag filter:");
+            print!("  [{}]", conf.main_tag_filter);
+            if conf.main_tag_filter.mandatory {
+                print!(" (mandatory)")
+            }
+            println!();
+        }
+        Subs::Tags {
+            tag_filter: Some(filter),
+            ..
+        } => {
+            let conf = conf_mut!();
+            let content = filter.content;
+            if let Some(name) = filter.name {
+                log::debug!("處理篩選器 {:?}", name);
+                let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
+                if let Some(existing_filter) = tag_filters.iter_mut().find(|f| f.name == name) {
+                    log::info!("修改篩選器 {} {}", name, content);
+                    existing_filter.content = content;
+                } else {
+                    log::info!("新增篩選器 {} {}", name, content);
+                    tag_filters.push(NamedTagFilter {
+                        content,
+                        name,
+                        inactivated: false,
+                    });
+                }
+            } else {
+                log::info!("加入主篩選器 {:?}", content);
+                conf.main_tag_filter = content;
             }
         }
         Subs::History {

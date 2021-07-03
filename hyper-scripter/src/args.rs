@@ -189,7 +189,12 @@ pub enum Subs {
         about = "Manage script tags. If a tag filter is given, store it to config, otherwise show tag information."
     )]
     Tags {
-        #[structopt(parse(try_from_str))]
+        #[structopt(short, long, conflicts_with = "switch-activated")]
+        unset: Option<String>,
+        #[structopt(short, long, conflicts_with = "unset")]
+        switch_activated: Option<String>,
+
+        #[structopt(parse(try_from_str), conflicts_with_all = &["unset", "switch-activated"])]
         tag_filter: Option<FilterQuery>,
     },
     #[structopt(about = "Manage script history")]

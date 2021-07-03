@@ -174,15 +174,10 @@ impl FromStr for FilterQuery {
             }
             [name, s] => {
                 log::trace!("解析有名篩選器：{} = {}", name, s);
-                let content: TagFilter = if s.is_empty() {
-                    Default::default()
-                } else {
-                    s.parse()?
-                };
                 Ok(FilterQuery {
                     // TODO: 檢查名字
                     name: Some(name.to_string()),
-                    content,
+                    content: s.parse()?,
                 })
             }
             _ => Err(Error::Format(FilterQueryCode, s.to_owned())),

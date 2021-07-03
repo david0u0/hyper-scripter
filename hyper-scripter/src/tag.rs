@@ -36,7 +36,7 @@ impl From<TagFilter> for TagFilterGroup {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagFilter {
     tags: Vec<TagControl>,
     pub append: bool,
@@ -165,9 +165,6 @@ impl Display for TagFilter {
     }
 }
 impl TagFilter {
-    pub fn is_empty(&self) -> bool {
-        self.tags.is_empty()
-    }
     pub fn push(&mut self, flow: Self) {
         if flow.append {
             self.tags.extend(flow.tags.into_iter());

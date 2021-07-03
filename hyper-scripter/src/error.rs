@@ -39,6 +39,7 @@ pub enum Error {
     ScriptError(i32),
     PreRunError(i32),
     RedundantOpt(RedundantOpt),
+    TagFilterNotFound(String),
     NoPreviousArgs,
     DontFuzz,
     Empty,

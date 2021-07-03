@@ -50,10 +50,16 @@ fn config_file() -> PathBuf {
     path::get_home().join(CONFIG_FILE)
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct NamedTagFilter {
     pub content: TagFilter,
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub inactivated: bool,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
@@ -123,14 +129,17 @@ impl Default for RawConfig {
                 NamedTagFilter {
                     content: "+pin".parse().unwrap(),
                     name: "pin".to_owned(),
+                    inactivated: false,
                 },
                 NamedTagFilter {
                     content: "+m/all,^hide".parse().unwrap(),
                     name: "no-hidden".to_owned(),
+                    inactivated: false,
                 },
                 NamedTagFilter {
                     content: "+m/all,^removed".parse().unwrap(),
                     name: "no-removed".to_owned(),
+                    inactivated: false,
                 },
             ],
             main_tag_filter: "+all".parse().unwrap(),
@@ -259,6 +268,10 @@ impl Config {
     pub fn get_tag_filter_group(&self) -> TagFilterGroup {
         let mut group = TagFilterGroup::default();
         for f in self.tag_filters.iter() {
+            if f.inactivated {
+                log::debug!("{:?} 未啟用", f);
+                continue;
+            }
             group.push(f.content.clone());
         }
         group.push(self.main_tag_filter.clone());

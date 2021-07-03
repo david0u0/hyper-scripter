@@ -38,7 +38,7 @@ fn get_default_home() -> Result<PathBuf> {
     Ok(home.into())
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(test))]
 fn get_sys_home() -> Result<PathBuf> {
     let p = match std::env::var(hs_home_env!()) {
         Ok(p) => {
@@ -50,11 +50,7 @@ fn get_sys_home() -> Result<PathBuf> {
     };
     Ok(p)
 }
-#[cfg(all(debug_assertions, not(test)))]
-fn get_sys_home() -> Result<PathBuf> {
-    Ok(".hyper_scripter".into())
-}
-#[cfg(all(debug_assertions, test))]
+#[cfg(test)]
 fn get_sys_home() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }

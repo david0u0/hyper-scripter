@@ -27,11 +27,11 @@ macro_rules! def_root {
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
             #[structopt(long, hidden = true, number_of_values = 1)]
-            pub skip_script: Vec<String>,
+            pub skip_script: Vec<String>, // TODO: 確認一下這功能到底要不要
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
-            #[structopt(long)]
-            pub no_alias: bool,
+            #[structopt(long, global = true)]
+            pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
             #[structopt(short = "H", long, help = "Path to hyper script home")]
             pub hs_home: Option<String>,
             #[structopt(
@@ -295,13 +295,13 @@ pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     std::process::exit(0);
 }
 
-fn handle_alias_args(args: &[String]) -> Result<Root> {
-    match alias_mod::Root::from_iter_safe(args) {
-        Ok(alias_root) => {
-            log::trace!("別名命令行物件 {:?}", alias_root);
-            if alias_root.no_alias {
-                log::debug!("不使用別名！");
-            } else {
+fn handle_alias_args(args: Vec<String>) -> Result<Root> {
+    if args.iter().any(|s| s == "--no-alias") {
+        log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
+    } else {
+        match alias_mod::Root::from_iter_safe(&args) {
+            Ok(alias_root) => {
+                log::trace!("別名命令行物件 {:?}", alias_root);
                 set_home(&alias_root.hs_home)?;
                 if let Some((alias, remaining_args)) = find_alias(&alias_root)? {
                     let base_len = args.len() - remaining_args.len();
@@ -314,11 +314,11 @@ fn handle_alias_args(args: &[String]) -> Result<Root> {
                     return Ok(Root::from_iter(new_args));
                 }
             }
-        }
-        Err(e) => {
-            log::warn!("解析別名參數出錯： {}", e);
-        }
-    };
+            Err(e) => {
+                log::warn!("解析別名參數出錯： {}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
+            }
+        };
+    }
 
     let root = Root::from_iter(args);
     set_home(&root.hs_home)?;
@@ -360,8 +360,8 @@ impl Root {
     }
 }
 
-pub fn handle_args(args: &[String]) -> Result<Root> {
-    let mut root = handle_alias_args(&args)?;
+pub fn handle_args(args: Vec<String>) -> Result<Root> {
+    let mut root = handle_alias_args(args)?;
     log::debug!("命令行物件：{:?}", root);
 
     root.sanitize()?;
@@ -372,12 +372,14 @@ pub fn handle_args(args: &[String]) -> Result<Root> {
 mod test {
     use super::*;
     fn build_args<'a>(args: &'a str) -> Vec<String> {
-        args.split(' ').map(|s| s.to_owned()).collect()
+        std::iter::once("hs")
+            .chain(args.split(' '))
+            .map(|s| s.to_owned())
+            .collect()
     }
     #[test]
     fn test_strange_set_alias() {
-        let args = build_args("hs alias trash -f removed");
-        let args = handle_args(&args).unwrap();
+        let args = handle_args(build_args("hs alias trash -f removed")).unwrap();
         assert_eq!(args.filter, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
@@ -394,8 +396,7 @@ mod test {
     }
     #[test]
     fn test_strange_alias() {
-        let args = build_args("hs -f e e -t e something -T e");
-        let args = handle_args(&args).unwrap();
+        let args = handle_args(build_args("hs -f e e -t e something -T e")).unwrap();
         assert_eq!(args.filter, vec!["e".parse().unwrap()]);
         assert_eq!(args.all, false);
         match &args.subcmd {
@@ -414,8 +415,7 @@ mod test {
             }
         }
 
-        let args = build_args("hs la -l");
-        let args = handle_args(&args).unwrap();
+        let args = handle_args(build_args("hs la -l")).unwrap();
         assert_eq!(args.filter, vec!["all,^removed".parse().unwrap()]);
         assert_eq!(args.all, true);
         match &args.subcmd {

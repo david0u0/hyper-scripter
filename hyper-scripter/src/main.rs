@@ -34,7 +34,7 @@ async fn main() {
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
-    let root = args::handle_args(&args)?;
+    let root = args::handle_args(args)?;
     if root.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);

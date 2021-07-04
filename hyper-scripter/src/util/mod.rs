@@ -246,8 +246,9 @@ pub fn prepare_script<T: AsRef<str>>(
                 "name": script.name.key().to_owned(),
                 "content": content,
             });
-            let template = &Config::get()?.get_script_conf(&script.ty)?.template;
-            handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
+            // let template = &Config::get()?.get_script_conf(&script.ty)?.template;
+            let template = vec![]; // FIXME:
+            handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
             for line in content {
                 writeln!(file, "{}", line)?;

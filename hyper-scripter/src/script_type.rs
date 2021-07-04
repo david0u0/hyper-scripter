@@ -144,10 +144,10 @@ impl ScriptTypeConfig {
 
 macro_rules! create_default_types {
     ($(( $name:literal, $tmpl:ident, $conf:expr )),*) => {
-        pub fn get_default_template(ty: &ScriptType) -> Option<&'static str> {
+        pub fn get_default_template(ty: &ScriptType) -> &'static str {
             match ty.0.as_ref() {
-                $($name => Some($tmpl),)*
-                _ => None
+                $($name => $tmpl,)*
+                _ => DEFAULT_WELCOME_MSG
             }
         }
         pub fn iter_default_templates() -> impl ExactSizeIterator<Item = (ScriptType, &'static str)> {

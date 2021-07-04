@@ -121,7 +121,7 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
 // TODO: 把這些 sep: &str 換成標準庫的 Pattern
 
 pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
-    if prefix.len() >= target.len() {
+    if prefix.len() > target.len() {
         return false;
     }
 
@@ -141,6 +141,7 @@ pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
 
 fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
     let mut ans_opt = None;
+    let mut first = true;
     foreach_reorder(choice, sep, &mut |choice_reordered| {
         let score_opt = MATCHER.fuzzy_match(choice_reordered, pattern);
         log::trace!(
@@ -150,13 +151,24 @@ fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
             pattern,
             score_opt,
         );
-        if let Some(score) = score_opt {
+        if let Some(mut score) = score_opt {
+            if first {
+                // NOTE: 正常排序的分數會稍微高一點
+                // 例如 [a/b, b/a] 中要找 `a/b`，則前者以分毫之差勝出
+                score += 1;
+                log::trace!(
+                    "模糊搜尋，候選者：{}，正常排序就命中，分數略提升為 {}",
+                    choice,
+                    score
+                );
+            }
             if let Some(ans) = ans_opt {
                 ans_opt = Some(std::cmp::max(score, ans));
             } else {
-                ans_opt = score_opt;
+                ans_opt = Some(score);
             }
         }
+        first = false;
     });
     ans_opt
 }
@@ -177,37 +189,38 @@ fn foreach_reorder<S: StopIndicator, F: FnMut(&str) -> S>(
     sep: &str,
     handler: &mut F,
 ) {
+    fn recursive_reorder<'a, S: StopIndicator, F: FnMut(&str) -> S>(
+        choice_arr: &[&'a str],
+        mem: &mut Vec<bool>,
+        reorderd: &mut Vec<&'a str>,
+        sep: &str,
+        handler: &mut F,
+    ) -> S {
+        if reorderd.len() == mem.len() {
+            let new_str = reorderd.join(sep);
+            handler(&new_str)
+        } else {
+            for i in 0..mem.len() {
+                if mem[i] {
+                    continue;
+                }
+                mem[i] = true;
+                reorderd.push(choice_arr[i]);
+                let indicator = recursive_reorder(choice_arr, mem, reorderd, sep, handler);
+                if indicator.should_stop() {
+                    return indicator;
+                }
+                reorderd.pop();
+                mem[i] = false;
+            }
+            Default::default()
+        }
+    }
+
     let choice_arr: Vec<_> = choice.split(sep).collect();
     let mut mem = vec![false; choice_arr.len()];
     let mut reorederd = Vec::<&str>::with_capacity(mem.len());
     recursive_reorder(&choice_arr, &mut mem, &mut reorederd, sep, handler);
-}
-fn recursive_reorder<'a, S: StopIndicator, F: FnMut(&str) -> S>(
-    choice_arr: &[&'a str],
-    mem: &mut Vec<bool>,
-    reorderd: &mut Vec<&'a str>,
-    sep: &str,
-    handler: &mut F,
-) -> S {
-    if reorderd.len() == mem.len() {
-        let new_str = reorderd.join(sep);
-        handler(&new_str)
-    } else {
-        for i in 0..mem.len() {
-            if mem[i] {
-                continue;
-            }
-            mem[i] = true;
-            reorderd.push(choice_arr[i]);
-            let indicator = recursive_reorder(choice_arr, mem, reorderd, sep, handler);
-            if indicator.should_stop() {
-                return indicator;
-            }
-            reorderd.pop();
-            mem[i] = false;
-        }
-        Default::default()
-    }
 }
 
 #[cfg(test)]
@@ -219,28 +232,28 @@ mod test {
             Cow::Borrowed(self)
         }
     }
-    fn extract_multifuzz<T: FuzzKey>(res: FuzzResult<T>) -> Vec<String> {
+    fn extract_multifuzz<'a>(res: FuzzResult<&'a str>) -> (&'a str, Vec<&'a str>) {
         match res {
             Multi { ans, others } => {
                 let mut ret = vec![];
-                ret.push(ans.fuzz_key().to_string());
+                ret.push(ans);
                 for data in others.into_iter() {
-                    ret.push(data.fuzz_key().to_string())
+                    ret.push(data);
                 }
                 ret.sort();
-                ret
+                (ans, ret)
             }
             _ => unreachable!(),
         }
     }
-    fn extract_high<T: FuzzKey>(res: FuzzResult<T>) -> String {
+    fn extract_high<'a>(res: FuzzResult<&'a str>) -> &'a str {
         match res {
-            High(t) => t.fuzz_key().to_string(),
+            High(t) => t,
             _ => unreachable!(),
         }
     }
     async fn do_fuzz<'a>(name: &'a str, v: &'a Vec<&'a str>) -> Option<FuzzResult<&'a str>> {
-        fuzz(name, v.clone().into_iter(), "/").await.unwrap()
+        fuzz(name, v.iter().map(|s| *s), "/").await.unwrap()
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz() {
@@ -248,7 +261,7 @@ mod test {
         let t1 = "測試腳本1";
         let t2 = "測試腳本2";
         let t3 = ".42";
-        let vec = vec![t1.clone(), t2, t3.clone()];
+        let vec = vec![t1, t2, t3];
 
         let res = do_fuzz("測試1", &vec).await.unwrap();
         assert_eq!(extract_high(res), t1);
@@ -260,13 +273,13 @@ mod test {
         assert!(res.is_none());
 
         let res = do_fuzz("測試", &vec).await.unwrap();
-        let v = extract_multifuzz(res);
-        assert_eq!(v, vec!["測試腳本1".to_owned(), "測試腳本2".to_owned()]);
+        let (_, v) = extract_multifuzz(res);
+        assert_eq!(v, vec!["測試腳本1", "測試腳本2"]);
 
         let mut vec = vec!["hs_test", "hs_build", "hs_dir", "runhs", "hs_run"];
         vec.sort();
         let err = do_fuzz("hs", &vec).await.unwrap();
-        let v = extract_multifuzz(err);
+        let (_, v) = extract_multifuzz(err);
         assert_eq!(v, vec);
     }
     #[tokio::test(threaded_scheduler)]
@@ -274,9 +287,35 @@ mod test {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1";
         let t2 = "測試腳本23456";
-        let vec = vec![t1.clone(), t2];
+        let vec = vec![t1, t2];
         let res = do_fuzz("測試", &vec).await.unwrap();
         assert_eq!(extract_high(res), t1, "模糊搜尋無法找出較短者");
+    }
+    #[tokio::test(threaded_scheduler)]
+    async fn test_reorder_fuzz() {
+        let _ = env_logger::try_init();
+        let t1 = "a/c";
+        let t2 = "b/a";
+        let t3 = "a/b";
+        let vec = vec![t1, t2, t3];
+
+        let res = do_fuzz("ab", &vec).await.unwrap();
+        let (ans, v) = extract_multifuzz(res);
+        assert_eq!(ans, "a/b");
+        assert_eq!(v, vec!["a/b", "b/a"]);
+
+        let res = do_fuzz("ba", &vec).await.unwrap();
+        let (ans, v) = extract_multifuzz(res);
+        assert_eq!(ans, "b/a");
+        assert_eq!(v, vec!["a/b", "b/a"]);
+
+        let res = do_fuzz("ca", &vec).await.unwrap();
+        assert_eq!(extract_high(res), "a/c");
+
+        let res = do_fuzz("a", &vec).await.unwrap();
+        let (ans, v) = extract_multifuzz(res);
+        assert_eq!(ans, "a/c"); // 真的同分，只好以順序決定了
+        assert_eq!(v, vec!["a/b", "a/c", "b/a"]);
     }
     #[test]
     fn test_reorder() {

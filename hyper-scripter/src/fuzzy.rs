@@ -4,7 +4,7 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
 use tokio::task::spawn_blocking;
 
-const MID_SCORE: i64 = 1000; // TODO: 好好決定這個魔法數字
+const MID_SCORE: i64 = 4500; // TODO: 好好決定這個魔法數字
 
 fn is_multifuzz(score: i64, best_score: i64) -> bool {
     // best_score * 0.7 < score
@@ -73,11 +73,17 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
             let key = unsafe { key.get() };
             let score = my_fuzz(key, unsafe { raw_name.get() }, unsafe { sep.get() });
 
-            if let Some(mut score) = score {
-                let len = key.chars().count();
-                log::trace!("將分數正交化：{} / {}", score * 100, len);
-                score = score * 100 / len as i64;
-                Some(score)
+            if let Some(score) = score {
+                let len = key.chars().count() as i64;
+                let computed_score = score * score * 10 / len as i64;
+                log::trace!(
+                    "將分數正交化：{} * {} * 10 / {} = {}",
+                    score,
+                    score,
+                    len,
+                    computed_score
+                );
+                Some(computed_score)
             } else {
                 None
             }
@@ -261,7 +267,8 @@ mod test {
         let t1 = "測試腳本1";
         let t2 = "測試腳本2";
         let t3 = ".42";
-        let vec = vec![t1, t2, t3];
+        let t4 = "測腳本4試";
+        let vec = vec![t1, t2, t3, t4];
 
         let res = do_fuzz("測試1", &vec).await.unwrap();
         assert_eq!(extract_high(res), t1);
@@ -273,14 +280,9 @@ mod test {
         assert!(res.is_none());
 
         let res = do_fuzz("測試", &vec).await.unwrap();
-        let (_, v) = extract_multifuzz(res);
+        let (ans, v) = extract_multifuzz(res);
         assert_eq!(v, vec!["測試腳本1", "測試腳本2"]);
-
-        let mut vec = vec!["hs_test", "hs_build", "hs_dir", "runhs", "hs_run"];
-        vec.sort();
-        let err = do_fuzz("hs", &vec).await.unwrap();
-        let (_, v) = extract_multifuzz(err);
-        assert_eq!(v, vec);
+        assert_eq!(ans, "測試腳本1"); // 真的同分，只好以順序決定了
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz_with_len() {

@@ -1,7 +1,8 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
-use crate::path::get_home;
+use crate::path::{get_home, get_template_path};
 use crate::script::ScriptInfo;
+use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
 use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
@@ -246,8 +247,8 @@ pub fn prepare_script<T: AsRef<str>>(
                 "name": script.name.key().to_owned(),
                 "content": content,
             });
-            let template = &Config::get()?.get_script_conf(&script.ty)?.template;
-            handle_fs_res(&[path], write_prepare_script(file, template, &info))?;
+            let template = get_or_create_tamplate(&script.ty)?;
+            handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
             for line in content {
                 writeln!(file, "{}", line)?;
@@ -260,13 +261,23 @@ pub fn prepare_script<T: AsRef<str>>(
     }
     Ok(if is_new { Some(Utc::now()) } else { None })
 }
+
+fn get_or_create_tamplate(ty: &ScriptType) -> Result<String> {
+    let tmpl_path = get_template_path(ty)?;
+    if tmpl_path.exists() {
+        return read_file(&tmpl_path);
+    }
+    let default_tmpl = get_default_template(ty);
+    write_file(&tmpl_path, default_tmpl)?;
+    Ok(default_tmpl.to_owned())
+}
+
 fn write_prepare_script<W: Write>(
     w: W,
-    template: &[String],
+    template: &str,
     info: &serde_json::Value,
 ) -> std::io::Result<()> {
     let reg = Handlebars::new();
-    let template = template.join("\n");
     reg.render_template_to_write(&template, &info, w)
         .map_err(|err| match err {
             TemplateRenderError::IOError(err, ..) => err,

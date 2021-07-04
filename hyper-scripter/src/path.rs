@@ -8,6 +8,7 @@ use std::sync::Mutex;
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
 pub const HS_PRE_RUN: &str = ".hs_prerun.sh";
+const TEMPLATE: &str = ".hs_templates";
 
 macro_rules! hs_home_env {
     () => {
@@ -146,6 +147,15 @@ pub fn open_script(
         }
     }
     Ok(script_path)
+}
+
+pub fn get_template_path(ty: &ScriptType) -> Result<PathBuf> {
+    let dir = get_home().join(TEMPLATE);
+    if !dir.exists() {
+        log::info!("找不到模板資料夾，創建之");
+        handle_fs_res(&[&dir], create_dir(&dir))?;
+    }
+    Ok(dir.join(format!("{}.hbs", ty)))
 }
 
 #[cfg(test)]

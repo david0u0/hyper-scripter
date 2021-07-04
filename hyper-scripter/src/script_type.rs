@@ -4,6 +4,9 @@ use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
+{{/each}}";
+
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 
 set -e
@@ -104,19 +107,9 @@ impl Default for ScriptType {
 pub struct ScriptTypeConfig {
     pub ext: Option<String>,
     pub color: String,
-    pub template: Vec<String>,
     pub cmd: Option<String>,
     args: Vec<String>,
     env: Vec<(String, String)>,
-}
-fn split(s: &str) -> Vec<String> {
-    s.split('\n').map(|s| s.to_owned()).collect()
-}
-fn default_template() -> Vec<String> {
-    vec![
-        "{{#each content}}{{{this}}}".to_owned(),
-        "{{/each}}".to_owned(),
-    ]
 }
 
 impl ScriptTypeConfig {
@@ -142,80 +135,79 @@ impl ScriptTypeConfig {
     }
     pub fn default_script_types() -> HashMap<ScriptType, ScriptTypeConfig> {
         let mut ret = HashMap::default();
-        ret.insert(
-            "sh".into(),
-            ScriptTypeConfig {
-                ext: Some("sh".to_owned()),
-                color: "bright magenta".to_owned(),
-                template: split(SHELL_WELCOME_MSG),
-                cmd: Some("bash".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![],
-            },
-        );
-        ret.insert(
-            "tmux".into(),
-            ScriptTypeConfig {
-                ext: Some("sh".to_owned()),
-                color: "white".to_owned(),
-                template: split(TMUX_WELCOME_MSG),
-                cmd: Some("bash".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![],
-            },
-        );
-        ret.insert(
-            "js".into(),
-            ScriptTypeConfig {
-                ext: Some("js".to_owned()),
-                color: "bright cyan".to_owned(),
-                template: split(JS_WELCOME_MSG),
-                cmd: Some("node".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![(
-                    "NODE_PATH".to_owned(),
-                    "{{{script_dir}}}/node_modules".to_owned(),
-                )],
-            },
-        );
-        ret.insert(
-            "js-i".into(),
-            ScriptTypeConfig {
-                ext: Some("js".to_owned()),
-                color: "bright cyan".to_owned(),
-                template: split(JS_WELCOME_MSG),
-                cmd: Some("node".to_owned()),
-                args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
-                env: vec![(
-                    "NODE_PATH".to_owned(),
-                    "{{{script_dir}}}/node_modules".to_owned(),
-                )],
-            },
-        );
-        ret.insert(
-            "rb".into(),
-            ScriptTypeConfig {
-                ext: Some("rb".to_owned()),
-                color: "bright red".to_owned(),
-                template: split(RB_WELCOME_MSG),
-                cmd: Some("ruby".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![],
-            },
-        );
-
-        ret.insert(
-            "txt".into(),
-            ScriptTypeConfig {
-                ext: None,
-                color: "bright black".to_owned(),
-                template: default_template(),
-                cmd: Some("cat".to_owned()),
-                args: vec!["{{path}}".to_owned()],
-                env: vec![],
-            },
-        );
-
+        for (ty, conf) in iter_default_configs() {
+            ret.insert(ty, conf);
+        }
         ret
     }
+}
+
+macro_rules! create_default_types {
+    ($(( $name:literal, $tmpl:ident, $conf:expr )),*) => {
+        pub fn get_default_template(ty: &ScriptType) -> &'static str {
+            match ty.0.as_ref() {
+                $($name => $tmpl,)*
+                _ => DEFAULT_WELCOME_MSG
+            }
+        }
+        pub fn iter_default_templates() -> impl ExactSizeIterator<Item = (ScriptType, &'static str)> {
+            let arr = [$( (ScriptType($name.to_owned()), $tmpl), )*];
+            std::array::IntoIter::new(arr)
+        }
+        fn iter_default_configs() -> impl ExactSizeIterator<Item = (ScriptType, ScriptTypeConfig)> {
+            let arr = [$( (ScriptType($name.to_owned()), $conf), )*];
+            std::array::IntoIter::new(arr)
+        }
+    };
+}
+
+create_default_types! {
+    ("sh", SHELL_WELCOME_MSG, ScriptTypeConfig {
+        ext: Some("sh".to_owned()),
+        color: "bright magenta".to_owned(),
+        cmd: Some("bash".to_owned()),
+        args: vec!["{{path}}".to_owned()],
+        env: vec![],
+    }),
+    ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
+        ext: Some("sh".to_owned()),
+        color: "white".to_owned(),
+        cmd: Some("bash".to_owned()),
+        args: vec!["{{path}}".to_owned()],
+        env: vec![],
+    }),
+    ("js", JS_WELCOME_MSG, ScriptTypeConfig {
+        ext: Some("js".to_owned()),
+        color: "bright cyan".to_owned(),
+        cmd: Some("node".to_owned()),
+        args: vec!["{{path}}".to_owned()],
+        env: vec![(
+            "NODE_PATH".to_owned(),
+            "{{{hs_home}}}/node_modules".to_owned(),
+        )],
+    }),
+    ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
+        ext: Some("js".to_owned()),
+        color: "bright cyan".to_owned(),
+        cmd: Some("node".to_owned()),
+        args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
+        env: vec![(
+            "NODE_PATH".to_owned(),
+            "{{{hs_home}}}/node_modules".to_owned(),
+        )],
+    }),
+    ("rb", RB_WELCOME_MSG, ScriptTypeConfig {
+        ext: Some("rb".to_owned()),
+        color: "bright red".to_owned(),
+        cmd: Some("ruby".to_owned()),
+        args: vec!["{{path}}".to_owned()],
+        env: vec![],
+    }),
+    ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
+        ext: None,
+        color: "bright black".to_owned(),
+        cmd: Some("cat".to_owned()),
+        args: vec!["{{path}}".to_owned()],
+        env: vec![],
+    })
 }

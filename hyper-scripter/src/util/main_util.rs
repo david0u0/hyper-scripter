@@ -3,7 +3,7 @@ use crate::path;
 use crate::query::{self, EditQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
-use crate::script_type::ScriptType;
+use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
 use hyper_scripter_historian::Historian;
 use std::path::PathBuf;
@@ -235,6 +235,17 @@ pub fn prepare_pre_run() -> Result {
     if !p.exists() {
         log::info!("寫入預執行腳本 {:?}", p);
         super::write_file(&p, ">&2 echo running $NAME $@")?;
+    }
+    Ok(())
+}
+
+pub fn load_templates() -> Result {
+    for (ty, tmpl) in iter_default_templates() {
+        let tmpl_path = path::get_template_path(&ty)?;
+        if tmpl_path.exists() {
+            continue;
+        }
+        super::write_file(&tmpl_path, tmpl)?;
     }
     Ok(())
 }

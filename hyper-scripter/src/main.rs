@@ -70,6 +70,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         log::info!("初次使用，載入好用工具和預執行腳本");
         util::main_util::load_utils(&mut repo).await?;
         util::main_util::prepare_pre_run()?;
+        util::main_util::load_templates()?;
     }
 
     let explicit_filter = !root.filter.is_empty();

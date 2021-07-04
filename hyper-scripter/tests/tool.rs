@@ -92,6 +92,7 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
     };
     full_args.extend(&args_vec);
 
+    log::info!("開始執行 {:?}", args_vec);
     let mut cmd = Command::new(EXE);
     let mut child = cmd
         .args(&full_args)

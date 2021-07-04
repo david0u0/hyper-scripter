@@ -80,7 +80,7 @@ pub async fn edit_or_create(
                 let name = query.into_script_name()?;
                 if script_repo.get_hidden_mut(&name).is_some() {
                     log::error!("與被篩掉的腳本撞名");
-                    return Err(Error::ScriptExist(name.to_string()));
+                    return Err(Error::ScriptIsFiltered(name.to_string()));
                 }
                 log::debug!("打開新命名腳本：{:?}", name);
                 if tags.append_namespace {
@@ -100,7 +100,7 @@ pub async fn edit_or_create(
             }};
         }
 
-        match query::do_script_query(&query, script_repo).await {
+        match query::do_script_query(&query, script_repo, false, None).await {
             Err(Error::DontFuzz) => new_named!(),
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {

@@ -32,6 +32,7 @@ pub enum Error {
 
     PathExist(PathBuf),
     ScriptExist(String),
+    ScriptIsFiltered(String),
     ScriptNotFound(String),
     NoAlias(String),
     UnknownType(String),

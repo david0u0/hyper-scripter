@@ -76,6 +76,21 @@ fn test_hs_in_hs() {
 }
 
 #[test]
+fn test_remove_history_in_script() {
+    println!("在腳本執行途中砍掉執行歷史，則該腳本的「執行完畢」事件應該一併消失");
+    let _g = setup();
+
+    run("e test1 | echo 1").unwrap();
+    run("e test2 | echo 2 && $HS_EXE -H $HS_HOME history rm =${NAME}! 1").unwrap();
+
+    assert_eq!(run("-").unwrap(), "2");
+    assert_eq!(run("-").unwrap(), "2"); // 比較晚創造，所以刪了執行事件還是腳本2先
+    assert_eq!(run("test1").unwrap(), "1");
+    assert_eq!(run("test2").unwrap(), "2");
+    assert_eq!(run("-").unwrap(), "1");
+}
+
+#[test]
 fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");
     let _g = setup();
@@ -85,6 +100,7 @@ fn test_edit_existing_bang() {
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
+        use hyper_scripter::error::Error;
         use hyper_scripter::script_repo::ScriptRepo;
         use hyper_scripter::tag::{Tag, TagFilter};
         use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
@@ -93,7 +109,7 @@ fn test_edit_existing_bang() {
         let mut repo = ScriptRepo::new(pool, None).await.unwrap();
         repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 
-        edit_or_create(
+        let err = edit_or_create(
             "test".parse().unwrap(),
             &mut repo,
             None,
@@ -106,6 +122,7 @@ fn test_edit_existing_bang() {
         )
         .await
         .expect_err("沒有 BANG! 就找到編輯的腳本！？");
+        matches!(err, Error::ScriptIsFiltered(s) if s == "test");
 
         let (p, e) = edit_or_create(
             "test!".parse().unwrap(),
@@ -127,21 +144,6 @@ fn test_edit_existing_bang() {
         tags.insert("hide".parse().unwrap());
         assert_eq!(tags, e.tags);
     });
-}
-
-#[test]
-fn test_remove_history_in_script() {
-    println!("在腳本執行途中砍掉執行歷史，則該腳本的「執行完畢」事件應該一併消失");
-    let _g = setup();
-
-    run("e test1 | echo 1").unwrap();
-    run("e test2 | echo 2 && $HS_EXE -H $HS_HOME history rm =${NAME}! 1").unwrap();
-
-    assert_eq!(run("-").unwrap(), "2");
-    assert_eq!(run("-").unwrap(), "2"); // 比較晚創造，所以刪了執行事件還是腳本2先
-    assert_eq!(run("test1").unwrap(), "1");
-    assert_eq!(run("test2").unwrap(), "2");
-    assert_eq!(run("-").unwrap(), "1");
 }
 
 // TODO: edit wild & edit phantom

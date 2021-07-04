@@ -33,6 +33,7 @@ impl Display for Error {
             PathNotFound(v) => fmt_multi_path(f, "Path not found", v)?,
             PathExist(path) => write!(f, "Path already exist: {:?}", path)?,
             ScriptExist(name) => write!(f, "Script already exist: {}", name)?,
+            ScriptIsFiltered(name) => write!(f, "Script filtered out: {}", name)?,
             ScriptNotFound(name) => write!(f, "Script not found: {}", name)?,
             UnknownType(t) => write!(f, "Unknown type: {}", t)?,
             Format(code, s) => {

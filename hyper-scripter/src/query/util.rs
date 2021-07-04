@@ -1,5 +1,5 @@
 use super::{ListQuery, ScriptQuery, ScriptQueryInner};
-use crate::config::Config;
+use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
@@ -55,9 +55,11 @@ pub async fn do_list_query<'a>(
 pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
+    force_all: bool,
+    force_prompt_level: Option<PromptLevel>,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
-    let all = script_query.bang;
+    let all = script_query.bang || force_all;
     match &script_query.inner {
         ScriptQueryInner::Prev(prev) => {
             let latest = script_repo.latest_mut(*prev, all);
@@ -70,7 +72,7 @@ pub async fn do_script_query<'b>(
         }
         ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
         ScriptQueryInner::Fuzz(name) => {
-            let level = Config::get()?.prompt_level;
+            let level = force_prompt_level.unwrap_or(Config::get()?.prompt_level);
             let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
             let need_prompt: bool;
             let entry = match fuzz_res {
@@ -82,6 +84,12 @@ pub async fn do_script_query<'b>(
                     need_prompt = true;
                     entry
                 }
+                #[cfg(feature = "benching")]
+                Some(fuzzy::Multi { ans, .. }) => {
+                    need_prompt = true;
+                    ans
+                }
+                #[cfg(not(feature = "benching"))]
                 Some(fuzzy::Multi { ans, others }) => {
                     need_prompt = true;
                     // NOTE: 從一堆分數相近者中選出最新的
@@ -100,7 +108,7 @@ pub async fn do_script_query<'b>(
                 }
                 None => return Ok(None),
             };
-            if (need_prompt && !level.never()) | level.always() {
+            if (need_prompt && !level.never()) || level.always() {
                 prompt_fuzz_acceptable(&*entry)?;
             }
             Ok(Some(entry))
@@ -111,13 +119,24 @@ pub async fn do_script_query_strict<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
 ) -> Result<RepoEntry<'b>> {
-    match do_script_query(script_query, script_repo).await {
-        Err(e) => Err(e),
-        Ok(None) => Err(Error::ScriptNotFound(
-            script_query.clone().into_script_name()?.to_string(), // TODO: 簡單點？
-        )),
-        Ok(Some(info)) => Ok(info),
+    // FIXME: 一旦 NLL 進化就修掉這段 unsafe
+    let ptr = script_repo as *mut ScriptRepo;
+    if let Some(info) = do_script_query(script_query, unsafe { &mut *ptr }, false, None).await? {
+        return Ok(info);
     }
+
+    #[cfg(not(feature = "benching"))]
+    if !script_query.bang {
+        let filtered =
+            do_script_query(script_query, script_repo, true, Some(PromptLevel::Never)).await?;
+        if let Some(filtered) = filtered {
+            return Err(Error::ScriptIsFiltered(filtered.name.key().to_string()));
+        }
+    }
+
+    Err(Error::ScriptNotFound(
+        script_query.clone().into_script_name()?.to_string(),
+    ))
 }
 
 static CTRLC_HANDLE: Once = Once::new();

@@ -214,9 +214,11 @@ pub enum History {
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,
-        #[structopt(short, long, requires("script"), default_value = "10")]
+        #[structopt(short, long, default_value = "10")]
         limit: u32,
-        #[structopt(short, long, requires("script"), default_value = "0")]
+        #[structopt(long)]
+        with_name: bool,
+        #[structopt(short, long, default_value = "0")]
         offset: u32,
     },
     Tidy {

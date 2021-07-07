@@ -436,6 +436,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 History::Show {
                     script,
                     limit,
+                    with_name,
                     offset,
                 },
         } => {
@@ -444,14 +445,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);
                 let args: Vec<String> = serde_json::from_str(&args)?;
-                let mut first = true;
+                if with_name {
+                    print!("{}", entry.name.key());
+                }
                 for arg in args {
-                    if !first {
-                        print!(" ");
-                    } else {
-                        first = false;
-                    }
-                    print!("{}", util::to_display_args(arg)?);
+                    print!(" {}", util::to_display_args(arg)?);
                 }
                 println!();
             }

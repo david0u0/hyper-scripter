@@ -85,10 +85,7 @@ pub fn get_home() -> &'static Path {
 }
 #[cfg(test)]
 pub fn get_home() -> &'static Path {
-    crate::set_once!(PATH, || {
-        let p = join_path(".", ".test_hyper_scripter").unwrap();
-        PATH.set(p);
-    });
+    crate::set_once!(PATH, || { join_path(".", ".test_hyper_scripter").unwrap() });
     PATH.get().as_ref()
 }
 

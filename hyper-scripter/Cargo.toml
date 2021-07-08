@@ -31,6 +31,7 @@ path = "src/main.rs"
 [features]
 default = []
 hard-home = []
+no-state-check = []
 benching = []
 
 [dependencies]

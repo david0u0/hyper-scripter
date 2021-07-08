@@ -263,19 +263,19 @@ fn set_home(p: &Option<String>) -> Result {
     Config::init()
 }
 
-fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'static Alias, &'a [String])>> {
+fn find_alias<'a>(root: &'a alias_mod::Root) -> Option<(&'static Alias, &'a [String])> {
     match &root.subcmd {
         Some(alias_mod::Subs::Other(v)) => {
             let first = v.first().unwrap().as_str();
             let conf = Config::get();
             if let Some(alias) = conf.alias.get(first) {
                 log::info!("別名 {} => {:?}", first, alias);
-                Ok(Some((alias, v)))
+                Some((alias, v))
             } else {
-                Ok(None)
+                None
             }
         }
-        _ => Ok(None),
+        _ => None,
     }
 }
 
@@ -309,7 +309,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
         Ok(alias_root) => {
             log::trace!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.hs_home)?;
-            if let Some((alias, remaining_args)) = find_alias(&alias_root)? {
+            if let Some((alias, remaining_args)) = find_alias(&alias_root) {
                 let base_len = args.len() - remaining_args.len();
                 let base_args = args.iter().take(base_len);
                 let after_args = alias.after.iter();

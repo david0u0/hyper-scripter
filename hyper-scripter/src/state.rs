@@ -1,17 +1,17 @@
 use std::cell::UnsafeCell;
+#[cfg(not(feature = "no-state-check"))]
 use std::sync::atomic::{AtomicU8, Ordering::SeqCst};
-
-struct DataCell<T>(UnsafeCell<T>);
-unsafe impl<T> Sync for DataCell<T> {}
 
 const UNINITIALIZED: u8 = 0;
 const INITIALIZING: u8 = 1;
 const INITIALIZED: u8 = 2;
 
 pub struct State<T> {
+    data: UnsafeCell<Option<T>>,
+    #[cfg(not(feature = "no-state-check"))]
     status: AtomicU8,
-    data: DataCell<Option<T>>,
 }
+unsafe impl<T> Sync for State<T> {}
 
 #[macro_export]
 macro_rules! set_once {
@@ -30,7 +30,8 @@ macro_rules! set_once {
 impl<T: Sized> State<T> {
     pub const fn new() -> State<T> {
         State {
-            data: DataCell(UnsafeCell::new(None)),
+            data: UnsafeCell::new(None),
+            #[cfg(not(feature = "no-state-check"))]
             status: AtomicU8::new(UNINITIALIZED),
         }
     }
@@ -47,22 +48,25 @@ impl<T: Sized> State<T> {
     }
 
     fn set_inner(&self, data: T) {
-        let status = self
-            .status
-            .compare_exchange(UNINITIALIZED, INITIALIZING, SeqCst, SeqCst);
-        log::debug!("設定前的狀態：{:?}", status);
-        match status {
-            Ok(_) => {
-                let ptr = self.data.0.get();
-                unsafe {
-                    *ptr = Some(data);
-                }
-                self.status.store(INITIALIZED, SeqCst);
+        #[cfg(not(feature = "no-state-check"))]
+        {
+            let status = self
+                .status
+                .compare_exchange(UNINITIALIZED, INITIALIZING, SeqCst, SeqCst);
+            log::debug!("設定前的狀態：{:?}", status);
+            if status.is_err() {
+                panic!("多次設定狀態");
             }
-            Err(_) => panic!("多次設定狀態"),
         }
+        let ptr = self.data.get();
+        unsafe {
+            *ptr = Some(data);
+        }
+        #[cfg(not(feature = "no-state-check"))]
+        self.status.store(INITIALIZED, SeqCst);
     }
     pub fn get(&self) -> &T {
+        #[cfg(not(feature = "no-state-check"))]
         match self.status.load(SeqCst) {
             UNINITIALIZED => {
                 panic!("還沒設定就取狀態");
@@ -74,7 +78,7 @@ impl<T: Sized> State<T> {
             }
             _ => (),
         }
-        let ptr = self.data.0.get();
+        let ptr = self.data.get();
         unsafe { (&*ptr).as_ref().unwrap() }
     }
 }

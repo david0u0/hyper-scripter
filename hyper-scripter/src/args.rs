@@ -257,16 +257,17 @@ pub struct List {
 
 fn set_home(p: &Option<String>) -> Result {
     match p {
-        Some(p) => path::set_home(p),
-        None => path::set_home_from_sys(),
+        Some(p) => path::set_home(p)?,
+        None => path::set_home_from_sys()?,
     }
+    Config::init()
 }
 
 fn find_alias<'a>(root: &'a alias_mod::Root) -> Result<Option<(&'static Alias, &'a [String])>> {
     match &root.subcmd {
         Some(alias_mod::Subs::Other(v)) => {
             let first = v.first().unwrap().as_str();
-            let conf = Config::get()?;
+            let conf = Config::get();
             if let Some(alias) = conf.alias.get(first) {
                 log::info!("別名 {} => {:?}", first, alias);
                 Ok(Some((alias, v)))
@@ -300,31 +301,33 @@ pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
-    } else {
-        match alias_mod::Root::from_iter_safe(&args) {
-            Ok(alias_root) => {
-                log::trace!("別名命令行物件 {:?}", alias_root);
-                set_home(&alias_root.hs_home)?;
-                if let Some((alias, remaining_args)) = find_alias(&alias_root)? {
-                    let base_len = args.len() - remaining_args.len();
-                    let base_args = args.iter().take(base_len);
-                    let after_args = alias.after.iter();
-                    let remaining_args = remaining_args.iter().skip(1);
-                    let new_args = base_args.chain(after_args).chain(remaining_args);
-
-                    // log::trace!("新的參數為 {:?}", new_args);
-                    return Ok(Root::from_iter(new_args));
-                }
-            }
-            Err(e) => {
-                log::warn!("解析別名參數出錯： {}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
-            }
-        };
+        let root = Root::from_iter(args);
+        set_home(&root.hs_home)?;
+        return Ok(root);
     }
+    match alias_mod::Root::from_iter_safe(&args) {
+        Ok(alias_root) => {
+            log::trace!("別名命令行物件 {:?}", alias_root);
+            set_home(&alias_root.hs_home)?;
+            if let Some((alias, remaining_args)) = find_alias(&alias_root)? {
+                let base_len = args.len() - remaining_args.len();
+                let base_args = args.iter().take(base_len);
+                let after_args = alias.after.iter();
+                let remaining_args = remaining_args.iter().skip(1);
+                let new_args = base_args.chain(after_args).chain(remaining_args);
 
-    let root = Root::from_iter(args);
-    set_home(&root.hs_home)?;
-    Ok(root)
+                // log::trace!("新的參數為 {:?}", new_args);
+                return Ok(Root::from_iter(new_args));
+            }
+            let root = Root::from_iter(args);
+            Ok(root)
+        }
+        Err(e) => {
+            log::warn!("解析別名參數出錯： {}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
+            Root::from_iter(args);
+            unreachable!()
+        }
+    }
 }
 
 impl Root {

@@ -1,6 +1,7 @@
 use crate::error::{Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
+use crate::state::State;
 use crate::tag::{TagFilter, TagFilterGroup};
 use crate::util;
 use colored::Color;
@@ -13,23 +14,7 @@ use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
 
-#[cfg(not(test))]
-lazy_static::lazy_static! {
-    static ref CONFIG: Result<Config> = RawConfig::load().map(|raw_config| {
-        match raw_config {
-            Some((conf, time)) => Config {
-                changed: false,
-                raw_config: conf,
-                last_modified: Some(time),
-            },
-            _ => RawConfig::default().into()
-        }
-    });
-}
-#[cfg(test)]
-lazy_static::lazy_static! {
-    static ref CONFIG: Result<Config> = Ok(RawConfig::default().into());
-}
+static CONFIG: State<Config> = State::new();
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
 where
@@ -228,7 +213,7 @@ impl From<RawConfig> for Config {
     }
 }
 impl Config {
-    pub fn store(&self) -> Result<()> {
+    pub fn store(&self) -> Result {
         let path = config_file();
         log::info!("寫入設定檔至 {:?}…", path);
         if !self.changed {
@@ -250,11 +235,26 @@ impl Config {
         }
         util::write_file(&path, &toml::to_string_pretty(&**self)?)
     }
-    pub fn get() -> Result<&'static Config> {
-        match &*CONFIG {
-            Ok(c) => Ok(c),
-            Err(e) => Err(e.clone()),
-        }
+    pub fn init() -> Result {
+        let conf = match RawConfig::load()? {
+            Some((conf, time)) => Config {
+                changed: false,
+                raw_config: conf,
+                last_modified: Some(time),
+            },
+            _ => RawConfig::default().into(),
+        };
+        CONFIG.set(conf);
+        Ok(())
+    }
+    #[cfg(not(test))]
+    pub fn get() -> &'static Config {
+        CONFIG.get()
+    }
+    #[cfg(test)]
+    pub fn get() -> &'static Config {
+        crate::set_once!(CONFIG, || { RawConfig::default().into() });
+        CONFIG.get()
     }
     pub fn get_color(&self, ty: &ScriptType) -> Result<Color> {
         let c = self.get_script_conf(ty)?.color.as_str();

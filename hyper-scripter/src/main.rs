@@ -44,7 +44,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     if let Some(conf) = res.conf {
         conf.store()?;
     } else {
-        Config::get()?.store()?;
+        Config::get().store()?;
     }
     Ok(res.errs)
 }
@@ -55,7 +55,7 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
-    let conf = Config::get()?;
+    let conf = Config::get();
     let (pool, init) = hyper_scripter::db::get_pool().await?;
     let recent = if root.timeless {
         None

@@ -85,7 +85,7 @@ pub fn fmt_meta<W: Write>(
     is_latest: bool,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let color = Config::get()?.get_color(&script.ty)?;
+    let color = Config::get().get_color(&script.ty)?;
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             let last_txt = if is_latest && !opt.plain {

@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::state::State;
 use futures::future::join_all;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
@@ -37,9 +38,7 @@ impl<T> FuzzResult<T> {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref MATCHER: SkimMatcherV2 = SkimMatcherV2::default();
-}
+static MATCHER: State<SkimMatcherV2> = State::new();
 
 pub trait FuzzKey {
     fn fuzz_key(&self) -> Cow<'_, str>;
@@ -66,6 +65,9 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
     let keys: Vec<_> = data_vec.iter().map(|(_, data)| data.fuzz_key()).collect();
     let sep = MyRaw::new(sep);
+
+    crate::set_once!(MATCHER, Default::default);
+
     let score_fut = keys.iter().map(|key| {
         let key = MyRaw::new(key.as_ref());
         spawn_blocking(move || {
@@ -149,7 +151,7 @@ fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
     let mut ans_opt = None;
     let mut first = true;
     foreach_reorder(choice, sep, &mut |choice_reordered| {
-        let score_opt = MATCHER.fuzzy_match(choice_reordered, pattern);
+        let score_opt = MATCHER.get().fuzzy_match(choice_reordered, pattern);
         log::trace!(
             "模糊搜尋，候選者：{}，重排列成：{}，輸入：{}，分數：{:?}",
             choice,

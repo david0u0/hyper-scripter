@@ -1,10 +1,10 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
+use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use std::fs::{canonicalize, create_dir, read_dir};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
 pub const HS_PRE_RUN: &str = ".hs_prerun.sh";
@@ -16,10 +16,7 @@ macro_rules! hs_home_env {
     };
 }
 
-// XXX: 改成不要用 lazy_static ?
-lazy_static::lazy_static! {
-    static ref PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
-}
+static PATH: State<PathBuf> = State::new();
 
 #[cfg(not(feature = "hard-home"))]
 fn get_default_home() -> Result<PathBuf> {
@@ -79,19 +76,20 @@ pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
             return set_home(redirect);
         }
     }
-    *PATH.lock().unwrap() = Some(path);
+    PATH.set(path);
     Ok(())
 }
 #[cfg(not(test))]
-pub fn get_home() -> PathBuf {
-    PATH.lock()
-        .unwrap()
-        .clone()
-        .expect("還沒設定路徑就取路徑，錯誤實作！")
+pub fn get_home() -> &'static Path {
+    PATH.get().as_ref()
 }
 #[cfg(test)]
-pub fn get_home() -> PathBuf {
-    join_path(".", ".test_hyper_scripter").unwrap()
+pub fn get_home() -> &'static Path {
+    crate::set_once!(PATH, || {
+        let p = join_path(".", ".test_hyper_scripter").unwrap();
+        PATH.set(p);
+    });
+    PATH.get().as_ref()
 }
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {

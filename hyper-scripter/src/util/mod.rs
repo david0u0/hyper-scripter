@@ -20,7 +20,7 @@ pub fn run(
     remaining: &[String],
     content: &str,
 ) -> Result<()> {
-    let conf = Config::get()?;
+    let conf = Config::get();
     let ty = &info.ty;
     let name = &info.name.key();
     let hs_home = get_home();

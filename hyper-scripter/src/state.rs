@@ -19,6 +19,9 @@ macro_rules! set_once {
         use std::sync::Once;
         static ONCE: Once = Once::new();
         ONCE.call_once(|| {
+            #[cfg(test)]
+            $state.set_test($f());
+            #[cfg(not(test))]
             $state.set($f());
         });
     }};
@@ -31,7 +34,19 @@ impl<T: Sized> State<T> {
             status: AtomicU8::new(UNINITIALIZED),
         }
     }
+
+    #[cfg(test)]
+    pub fn set(&self, _data: T) {}
+    #[cfg(test)]
+    pub fn set_test(&self, data: T) {
+        self.set_inner(data)
+    }
+    #[cfg(not(test))]
     pub fn set(&self, data: T) {
+        self.set_inner(data)
+    }
+
+    fn set_inner(&self, data: T) {
         let status = self
             .status
             .compare_exchange(UNINITIALIZED, INITIALIZING, SeqCst, SeqCst);

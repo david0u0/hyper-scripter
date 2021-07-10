@@ -247,28 +247,34 @@ fn test_namespace_reorder_search() {
 #[test]
 fn test_append_tags() {
     let _g = setup();
-    run("tags global").unwrap();
-    run("e -t +append append-test | echo 附加標籤".to_string()).unwrap();
-    run("e -t no-append no-append-test | echo 不要給我打標籤").unwrap();
+    run("tags global,test").unwrap();
+    let append_test = ScriptTest::new("append-test", Some("+append"));
+    let no_append_test = ScriptTest::new("no-append-test", Some("no-append"));
 
-    assert_eq!("附加標籤", run("apptest").unwrap());
-    run("no-appendtest").expect_err("標籤還是附加上去了？");
+    append_test.assert_tags(["global", "test", "append"], None, None);
+    no_append_test.assert_not_exist(None, None);
+    no_append_test.assert_tags(["no-append"], Some("-a"), None);
 
-    assert_eq!(
-        "附加標籤",
-        run("-f append apptest").expect("標籤沒附加上去？")
-    );
-    assert_eq!("不要給我打標籤", run("-f no-append apptest").unwrap());
+    run("mv -f no-append no-append-test -t +eventually-append").unwrap();
 
-    run("-f no-append mv no-append-test -t +eventually-append").unwrap();
-    assert_eq!(
-        "不要給我打標籤",
-        run("-f eventually-append apptest").expect("標籤沒被 mv 附加上去？")
+    no_append_test.assert_tags(
+        ["no-append", "eventually-append"],
+        Some("-a"),
+        Some("未能以 mv 附加標籤"),
     );
-    assert_eq!(
-        "不要給我打標籤",
-        run("-f no-append apptest").expect("標籤被 mv 弄壞了？")
-    );
+    append_test.assert_tags(["global", "test", "append"], None, Some("標籤被 mv 弄壞了"));
+    // 測試 ^all 的功能（無視一切先前的標籤）
+    let t1 = ScriptTest::new("non-global/namespace-test", Some("+^all"));
+    let t2 = ScriptTest::new("non-global/no-namespace-test", Some("^all"));
+    t1.assert_tags(["non-global"], Some("-a"), None);
+    t2.assert_tags([], Some("-a"), None);
+    // 測試 ^{some-tag} 的功能
+    let t1 = ScriptTest::new("only-test", Some("+^global"));
+    let t2 = ScriptTest::new("only-global", Some("+^test"));
+    let t3 = ScriptTest::new("nooooo", Some("^test"));
+    t1.assert_tags(["test"], None, None);
+    t2.assert_tags(["global"], None, None);
+    t3.assert_tags([], Some("-a"), None);
 }
 
 #[test]

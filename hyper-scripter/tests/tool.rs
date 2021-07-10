@@ -149,3 +149,42 @@ pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str
     res.sort();
     assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);
 }
+
+// TODO: 把整合測試的大部份地方改用這個結構
+pub struct ScriptTest {
+    name: String,
+}
+impl ScriptTest {
+    pub fn new(name: &str, tags: Option<&str>) -> Self {
+        let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
+        run(format!("e {} ={} | echo $HS_TAGS", tags_str, name)).unwrap();
+        ScriptTest {
+            name: name.to_owned(),
+        }
+    }
+    pub fn assert_not_exist(&self, args: Option<&str>, msg: Option<&str>) {
+        let s = format!("which {} ={}", args.unwrap_or_default(), self.name);
+        let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
+        run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
+    }
+    pub fn assert_tags<const N: usize>(
+        &self,
+        tags: [&str; N],
+        args: Option<&str>,
+        msg: Option<&str>,
+    ) {
+        let s = format!("{} ={}", args.unwrap_or_default(), self.name);
+        let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
+
+        let res = run(&s).expect(&format!("執行 {} 失敗{}", s, msg));
+        let mut actual_tags: Vec<_> = res.split(' ').filter(|s| !s.is_empty()).collect();
+        actual_tags.sort();
+        let mut expected_tags: Vec<_> = tags.iter().map(|s| *s).collect();
+        expected_tags.sort();
+        assert_eq!(
+            expected_tags, actual_tags,
+            "{} 的標籤不如預期{}",
+            self.name, msg
+        );
+    }
+}

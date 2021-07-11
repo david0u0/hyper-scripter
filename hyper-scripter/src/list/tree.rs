@@ -56,7 +56,7 @@ impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
 impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatter {
     fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
-        let color = Config::get()?.get_color(&script.ty)?;
+        let color = Config::get().get_color(&script.ty)?;
         let ident = ident_string(self.ident_style, t)?;
         let ident = style(self.plain, ident, |s| s.color(color).bold());
         if self.latest_script_id == script.id && !self.plain {
@@ -74,7 +74,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatte
 impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter {
     fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(name, script) = t;
-        let color = Config::get()?.get_color(&script.ty)?;
+        let color = Config::get().get_color(&script.ty)?;
         let ident = style(self.plain, name, |s| s.color(color).bold());
         let ty_txt = style(self.plain, &script.ty, |s| s.color(color).bold());
         if self.latest_script_id == script.id && !self.plain {

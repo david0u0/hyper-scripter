@@ -19,6 +19,7 @@ pub mod script;
 pub mod script_repo;
 pub mod script_time;
 pub mod script_type;
+pub mod state;
 pub mod tag;
 pub mod util;
 

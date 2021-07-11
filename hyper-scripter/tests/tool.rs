@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::{Command, Stdio};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, Once};
 
 lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
@@ -48,9 +48,13 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         }
     }
 
-    hyper_scripter::path::set_home(&home).unwrap();
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        hyper_scripter::path::set_home(&home).unwrap();
+        Config::init().unwrap();
+    });
 
-    run("alias e edit --fast").unwrap();
+    run_with_home(HOME, "alias e edit --fast").unwrap(); // 這時資料夾還沒建好，如果用 run 又會因為 canonicalize 而出問題
     let mut conf = load_conf();
     conf.prompt_level = PromptLevel::Never;
     conf.store().unwrap();

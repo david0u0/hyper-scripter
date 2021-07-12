@@ -1,4 +1,4 @@
-use super::{ListQuery, ScriptQuery, ScriptQueryInner};
+use super::{prefetch::prefetch, ListQuery, ScriptQuery, ScriptQueryInner};
 use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
@@ -15,7 +15,11 @@ pub async fn do_list_query<'a>(
 ) -> Result<Vec<RepoEntry<'a>>> {
     if queries.is_empty() {
         return Ok(repo.iter_mut(false).collect());
+        // } else if queries.len() == 1 { TODO:  prefetch and return
     }
+
+    repo.fetch_all().await?;
+
     let mut mem = HashSet::<i64>::default();
     let mut ret = vec![];
     let repo_ptr = repo as *mut ScriptRepo;
@@ -29,7 +33,7 @@ pub async fn do_list_query<'a>(
                 ret.push($script);
             };
         }
-        // SAFETY: `mem` 已保證回傳的陣列不可能包含相同的資料
+        // SAFETY: `mem` 已保證回傳的陣列不可能包含相同的資料，且 __不做預載入__ 不會動到 repo 本身
         let repo = unsafe { &mut *repo_ptr };
         match query {
             ListQuery::Pattern(re) => {
@@ -40,7 +44,7 @@ pub async fn do_list_query<'a>(
                 }
             }
             ListQuery::Query(query) => {
-                let script = match do_script_query_strict(query, repo).await {
+                let script = match do_script_query_strict_inner(query, repo, false).await {
                     Err(Error::DontFuzz) => continue,
                     Ok(entry) => entry,
                     Err(e) => return Err(e),
@@ -52,13 +56,23 @@ pub async fn do_list_query<'a>(
     Ok(ret)
 }
 
-pub async fn do_script_query<'b>(
+async fn do_script_query_inner<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
     force_all: bool,
     force_prompt_level: Option<PromptLevel>,
+    do_prefetch: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
+
+    // FIXME: 一旦 NLL 進化就修掉這段 unsafe
+    if do_prefetch {
+        let ptr: *mut ScriptRepo = script_repo;
+        if let Some(res) = prefetch(script_query, unsafe { &mut *ptr }).await {
+            return res;
+        }
+    }
+
     let all = script_query.bang || force_all;
     match &script_query.inner {
         ScriptQueryInner::Prev(prev) => {
@@ -115,20 +129,36 @@ pub async fn do_script_query<'b>(
         }
     }
 }
-pub async fn do_script_query_strict<'b>(
+pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
+) -> Result<Option<RepoEntry<'b>>> {
+    do_script_query_inner(script_query, script_repo, false, None, true).await
+}
+
+async fn do_script_query_strict_inner<'b>(
+    script_query: &ScriptQuery,
+    script_repo: &'b mut ScriptRepo,
+    do_prefetch: bool,
 ) -> Result<RepoEntry<'b>> {
     // FIXME: 一旦 NLL 進化就修掉這段 unsafe
     let ptr = script_repo as *mut ScriptRepo;
-    if let Some(info) = do_script_query(script_query, unsafe { &mut *ptr }, false, None).await? {
+    if let Some(info) =
+        do_script_query_inner(script_query, unsafe { &mut *ptr }, false, None, false).await?
+    {
         return Ok(info);
     }
 
     #[cfg(not(feature = "benching"))]
     if !script_query.bang {
-        let filtered =
-            do_script_query(script_query, script_repo, true, Some(PromptLevel::Never)).await?;
+        let filtered = do_script_query_inner(
+            script_query,
+            script_repo,
+            true,
+            Some(PromptLevel::Never),
+            false,
+        )
+        .await?;
         if let Some(filtered) = filtered {
             return Err(Error::ScriptIsFiltered(filtered.name.key().to_string()));
         }
@@ -137,6 +167,12 @@ pub async fn do_script_query_strict<'b>(
     Err(Error::ScriptNotFound(
         script_query.clone().into_script_name()?.to_string(),
     ))
+}
+pub async fn do_script_query_strict<'b>(
+    script_query: &ScriptQuery,
+    script_repo: &'b mut ScriptRepo,
+) -> Result<RepoEntry<'b>> {
+    do_script_query_strict_inner(script_query, script_repo, true).await
 }
 
 static CTRLC_HANDLE: Once = Once::new();

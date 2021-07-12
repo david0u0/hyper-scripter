@@ -10,6 +10,7 @@ use std::str::FromStr;
 
 mod util;
 pub use util::*;
+mod prefetch;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub enum EditQuery {

@@ -178,9 +178,19 @@ pub struct ScriptRepo {
     latest_name: Option<String>,
     db_env: DBEnv,
     known_tags: HashSet<Tag>,
+    all_loaded: bool,
 }
 
 impl ScriptRepo {
+    pub async fn fetch_all(&mut self) -> Result {
+        // TODO
+        self.all_loaded = true;
+        Ok(())
+    }
+
+    pub fn all_loaded(&self) -> bool {
+        self.all_loaded
+    }
     pub fn iter_known_tags(&self) -> impl Iterator<Item = &Tag> {
         self.known_tags.iter()
     }
@@ -272,6 +282,7 @@ impl ScriptRepo {
         }
         Ok(ScriptRepo {
             map,
+            all_loaded: true,
             hidden_map,
             known_tags,
             latest_name: None,

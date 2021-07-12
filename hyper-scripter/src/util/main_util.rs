@@ -100,7 +100,7 @@ pub async fn edit_or_create(
             }};
         }
 
-        match query::do_script_query(&query, script_repo, false, None).await {
+        match query::do_script_query(&query, script_repo).await {
             Err(Error::DontFuzz) => new_named!(),
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {

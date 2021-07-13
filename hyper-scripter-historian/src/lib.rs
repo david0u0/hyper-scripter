@@ -3,7 +3,7 @@ extern crate derive_more;
 
 use chrono::NaiveDateTime;
 use sqlx::{error::Error as DBError, Pool, Sqlite, SqlitePool};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 mod db;
@@ -94,8 +94,7 @@ impl Historian {
 
         res
     }
-    pub async fn new(path: impl AsRef<Path>) -> Result<Self, DBError> {
-        let path = path.as_ref().to_owned();
+    pub async fn new(path: PathBuf) -> Result<Self, DBError> {
         db::get_pool(&path).await.map(|pool| Historian {
             pool: Arc::new(RwLock::new(pool)),
             path,

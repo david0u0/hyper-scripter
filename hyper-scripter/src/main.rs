@@ -13,6 +13,7 @@ use hyper_scripter::{
     path,
     util::{self, main_util::EditTagArgs},
 };
+use hyper_scripter_historian::Historian;
 
 #[tokio::main]
 async fn main() {
@@ -62,7 +63,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
     } else {
         root.recent.or(conf.recent)
     };
-    let mut repo = ScriptRepo::new(pool, recent)
+
+    let historian = Historian::new(path::get_home().to_owned()).await?;
+    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), root.no_trace)
         .await
         .context("讀取歷史記錄失敗")?;
 
@@ -74,7 +77,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
     }
 
     let explicit_filter = !root.filter.is_empty();
-    let historian = repo.historian().clone();
     let mut ret = MainReturn {
         conf: None,
         errs: vec![],
@@ -209,7 +211,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 dummy,
                 &mut entry,
                 &args,
-                historian.clone(),
+                historian,
                 &mut ret.errs,
                 previous_args,
             )

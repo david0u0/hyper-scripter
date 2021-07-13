@@ -1,5 +1,4 @@
 use crate::error::Result;
-use crate::path;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
@@ -15,6 +14,7 @@ use helper::*;
 
 #[derive(Clone, Debug)]
 pub struct DBEnv {
+    no_trace: bool,
     info_pool: SqlitePool,
     historian: Historian,
 }
@@ -96,6 +96,10 @@ impl DBEnv {
             )
             .execute(&self.info_pool)
             .await?;
+        }
+
+        if self.no_trace {
+            return Ok(0);
         }
 
         let mut last_event_id = 0;
@@ -208,8 +212,12 @@ impl ScriptRepo {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
-    pub async fn new(pool: SqlitePool, recent: Option<u32>) -> Result<ScriptRepo> {
-        let historian = Historian::new(path::get_home()).await?;
+    pub async fn new(
+        pool: SqlitePool,
+        recent: Option<u32>,
+        historian: Historian,
+        no_trace: bool,
+    ) -> Result<ScriptRepo> {
         let mut known_tags: HashSet<Tag> = Default::default();
 
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
@@ -277,6 +285,7 @@ impl ScriptRepo {
             latest_name: None,
             db_env: DBEnv {
                 info_pool: pool,
+                no_trace,
                 historian,
             },
         })

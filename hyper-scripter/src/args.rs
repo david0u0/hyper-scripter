@@ -30,6 +30,8 @@ macro_rules! def_root {
             pub skip_script: Vec<String>, // TODO: 確認一下這功能到底要不要
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
+            #[structopt(long, global = true, help = "do not record history")]
+            pub no_trace: bool,
             #[structopt(long, global = true)]
             pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
             #[structopt(short = "H", long, help = "Path to hyper script home")]

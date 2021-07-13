@@ -104,9 +104,13 @@ fn test_edit_existing_bang() {
         use hyper_scripter::script_repo::ScriptRepo;
         use hyper_scripter::tag::{Tag, TagFilter};
         use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
+        use hyper_scripter_historian::Historian;
 
-        let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
-        let mut repo = ScriptRepo::new(pool, None).await.unwrap();
+        let mut repo = {
+            let historian = Historian::new(get_home().to_owned()).await.unwrap();
+            let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
+            ScriptRepo::new(pool, None, historian, false).await.unwrap()
+        };
         repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 
         let err = edit_or_create(

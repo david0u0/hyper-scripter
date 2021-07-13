@@ -23,6 +23,12 @@ fn test_history_args() {
 }
 
 #[test]
+fn test_no_trace() {
+    let _g = setup();
+    // TODO
+}
+
+#[test]
 fn test_history_args_order() {
     let _g = setup();
     run("e arg-receiver | # do nothing").unwrap();

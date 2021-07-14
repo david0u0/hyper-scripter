@@ -30,8 +30,10 @@ macro_rules! def_root {
             pub skip_script: Vec<String>, // TODO: 確認一下這功能到底要不要
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
-            #[structopt(long, global = true, help = "do not record history")]
+            #[structopt(long, global = true, help = "Do not record history")]
             pub no_trace: bool,
+            #[structopt(short = "r", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+            pub archaeology: bool,
             #[structopt(long, global = true)]
             pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
             #[structopt(short = "H", long, help = "Path to hyper script home")]
@@ -242,15 +244,13 @@ pub struct List {
     #[structopt(
         long,
         help = "Show file path to the script.",
-        conflicts_with("long"),
-        overrides_with("name")
+        conflicts_with_all = &["long", "name"]
     )]
     pub file: bool,
     #[structopt(
         long,
         help = "Show only name of the script.",
-        conflicts_with("long"),
-        overrides_with("file")
+        conflicts_with_all = &["long", "file"]
     )]
     pub name: bool,
     #[structopt(parse(try_from_str))]

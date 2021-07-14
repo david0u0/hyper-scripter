@@ -6,7 +6,7 @@ use hyper_scripter::extract_help;
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
-use hyper_scripter::script_repo::ScriptRepo;
+use hyper_scripter::script_repo::{RecentFilter, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
@@ -58,10 +58,14 @@ struct MainReturn {
 async fn main_inner(root: Root) -> Result<MainReturn> {
     let conf = Config::get();
     let (pool, init) = hyper_scripter::db::get_pool().await?;
+
     let recent = if root.timeless {
         None
     } else {
-        root.recent.or(conf.recent)
+        root.recent.or(conf.recent).map(|recent| RecentFilter {
+            recent,
+            archaeology: root.archaeology,
+        })
     };
 
     let historian = Historian::new(path::get_home().to_owned()).await?;

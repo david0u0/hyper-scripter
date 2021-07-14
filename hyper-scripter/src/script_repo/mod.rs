@@ -13,6 +13,12 @@ pub use helper::RepoEntry;
 use helper::*;
 
 #[derive(Clone, Debug)]
+pub struct RecentFilter {
+    pub recent: u32,
+    pub archaeology: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct DBEnv {
     no_trace: bool,
     info_pool: SqlitePool,
@@ -214,17 +220,17 @@ impl ScriptRepo {
     }
     pub async fn new(
         pool: SqlitePool,
-        recent: Option<u32>,
+        recent: Option<RecentFilter>,
         historian: Historian,
         no_trace: bool,
     ) -> Result<ScriptRepo> {
         let mut known_tags: HashSet<Tag> = Default::default();
 
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
-        let time_bound = recent.map(|recent| {
+        let time_bound = recent.map(|r| {
             let mut time = Utc::now().naive_utc();
-            time -= Duration::days(recent.into());
-            time
+            time -= Duration::days(r.recent.into());
+            (time, r.archaeology)
         });
 
         let scripts = sqlx::query!(
@@ -272,10 +278,16 @@ impl ScriptRepo {
 
             let script = builder.build();
 
-            if time_bound.map_or(true, |time_bound| script.last_time() > time_bound) {
-                map.insert(name, script);
+            let hide_by_time = if let Some((time_bound, archaeology)) = time_bound {
+                let overtime = time_bound > script.last_time();
+                archaeology ^ overtime
             } else {
+                false
+            };
+            if hide_by_time {
                 hidden_map.insert(name, script);
+            } else {
+                map.insert(name, script);
             }
         }
         Ok(ScriptRepo {

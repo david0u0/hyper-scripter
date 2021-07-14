@@ -159,3 +159,9 @@ fn test_history_args_rm_last() {
     assert_eq!(run("run -").unwrap(), "A"); // read time
     assert_eq!(run("run ^^").unwrap(), "C"); // create time
 }
+
+#[test]
+fn test_archaeology() {
+    let _g = setup();
+    // TODO
+}

@@ -279,7 +279,7 @@ impl ScriptRepo {
             let script = builder.build();
 
             let hide_by_time = if let Some((time_bound, archaeology)) = time_bound {
-                let overtime = time_bound > script.last_time();
+                let overtime = time_bound > script.last_time_without_read();
                 archaeology ^ overtime
             } else {
                 false

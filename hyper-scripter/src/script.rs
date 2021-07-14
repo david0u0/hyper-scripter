@@ -151,6 +151,12 @@ impl DerefMut for ScriptInfo {
     }
 }
 
+fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
+    match time {
+        Some(time) => **time,
+        _ => NaiveDateTime::from_timestamp(1, 0),
+    }
+}
 impl ScriptInfo {
     pub fn set_id(&mut self, id: i64) {
         assert_eq!(self.id, 0, "只有 id=0（代表新腳本）時可以設定 id");
@@ -172,13 +178,14 @@ impl ScriptInfo {
             timeless_info,
         }
     }
+    pub fn last_time_without_read(&self) -> NaiveDateTime {
+        max!(
+            *self.write_time,
+            map(&self.exec_time),
+            map(&self.exec_done_time)
+        )
+    }
     pub fn last_time(&self) -> NaiveDateTime {
-        fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
-            match time {
-                Some(time) => **time,
-                _ => NaiveDateTime::from_timestamp(1, 0),
-            }
-        }
         max!(
             *self.read_time,
             *self.write_time,

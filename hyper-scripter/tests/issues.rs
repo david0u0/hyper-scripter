@@ -151,3 +151,9 @@ fn test_edit_existing_bang() {
 }
 
 // TODO: edit wild & edit phantom
+
+#[test]
+fn test_edit_withou_change() {
+    println!("沒有動到檔案就不要記錄寫入事件");
+    // TODO
+}

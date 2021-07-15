@@ -153,7 +153,15 @@ fn test_edit_existing_bang() {
 // TODO: edit wild & edit phantom
 
 #[test]
-fn test_edit_withou_change() {
+fn test_edit_without_change() {
     println!("沒有動到檔案就不要記錄寫入事件");
-    // TODO
+    let _g = setup();
+
+    run("e test1 | echo $NAME").unwrap();
+    run("e test2 | echo $NAME").unwrap();
+    assert_eq!("test2", run("-").unwrap());
+    run("e test1").unwrap(); // nothing changed!
+    assert_eq!("test2", run("-").unwrap());
+    run("e test1 | echo $NAME").unwrap();
+    assert_eq!("test1\ntest1", run("-").unwrap());
 }

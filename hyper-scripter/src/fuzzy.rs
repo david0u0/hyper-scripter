@@ -5,7 +5,7 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
 use tokio::task::spawn_blocking;
 
-const MID_SCORE: i64 = 4500; // TODO: 好好決定這個魔法數字
+const MID_SCORE: i64 = 4100; // TODO: 好好決定這個魔法數字
 
 fn is_multifuzz(score: i64, best_score: i64) -> bool {
     // best_score * 0.7 < score

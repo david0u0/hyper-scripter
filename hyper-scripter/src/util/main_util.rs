@@ -6,7 +6,7 @@ use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
 use hyper_scripter_historian::Historian;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
     pub content: TagFilter,
@@ -113,6 +113,7 @@ pub async fn edit_or_create(
                 log::debug!("打開既有命名腳本：{:?}", entry.name);
                 let p = path::open_script(&entry.name, &entry.ty, Some(true))
                     .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+                // NOTE: 直接返回
                 // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
                 // return Ok((p, entry));
                 let n = entry.name.clone();
@@ -128,6 +129,7 @@ pub async fn edit_or_create(
 
     log::info!("編輯 {:?}", script_name);
 
+    // 這裡的 or_insert 其實永遠會發生，所以無需用閉包來傳
     let entry = script_repo
         .entry(&script_name)
         .or_insert(
@@ -248,4 +250,32 @@ pub fn load_templates() -> Result {
         super::write_file(&tmpl_path, tmpl)?;
     }
     Ok(())
+}
+
+use super::PrepareRespond;
+pub async fn after_script(
+    entry: &mut RepoEntry<'_>,
+    path: &Path,
+    prepare_resp: &PrepareRespond,
+) -> Result<bool> {
+    match prepare_resp {
+        PrepareRespond::HasContent => {
+            log::debug!("帶內容腳本，不執行後處理");
+        }
+        PrepareRespond::NoContent { is_new, time } => {
+            let modified = super::file_modify_time(path)?;
+            if time >= &modified {
+                return Ok(if *is_new {
+                    log::info!("新腳本未變動，應刪除之");
+                    super::remove(path)?;
+                    false
+                } else {
+                    log::info!("舊本未變動，不記錄事件");
+                    true
+                });
+            }
+        }
+    }
+    entry.update(|info| info.write()).await?;
+    Ok(true)
 }

@@ -81,23 +81,22 @@ impl ScriptName {
     }
     /// 回傳值是相對於 HS_HOME 的路徑
     pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
-        let mut file_name: String;
-        let add_ext = |name: &mut String| -> Result<()> {
+        fn add_ext(name: &mut String, ty: &ScriptType) -> Result<()> {
             if let Some(ext) = &Config::get().get_script_conf(ty)?.ext {
                 *name = format!("{}.{}", name, ext);
             }
             Ok(())
-        };
+        }
         match self {
             ScriptName::Anonymous(id) => {
-                file_name = id.to_string();
+                let mut file_name = id.to_string();
                 let dir: PathBuf = ANONYMOUS.into();
-                add_ext(&mut file_name)?;
+                add_ext(&mut file_name, ty)?;
                 Ok(dir.join(file_name))
             }
             ScriptName::Named(name) => {
-                file_name = name.to_string();
-                add_ext(&mut file_name)?;
+                let mut file_name = name.to_string();
+                add_ext(&mut file_name, ty)?;
                 Ok(file_name.into())
             }
         }

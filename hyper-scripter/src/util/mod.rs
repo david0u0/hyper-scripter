@@ -4,7 +4,6 @@ use crate::path::{get_home, get_template_path};
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
-use handlebars::{Handlebars, TemplateRenderError};
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};
 use std::io::{Read, Write};
@@ -143,6 +142,12 @@ where
     create_cmd(cmd, remaining)
 }
 
+pub fn file_modify_time(path: &Path) -> Result<DateTime<Utc>> {
+    let meta = handle_fs_res(&[path], std::fs::metadata(path))?;
+    let modified = handle_fs_res(&[path], meta.modified())?;
+    Ok(modified.into())
+}
+
 pub fn read_file(path: &Path) -> Result<String> {
     let mut file = handle_fs_res(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;
     let mut content = String::new();
@@ -204,64 +209,6 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-/// 若是不曾存在的腳本，準備之，並回傳創建的時間
-/// 注意若是帶內容編輯則一律視為舊腳本
-pub fn prepare_script<T: AsRef<str>>(
-    path: &Path,
-    script: &ScriptInfo,
-    no_template: bool,
-    content: &[T],
-) -> Result<Option<DateTime<Utc>>> {
-    log::info!("開始準備 {} 腳本內容……", script.name);
-    let has_content = !content.is_empty();
-    let mut is_new = if path.exists() {
-        log::debug!("腳本已存在，往後接上給定的訊息");
-        let mut file = handle_fs_res(
-            &[path],
-            std::fs::OpenOptions::new()
-                .append(true)
-                .write(true)
-                .open(path),
-        )?;
-        for content in content.iter() {
-            handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
-        }
-        false
-    } else {
-        let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
-        let birthplace = relative_to_home(&birthplace_abs);
-
-        // NOTE: 創建資料夾和檔案
-        if let Some(parent) = path.parent() {
-            handle_fs_res(&[path], create_dir_all(parent))?;
-        }
-        let mut file = handle_fs_res(&[path], File::create(&path))?;
-
-        let content = content.iter().map(|s| s.as_ref().split('\n')).flatten();
-        if !no_template {
-            let content: Vec<_> = content.collect();
-            let info = json!({
-                "birthplace_in_home": birthplace.is_some(),
-                "birthplace": birthplace,
-                "birthplace_abs": birthplace_abs,
-                "name": script.name.key().to_owned(),
-                "content": content,
-            });
-            let template = get_or_create_tamplate(&script.ty)?;
-            handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
-        } else {
-            for line in content {
-                writeln!(file, "{}", line)?;
-            }
-        }
-        true
-    };
-    if has_content {
-        is_new = false;
-    }
-    Ok(if is_new { Some(Utc::now()) } else { None })
-}
-
 fn get_or_create_tamplate(ty: &ScriptType) -> Result<String> {
     let tmpl_path = get_template_path(ty)?;
     if tmpl_path.exists() {
@@ -270,37 +217,6 @@ fn get_or_create_tamplate(ty: &ScriptType) -> Result<String> {
     let default_tmpl = get_default_template(ty);
     write_file(&tmpl_path, default_tmpl)?;
     Ok(default_tmpl.to_owned())
-}
-
-fn write_prepare_script<W: Write>(
-    w: W,
-    template: &str,
-    info: &serde_json::Value,
-) -> std::io::Result<()> {
-    let reg = Handlebars::new();
-    reg.render_template_to_write(&template, &info, w)
-        .map_err(|err| match err {
-            TemplateRenderError::IOError(err, ..) => err,
-            e => panic!("解析模版錯誤：{}", e),
-        })
-}
-pub fn after_script(path: &Path, created: Option<DateTime<Utc>>) -> Result<bool> {
-    if let Some(created) = created {
-        let meta = handle_fs_res(&[path], std::fs::metadata(path))?;
-        let modified = handle_fs_res(&[path], meta.modified())?;
-        let modified = modified.duration_since(std::time::UNIX_EPOCH)?.as_secs();
-        if created.timestamp() >= modified as i64 {
-            log::info!("腳本未變動，刪除之");
-            handle_fs_res(&[path], remove_file(path))?;
-            Ok(false)
-        } else {
-            log::debug!("腳本更新時間比創建還新，不執行後處理");
-            Ok(true)
-        }
-    } else {
-        log::debug!("既存腳本，不執行後處理");
-        Ok(true)
-    }
 }
 
 // 如果有需要跳脫的字元就吐 json 格式，否則就照原字串
@@ -349,4 +265,84 @@ fn find_pre_run() -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+#[derive(Debug)]
+pub enum PrepareRespond {
+    HasContent,
+    NoContent { is_new: bool, time: DateTime<Utc> },
+}
+pub fn prepare_script<T: AsRef<str>>(
+    path: &Path,
+    script: &ScriptInfo,
+    no_template: bool,
+    content: &[T],
+) -> Result<PrepareRespond> {
+    log::info!("開始準備 {} 腳本內容……", script.name);
+    let has_content = !content.is_empty();
+    let is_new = !path.exists();
+    if is_new {
+        let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
+        let birthplace = relative_to_home(&birthplace_abs);
+
+        // NOTE: 創建資料夾和檔案
+        if let Some(parent) = path.parent() {
+            handle_fs_res(&[path], create_dir_all(parent))?;
+        }
+        let mut file = handle_fs_res(&[path], File::create(&path))?;
+
+        let content = content.iter().map(|s| s.as_ref().split('\n')).flatten();
+        if !no_template {
+            let content: Vec<_> = content.collect();
+            let info = json!({
+                "birthplace_in_home": birthplace.is_some(),
+                "birthplace": birthplace,
+                "birthplace_abs": birthplace_abs,
+                "name": script.name.key().to_owned(),
+                "content": content,
+            });
+            let template = get_or_create_tamplate(&script.ty)?;
+            handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
+        } else {
+            for line in content {
+                writeln!(file, "{}", line)?;
+            }
+        }
+    } else {
+        if has_content {
+            log::debug!("腳本已存在，往後接上給定的訊息");
+            let mut file = handle_fs_res(
+                &[path],
+                std::fs::OpenOptions::new()
+                    .append(true)
+                    .write(true)
+                    .open(path),
+            )?;
+            for content in content.iter() {
+                handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
+            }
+        }
+    }
+
+    Ok(if has_content {
+        PrepareRespond::HasContent
+    } else {
+        PrepareRespond::NoContent {
+            is_new,
+            time: file_modify_time(path)?,
+        }
+    })
+}
+fn write_prepare_script<W: Write>(
+    w: W,
+    template: &str,
+    info: &serde_json::Value,
+) -> std::io::Result<()> {
+    use handlebars::{Handlebars, TemplateRenderError};
+    let reg = Handlebars::new();
+    reg.render_template_to_write(&template, &info, w)
+        .map_err(|err| match err {
+            TemplateRenderError::IOError(err, ..) => err,
+            e => panic!("解析模版錯誤：{}", e),
+        })
 }

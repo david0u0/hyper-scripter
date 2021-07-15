@@ -11,7 +11,7 @@ use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
     path,
-    util::{self, main_util::EditTagArgs},
+    util::{self, main_util, main_util::EditTagArgs},
 };
 use hyper_scripter_historian::Historian;
 
@@ -75,9 +75,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
 
     if init {
         log::info!("初次使用，載入好用工具和預執行腳本");
-        util::main_util::load_utils(&mut repo).await?;
-        util::main_util::prepare_pre_run()?;
-        util::main_util::load_templates()?;
+        main_util::load_utils(&mut repo).await?;
+        main_util::prepare_pre_run()?;
+        main_util::load_templates()?;
     }
 
     let explicit_filter = !root.filter.is_empty();
@@ -101,7 +101,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
     }
 
     match root.subcmd.unwrap() {
-        Subs::LoadUtils => util::main_util::load_utils(&mut repo).await?,
+        Subs::LoadUtils => main_util::load_utils(&mut repo).await?,
         Subs::Alias {
             unset: false,
             before: Some(before),
@@ -176,17 +176,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
             };
             let (path, mut entry) =
-                util::main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
-            let created = util::prepare_script(&path, &*entry, no_template, &content)?;
+                main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
+            let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
             if !fast {
                 let cmd = util::create_concat_cmd(&conf.editor, &[&path]);
                 let stat = util::run_cmd(cmd)?;
                 log::debug!("編輯器返回：{:?}", stat);
             }
-            let should_keep = util::after_script(&path, created)?;
-            if should_keep {
-                entry.update(|info| info.write()).await?;
-            } else {
+            let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
+            if !should_keep {
                 let name = entry.name.clone();
                 repo.remove(&name).await?
             }
@@ -210,7 +208,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             repeat,
         } => {
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
-            util::main_util::run_n_times(
+            main_util::run_n_times(
                 repeat,
                 dummy,
                 &mut entry,
@@ -274,8 +272,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     });
                     log::debug!("不要真的刪除腳本，改用標籤隱藏之：{}", new_name);
                     let new_name = Some(ScriptName::Named(new_name));
-                    let res =
-                        util::main_util::mv(&mut entry, new_name, None, delete_tag.clone()).await;
+                    let res = main_util::mv(&mut entry, new_name, None, delete_tag.clone()).await;
                     match res {
                         Err(Error::PathNotFound(_)) => {
                             log::warn!("{:?} 實體不存在，消滅之", entry.name);
@@ -333,7 +330,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 None => None,
             };
             let mut entry = query::do_script_query_strict(&origin, &mut repo).await?;
-            util::main_util::mv(&mut entry, new_name, ty, tags).await?;
+            main_util::mv(&mut entry, new_name, ty, tags).await?;
         }
         Subs::Tags {
             unset: Some(name), ..

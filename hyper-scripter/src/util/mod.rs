@@ -280,20 +280,8 @@ pub fn prepare_script<T: AsRef<str>>(
 ) -> Result<PrepareRespond> {
     log::info!("開始準備 {} 腳本內容……", script.name);
     let has_content = !content.is_empty();
-    let is_new = if path.exists() {
-        log::debug!("腳本已存在，往後接上給定的訊息");
-        let mut file = handle_fs_res(
-            &[path],
-            std::fs::OpenOptions::new()
-                .append(true)
-                .write(true)
-                .open(path),
-        )?;
-        for content in content.iter() {
-            handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
-        }
-        false
-    } else {
+    let is_new = !path.exists();
+    if is_new {
         let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
         let birthplace = relative_to_home(&birthplace_abs);
 
@@ -320,8 +308,22 @@ pub fn prepare_script<T: AsRef<str>>(
                 writeln!(file, "{}", line)?;
             }
         }
-        true
-    };
+    } else {
+        if has_content {
+            log::debug!("腳本已存在，往後接上給定的訊息");
+            let mut file = handle_fs_res(
+                &[path],
+                std::fs::OpenOptions::new()
+                    .append(true)
+                    .write(true)
+                    .open(path),
+            )?;
+            for content in content.iter() {
+                handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
+            }
+        }
+    }
+
     Ok(if has_content {
         PrepareRespond::HasContent
     } else {
@@ -344,4 +346,3 @@ fn write_prepare_script<W: Write>(
             e => panic!("解析模版錯誤：{}", e),
         })
 }
-

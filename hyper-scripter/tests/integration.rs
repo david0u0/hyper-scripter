@@ -127,8 +127,8 @@ fn test_edit_same_name() {
 fn test_edit_append() {
     let _g = setup();
 
-    run("e -t test test | echo 第一行".to_string()).unwrap();
-    run("e - | echo 第二行\necho 第三行".to_string()).unwrap();
+    run("e -t test test | echo 第一行").unwrap();
+    run("e - | echo 第二行\necho 第三行").unwrap();
     assert_eq!("第一行\n第二行\n第三行", run("-f test -").unwrap());
 }
 

@@ -2,6 +2,7 @@ require 'io/console'
 
 RED = "\033[0;31m".freeze
 NC = "\033[0m".freeze
+ENTER = "\r".freeze
 
 class HSEnv
   ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
@@ -63,6 +64,7 @@ class Selector
 
   # Handle customized keys
   def register_keys(keys, callback, msg = '')
+    @enter_overriden = true if keys.include?(ENTER)
     keys = [keys] unless keys.is_a?(Array)
     keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, msg)) }
   end
@@ -75,6 +77,7 @@ class Selector
     @number = nil
     @offset = offset
     @callbacks = {}
+    @enter_overriden = false
   end
 
   def run
@@ -107,6 +110,8 @@ class Selector
       resp = STDIN.getch
       exit if resp == "\u0003" # Ctrl-C
 
+      callback = nil
+
       if mode == :search
         case resp
         when "\b", "\c?"
@@ -115,7 +120,7 @@ class Selector
           else
             @search_string = @search_string[0..-2]
           end
-        when "\r"
+        when ENTER
           mode = :normal
         else
           @search_string += resp
@@ -130,7 +135,7 @@ class Selector
           else
             @number /= 10
           end
-        when "\r"
+        when ENTER
           mode = :normal
           pos = [@number - @offset, 0].max
           pos = [pos, option_count - 1].min
@@ -151,8 +156,6 @@ class Selector
         when 'N'
           new_pos = search_index(pos - 1, true)
           pos = new_pos unless new_pos.nil?
-        when "\r"
-          return self.class.make_result(display_pos, @options[pos])
         when '/'
           mode = :search
           @search_string = ''
@@ -161,19 +164,15 @@ class Selector
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
+          elsif (resp == ENTER) && !@enter_overriden
+            return self.class.make_result(display_pos, @options[pos])
           else
-            @callbacks.each do |key, callback|
+            @callbacks.each do |key, cur_callback|
               next unless key == resp
 
-              should_break = callback.cb.call(display_pos, @options[pos])
-              return self.class.make_result(display_pos, @options[pos]) if should_break == true
-
+              callback = cur_callback.cb
               break
             end
-
-            # for options count change
-            new_options = @options.length
-            pos = new_options - 1 if pos >= new_options
           end
         end
       end
@@ -182,6 +181,15 @@ class Selector
         $stderr.print "\e[A"
       end
       $stderr.print "\r\e[J"
+
+      next unless callback
+
+      should_break = callback.call(display_pos, @options[pos])
+      return self.class.make_result(display_pos, @options[pos]) if should_break == true
+
+      # for options count change
+      new_options = @options.length
+      pos = new_options - 1 if pos >= new_options
     end
   end
 

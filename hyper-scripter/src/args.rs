@@ -32,7 +32,7 @@ macro_rules! def_root {
             pub dump_args: bool,
             #[structopt(long, global = true, help = "Do not record history")]
             pub no_trace: bool,
-            #[structopt(short = "r", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+            #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
             pub archaeology: bool,
             #[structopt(long, global = true)]
             pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
@@ -225,8 +225,12 @@ pub enum History {
         #[structopt(short, long, default_value = "0")]
         offset: u32,
     },
+    Neglect {
+        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        queries: Vec<ListQuery>,
+    },
     Tidy {
-        #[structopt(parse(try_from_str))]
+        #[structopt(parse(try_from_str), required = true, min_values = 1)]
         queries: Vec<ListQuery>,
     },
 }

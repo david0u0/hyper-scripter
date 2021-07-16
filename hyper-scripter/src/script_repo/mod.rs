@@ -69,6 +69,14 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
+    pub async fn purge_last_events(&self, id: i64) -> Result {
+        log::debug!("清理腳本 {:?} 的最新事件", id);
+        sqlx::query!("DELETE FROM last_events WHERE script_id = ?", id)
+            .execute(&self.info_pool)
+            .await?;
+        Ok(())
+    }
+
     async fn update_last_time(&self, info: &ScriptInfo) -> Result {
         let last_time = info.last_time();
         let exec_time = info.exec_time.as_ref().map(|t| **t);
@@ -191,6 +199,10 @@ pub struct ScriptRepo {
 }
 
 impl ScriptRepo {
+    pub fn get_db_env(&self) -> &DBEnv {
+        &self.db_env
+    }
+
     pub fn iter_known_tags(&self) -> impl Iterator<Item = &Tag> {
         self.known_tags.iter()
     }
@@ -354,13 +366,12 @@ impl ScriptRepo {
             .get_mut(&*name.key())
             .map(|info| RepoEntry::new(info, db_env))
     }
+
     pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
             self.db_env.historian.remove(info.id).await?;
-            sqlx::query!("DELETE FROM last_events WHERE script_id = ?", info.id)
-                .execute(&self.db_env.info_pool)
-                .await?;
+            self.db_env.purge_last_events(info.id).await?;
             sqlx::query!("DELETE from script_infos where id = ?", info.id)
                 .execute(&self.db_env.info_pool)
                 .await?;

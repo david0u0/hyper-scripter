@@ -248,13 +248,13 @@ pub struct List {
     #[structopt(
         long,
         help = "Show file path to the script.",
-        conflicts_with_all = &["long", "name"]
+        conflicts_with_all = &["long"]
     )]
     pub file: bool,
     #[structopt(
         long,
         help = "Show only name of the script.",
-        conflicts_with_all = &["long", "file"]
+        conflicts_with_all = &["long"]
     )]
     pub name: bool,
     #[structopt(parse(try_from_str))]

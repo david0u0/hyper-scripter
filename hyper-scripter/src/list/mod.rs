@@ -20,6 +20,7 @@ pub enum DisplayIdentStyle {
     File,
     Name,
     Normal,
+    NameAndFile,
 }
 #[derive(Debug, Eq, PartialEq)]
 pub enum DisplayStyle<T, U> {

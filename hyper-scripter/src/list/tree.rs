@@ -39,6 +39,11 @@ fn ident_string(style: DisplayIdentStyle, t: &TrimmedScriptInfo<'_>) -> Result<S
         DisplayIdentStyle::Normal => format!("{}({})", name, script.ty),
         DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
         DisplayIdentStyle::Name => name.to_string(),
+        DisplayIdentStyle::NameAndFile => format!(
+            "{}({})",
+            name.to_string(),
+            script.file_path()?.to_string_lossy().to_string()
+        ),
     })
 }
 

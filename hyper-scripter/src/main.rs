@@ -245,6 +245,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 (false, true, false) => DisplayStyle::Short(DisplayIdentStyle::File, ()),
                 (false, false, true) => DisplayStyle::Short(DisplayIdentStyle::Name, ()),
                 (false, false, false) => DisplayStyle::Short(DisplayIdentStyle::Normal, ()),
+                (false, true, true) => DisplayStyle::Short(DisplayIdentStyle::NameAndFile, ()),
                 (true, false, false) => DisplayStyle::Long(()),
                 _ => unreachable!(),
             };

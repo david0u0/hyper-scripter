@@ -17,6 +17,11 @@ fn ident_string(style: &DisplayIdentStyle, script: &ScriptInfo) -> Result<String
         DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
         DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
         DisplayIdentStyle::Name => script.name.to_string(),
+        DisplayIdentStyle::NameAndFile => format!(
+            "{}({})",
+            script.name.to_string(),
+            script.file_path()?.to_string_lossy().to_string()
+        ),
     })
 }
 

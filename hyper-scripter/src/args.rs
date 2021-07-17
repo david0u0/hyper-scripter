@@ -245,17 +245,9 @@ pub struct List {
     pub grouping: String,
     #[structopt(long, help = "No color and other decoration.")]
     pub plain: bool,
-    #[structopt(
-        long,
-        help = "Show file path to the script.",
-        conflicts_with_all = &["long"]
-    )]
+    #[structopt(long, help = "Show file path to the script.", conflicts_with = "long")]
     pub file: bool,
-    #[structopt(
-        long,
-        help = "Show only name of the script.",
-        conflicts_with_all = &["long"]
-    )]
+    #[structopt(long, help = "Show name of the script.", conflicts_with = "long")]
     pub name: bool,
     #[structopt(parse(try_from_str))]
     pub queries: Vec<ListQuery>,

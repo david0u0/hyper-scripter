@@ -50,9 +50,10 @@ def parse(ls_string)
 end
 
 def import_dir(dir, namespace)
-  dir = File.expand_path(dir)
+  other_env = HSEnv.new(File.expand_path(dir))
+
   puts "import directory #{dir}"
-  out = HS_ENV.do_hs('ls --plain', true, dir)
+  out = other_env.do_hs('ls --plain', true)
   parse(out).each do |script|
     new_name = if namespace.nil? || script.name.start_with?('.')
                  script.name
@@ -67,7 +68,7 @@ def import_dir(dir, namespace)
     rescue StandardError
       puts "importing #{script.name} as #{new_name}..."
       content = begin
-        HS_ENV.do_hs("cat =#{script.name}", true, dir)
+        other_env.do_hs("cat =#{script.name}", true)
       rescue StandardError => e
         warn(e)
         next

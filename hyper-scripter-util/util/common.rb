@@ -19,8 +19,8 @@ class HSEnv
 
   attr_reader :home, :exe
 
-  def do_hs(arg, all, path = @home)
-    cmd = hs_command_str(arg, all, path)
+  def do_hs(arg, all)
+    cmd = hs_command_str(arg, all)
     output = `#{cmd}`
     raise StandardError, "Hyper scripter exits with #{$?.exitstatus}" unless $?.success?
 
@@ -35,8 +35,8 @@ class HSEnv
     v
   end
 
-  def exec_hs(arg, all = true, path = @home)
-    cmd = hs_command_str(arg, all, path)
+  def exec_hs(arg, all = true)
+    cmd = hs_command_str(arg, all)
     exec cmd.to_s
   end
 
@@ -51,13 +51,13 @@ class HSEnv
     @exe = env_var(:exe)
   end
 
-  def hs_command_str(arg, all, path)
+  def hs_command_str(arg, all)
     visible_str = if all
                     '-f all --timeless'
                   else
                     ''
                   end
-    "#{@exe} --no-alias -H #{path} #{visible_str} #{@prefix} #{arg}"
+    "#{@exe} --no-alias -H #{@home} #{visible_str} #{@prefix} #{arg}"
   end
 end
 

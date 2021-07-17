@@ -28,7 +28,11 @@ class HSEnv
   end
 
   def env_var(var_name)
-    ENV[ENV_MAP[var_name]]
+    k = ENV_MAP[var_name]
+    v = ENV[k]
+    raise StandardError, "No environment variable #{k} found" if v.nil?
+
+    v
   end
 
   def exec_hs(arg, all = true, path = @home)

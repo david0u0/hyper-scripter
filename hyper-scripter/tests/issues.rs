@@ -116,7 +116,7 @@ fn test_edit_existing_bang() {
         let err = edit_or_create(
             "test".parse().unwrap(),
             &mut repo,
-            None,
+            Some("rb".parse().unwrap()), // 即使不同型的腳本也該報錯
             EditTagArgs {
                 content: "gg".parse().unwrap(),
                 append_namespace: true,

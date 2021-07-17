@@ -4,7 +4,6 @@ mod tool;
 
 use std::fs::{create_dir_all, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
-use std::path::Path;
 use tool::*;
 
 fn test_import() {
@@ -51,30 +50,46 @@ fn test_import() {
 }
 
 fn test_collect() {
-    pub fn create_all(p: &str, content: &str) -> String {
-        let p: &Path = p.as_ref();
-        let name = p.with_extension("");
-        let p = get_home().join(p);
+    pub fn create_all(name: &str, ext: Option<&str>, content: &str) -> String {
+        let full_name = if let Some(ext) = ext {
+            format!("{}.{}", name, ext)
+        } else {
+            name.to_owned()
+        };
+        let p = get_home().join(full_name);
+
         if let Some(parent) = p.parent() {
             create_dir_all(parent).unwrap();
         }
         let mut file = File::create(p).unwrap();
         file.write_all(content.as_bytes()).unwrap();
-        format!("={}", name.to_string_lossy())
+        format!("={}", name)
     }
 
-    let named = create_all("this/is/a/collect/t.est.rb", "puts '這是一個收集測試'");
-    let named_txt = create_all("this/is/a/txt/coll.ect/test", "這是一個文字檔收集測試");
-    create_all(".anonymous/10.sh", "echo 這是一個匿名收集測試");
-    create_all(".anonymous/100", "這是一個匿名文字檔收集測試");
+    run("e noughty-txt.sh -T txt | echo 別收集我").unwrap();
+
+    let named = create_all(
+        "this/is/a/collect/t.est",
+        Some("rb"),
+        "puts '這是一個收集測試'",
+    );
+    let named_txt = create_all(
+        "this/is/a/txt/coll.ect/test.ggext",
+        None,
+        "這是一個文字檔收集測試",
+    );
+    create_all(".anonymous/10", Some("sh"), "echo 這是一個匿名收集測試");
+    create_all(".anonymous/100", None, "這是一個匿名文字檔收集測試");
 
     create_all(
         "this/is/a/collect/.test.rb",
+        None,
         "puts '這是一個不會被收集到的測試，因為路徑中帶.'",
     );
 
     create_all(
         "this/is/a/.collect/test.sh",
+        None,
         "echo '這是一個不會被收集到的測試，因為路徑中帶.'",
     );
 
@@ -104,7 +119,7 @@ fn test_collect() {
     assert_eq!(run("-f tag youest").unwrap(), "殼已破碎");
     assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(21, Some("all"), None);
+    assert_ls_len(22, Some("all"), None);
 }
 
 #[test]

@@ -6,6 +6,8 @@
 
 require_relative './common'
 
+HOME = HS_ENV.home
+
 def directory_tree(path)
   files = []
   Dir.foreach(path) do |entry|
@@ -53,34 +55,39 @@ def extract_name(file)
   [name, ty]
 end
 
-root = HS_ENV.home
-directory_tree(root).each do |full_path|
-  script = full_path.delete_prefix(root).delete_prefix('/')
-  next unless shoud_collect?(script)
+existing_files = {}
 
-  name, ty = extract_name(script)
+HS_ENV.do_hs('ls --grouping=none --file --name --plain', true).split(' ').each do |s|
+  match = /(?<name>[^(]+)\((?<file>.+)\)/.match(s)
+  name = match[:name]
+  file = match[:file]
+  file = File.join(HOME, file)
 
-  begin
-    HS_ENV.do_hs("which =#{name} 2>/dev/null", true)
+  if File.exist?(file)
+    existing_files[file] = true
     next
-  rescue StandardError
   end
 
-  puts "collecting script #{script}!"
-
-  file = File.open(full_path)
-  HS_ENV.do_hs("edit =#{name} -T #{ty} --fast", false)
+  warn "removing script #{name}!"
+  HS_ENV.do_hs("rm --purge =#{name}", true)
 end
 
-HS_ENV.do_hs('ls --grouping=none --name --plain', true).split(' ').each do |name|
-  file = begin
-    HS_ENV.do_hs("which =#{name} 2>/dev/null", true).strip
+directory_tree(HOME).each do |full_path|
+  script = full_path.delete_prefix(HOME).delete_prefix('/')
+  next unless shoud_collect?(script)
+  next if existing_files[full_path]
+
+  name, ty = extract_name(script)
+  warn "collecting script #{script}!"
+
+  begin
+    HS_ENV.do_hs("edit =#{name} -T #{ty} --fast", false)
   rescue StandardError
-    next
+    name = "#{name}.#{ty}"
+    warn "try to collect #{name} with type txt"
+    begin
+      HS_ENV.do_hs("edit =#{name} -T txt --fast", false)
+    rescue StandardError
+    end
   end
-
-  next if File.exist?(file)
-
-  puts "removing script #{file}!"
-  HS_ENV.do_hs("rm --purge =#{name}", true)
 end

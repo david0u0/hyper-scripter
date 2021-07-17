@@ -35,7 +35,11 @@ def shoud_collect?(file)
 end
 
 def extract_name(file)
-  name, _, ext = file.rpartition('.')
+  ty = File.extname(file)
+  name = file.delete_suffix(ty)
+  ty = ty.delete_prefix('.') # the first char is `.`
+  ty = 'txt' if ty == ''
+
   if name.start_with? '.anonymous'
     name = name.sub(%r{^\.anonymous/}, '')
     num = name.to_i
@@ -46,7 +50,7 @@ def extract_name(file)
       throw "what? #{name}?"
     end
   end
-  [name, ext]
+  [name, ty]
 end
 
 root = HS_ENV.home
@@ -54,23 +58,29 @@ directory_tree(root).each do |full_path|
   script = full_path.delete_prefix(root).delete_prefix('/')
   next unless shoud_collect?(script)
 
-  name, ext = extract_name(script)
+  name, ty = extract_name(script)
 
-  HS_ENV.do_hs("which =#{name} 2>/dev/null", true)
-  next if $?.success?
+  begin
+    HS_ENV.do_hs("which =#{name} 2>/dev/null", true)
+    next
+  rescue StandardError
+  end
 
   puts "collecting script #{script}!"
 
   file = File.open(full_path)
-  HS_ENV.do_hs("edit =#{name} -T #{ext} --fast", false)
+  HS_ENV.do_hs("edit =#{name} -T #{ty} --fast", false)
 end
 
 HS_ENV.do_hs('ls --grouping=none --name --plain', true).split(' ').each do |name|
-  file = HS_ENV.do_hs("which =#{name} 2>/dev/null", true).delete_suffix("\n")
-  next unless $?.success?
-
-  unless File.exist?(file)
-    puts "removing script #{file}!"
-    HS_ENV.do_hs("rm --purge =#{name}", true)
+  file = begin
+    HS_ENV.do_hs("which =#{name} 2>/dev/null", true).strip
+  rescue StandardError
+    next
   end
+
+  next if File.exist?(file)
+
+  puts "removing script #{file}!"
+  HS_ENV.do_hs("rm --purge =#{name}", true)
 end

@@ -12,6 +12,15 @@ use std::process::{Command, ExitStatus};
 
 pub mod main_util;
 
+pub fn illegal_name(s: &str) -> bool {
+    s.starts_with('-')
+        || s.starts_with('.')
+        || s.contains("..")
+        || s.contains(' ')
+        || s.contains('/')
+        || s.is_empty()
+}
+
 // XXX: main util?
 pub fn run(
     script_path: &Path,

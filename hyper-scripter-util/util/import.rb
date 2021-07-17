@@ -60,15 +60,20 @@ def import_dir(dir, namespace)
                  "#{namespace}/#{script.name}"
                end
 
-    HS_ENV.do_hs("which =#{new_name} 2>/dev/null", true)
-    if $?.success?
+    begin
+      HS_ENV.do_hs("which =#{new_name} 2>/dev/null", true)
       puts "#{new_name} already exists!"
       next
-    else
+    rescue StandardError
       puts "importing #{script.name} as #{new_name}..."
-      content = HS_ENV.do_hs("cat =#{script.name}", true, dir)
-      content = Shellwords.escape(content)
+      content = begin
+        HS_ENV.do_hs("cat =#{script.name}", true, dir)
+      rescue StandardError => e
+        warn(e)
+        next
+      end
 
+      content = Shellwords.escape(content)
       tags_str = script.tags.join(',')
       HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -T #{script.ty} --no-template --fast #{content}", false)
     end

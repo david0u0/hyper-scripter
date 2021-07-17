@@ -7,7 +7,7 @@ ENTER = "\r".freeze
 class HSEnv
   ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
 
-  def initialize(script_dir)
+  def initialize(script_dir = nil)
     find_hs_env(script_dir)
     warn "hyper script home = #{@home}, executable = #{@exe}"
     @prefix = ''
@@ -17,16 +17,14 @@ class HSEnv
     @prefix = pref
   end
 
-  def find_hs_env(_script_dir)
-    @home = env_var(:home)
-    @exe = env_var(:exe)
-  end
-
   attr_reader :home, :exe
 
   def do_hs(arg, all, path = @home)
     cmd = hs_command_str(arg, all, path)
-    `#{cmd}`
+    output = `#{cmd}`
+    raise StandardError, "Hyper scripter exits with #{$?.exitstatus}" unless $?.success?
+
+    output
   end
 
   def env_var(var_name)
@@ -40,15 +38,26 @@ class HSEnv
 
   private
 
+  def find_hs_env(script_dir)
+    @home = if script_dir.nil?
+              env_var(:home)
+            else
+              script_dir
+            end
+    @exe = env_var(:exe)
+  end
+
   def hs_command_str(arg, all, path)
-    access_str = ''
-    access_str = '-f all --timeless' if all
-    "#{@exe} --no-alias -H #{path} #{access_str} #{@prefix} #{arg}"
+    visible_str = if all
+                    '-f all --timeless'
+                  else
+                    ''
+                  end
+    "#{@exe} --no-alias -H #{path} #{visible_str} #{@prefix} #{arg}"
   end
 end
 
-DIR = File.dirname(__FILE__)
-HS_ENV = HSEnv.new(DIR)
+HS_ENV = HSEnv.new
 
 # selector
 class Selector

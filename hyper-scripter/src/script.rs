@@ -3,6 +3,7 @@ use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode,
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
+use crate::util::illegal_name;
 use chrono::NaiveDateTime;
 use fxhash::FxHashSet as HashSet;
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,7 @@ impl FromStr for ScriptName {
 impl ScriptName {
     pub fn valid(s: &str) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
-        let reg = regex::Regex::new(r"^\.(\w+)$")?;
+        let reg = regex::Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(s);
         if let Some(m) = m {
             let id_str = m.get(1).unwrap().as_str();
@@ -48,14 +49,10 @@ impl ScriptName {
             }
         } else {
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
-            if s.starts_with('-')
-                || s.starts_with('.')
-                || s.contains("..")
-                || s.contains(' ')
-                || s.is_empty()
-            {
-                return Err(Error::Format(ScriptNameCode, s.to_owned()))
-                    .context("命名腳本格式有誤");
+            for s in s.split('/') {
+                if illegal_name(s) {
+                    return Err(Error::Format(ScriptNameCode, s.to_owned()));
+                }
             }
             Ok(None)
         }

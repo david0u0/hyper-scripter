@@ -21,21 +21,6 @@ name = 'no-removed'
 [categories.js-i]
 ext = 'js'
 color = 'bright cyan'
-template = [
-    '// Hello, scripter! Here are some information you may be intrested in:',
-    '',
-    '''const name = '{{name}}';''',
-    '''process.chdir(require('os').homedir());''',
-    '''{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}''',
-    '''let spawn = require('child_process').spawnSync;''',
-    '''spawn('test', [], { stdio: 'inherit' });''',
-    '',
-    '''let writeFile = require('fs').writeFileSync;''',
-    '''writeFile('/dev/null', 'some content');''',
-    '',
-    '{{#each content}}{{{this}}}',
-    '{{/each}}',
-]
 cmd = 'node'
 args = [
     '-i',
@@ -60,26 +45,12 @@ after = [
 [categories.md]
 ext = 'md'
 color = 'bright black'
-template = [
-    '{{#each content}}{{{this}}}',
-    '{{/each}}',
-]
 args = []
 env = []
 
 [categories.sh]
 ext = 'sh'
 color = 'bright magenta'
-template = [
-    '# Hello, scripter! Here are some useful commands to begin with:',
-    '',
-    'export NAME="{{name}}"',
-    'export VAR="${VAR:-default}"',
-    'cd ~/{{birthplace}}',
-    '',
-    '{{#each content}}{{{this}}}',
-    '{{/each}}',
-]
 cmd = 'bash'
 args = ['{{path}}']
 env = []
@@ -87,14 +58,6 @@ env = []
 [categories.rb]
 ext = 'rb'
 color = 'bright red'
-template = [
-    '# Hello, scripter!',
-    '''Dir.chdir("#{ENV['HOME']}/{{birthplace}}")''',
-    "NAME = '{{name}}'",
-    '',
-    '{{#each content}}{{{this}}}',
-    '{{/each}} ',
-]
 cmd = 'ruby'
 args = ['{{path}}']
 env = []
@@ -102,25 +65,6 @@ env = []
 [categories.vorpal]
 ext = 'js'
 color = 'bright cyan'
-template = [
-    '''const name = '{{name}}';''',
-    '''process.chdir(require('os').homedir());''',
-    '''{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}''',
-    '',
-    '''let Vorpal = require('vorpal');''',
-    'let vorpal = new Vorpal();',
-    '',
-    '''vorpal.command('test <arg1> [arg2]', 'this is a teeeest!').action(args => {''',
-    '    console.log(`arg1 = ${args.arg1}`);',
-    '    console.log(`arg2 = ${args.arg2}`);',
-    '    return Promise.resolve();',
-    '});',
-    '',
-    '{{#each content}}{{{this}}}',
-    '{{/each}}',
-    '',
-    '''vorpal.delimiter('>').show();''',
-]
 cmd = 'node'
 args = ['{{path}}']
 env = [[
@@ -131,43 +75,11 @@ env = [[
 [categories.tmux]
 ext = 'sh'
 color = 'white'
-template = [
-    '# Hello, scripter!',
-    'export NAME="{{name}}"',
-    'export VAR="${VAR:-default}"',
-    'cd ~/{{birthplace}}',
-    '',
-    'tmux new-session -s $NAME -d "{{{content.0}}}" || exit 1',
-    'tmux split-window -h "{{{content.1}}}"',
-    '{{#if content.2}}tmux split-window -v "{{{content.2}}}"',
-    '{{/if}}',
-    'tmux -2 attach-session -d',
-]
 cmd = 'sh'
 args = ['{{path}}']
 env = []
 
-[categories.js]
-ext = 'js'
-color = 'bright cyan'
-template = [
-    '// Hello, scripter! Here are some information you may be intrested in:',
-    '',
-    '''const name = '{{name}}';''',
-    '''process.chdir(require('os').homedir());''',
-    '''{{#if birthplace}}process.chdir('{{birthplace}}');{{/if}}''',
-    '''let spawn = require('child_process').spawnSync;''',
-    '''spawn('test', [], { stdio: 'inherit' });''',
-    '',
-    '''let writeFile = require('fs').writeFileSync;''',
-    '''writeFile('/dev/null', 'some content');''',
-    '',
-    '{{#each content}}{{{this}}}',
-    '{{/each}}',
-]
-cmd = 'node'
-args = ['{{path}}']
-env = [[
-    'NODE_PATH',
-    '{{{script_dir}}}/node_modules',
-]]
+[categories.txt]
+color = 'bright black'
+args = []
+env = []

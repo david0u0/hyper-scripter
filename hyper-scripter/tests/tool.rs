@@ -167,7 +167,7 @@ impl ScriptTest {
         }
     }
     pub fn assert_not_exist(&self, args: Option<&str>, msg: Option<&str>) {
-        let s = format!("which {} ={}", args.unwrap_or_default(), self.name);
+        let s = format!("cat {} ={}", args.unwrap_or_default(), self.name);
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
     }

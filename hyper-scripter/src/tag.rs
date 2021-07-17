@@ -1,6 +1,6 @@
 use crate::error::{Error, FormatCode::Tag as TagCode};
+use crate::util::illegal_name;
 use fxhash::FxHashSet as HashSet;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
@@ -86,8 +86,7 @@ impl Display for Tag {
 impl FromStr for Tag {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Error> {
-        let re = Regex::new(r"^(\w|\d|-|_)+$").unwrap();
-        if !re.is_match(s) {
+        if illegal_name(s) {
             log::error!("標籤格式不符：{}", s);
             return Err(Error::Format(TagCode, s.to_owned()));
         }

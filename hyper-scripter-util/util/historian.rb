@@ -14,7 +14,6 @@ ARGS = ARGV.join(' ')
 HS_ENV.prefix("--skip-script #{HISTORIAN}")
 
 arg_obj_str = HS_ENV.do_hs("--dump-args history show #{ARGS}", false)
-exit 1 unless $?.success?
 arg_obj = JSON.parse(arg_obj_str)
 filters = arg_obj['filter']
 timeless = arg_obj['timeless']
@@ -35,13 +34,11 @@ script_name = HS_ENV.do_hs(
   "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
   false
 ).strip
-exit 1 unless $?.success?
 
 warn "Historian for #{script_name}"
 
 load_history = lambda do
   history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
-  exit 1 unless $?.success?
   history.lines.map { |s| s.strip }
 end
 

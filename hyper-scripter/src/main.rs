@@ -24,10 +24,14 @@ async fn main() {
     };
     let mut exit_code = 0;
     for err in errs.iter() {
+        use Error::*;
         match err {
-            Error::ScriptError(c) | Error::PreRunError(c) => exit_code = *c,
-            _ if exit_code == 0 => exit_code = 1,
-            _ => (),
+            ScriptError(c) | PreRunError(c) | EditorError(c, _) => exit_code = *c,
+            _ => {
+                if exit_code == 0 {
+                    exit_code = 1;
+                }
+            }
         }
         eprint!("{}", err);
     }
@@ -52,6 +56,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
 
 struct MainReturn {
     conf: Option<Config>,
+    /// 用來裝那種不會馬上造成中止的錯誤，例如 ScriptError
     errs: Vec<Error>,
 }
 
@@ -181,7 +186,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             if !fast {
                 let cmd = util::create_concat_cmd(&conf.editor, &[&path]);
                 let stat = util::run_cmd(cmd)?;
-                log::debug!("編輯器返回：{:?}", stat);
+                if !stat.success() {
+                    let code = stat.code().unwrap_or_default();
+                    ret.errs.push(Error::EditorError(code, conf.editor.clone()));
+                }
             }
             let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
             if !should_keep {

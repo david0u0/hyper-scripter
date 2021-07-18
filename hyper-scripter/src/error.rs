@@ -37,8 +37,11 @@ pub enum Error {
     NoAlias(String),
     UnknownType(String),
     Format(FormatCode, String),
+
     ScriptError(i32),
     PreRunError(i32),
+    EditorError(i32, Vec<String>),
+
     RedundantOpt(RedundantOpt),
     TagFilterNotFound(String),
     NoPreviousArgs,

@@ -1,4 +1,4 @@
-use hyper_scripter::config::{Config, PromptLevel, RawConfig};
+use hyper_scripter::config::{Config, PromptLevel};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -28,7 +28,7 @@ pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
 pub fn load_conf() -> Config {
-    RawConfig::load().unwrap().unwrap().0.into()
+    Config::load().unwrap()
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();

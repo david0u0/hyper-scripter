@@ -8,7 +8,6 @@ use colored::Color;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
-use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -76,7 +75,7 @@ impl PromptLevel {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
-pub struct RawConfig {
+pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
@@ -89,15 +88,10 @@ pub struct RawConfig {
     pub categories: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
-}
-#[derive(Debug, Clone, Deref)]
-pub struct Config {
-    changed: bool,
+    #[serde(skip)]
     last_modified: Option<SystemTime>,
-    #[deref]
-    raw_config: RawConfig,
 }
-impl Default for RawConfig {
+impl Default for Config {
     fn default() -> Self {
         fn gen_alias(from: &str, after: &[&str]) -> (String, Alias) {
             (
@@ -107,7 +101,8 @@ impl Default for RawConfig {
                 },
             )
         }
-        RawConfig {
+        Config {
+            last_modified: None,
             editor: vec!["vim".to_string()],
             prompt_level: PromptLevel::Smart,
             tag_filters: vec![
@@ -162,8 +157,8 @@ impl Default for RawConfig {
         }
     }
 }
-impl RawConfig {
-    pub fn load() -> Result<Option<(Self, SystemTime)>> {
+impl Config {
+    pub fn load() -> Result<Self> {
         let path = config_file();
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
@@ -171,59 +166,31 @@ impl RawConfig {
                 let meta = util::handle_fs_res(&[&path], std::fs::metadata(&path))?;
                 let modified = util::handle_fs_res(&[&path], meta.modified())?;
 
-                let conf = toml::from_str(&s).map_err(|err| {
+                let mut conf: Config = toml::from_str(&s).map_err(|err| {
                     Error::Format(
                         FormatCode::Config,
                         format!("{}: {}", path.to_string_lossy(), err),
                     )
                 })?;
-                Ok(Some((conf, modified)))
+                conf.last_modified = Some(modified);
+                Ok(conf)
             }
             Err(Error::PathNotFound(_)) => {
                 log::debug!("找不到設定檔");
-                Ok(None)
+                Ok(Default::default())
             }
             Err(e) => Err(e),
         }
     }
-    // XXX: extract
-    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>> {
-        let reg = Handlebars::new();
-        let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
-        for (name, e) in self.env.iter() {
-            let res = reg.render_template(e, &info)?;
-            env.push((name.to_owned(), res));
-        }
-        Ok(env)
-    }
-}
-impl DerefMut for Config {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.changed = true;
-        &mut self.raw_config
-    }
-}
-impl From<RawConfig> for Config {
-    fn from(c: RawConfig) -> Self {
-        Config {
-            changed: true,
-            last_modified: None,
-            raw_config: c,
-        }
-    }
-}
-impl Config {
+
     pub fn store(&self) -> Result {
         let path = config_file();
         log::info!("寫入設定檔至 {:?}…", path);
-        if !self.changed {
-            log::info!("設定檔未改變，不寫入");
-            return Ok(());
-        }
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {
                 let modified = util::handle_fs_res(&[&path], meta.modified())?;
-                if self.last_modified.map_or(false, |time| time < modified) {
+                // NOTE: 若設定檔是憑空造出來的，但要存入時卻發現已有檔案，同樣不做存入
+                if self.last_modified.map_or(true, |time| time < modified) {
                     log::info!("設定檔已被修改，不寫入");
                     return Ok(());
                 }
@@ -233,18 +200,15 @@ impl Config {
             }
             Err(err) => return Err(err),
         }
-        util::write_file(&path, &toml::to_string_pretty(&**self)?)
+        util::write_file(&path, &toml::to_string_pretty(self)?)
     }
+
+    pub fn is_from_dafault(&self) -> bool {
+        self.last_modified.is_none()
+    }
+
     pub fn init() -> Result {
-        let conf = match RawConfig::load()? {
-            Some((conf, time)) => Config {
-                changed: false,
-                raw_config: conf,
-                last_modified: Some(time),
-            },
-            _ => RawConfig::default().into(),
-        };
-        CONFIG.set(conf);
+        CONFIG.set(Config::load()?);
         Ok(())
     }
     #[cfg(not(test))]
@@ -253,8 +217,19 @@ impl Config {
     }
     #[cfg(test)]
     pub fn get() -> &'static Config {
-        crate::set_once!(CONFIG, || { RawConfig::default().into() });
+        crate::set_once!(CONFIG, || { Config::default().into() });
         CONFIG.get()
+    }
+
+    // XXX: extract
+    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>> {
+        let reg = Handlebars::new();
+        let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
+        for (name, e) in self.env.iter() {
+            let res = reg.render_template(e, &info)?;
+            env.push((name.to_owned(), res));
+        }
+        Ok(env)
     }
     pub fn get_color(&self, ty: &ScriptType) -> Result<Color> {
         let c = self.get_script_conf(ty)?.color.as_str();
@@ -286,12 +261,12 @@ mod test {
     #[test]
     fn test_config_serde() {
         path::set_home_from_sys().unwrap();
-        let c1 = RawConfig {
+        let c1 = Config {
             main_tag_filter: "a,^b,c".parse().unwrap(),
             ..Default::default()
         };
         let s = to_string_pretty(&c1).unwrap();
-        let c2: RawConfig = from_str(&s).unwrap();
+        let c2: Config = from_str(&s).unwrap();
         assert_eq!(c1, c2);
     }
 }

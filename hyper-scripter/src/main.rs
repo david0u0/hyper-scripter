@@ -47,8 +47,10 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     }
     let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
+        log::info!("存入改變後的設定檔");
         conf.store()?;
-    } else {
+    } else if Config::get().is_from_dafault() {
+        log::info!("存入憑空產生的設定檔");
         Config::get().store()?;
     }
     Ok(res.errs)

@@ -1,9 +1,15 @@
 use crate::error::Result;
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
+    SqlitePool,
+};
 
 pub async fn get_pool() -> Result<(SqlitePool, bool)> {
     let file = crate::path::get_home().join(".script_info.db");
-    let res = SqlitePool::connect_with(SqliteConnectOptions::new().filename(&file)).await;
+    let opt = SqliteConnectOptions::new()
+        .filename(&file)
+        .journal_mode(SqliteJournalMode::Off);
+    let res = SqlitePool::connect_with(opt).await;
     let init: bool;
     let pool = if res.is_err() {
         init = true;

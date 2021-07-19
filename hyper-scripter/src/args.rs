@@ -97,6 +97,11 @@ pub enum Subs {
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
     Help { args: Vec<String> },
+    #[structopt(about = "Print the help message of env variables")]
+    Env {
+        #[structopt(default_value = "-", parse(try_from_str))]
+        script_query: ScriptQuery,
+    },
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
     #[structopt(about = "Edit hyper script")]

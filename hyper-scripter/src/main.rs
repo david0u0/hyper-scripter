@@ -2,7 +2,7 @@ use chrono::Utc;
 use hyper_scripter::args::{self, print_help, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, Result};
-use hyper_scripter::extract_help;
+use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script::ScriptName;
@@ -204,9 +204,18 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let script_query: ScriptQuery = args[0].parse()?;
             let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
+            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
+            let content = util::read_file(&script_path)?;
 
-            extract_help!(helps, entry, true);
+            let helps = extract_help_from_content(&content, true);
             for msg in helps {
+                println!("{}", msg);
+            }
+            let envs = extract_env_from_content(&content);
+            if envs.len() > 0 {
+                println!();
+            }
+            for msg in envs {
                 println!("{}", msg);
             }
         }
@@ -237,11 +246,21 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::Cat { script_query } => {
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
-            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             log::info!("打印 {:?}", entry.name);
+            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             print!("{}", content);
             entry.update(|info| info.read()).await?;
+        }
+        Subs::Env { script_query } => {
+            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            log::info!("打印 {:?} 的環境變數", entry.name);
+            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
+            let content = util::read_file(&script_path)?;
+            let envs = extract_env_from_content(&content);
+            for msg in envs {
+                println!("{}", msg);
+            }
         }
         Subs::LS(List {
             long,

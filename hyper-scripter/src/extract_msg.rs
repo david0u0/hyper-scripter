@@ -1,19 +1,30 @@
-const KEY: &str = "[HS_HELP]:";
+const HELP_KEY: &str = "[HS_HELP]:";
+const ENV_KEY: &str = "[HS_ENV]:";
 
-fn trim_first_white(s: &str) -> &str {
-    if let Some(s) = s.strip_prefix(' ') {
-        s
-    } else {
-        s
+pub fn extract_env_from_content(content: &str) -> impl ExactSizeIterator<Item = &str> {
+    extract_msg_from_content(content, ENV_KEY, true)
+        .into_iter()
+        .map(str::trim)
+}
+pub fn extract_help_from_content(content: &str, long: bool) -> impl ExactSizeIterator<Item = &str> {
+    fn trim_first_white(s: &str) -> &str {
+        if let Some(s) = s.strip_prefix(' ') {
+            s
+        } else {
+            s
+        }
     }
+    extract_msg_from_content(content, HELP_KEY, long)
+        .into_iter()
+        .map(|s| trim_first_white(s))
 }
 
-pub fn extract_help_from_content(mut content: &str, long: bool) -> Vec<&str> {
+fn extract_msg_from_content<'a>(mut content: &'a str, key: &str, long: bool) -> Vec<&'a str> {
     let mut ans = vec![];
-    if let Some(pos) = content.find(KEY) {
+    if let Some(pos) = content.find(key) {
         content = &content[pos..];
         let new_line_pos = content.find('\n').unwrap_or_else(|| content.len());
-        ans.push(trim_first_white(&content[KEY.len()..new_line_pos]));
+        ans.push(&content[key.len()..new_line_pos]);
         if !long {
             return ans;
         }
@@ -22,10 +33,10 @@ pub fn extract_help_from_content(mut content: &str, long: bool) -> Vec<&str> {
         return ans;
     }
 
-    while let Some(pos) = content.find(KEY) {
+    while let Some(pos) = content.find(key) {
         content = &content[pos..];
         let new_line_pos = content.find('\n').unwrap_or_else(|| content.len());
-        ans.push(trim_first_white(&content[KEY.len()..new_line_pos]));
+        ans.push(&content[key.len()..new_line_pos]);
 
         content = &content[new_line_pos..];
     }

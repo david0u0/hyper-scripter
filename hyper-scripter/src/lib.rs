@@ -9,7 +9,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 mod error_display;
-pub mod extract_help;
+pub mod extract_msg;
 pub mod fuzzy;
 pub mod list;
 pub mod migration;
@@ -28,11 +28,13 @@ pub enum Either<T, U> {
     Two(U),
 }
 
+// XXX: 真的需要這玩意嗎==
 #[macro_export]
 macro_rules! extract_help {
     ($res_name:ident, $script:expr, $long:expr) => {
         let script_path = $crate::path::open_script(&$script.name, &$script.ty, Some(true))?;
         let content = $crate::util::read_file(&script_path)?;
-        let $res_name = $crate::extract_help::extract_help_from_content(&content, $long);
+        let $res_name = $crate::extract_msg::extract_help_from_content(&content, $long);
     };
 }
+

@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
+use crate::extract_msg::extract_env_from_content;
 use crate::path::{get_home, get_template_path};
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
@@ -39,6 +40,8 @@ pub fn run(
 
     let hs_cmd = std::env::args().next().unwrap_or_default();
 
+    let hs_env_help: Vec<_> = extract_env_from_content(content).collect();
+
     let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
         cmd
@@ -59,6 +62,7 @@ pub fn run(
         "hs_tags": hs_tags,
         "hs_cmd": hs_cmd,
         "hs_exe": hs_exe,
+        "hs_env_help": hs_env_help,
         "name": name,
         "content": content,
     });

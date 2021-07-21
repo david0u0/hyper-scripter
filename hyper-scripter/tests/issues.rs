@@ -165,3 +165,36 @@ fn test_edit_without_change() {
     run("e test1 | echo $NAME").unwrap();
     assert_eq!("test1\ntest1", run("-").unwrap());
 }
+
+#[test]
+fn test_multifuzz() {
+    use hyper_scripter::fuzzy::*;
+
+    println!("模糊搜撞在一起時的特殊行為 1. 取最新者 2. 不可為「正解」的後綴");
+    let _g = setup();
+    let pref = ScriptTest::new("multifuzz", None);
+    let t1 = ScriptTest::new("multifuzz/t1", None);
+    let t2 = ScriptTest::new("multifuzz/t2", None);
+
+    // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let res = rt.block_on(async {
+        fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), "/")
+            .await
+            .unwrap()
+            .unwrap()
+    });
+    {
+        let is_match =
+            matches!(res, Multi{ans, others} if ans == pref.get_name() && others.len() == 2);
+        assert!(is_match, "並非預期中的 multifuzz 結果，應更新測資");
+    }
+
+    t2.assert_can_find("multifuzz/t");
+    t1.run(None).unwrap();
+    t1.assert_can_find("multifuzz/t");
+    t2.run(None).unwrap();
+    t2.assert_can_find("multifuzz/t");
+
+    pref.assert_can_find("multifuzz");
+}

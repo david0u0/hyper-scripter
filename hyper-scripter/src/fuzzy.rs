@@ -43,6 +43,12 @@ static MATCHER: State<SkimMatcherV2> = State::new();
 pub trait FuzzKey {
     fn fuzz_key(&self) -> Cow<'_, str>;
 }
+impl<T: AsRef<str>> FuzzKey for T {
+    fn fuzz_key(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.as_ref())
+    }
+}
+
 #[derive(Copy, Clone)]
 struct MyRaw(*const str);
 unsafe impl Send for MyRaw {}
@@ -235,11 +241,6 @@ fn foreach_reorder<S: StopIndicator, F: FnMut(&str) -> S>(
 mod test {
     use super::*;
 
-    impl<'a> FuzzKey for &'a str {
-        fn fuzz_key(&self) -> Cow<'a, str> {
-            Cow::Borrowed(self)
-        }
-    }
     fn extract_multifuzz<'a>(res: FuzzResult<&'a str>) -> (&'a str, Vec<&'a str>) {
         match res {
             Multi { ans, others } => {

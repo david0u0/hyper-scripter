@@ -46,7 +46,9 @@ fn extract_msg_from_content<'a>(mut content: &'a str, key: &str, long: bool) -> 
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    fn extract_help_from_content(content: &str, long: bool) -> Vec<&str> {
+        super::extract_help_from_content(content, long).collect()
+    }
     #[test]
     fn test_extract_help() {
         let content = "

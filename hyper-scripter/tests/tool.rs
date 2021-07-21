@@ -159,6 +159,9 @@ pub struct ScriptTest {
     name: String,
 }
 impl ScriptTest {
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
     pub fn new(name: &str, tags: Option<&str>) -> Self {
         let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
         run(format!("e {} ={} | echo $HS_TAGS", tags_str, name)).unwrap();
@@ -170,6 +173,10 @@ impl ScriptTest {
         let s = format!("cat {} ={}", args.unwrap_or_default(), self.name);
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
+    }
+    pub fn run(&self, args: Option<&str>) -> Result<String, ExitStatus> {
+        let s = format!("{} ={}", args.unwrap_or_default(), self.name);
+        run(&s)
     }
     pub fn assert_tags<const N: usize>(
         &self,
@@ -190,5 +197,10 @@ impl ScriptTest {
             "{} 的標籤不如預期{}",
             self.name, msg
         );
+    }
+    pub fn assert_can_find(&self, command: &str) {
+        let command = format!("ls --plain --grouping=none --name {}", command);
+        let res = run(&command).expect(&format!("執行 {} 失敗", command));
+        assert_eq!(res, self.name);
     }
 }

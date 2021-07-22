@@ -76,10 +76,10 @@ class Selector
   end
 
   # Handle customized keys
-  def register_keys(keys, callback, msg = '')
+  def register_keys(keys, callback, msg: '', recur: false)
     @enter_overriden = true if keys.include?(ENTER)
     keys = [keys] unless keys.is_a?(Array)
-    keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, msg)) }
+    keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, msg, recur)) }
   end
 
   # Initiate the selector
@@ -183,22 +183,24 @@ class Selector
             @callbacks.each do |key, cur_callback|
               next unless key == resp
 
-              callback = cur_callback.cb
+              callback = cur_callback
               break
             end
           end
         end
       end
 
-      line_count.times do
-        $stderr.print "\e[A"
+      if callback.nil? || callback.recur
+        line_count.times do
+          $stderr.print "\e[A"
+        end
+        $stderr.print "\r\e[J"
       end
-      $stderr.print "\r\e[J"
 
       next unless callback
 
-      should_break = callback.call(display_pos, @options[pos])
-      return self.class.make_result(display_pos, @options[pos]) if should_break == true
+      callback.cb.call(display_pos, @options[pos])
+      return self.class.make_result(display_pos, @options[pos]) unless callback.recur
 
       # for options count change
       new_options = @options.length
@@ -211,9 +213,9 @@ class Selector
     ret.new(pos, content)
   end
 
-  def self.make_callback(cb, content)
-    ret = Struct.new(:cb, :content)
-    ret.new(cb, content)
+  def self.make_callback(cb, content, recur)
+    ret = Struct.new(:cb, :content, :recur)
+    ret.new(cb, content, recur)
   end
 
   private

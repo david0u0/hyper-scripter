@@ -45,23 +45,25 @@ end
 sourcing = false
 echoing = false
 selector = Selector.new(load_history.call, offset + 1)
+
 selector.register_keys(%w[d D], lambda { |pos, _|
   HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
   selector.load(load_history.call)
-}, 'delete the history')
+}, msg: 'delete the history', recur: true)
+
 selector.register_keys(%w[p P], lambda { |_, _|
   echoing = true
-  true
-}, 'print the argument to stdout')
+}, msg: 'print the argument to stdout')
+
 selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
-  true
-})
+}, msg: 'set next command')
+
 selector.register_keys(%w[r R], lambda { |pos, _|
   sourcing = true
   HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
-  true
-}, 'replce the argument')
+}, msg: 'replce the argument')
+
 args = begin
   selector.run.content
 rescue Selector::Empty

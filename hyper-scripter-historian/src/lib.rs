@@ -11,6 +11,8 @@ mod event;
 pub mod migration;
 pub use event::*;
 
+const ZERO: i64 = 0;
+
 #[derive(Debug, Clone)]
 pub struct Historian {
     pool: Arc<RwLock<SqlitePool>>,
@@ -57,7 +59,7 @@ impl<'a> DBEvent<'a> {
             time,
             ty,
             cmd,
-            main_event_id: 0,
+            main_event_id: ZERO,
             content: None,
             args: None,
         }
@@ -112,6 +114,7 @@ macro_rules! ignore_arg {
 
 #[derive(Debug)]
 pub struct IgnoreResult {
+    pub script_id: i64,
     pub exec_time: Option<NaiveDateTime>,
     pub exec_done_time: Option<NaiveDateTime>,
 }
@@ -186,7 +189,7 @@ impl Historian {
                 .fetch_one(&*self.pool.read().unwrap())
                 .await?;
                 if ignored_res.ignored {
-                    return Ok(0);
+                    return Ok(ZERO);
                 }
                 let code = code.to_string();
                 self.raw_record(db_event.content(&code).main_event_id(*main_event_id))
@@ -242,11 +245,17 @@ impl Historian {
 
     async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
         Ok(IgnoreResult {
+            script_id,
             exec_time: self.last_time_of(script_id, EventType::Exec).await?,
             exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
         })
     }
     pub async fn ignore_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+        if event_id == ZERO {
+            log::info!("試圖忽略零事件，什麼都不做");
+            return Ok(None);
+        }
+
         let pool = self.pool.read().unwrap();
         let exec_ty = EventType::Exec.to_string();
         let latest_record = sqlx::query!(
@@ -260,6 +269,7 @@ impl Historian {
         )
         .fetch_one(&*pool)
         .await?;
+        // TODO: check if this event is exec?
 
         ignore_arg!(pool, "id = ?", event_id);
 

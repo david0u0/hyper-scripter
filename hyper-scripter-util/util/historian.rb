@@ -6,12 +6,11 @@
 require 'json'
 require_relative './common'
 
-HISTORIAN = HS_ENV.env_var(:name)
 ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query
 # e.g. hs util/historian !
-HS_ENV.prefix("--skip-script #{HISTORIAN}")
+# TODO: HS_ENV.run("history rm-id ")
 
 arg_obj_str = HS_ENV.do_hs("--dump-args history show #{ARGS}", false)
 arg_obj = JSON.parse(arg_obj_str)

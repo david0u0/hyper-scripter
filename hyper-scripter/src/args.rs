@@ -26,8 +26,6 @@ macro_rules! def_root {
         #[derive(StructOpt, Debug, Serialize)]
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
-            #[structopt(long, hidden = true, number_of_values = 1)]
-            pub skip_script: Vec<String>, // TODO: 確認一下這功能到底要不要
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
             #[structopt(long, global = true, help = "Do not record history")]
@@ -220,6 +218,9 @@ pub enum History {
         script: ScriptQuery,
         number: std::num::NonZeroU64,
     },
+    // TODO: 好想把它寫在 history rm 裡面...
+    #[structopt(name = "rm-id")]
+    RMID { event_id: u64 },
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,

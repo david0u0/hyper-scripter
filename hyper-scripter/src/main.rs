@@ -458,6 +458,23 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::History {
+            subcmd: History::RMID { event_id },
+        } => {
+            let res = historian.ignore_args_by_id(event_id as i64).await?;
+            if let Some(res) = res {
+                let mut entry = repo.get_mut_by_id(res.script_id).ok_or_else(|| {
+                    log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
+                    Error::ScriptNotFound(res.script_id.to_string())
+                })?;
+                entry
+                    .update(|info| {
+                        info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
+                        info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                    })
+                    .await?;
+            }
+        }
+        Subs::History {
             subcmd: History::Tidy { queries },
         } => {
             for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {

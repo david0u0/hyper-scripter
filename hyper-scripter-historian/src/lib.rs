@@ -76,6 +76,40 @@ impl<'a> DBEvent<'a> {
     }
 }
 
+macro_rules! ignore_arg {
+    ($pool:expr, $cond:literal, $($var:expr),+) => {
+        let exec_ty = EventType::Exec.to_string();
+        let done_ty = EventType::ExecDone.to_string();
+        sqlx::query!(
+            "
+            UPDATE events SET ignored = true
+            WHERE type = ? AND
+            "
+                + $cond,
+            exec_ty,
+            $($var),*
+        )
+        .execute(&*$pool)
+        .await?;
+
+        sqlx::query!(
+            "
+            UPDATE events SET ignored = true
+            WHERE type = ? AND main_event_id IN (
+                SELECT id FROM events WHERE type = ? AND "
+                + $cond
+                + "
+            )
+            ",
+            done_ty,
+            exec_ty,
+            $($var),*
+        )
+        .execute(&*$pool)
+        .await?;
+    };
+}
+
 #[derive(Debug)]
 pub struct IgnoreResult {
     pub exec_time: Option<NaiveDateTime>,
@@ -206,16 +240,46 @@ impl Historian {
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
     }
 
+    async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
+        Ok(IgnoreResult {
+            exec_time: self.last_time_of(script_id, EventType::Exec).await?,
+            exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
+        })
+    }
+    pub async fn ignore_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+        let pool = self.pool.read().unwrap();
+        let exec_ty = EventType::Exec.to_string();
+        let latest_record = sqlx::query!(
+            "
+            SELECT id, script_id FROM events
+            WHERE type= ? AND script_id = (SELECT script_id FROM events WHERE id = ?)
+            ORDER BY time DESC LIMIT 1
+            ",
+            exec_ty,
+            event_id,
+        )
+        .fetch_one(&*pool)
+        .await?;
+
+        ignore_arg!(pool, "id = ?", event_id);
+
+        if latest_record.id == event_id {
+            log::info!("ignore last args");
+            let ret = self.make_ignore_result(latest_record.script_id).await?;
+            return Ok(Some(ret));
+        }
+        Ok(None)
+    }
     pub async fn ignore_args(
         &self,
         script_id: i64,
         number: std::num::NonZeroU64,
     ) -> Result<Option<IgnoreResult>, DBError> {
         let number = number.get();
-        let exec_ty = EventType::Exec.to_string();
-        let done_ty = EventType::ExecDone.to_string();
         let offset = number as i64 - 1;
+        let exec_ty = EventType::Exec.to_string();
         let pool = self.pool.read().unwrap();
+
         let args = sqlx::query!(
             "
             WITH args AS (
@@ -233,39 +297,11 @@ impl Historian {
         .await?
         .args;
 
-        sqlx::query!(
-            "
-            UPDATE events SET ignored = true
-            WHERE script_id = ? AND type = ? AND args = ?
-            ",
-            script_id,
-            exec_ty,
-            args,
-        )
-        .execute(&*pool)
-        .await?;
-
-        sqlx::query!(
-            "
-            UPDATE events SET ignored = true
-            WHERE script_id = ? AND type = ? AND main_event_id IN (
-                SELECT id FROM events WHERE args = ? AND script_id = ?
-            )
-            ",
-            script_id,
-            done_ty,
-            args,
-            script_id,
-        )
-        .execute(&*pool)
-        .await?;
+        ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
 
         if number == 1 {
             log::info!("ignore last args");
-            let ret = IgnoreResult {
-                exec_time: self.last_time_of(script_id, EventType::Exec).await?,
-                exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
-            };
+            let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));
         }
         Ok(None)

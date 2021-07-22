@@ -5,7 +5,8 @@ NC = "\033[0m".freeze
 ENTER = "\r".freeze
 
 class HSEnv
-  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
+  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID',
+              source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
 
   def initialize(script_dir = nil)
     find_hs_env(script_dir)

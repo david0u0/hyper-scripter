@@ -10,7 +10,7 @@ ARGS = ARGV.join(' ')
 
 # prevent the call to `util/historian` screw up historical query
 # e.g. hs util/historian !
-# TODO: HS_ENV.run("history rm-id ")
+HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
 
 arg_obj_str = HS_ENV.do_hs("--dump-args history show #{ARGS}", false)
 arg_obj = JSON.parse(arg_obj_str)

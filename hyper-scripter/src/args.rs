@@ -219,8 +219,11 @@ pub enum History {
         number: std::num::NonZeroU64,
     },
     // TODO: 好想把它寫在 history rm 裡面...
-    #[structopt(name = "rm-id")]
-    RMID { event_id: u64 },
+    #[structopt(
+        name = "rm-id",
+        about = "Remove history by the event's id\nUseful if you want to keep those illegal arguments from polluting the history."
+    )]
+    RMID { event_id: u64 }, // TODO: 測試
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,

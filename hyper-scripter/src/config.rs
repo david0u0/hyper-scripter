@@ -144,6 +144,7 @@ impl Default for Config {
                 ("NAME", "{{name}}"),
                 ("HS_HOME", "{{hs_home}}"),
                 ("HS_CMD", "{{hs_cmd}}"),
+                ("HS_RUN_ID", "{{hs_run_id}}"),
                 (
                     "HS_TAGS",
                     "{{#each hs_tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",

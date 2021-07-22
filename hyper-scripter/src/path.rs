@@ -54,6 +54,10 @@ fn get_sys_home() -> Result<PathBuf> {
 }
 
 fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
+    let path = path.as_ref();
+    if path.is_absolute() {
+        return Ok(path.to_owned());
+    }
     let here = canonicalize(base)?;
     Ok(here.join(path))
 }

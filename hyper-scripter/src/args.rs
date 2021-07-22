@@ -191,7 +191,7 @@ pub enum Subs {
         #[structopt(short, long)]
         tags: Option<TagFilter>,
         #[structopt(parse(try_from_str))]
-        origin: ScriptQuery,
+        origin: ListQuery,
         new: Option<ScriptName>,
     },
     #[structopt(

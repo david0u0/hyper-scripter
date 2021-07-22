@@ -33,10 +33,15 @@ pub async fn do_list_query<'a>(
         let repo = unsafe { &mut *repo_ptr };
         match query {
             ListQuery::Pattern(re) => {
+                let mut is_empty = true;
                 for script in repo.iter_mut(false) {
                     if re.is_match(&script.name.key()) {
+                        is_empty = false;
                         insert!(script);
                     }
+                }
+                if is_empty {
+                    return Err(Error::ScriptNotFound(re.to_string()));
                 }
             }
             ListQuery::Query(query) => {
@@ -49,6 +54,7 @@ pub async fn do_list_query<'a>(
             }
         }
     }
+
     Ok(ret)
 }
 

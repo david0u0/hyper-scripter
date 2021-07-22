@@ -1,7 +1,7 @@
 use chrono::Utc;
 use hyper_scripter::args::{self, print_help, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
-use hyper_scripter::error::{Contextable, Error, Result};
+use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, ScriptQuery};
@@ -359,8 +359,22 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 None => None,
             };
-            let mut entry = query::do_script_query_strict(&origin, &mut repo).await?;
-            main_util::mv(&mut entry, new_name, ty, tags).await?;
+            let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;
+            if new_name.is_some() {
+                if scripts.len() > 1 {
+                    log::warn!("試圖把多個腳本移動成同一個");
+                    return Err(RedundantOpt::Scripts(
+                        scripts.iter().map(|s| s.name.key().to_string()).collect(),
+                    )
+                    .into());
+                }
+                //  只有一個，放心移動
+                main_util::mv(&mut scripts[0], new_name, ty.clone(), tags.clone()).await?;
+            } else {
+                for entry in scripts.iter_mut() {
+                    main_util::mv(entry, None, ty.clone(), tags.clone()).await?;
+                }
+            }
         }
         Subs::Tags {
             unset: Some(name), ..

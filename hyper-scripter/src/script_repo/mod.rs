@@ -366,6 +366,10 @@ impl ScriptRepo {
             .get_mut(&*name.key())
             .map(|info| RepoEntry::new(info, db_env))
     }
+    pub fn get_mut_by_id(&mut self, id: i64) -> Option<RepoEntry<'_>> {
+        // XXX: 複雜度很瞎
+        self.iter_mut(true).find(|e| e.id == id)
+    }
 
     pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {

@@ -28,6 +28,7 @@ pub fn run(
     info: &ScriptInfo,
     remaining: &[String],
     content: &str,
+    run_id: i64,
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
@@ -59,6 +60,7 @@ pub fn run(
     info = json!({
         "path": script_path,
         "hs_home": hs_home,
+        "hs_run_id": run_id,
         "hs_tags": hs_tags,
         "hs_cmd": hs_cmd,
         "hs_exe": hs_exe,

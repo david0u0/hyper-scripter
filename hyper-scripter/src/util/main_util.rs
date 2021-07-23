@@ -191,6 +191,7 @@ pub async fn run_n_times(
             &*entry,
             &args,
             &entry.exec_time.as_ref().unwrap().data().unwrap().0,
+            entry.last_event_id(),
         );
         let ret_code: i32;
         match run_res {

@@ -26,8 +26,6 @@ macro_rules! def_root {
         #[derive(StructOpt, Debug, Serialize)]
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
-            #[structopt(long, hidden = true, number_of_values = 1)]
-            pub skip_script: Vec<String>, // TODO: 確認一下這功能到底要不要
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
             #[structopt(long, global = true, help = "Do not record history")]
@@ -220,6 +218,12 @@ pub enum History {
         script: ScriptQuery,
         number: std::num::NonZeroU64,
     },
+    // TODO: 好想把它寫在 history rm 裡面...
+    #[structopt(
+        name = "rm-id",
+        about = "Remove history by the event's id\nUseful if you want to keep those illegal arguments from polluting the history."
+    )]
+    RMID { event_id: u64 }, // TODO: 測試
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,
@@ -233,6 +237,12 @@ pub enum History {
     Neglect {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
         queries: Vec<ListQuery>,
+    },
+    #[structopt( settings = NO_FLAG_SETTINGS)] // TODO: 測試
+    Amend {
+        event_id: u64,
+        #[structopt(help = "Command line args to pass to the script")]
+        args: Vec<String>,
     },
     Tidy {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]

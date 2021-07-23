@@ -238,6 +238,12 @@ pub enum History {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
         queries: Vec<ListQuery>,
     },
+    #[structopt( settings = NO_FLAG_SETTINGS)] // TODO: 測試
+    Amend {
+        event_id: u64,
+        #[structopt(help = "Command line args to pass to the script")]
+        args: Vec<String>,
+    },
     Tidy {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
         queries: Vec<ListQuery>,

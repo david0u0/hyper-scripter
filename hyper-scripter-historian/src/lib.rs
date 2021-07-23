@@ -317,6 +317,27 @@ impl Historian {
         Ok(None)
     }
 
+    pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {
+        if event_id == ZERO {
+            log::info!("試圖修改零事件，什麼都不做");
+            return Ok(());
+        }
+
+        let exec_ty = EventType::Exec.to_string();
+        sqlx::query!(
+            "
+            UPDATE events SET ignored = false, args = ?
+            WHERE type = ? AND id = ?
+            ",
+            args,
+            exec_ty,
+            event_id
+        )
+        .execute(&*self.pool.read().unwrap())
+        .await?;
+        Ok(())
+    }
+
     pub async fn last_time_of(
         &self,
         script_id: i64,

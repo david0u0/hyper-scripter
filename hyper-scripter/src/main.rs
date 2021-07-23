@@ -475,6 +475,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::History {
+            subcmd: History::Amend { event_id, args },
+        } => {
+            let args = serde_json::to_string(&args)?;
+            historian.amend_args_by_id(event_id as i64, &args).await?
+        }
+        Subs::History {
             subcmd: History::Tidy { queries },
         } => {
             for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {

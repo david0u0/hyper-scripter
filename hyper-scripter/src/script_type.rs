@@ -8,9 +8,9 @@ const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
 {{/each}}";
 
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+# [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
 
 set -e
-export VAR=\"${VAR:-default}\"
 {{#if birthplace_in_home}}
 cd ~/{{birthplace}}
 {{else}}
@@ -20,6 +20,7 @@ cd {{birthplace_abs}}
 {{/each}}";
 
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
+// [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
 
 process.chdir(require('os').homedir());
 {{#if birthplace_in_home}}
@@ -38,6 +39,8 @@ writeFile('/dev/null', 'some content');
 {{/each}}";
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+# [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
+
 NAME=${NAME/./_}
 tmux has-session -t $NAME
 if [ $? = 0 ]; then
@@ -47,7 +50,6 @@ if [ $? = 0 ]; then
 fi
 
 set -e
-export VAR=\"${VAR:-default}\"
 {{#if birthplace_in_home}}
 cd ~/{{birthplace}}
 {{else}}
@@ -60,6 +62,7 @@ tmux split-window -h \"{{{content.1}}}; $SHELL\"
 tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+# [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
 {{#if birthplace_in_home}}
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
 {{else}}

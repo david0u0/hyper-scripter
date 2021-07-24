@@ -1,5 +1,5 @@
 const HELP_KEY: &str = "[HS_HELP]:";
-const ENV_KEY: &str = "[HS_ENV]:";
+const ENV_KEY: &str = "[HS_ENV_HELP]:";
 
 pub fn extract_env_from_content(content: &str) -> impl ExactSizeIterator<Item = &str> {
     extract_msg_from_content(content, ENV_KEY, true)

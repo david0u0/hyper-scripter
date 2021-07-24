@@ -252,7 +252,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             print!("{}", content);
             entry.update(|info| info.read()).await?;
         }
-        Subs::Env { script_query } => {
+        Subs::EnvHelp { script_query } => {
             let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("打印 {:?} 的環境變數", entry.name);
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;

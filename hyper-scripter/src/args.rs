@@ -96,7 +96,7 @@ pub enum Subs {
     )]
     Help { args: Vec<String> },
     #[structopt(about = "Print the help message of env variables")]
-    Env {
+    EnvHelp {
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
     },

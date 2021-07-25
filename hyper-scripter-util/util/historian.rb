@@ -6,7 +6,16 @@
 require 'json'
 require_relative './common'
 
-ARGS = ARGV.join(' ')
+def split_args(args)
+  index = args.index('--')
+  if index.nil?
+    ['', args.join(' ')]
+  else
+    [args[..index].join(' '), args[index+1..].join(' ')]
+  end
+end
+
+SEQUENCE, ARGS = split_args(ARGV)
 
 # prevent the call to `util/historian` screw up historical query
 # e.g. hs util/historian !
@@ -64,7 +73,7 @@ selector.register_keys(%w[r R], lambda { |pos, _|
 }, msg: 'replce the argument')
 
 args = begin
-  selector.run.content
+  selector.run(sequence: SEQUENCE).content
 rescue Selector::Empty
   puts 'History is empty'
   exit

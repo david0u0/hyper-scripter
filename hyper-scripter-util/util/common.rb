@@ -94,7 +94,7 @@ class Selector
     @enter_overriden = false
   end
 
-  def run
+  def run(sequence: '')
     pos = 0
     mode = :normal
     loop do
@@ -104,13 +104,15 @@ class Selector
 
       line_count = 0
       display_pos = @offset + pos
-      @options.each_with_index do |option, i|
-        cur_display_pos = @offset + i
-        leading = pos == i ? '>' : ' '
-        gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
-        line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
-        option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
-        $stderr.print gen_line.call(option) + "\n"
+      if sequence.length == 0
+        @options.each_with_index do |option, i|
+          cur_display_pos = @offset + i
+          leading = pos == i ? '>' : ' '
+          gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
+          line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
+          option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
+          $stderr.print gen_line.call(option) + "\n"
+        end
       end
 
       case mode
@@ -120,8 +122,13 @@ class Selector
         $stderr.print ":#{@number}"
       end
 
-      resp = ' '
-      resp = STDIN.getch
+      resp = if sequence.length > 0
+               ch = sequence[0]
+               sequence = sequence[1..]
+               ch
+             else
+               STDIN.getch
+             end
       exit if resp == "\u0003" # Ctrl-C
 
       callback = nil

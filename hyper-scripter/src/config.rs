@@ -134,6 +134,7 @@ impl Default for Config {
                 gen_alias("tree", &["ls", "--grouping", "tree"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "-p"]),
+                gen_alias("pc", &["=util/historian!", "c", "--"]),
                 gen_alias("h", &["=util/historian!"]),
             ]
             .into_iter()

@@ -23,6 +23,7 @@ pub struct DBEnv {
     no_trace: bool,
     info_pool: SqlitePool,
     historian: Historian,
+    modifies_script: bool,
 }
 
 pub struct RepoEntryOptional<'b> {
@@ -41,27 +42,8 @@ impl<'b> RepoEntryOptional<'b> {
         let info = self.entry.or_insert(info);
         if !exist {
             log::debug!("往資料庫塞新腳本 {:?}", info);
-            let name_cow = info.name.key();
-            let name = name_cow.as_ref();
-            let ty = info.ty.as_ref();
-            let tags = join_tags(info.tags.iter());
-            sqlx::query!(
-                "
-                INSERT INTO script_infos (name, ty, tags)
-                VALUES(?, ?, ?)
-                ",
-                name,
-                ty,
-                tags,
-            )
-            .execute(&self.env.info_pool)
-            .await?;
-            log::debug!("往資料庫新增腳本成功");
-            let id = sqlx::query!("SELECT last_insert_rowid() as id")
-                .fetch_one(&self.env.info_pool)
-                .await?
-                .id;
-            log::debug!("得到新腳本 id {}", id);
+            let id = self.env.handle_insert(info).await?;
+            log::debug!("往資料庫新增腳本成功，得 id = {}", id);
             info.set_id(id as i64);
         }
         Ok(RepoEntry::new(info, self.env))
@@ -94,9 +76,45 @@ impl DBEnv {
         .await?;
         Ok(())
     }
+
+    async fn handle_delete(&self, id: i64) -> Result {
+        assert!(self.modifies_script);
+        self.historian.remove(id).await?;
+        self.purge_last_events(id).await?;
+        sqlx::query!("DELETE from script_infos where id = ?", id)
+            .execute(&self.info_pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_insert(&self, info: &ScriptInfo) -> Result<i64> {
+        assert!(self.modifies_script);
+        let name_cow = info.name.key();
+        let name = name_cow.as_ref();
+        let ty = info.ty.as_ref();
+        let tags = join_tags(info.tags.iter());
+        sqlx::query!(
+            "
+            INSERT INTO script_infos (name, ty, tags)
+            VALUES(?, ?, ?)
+            ",
+            name,
+            ty,
+            tags,
+        )
+        .execute(&self.info_pool)
+        .await?;
+        let id = sqlx::query!("SELECT last_insert_rowid() as id")
+            .fetch_one(&self.info_pool)
+            .await?
+            .id;
+        Ok(id as i64)
+    }
+
     async fn handle_change(&self, info: &ScriptInfo, main_event_id: i64) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
+            assert!(self.modifies_script);
             let name = info.name.key();
             let name = name.as_ref();
             let tags = join_tags(info.tags.iter());
@@ -235,6 +253,7 @@ impl ScriptRepo {
         recent: Option<RecentFilter>,
         historian: Historian,
         no_trace: bool,
+        modifies_script: bool,
     ) -> Result<ScriptRepo> {
         let mut known_tags: HashSet<Tag> = Default::default();
 
@@ -311,6 +330,7 @@ impl ScriptRepo {
                 info_pool: pool,
                 no_trace,
                 historian,
+                modifies_script,
             },
         })
     }
@@ -370,11 +390,7 @@ impl ScriptRepo {
     pub async fn remove(&mut self, name: &ScriptName) -> Result {
         if let Some(info) = self.map.remove(&*name.key()) {
             log::debug!("從資料庫刪除腳本 {:?}", info);
-            self.db_env.historian.remove(info.id).await?;
-            self.db_env.purge_last_events(info.id).await?;
-            sqlx::query!("DELETE from script_infos where id = ?", info.id)
-                .execute(&self.db_env.info_pool)
-                .await?;
+            self.db_env.handle_delete(info.id).await?;
         }
         Ok(())
     }

@@ -64,7 +64,8 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     let conf = Config::get();
-    let (pool, init) = hyper_scripter::db::get_pool().await?;
+    let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
+    let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;
 
     let recent = if root.timeless {
         None
@@ -76,7 +77,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
     };
 
     let historian = Historian::new(path::get_home().to_owned()).await?;
-    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), root.no_trace)
+    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), root.no_trace, need_journal)
         .await
         .context("讀取歷史記錄失敗")?;
 

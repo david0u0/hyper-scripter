@@ -108,8 +108,10 @@ fn test_edit_existing_bang() {
 
         let mut repo = {
             let historian = Historian::new(get_home().to_owned()).await.unwrap();
-            let (pool, _) = hyper_scripter::db::get_pool().await.unwrap();
-            ScriptRepo::new(pool, None, historian, false).await.unwrap()
+            let (pool, _) = hyper_scripter::db::get_pool(&mut true).await.unwrap();
+            ScriptRepo::new(pool, None, historian, false, true)
+                .await
+                .unwrap()
         };
         repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 

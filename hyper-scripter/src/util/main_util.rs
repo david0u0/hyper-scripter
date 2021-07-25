@@ -1,3 +1,4 @@
+use crate::args::Subs;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::path;
 use crate::query::{self, EditQuery};
@@ -251,6 +252,19 @@ pub fn load_templates() -> Result {
         super::write_file(&tmpl_path, tmpl)?;
     }
     Ok(())
+}
+
+/// 判斷是否需要寫入主資料庫（script_infos 表格）
+pub fn need_write(arg: &Subs) -> bool {
+    use Subs::*;
+    match arg {
+        Edit { .. } => true,
+        MV { .. } => true,
+        CP { .. } => true,
+        RM { .. } => true,
+        LoadUtils { .. } => true,
+        _ => false,
+    }
 }
 
 use super::PrepareRespond;

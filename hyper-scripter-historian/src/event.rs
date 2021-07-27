@@ -27,6 +27,18 @@ impl EventData<'_> {
     }
 }
 
+impl EventType {
+    pub const fn get_str(&self) -> &'static str {
+        use EventType::*;
+        match self {
+            ExecDone => "ExecDone",
+            Exec => "Exec",
+            Read => "Read",
+            Write => "Write",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Event<'a> {
     pub data: EventData<'a>,

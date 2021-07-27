@@ -4,7 +4,7 @@ use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
-use hyper_scripter::query::{self, ScriptQuery};
+use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
 use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::{RecentFilter, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
@@ -459,10 +459,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::History {
-            subcmd: History::RM { script, number },
+            subcmd: History::RM { script, range },
         } => {
             let mut entry = query::do_script_query_strict(&script, &mut repo).await?;
-            let res = historian.ignore_args(entry.id, number).await?;
+            let res = match range {
+                RangeQuery::Single(n) => historian.ignore_args(entry.id, n).await?,
+                RangeQuery::Range { min, max } => {
+                    historian.ignore_args_range(entry.id, min, max).await?
+                }
+            };
             if let Some(res) = res {
                 entry
                     .update(|info| {

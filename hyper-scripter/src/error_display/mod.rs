@@ -40,6 +40,7 @@ impl Display for Error {
                 write!(f, "Format error for ")?;
                 use FormatCode::*;
                 match code {
+                    RangeQuery => write!(f, "range query")?,
                     Config => write!(f, "config file")?,
                     ScriptName => write!(f, "script name")?,
                     Regex => write!(f, "regular expression")?,

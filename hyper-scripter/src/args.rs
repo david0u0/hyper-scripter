@@ -1,7 +1,7 @@
 use crate::config::{Alias, Config};
 use crate::error::Result;
 use crate::path;
-use crate::query::{EditQuery, FilterQuery, ListQuery, ScriptQuery};
+use crate::query::{EditQuery, FilterQuery, ListQuery, RangeQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
@@ -216,7 +216,7 @@ pub enum History {
     RM {
         #[structopt(parse(try_from_str))]
         script: ScriptQuery,
-        number: std::num::NonZeroU64,
+        range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...
     #[structopt(

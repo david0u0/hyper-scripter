@@ -10,6 +10,8 @@ use std::str::FromStr;
 
 mod util;
 pub use util::*;
+mod range_query;
+pub use range_query::*;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub enum EditQuery {

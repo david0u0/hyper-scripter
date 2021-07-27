@@ -11,6 +11,7 @@ pub enum FormatCode {
     Config,
     ScriptName,
     Regex,
+    RangeQuery,
     ScriptQuery,
     Tag,
     FilterQuery,

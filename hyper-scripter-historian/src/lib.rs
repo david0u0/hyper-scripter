@@ -311,10 +311,9 @@ impl Historian {
         let first_time = if let Some(max) = max {
             let max = max.get() as i64 - 1;
             let t = select_last_arg!(Time, "time", script_id, max, 1)
-                .fetch_one(&*pool)
-                .await?
-                .time;
-            Some(t)
+                .fetch_optional(&*pool)
+                .await?;
+            t.map(|t| t.time)
         } else {
             None
         };
@@ -332,7 +331,7 @@ impl Historian {
             ignore_arg!(pool, "script_id = ? AND time <= ?", script_id, last_time);
         }
 
-        if min == 1 {
+        if min == 0 {
             log::info!("ignore last args");
             let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));
@@ -355,7 +354,7 @@ impl Historian {
 
         ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
 
-        if number == 1 {
+        if offset == 0 {
             log::info!("ignore last args");
             let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));

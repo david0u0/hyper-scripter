@@ -185,9 +185,7 @@ pub async fn fmt_list<W: Write>(
                     let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
                     match &mut opt.display_style {
                         DisplayStyle::Long(table) => {
-                            table.add_row(Row::new(vec![
-                                Cell::new(&tags_txt.to_string()).with_hspan(TITLE.len())
-                            ]));
+                            table.add_row(Row::new(vec![Cell::new(&tags_txt.to_string())]));
                         }
                         DisplayStyle::Short(_, w) => {
                             writeln!(w, "{}", tags_txt)?;

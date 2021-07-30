@@ -1,6 +1,8 @@
 require 'io/console'
 
 RED = "\033[0;31m".freeze
+YELLOW_BG = "\033[0;43m".freeze
+YELLOW_BG_RED = "\033[31;43m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
 
@@ -83,6 +85,11 @@ class Selector
     keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, msg, recur)) }
   end
 
+  def register_keys_virtual(keys, callback, msg: '', recur: false)
+    keys = [keys] unless keys.is_a?(Array)
+    keys.each { |k| @virtual_callbacks.store(k, self.class.make_callback(callback, msg, recur)) }
+  end
+
   # Initiate the selector
   # @param offset [Integer, #read] the first visual number of the candidates
   def initialize(options, offset = 1)
@@ -91,12 +98,18 @@ class Selector
     @number = nil
     @offset = offset
     @callbacks = {}
+    @virtual_callbacks = {}
     @enter_overriden = false
+  end
+
+  def can_virtual?
+    @virtual_callbacks.length > 0
   end
 
   def run(sequence: '')
     pos = 0
     mode = :normal
+    virtual_state = nil
     loop do
       win_width = IO.console.winsize[1]
       option_count = @options.length
@@ -104,14 +117,21 @@ class Selector
 
       line_count = 0
       display_pos = @offset + pos
+
+      virtual_state.set_point(pos) unless virtual_state.nil?
+
       if sequence.length == 0
         @options.each_with_index do |option, i|
           cur_display_pos = @offset + i
+          is_virtual_selected = virtual_state.nil? ? false : virtual_state.in_range?(i)
           leading = pos == i ? '>' : ' '
           gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
           line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
-          option = option.gsub(@search_string, "#{RED}#{@search_string}#{NC}") if @search_string.length > 0
-          $stderr.print gen_line.call(option) + "\n"
+          option = self.class.color_line(option, @search_string, is_virtual_selected)
+          option = gen_line.call(option)
+
+          option = "#{YELLOW_BG}#{option}#{NC}" if is_virtual_selected
+          $stderr.print("#{option}\n")
         end
       end
 
@@ -180,15 +200,19 @@ class Selector
         when '/'
           mode = :search
           @search_string = ''
+        when 'v', 'V'
+          virtual_state = (VirtualState.new(pos) if virtual_state.nil? && can_virtual?)
         else
           resp_to_i = resp.to_i
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
-          elsif (resp == ENTER) && !@enter_overriden
+          elsif (resp == ENTER) && virtual_state.nil? && !@enter_overriden
+            # default enter behavior, for non-virtual mode
             return self.class.make_result(display_pos, @options[pos])
           else
-            @callbacks.each do |key, cur_callback|
+            callbacks = virtual_state.nil? ? @callbacks : @virtual_callbacks
+            callbacks.each do |key, cur_callback|
               next unless key == resp
 
               callback = cur_callback
@@ -207,23 +231,47 @@ class Selector
 
       next unless callback
 
-      callback.cb.call(display_pos, @options[pos])
-      return self.class.make_result(display_pos, @options[pos]) unless callback.recur
+      if virtual_state.nil?
+        callback.cb.call(display_pos, @options[pos])
+        return self.class.make_result(display_pos, @options[pos]) unless callback.recur
+      else
+        min, max = virtual_state.get_range
+        display_min = min + @offset
+        display_max = max + @offset
+        opts = @options[min..max]
+        callback.cb.call(display_min, display_max, opts)
+        return self.class.make_multi_result(display_min, display_max, opts) unless callback.recur
+      end
 
       # for options count change
       new_options = @options.length
-      pos = new_options - 1 if pos >= new_options
+      pos = [@options.length - 1, pos].min
+      virtual_state.truncate_by_length(@options.length) unless virtual_state.nil?
     end
   end
 
   def self.make_result(pos, content)
-    ret = Struct.new(:pos, :content)
-    ret.new(pos, content)
+    ret = Struct.new(:is_multi, :pos, :content)
+    ret.new(false, pos, content)
+  end
+
+  def self.make_multi_result(min, max, options)
+    ret = Struct.new(:is_multi, :min, :max, :options)
+    ret.new(true, min, max, options)
   end
 
   def self.make_callback(cb, content, recur)
     ret = Struct.new(:cb, :content, :recur)
     ret.new(cb, content, recur)
+  end
+
+  def self.color_line(option, search_string, is_virtual_selected)
+    if is_virtual_selected
+      return option.gsub(search_string, "#{YELLOW_BG_RED}#{search_string}#{YELLOW_BG}") if search_string.length > 0
+    elsif search_string.length > 0
+      return option.gsub(search_string, "#{RED}#{search_string}#{NC}")
+    end
+    option
   end
 
   private
@@ -245,5 +293,34 @@ class Selector
     lines = 1 + len / win_width
     lines -= 1 if len % win_width == 0
     lines
+  end
+end
+
+class VirtualState
+  def initialize(num)
+    @fixed = num
+    @moving = num
+  end
+
+  def set_point(num)
+    @moving = num
+  end
+
+  def get_range
+    if @fixed < @moving
+      [@fixed, @moving + 1]
+    else
+      [@moving, @fixed + 1]
+    end
+  end
+
+  def truncate_by_length(length)
+    @fixed = [length - 1, @fixed].min
+    @moving = [length - 1, @moving].min
+  end
+
+  def in_range?(num)
+    from, to = get_range
+    num >= from and num < to
   end
 end

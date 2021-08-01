@@ -255,13 +255,6 @@ pub fn to_display_args(arg: String) -> Result<String> {
     }
 }
 
-pub fn serialize_to_string<S: serde::Serializer, T: ToString>(
-    t: T,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&t.to_string())
-}
-
 fn relative_to_home(p: &Path) -> Option<&Path> {
     const CUR_DIR: &str = ".";
     let home = dirs::home_dir()?;

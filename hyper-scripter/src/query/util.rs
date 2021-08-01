@@ -32,7 +32,7 @@ pub async fn do_list_query<'a>(
         // SAFETY: `mem` 已保證回傳的陣列不可能包含相同的資料
         let repo = unsafe { &mut *repo_ptr };
         match query {
-            ListQuery::Pattern(re) => {
+            ListQuery::Pattern(re, og) => {
                 let mut is_empty = true;
                 for script in repo.iter_mut(false) {
                     if re.is_match(&script.name.key()) {
@@ -41,7 +41,7 @@ pub async fn do_list_query<'a>(
                     }
                 }
                 if is_empty {
-                    return Err(Error::ScriptNotFound(re.to_string()));
+                    return Err(Error::ScriptNotFound(og.to_owned()));
                 }
             }
             ListQuery::Query(query) => {

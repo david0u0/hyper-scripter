@@ -37,25 +37,35 @@ impl FromStr for EditQuery {
     }
 }
 
-use crate::util::serialize_to_string;
+fn serialize_to_string<S: serde::Serializer, U, T: ToString>(
+    _u: U,
+    t: T,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(&t.to_string())
+}
+
 #[derive(Debug, Serialize)]
 pub enum ListQuery {
     #[serde(serialize_with = "serialize_to_string")]
-    Pattern(Regex),
+    Pattern(Regex, String),
     Query(ScriptQuery),
 }
 impl FromStr for ListQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         if s.contains('*') {
+            let s = s.to_owned();
             // TODO: 好好檢查
-            let s = s.replace(".", r"\.");
-            let s = s.replace("*", ".*");
-            let re = Regex::new(&format!("^{}$", s)).map_err(|e| {
-                log::error!("正規表達式錯誤：{}", e);
-                Error::Format(RegexCode, s)
-            })?;
-            Ok(ListQuery::Pattern(re))
+            let re = s.replace(".", r"\.");
+            let re = re.replace("*", ".*");
+            match Regex::new(&format!("^{}$", re)) {
+                Ok(re) => Ok(ListQuery::Pattern(re, s)),
+                Err(e) => {
+                    log::error!("正規表達式錯誤：{}", e);
+                    Err(Error::Format(RegexCode, s))
+                }
+            }
         } else {
             Ok(ListQuery::Query(s.parse()?))
         }

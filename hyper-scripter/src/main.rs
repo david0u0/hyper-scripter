@@ -1,5 +1,5 @@
 use chrono::Utc;
-use hyper_scripter::args::{self, print_help, History, List, Root, Subs};
+use hyper_scripter::args::{self, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -201,7 +201,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::Help { args } => {
-            print_help(args.iter())?;
             let script_query: ScriptQuery = args[0].parse()?;
             let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);

@@ -292,7 +292,7 @@ fn find_alias<'a>(root: &'a alias_mod::Root) -> Option<(&'static Alias, &'a [Str
     }
 }
 
-pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
+fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
     let c: structopt::clap::App = Root::clap();
     let mut clap = &c;
@@ -312,6 +312,7 @@ pub fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
 }
 
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
+    use structopt::clap::{Error as ClapError, ErrorKind::VersionDisplayed};
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
         let root = Root::from_iter(args);
@@ -335,6 +336,13 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
             let root = Root::from_iter(args);
             Ok(root)
         }
+        Err(ClapError {
+            kind: VersionDisplayed,
+            ..
+        }) => {
+            // `from_iter_safe` 中已打印出版本，不再多做事，直接退出
+            std::process::exit(0);
+        }
         Err(e) => {
             log::warn!("解析別名參數出錯： {}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
             Root::from_iter(args);
@@ -356,6 +364,9 @@ impl Root {
                 };
                 log::info!("執行模式 {:?}", run);
                 self.subcmd = Some(run);
+            }
+            Some(Subs::Help { args }) => {
+                print_help(args.iter())?;
             }
             None => {
                 log::info!("無參數模式");

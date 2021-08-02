@@ -212,10 +212,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 println!("{}", msg);
             }
             let envs = extract_env_from_content(&content);
-            if envs.len() > 0 {
-                println!();
-            }
+            let mut first = true;
             for msg in envs {
+                if first {
+                    first = false;
+                    println!("");
+                }
                 println!("{}", msg);
             }
         }

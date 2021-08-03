@@ -1,11 +1,10 @@
 use super::{
-    style, time_str,
+    extract_help, style, time_str,
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
 use crate::config::Config;
 use crate::error::Result;
-use crate::extract_help;
 use crate::script::ScriptInfo;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
@@ -87,8 +86,8 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
         }
         write!(f, "{}", ident)?;
 
-        extract_help!(help_msg, script, false);
-        let help_msg = help_msg.into_iter().next().unwrap_or_default();
+        let mut buff = String::new();
+        let help_msg = extract_help(&mut buff, script)?;
 
         let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
         self.table.add_row(row);

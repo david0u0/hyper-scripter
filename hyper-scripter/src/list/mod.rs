@@ -4,9 +4,16 @@ pub use list_impl::*;
 mod tree;
 mod tree_lib;
 
-use crate::{query::ListQuery, script_time::ScriptTime};
+use crate::{error::Result, query::ListQuery, script::ScriptInfo, script_time::ScriptTime};
 use colored::{ColoredString, Colorize};
 use std::borrow::Cow;
+
+fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> Result<&'a str> {
+    let script_path = crate::path::open_script(&script.name, &script.ty, Some(true))?;
+    *buff = crate::util::read_file(&script_path)?;
+    let mut helps = crate::extract_msg::extract_help_from_content(buff);
+    Ok(helps.next().unwrap_or_default())
+}
 
 fn time_str<T>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
     match time {

@@ -207,7 +207,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
 
-            let helps = extract_help_from_content(&content, true);
+            let helps = extract_help_from_content(&content);
             for msg in helps {
                 println!("{}", msg);
             }

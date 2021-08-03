@@ -1,7 +1,8 @@
-use super::{style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions};
+use super::{
+    extract_help, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
+};
 use crate::config::Config;
 use crate::error::Result;
-use crate::extract_help;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
@@ -105,8 +106,8 @@ pub fn fmt_meta<W: Write>(
             );
             let ty_txt = style(opt.plain, &script.ty, |s| s.color(color).bold());
 
-            extract_help!(help_msg, script, false);
-            let help_msg = help_msg.into_iter().next().unwrap_or_default();
+            let mut buff = String::new();
+            let help_msg = extract_help(&mut buff, script)?;
 
             let row = row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
             table.add_row(row);

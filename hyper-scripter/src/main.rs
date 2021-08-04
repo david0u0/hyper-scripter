@@ -511,9 +511,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd: History::Neglect { queries },
         } => {
-            let db_env = repo.get_db_env().clone();
             for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
-                db_env.purge_last_events(entry.id).await?;
+                let id = entry.id;
+                entry.get_env().handle_neglect(id).await;
             }
         }
         Subs::History {

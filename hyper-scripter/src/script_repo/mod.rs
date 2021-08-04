@@ -51,11 +51,15 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
-    pub async fn purge_last_events(&self, id: i64) -> Result {
-        log::debug!("清理腳本 {:?} 的最新事件", id);
-        sqlx::query!("DELETE FROM last_events WHERE script_id = ?", id)
-            .execute(&self.info_pool)
-            .await?;
+    pub async fn handle_neglect(&self, id: i64) -> Result {
+        let time = Utc::now().naive_utc();
+        sqlx::query!(
+            "UPDATE last_events SET neglect = ? WHERE script_id = ?",
+            time,
+            id
+        )
+        .execute(&self.info_pool)
+        .await?;
         Ok(())
     }
 
@@ -80,7 +84,10 @@ impl DBEnv {
     async fn handle_delete(&self, id: i64) -> Result {
         assert!(self.modifies_script);
         self.historian.remove(id).await?;
-        self.purge_last_events(id).await?;
+        log::debug!("清理腳本 {:?} 的最新事件", id);
+        sqlx::query!("DELETE FROM last_events WHERE script_id = ?", id)
+            .execute(&self.info_pool)
+            .await?;
         sqlx::query!("DELETE from script_infos where id = ?", id)
             .execute(&self.info_pool)
             .await?;
@@ -217,10 +224,6 @@ pub struct ScriptRepo {
 }
 
 impl ScriptRepo {
-    pub fn get_db_env(&self) -> &DBEnv {
-        &self.db_env
-    }
-
     pub fn iter_known_tags(&self) -> impl Iterator<Item = &Tag> {
         self.known_tags.iter()
     }
@@ -270,16 +273,16 @@ impl ScriptRepo {
         .fetch_all(&pool)
         .await?;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
-        for script in scripts.into_iter() {
-            let name = script.name;
-            log::trace!("載入腳本：{} {} {}", name, script.ty, script.tags);
+        for record in scripts.into_iter() {
+            let name = record.name;
+            log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
             let script_name = name.clone().into_script_name()?;
 
             let mut builder = ScriptInfo::builder(
-                script.id,
+                record.id,
                 script_name,
-                script.ty.into(),
-                script.tags.split(',').filter_map(|s| {
+                record.ty.into(),
+                record.tags.split(',').filter_map(|s| {
                     if s.is_empty() {
                         None
                     } else {
@@ -292,24 +295,28 @@ impl ScriptRepo {
                     }
                 }),
             )
-            .created_time(script.created_time);
+            .created_time(record.created_time);
 
-            if let Some(time) = script.write {
+            if let Some(time) = record.write {
                 builder = builder.write_time(time);
             }
-            if let Some(time) = script.read {
+            if let Some(time) = record.read {
                 builder = builder.read_time(time);
             }
-            if let Some(time) = script.exec {
+            if let Some(time) = record.exec {
                 builder = builder.exec_time(time);
             }
-            if let Some(time) = script.exec_done {
+            if let Some(time) = record.exec_done {
                 builder = builder.exec_done_time(time);
             }
 
             let script = builder.build();
 
-            let hide_by_time = if let Some((time_bound, archaeology)) = time_bound {
+            let hide_by_time = if let Some((mut time_bound, archaeology)) = time_bound {
+                if let Some(neglect) = record.neglect {
+                    log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
+                    time_bound = neglect;
+                }
                 let overtime = time_bound > script.last_time_without_read();
                 archaeology ^ overtime
             } else {

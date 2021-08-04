@@ -42,6 +42,9 @@ impl<'b> RepoEntry<'b> {
     pub fn into_inner(self) -> &'b ScriptInfo {
         self.info
     }
+    pub fn get_env(&self) -> &DBEnv {
+        self.env
+    }
 }
 impl<'b> Iterator for Iter<'b> {
     type Item = RepoEntry<'b>;

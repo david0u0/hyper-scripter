@@ -9,7 +9,7 @@ use colored::{ColoredString, Colorize};
 use std::borrow::Cow;
 
 fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> Result<&'a str> {
-    let script_path = crate::path::open_script(&script.name, &script.ty, Some(true))?;
+    let script_path = crate::path::open_script(&script.name, &script.ty, None)?;
     *buff = crate::util::read_file(&script_path)?;
     let mut helps = crate::extract_msg::extract_help_from_content(buff);
     Ok(helps.next().unwrap_or_default())

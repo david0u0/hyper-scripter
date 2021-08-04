@@ -11,7 +11,7 @@ def split_args(args)
   if index.nil?
     ['', args.join(' ')]
   else
-    [args[..index].join(' '), args[index + 1..].join(' ')]
+    [args[0..index].join(' '), args[index + 1..-1].join(' ')]
   end
 end
 
@@ -75,6 +75,7 @@ selector.register_keys(%w[r R], lambda { |pos, _|
 selector.register_keys_virtual(%w[d D], lambda { |min, max, _|
   HS_ENV.do_hs("history rm =#{script_name}! #{min}..#{max}", false)
   selector.load(load_history.call)
+  selector.exit_virtual
 }, msg: 'delete the history', recur: true)
 
 args = begin

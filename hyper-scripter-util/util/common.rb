@@ -100,6 +100,7 @@ class Selector
     @callbacks = {}
     @virtual_callbacks = {}
     @enter_overriden = false
+    @virtual_state = nil
   end
 
   def can_virtual?
@@ -109,7 +110,6 @@ class Selector
   def run(sequence: '')
     pos = 0
     mode = :normal
-    virtual_state = nil
     loop do
       win_width = IO.console.winsize[1]
       option_count = @options.length
@@ -118,12 +118,12 @@ class Selector
       line_count = 0
       display_pos = @offset + pos
 
-      virtual_state.set_point(pos) unless virtual_state.nil?
+      @virtual_state.set_point(pos) unless @virtual_state.nil?
 
       if sequence.length == 0
         @options.each_with_index do |option, i|
           cur_display_pos = @offset + i
-          is_virtual_selected = virtual_state.nil? ? false : virtual_state.in_range?(i)
+          is_virtual_selected = @virtual_state.nil? ? false : @virtual_state.in_range?(i)
           leading = pos == i ? '>' : ' '
           gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
           line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
@@ -144,7 +144,7 @@ class Selector
 
       resp = if sequence.length > 0
                ch = sequence[0]
-               sequence = sequence[1..]
+               sequence = sequence[1..-1]
                ch
              else
                STDIN.getch
@@ -201,17 +201,17 @@ class Selector
           mode = :search
           @search_string = ''
         when 'v', 'V'
-          virtual_state = (VirtualState.new(pos) if virtual_state.nil? && can_virtual?)
+          @virtual_state = (VirtualState.new(pos) if @virtual_state.nil? && can_virtual?)
         else
           resp_to_i = resp.to_i
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
-          elsif (resp == ENTER) && virtual_state.nil? && !@enter_overriden
+          elsif (resp == ENTER) && @virtual_state.nil? && !@enter_overriden
             # default enter behavior, for non-virtual mode
             return self.class.make_result(display_pos, @options[pos])
           else
-            callbacks = virtual_state.nil? ? @callbacks : @virtual_callbacks
+            callbacks = @virtual_state.nil? ? @callbacks : @virtual_callbacks
             callbacks.each do |key, cur_callback|
               next unless key == resp
 
@@ -231,11 +231,11 @@ class Selector
 
       next unless callback
 
-      if virtual_state.nil?
+      if @virtual_state.nil?
         callback.cb.call(display_pos, @options[pos])
         return self.class.make_result(display_pos, @options[pos]) unless callback.recur
       else
-        min, max = virtual_state.get_range
+        min, max = @virtual_state.get_range
         display_min = min + @offset
         display_max = max + @offset
         opts = @options[min..max]
@@ -246,8 +246,12 @@ class Selector
       # for options count change
       new_options = @options.length
       pos = [@options.length - 1, pos].min
-      virtual_state.truncate_by_length(@options.length) unless virtual_state.nil?
+      @virtual_state.truncate_by_length(@options.length) unless @virtual_state.nil?
     end
+  end
+
+  def exit_virtual
+    @virtual_state = nil
   end
 
   def self.make_result(pos, content)

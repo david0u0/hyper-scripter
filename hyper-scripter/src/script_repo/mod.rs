@@ -67,14 +67,19 @@ impl DBEnv {
         let last_time = info.last_time();
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
+        let neglect = info.neglect_time.as_ref().map(|t| **t);
         sqlx::query!(
-            "INSERT OR REPLACE INTO last_events (script_id, last_time, read, write, exec, exec_done) VALUES(?, ?, ?, ?, ?, ?)",
+            "
+            INSERT OR REPLACE INTO last_events
+            (script_id, last_time, read, write, exec, exec_done, neglect) VALUES(?, ?, ?, ?, ?, ?, ?)
+            ",
             info.id,
             last_time,
             *info.read_time,
             *info.write_time,
             exec_time,
             exec_done_time,
+            neglect
         )
         .execute(&self.info_pool)
         .await?;
@@ -308,6 +313,9 @@ impl ScriptRepo {
             }
             if let Some(time) = record.exec_done {
                 builder = builder.exec_done_time(time);
+            }
+            if let Some(time) = record.neglect {
+                builder = builder.neglect_time(time);
             }
 
             let script = builder.build();

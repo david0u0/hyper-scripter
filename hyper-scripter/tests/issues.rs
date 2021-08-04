@@ -192,11 +192,11 @@ fn test_multifuzz() {
         assert!(is_match, "並非預期中的 multifuzz 結果，應更新測資");
     }
 
-    t2.assert_can_find("multifuzz/t");
+    t2.can_find("multifuzz/t").unwrap();
     t1.run(None).unwrap();
-    t1.assert_can_find("multifuzz/t");
+    t1.can_find("multifuzz/t").unwrap();
     t2.run(None).unwrap();
-    t2.assert_can_find("multifuzz/t");
+    t2.can_find("multifuzz/t").unwrap();
 
-    pref.assert_can_find("multifuzz");
+    pref.can_find("multifuzz").unwrap();
 }

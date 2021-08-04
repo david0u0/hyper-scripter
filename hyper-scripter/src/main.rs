@@ -513,7 +513,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         } => {
             for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
                 let id = entry.id;
-                entry.get_env().handle_neglect(id).await;
+                entry.get_env().handle_neglect(id).await?;
             }
         }
         Subs::History {

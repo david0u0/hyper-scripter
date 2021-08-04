@@ -133,6 +133,7 @@ pub struct TimelessScriptInfo {
 pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
+    pub neglect_time: Option<ScriptTime>,
     /// (content, args)
     pub exec_time: Option<ScriptTime<(String, String)>>,
     pub exec_done_time: Option<ScriptTime<i32>>,
@@ -171,6 +172,7 @@ impl ScriptInfo {
             write_time: now.clone(),
             exec_time: None,
             exec_done_time: None,
+            neglect_time: None,
             timeless_info,
         }
     }
@@ -210,6 +212,9 @@ impl ScriptInfo {
         log::trace!("{:?} 執行結果為 {}", self, code);
         self.exec_done_time = Some(ScriptTime::now(code));
     }
+    pub fn neglect(&mut self) {
+        self.neglect_time = Some(ScriptTime::now(()))
+    }
     pub fn builder(
         id: i64,
         name: ScriptName,
@@ -226,6 +231,7 @@ impl ScriptInfo {
             exec_time: None,
             write_time: None,
             exec_done_time: None,
+            neglect_time: None,
         }
     }
 }
@@ -257,6 +263,7 @@ pub struct ScriptBuilder {
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
+    neglect_time: Option<NaiveDateTime>,
     exec_done_time: Option<NaiveDateTime>,
     id: i64,
     tags: HashSet<Tag>,
@@ -280,6 +287,10 @@ impl ScriptBuilder {
         self.write_time = Some(time);
         self
     }
+    pub fn neglect_time(mut self, time: NaiveDateTime) -> Self {
+        self.neglect_time = Some(time);
+        self
+    }
     pub fn created_time(mut self, time: NaiveDateTime) -> Self {
         self.created_time = Some(time);
         self
@@ -291,6 +302,7 @@ impl ScriptBuilder {
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
+            neglect_time: self.neglect_time.map(ScriptTime::new),
             timeless_info: TimelessScriptInfo {
                 changed: false,
                 id: self.id,

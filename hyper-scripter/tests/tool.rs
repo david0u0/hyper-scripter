@@ -24,6 +24,36 @@ pub fn get_exe_abs() -> String {
 
 const HOME: &str = "./.hyper_scripter";
 
+#[derive(Debug)]
+enum ErrorInner {
+    Other,
+    ExitStatus(ExitStatus),
+}
+#[derive(Debug)]
+pub struct Error {
+    msg: Vec<String>,
+    inner: ErrorInner,
+}
+impl Error {
+    pub fn exit_status(e: ExitStatus) -> Error {
+        Error {
+            msg: vec![],
+            inner: ErrorInner::ExitStatus(e),
+        }
+    }
+    pub fn other<T: ToString>(s: T) -> Error {
+        Error {
+            msg: vec![s.to_string()],
+            inner: ErrorInner::Other,
+        }
+    }
+    pub fn context<T: ToString>(mut self, s: T) -> Error {
+        self.msg.push(s.to_string());
+        self
+    }
+}
+type Result<T = ()> = std::result::Result<T, Error>;
+
 pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
@@ -79,11 +109,11 @@ pub fn check_exist(p: &[&str]) -> bool {
     let file = join_path(p);
     file.exists()
 }
-pub fn run<T: ToString>(args: T) -> Result<String, ExitStatus> {
+pub fn run<T: ToString>(args: T) -> Result<String> {
     let home = get_home();
     run_with_home(&*home.to_string_lossy(), args)
 }
-pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitStatus> {
+pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String> {
     let mut full_args = vec!["-H", home];
     let args = args.to_string();
     let args_vec: Vec<&str> = if args.find('|').is_some() {
@@ -119,7 +149,7 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String, ExitSta
     let res = if status.success() {
         Ok(out_str.join("\n"))
     } else {
-        Err(status)
+        Err(Error::exit_status(status).context(format!("執行 {:?} 失敗", args_vec)))
     };
     log::info!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res
@@ -174,7 +204,7 @@ impl ScriptTest {
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
-    pub fn run(&self, args: Option<&str>) -> Result<String, ExitStatus> {
+    pub fn run(&self, args: Option<&str>) -> Result<String> {
         let s = format!("{} ={}", args.unwrap_or_default(), self.name);
         run(&s)
     }
@@ -198,9 +228,16 @@ impl ScriptTest {
             self.name, msg
         );
     }
-    pub fn assert_can_find(&self, command: &str) {
+    pub fn can_find(&self, command: &str) -> Result {
         let command = format!("ls --plain --grouping=none --name {}", command);
-        let res = run(&command).expect(&format!("執行 {} 失敗", command));
-        assert_eq!(res, self.name);
+        let res = run(&command)?;
+        if res == self.name {
+            Ok(())
+        } else {
+            Err(Error::other(format!("想找 {} 卻找到 {}", self.name, res)))
+        }
+    }
+    pub fn can_find_by_name(&self) -> Result {
+        self.can_find(&format!("={}", self.name))
     }
 }

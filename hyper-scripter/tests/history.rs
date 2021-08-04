@@ -165,3 +165,35 @@ fn test_archaeology() {
     let _g = setup();
     // TODO
 }
+
+#[test]
+fn test_neglect() {
+    let _g = setup();
+    let t1 = ScriptTest::new("1", None);
+    let t2 = ScriptTest::new("2", None);
+    let neg1 = ScriptTest::new("neg1", None);
+    let neg2 = ScriptTest::new("neg2", None);
+    t1.can_find_by_name().unwrap();
+    t2.can_find_by_name().unwrap();
+    neg1.can_find_by_name().unwrap();
+    neg2.can_find_by_name().unwrap();
+
+    run(format!("history neglect {}", neg1.get_name())).unwrap();
+    run(format!("history neglect {}", neg2.get_name())).unwrap();
+
+    t1.can_find_by_name().unwrap();
+    t2.can_find_by_name().unwrap();
+    neg1.can_find_by_name().unwrap_err();
+    neg2.can_find_by_name().unwrap_err();
+
+    run(format!("cat ={}!", neg1.get_name())).unwrap();
+    neg1.can_find_by_name()
+        .expect_err("讀取事件破壞了忽視的狀態");
+
+    run(format!("mv ={}!", neg1.get_name())).unwrap();
+    neg1.can_find_by_name().expect("移動事件沒有解除忽視狀態");
+
+    neg2.can_find_by_name().unwrap_err();
+    run(format!("={}!", neg2.get_name())).unwrap();
+    neg2.can_find_by_name().expect("執行事件沒有解除忽視狀態");
+}

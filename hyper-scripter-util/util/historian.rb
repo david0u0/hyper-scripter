@@ -17,6 +17,18 @@ end
 
 SEQUENCE, ARGS = split_args(ARGV)
 
+class Option
+  def initialize(content, number)
+    @content = content.strip
+    @number = number
+  end
+
+  def to_s
+    @content
+  end
+  attr_reader :number, :content
+end
+
 # prevent the call to `util/historian` screw up historical query
 # e.g. hs util/historian !
 HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
@@ -47,15 +59,15 @@ warn "Historian for #{script_name}"
 
 load_history = lambda do
   history = HS_ENV.do_hs("history show =#{script_name}! --limit #{limit} --offset #{offset}", false)
-  history.lines.map { |s| s.strip }
+  history.lines.each_with_index.map { |s, i| Option.new(s, i + offset + 1) }
 end
 
 sourcing = false
 echoing = false
-selector = Selector.new(load_history.call, offset + 1)
+selector = Selector.new(load_history.call)
 
-selector.register_keys(%w[d D], lambda { |pos, _|
-  HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
+selector.register_keys(%w[d D], lambda { |_, obj|
+  HS_ENV.do_hs("history rm =#{script_name}! #{obj.number}", false)
   selector.load(load_history.call)
 }, msg: 'delete the history', recur: true)
 
@@ -67,20 +79,21 @@ selector.register_keys(%w[c C], lambda { |_, _|
   sourcing = true
 }, msg: 'set next command')
 
-selector.register_keys(%w[r R], lambda { |pos, _|
+selector.register_keys(%w[r R], lambda { |_, obj|
   sourcing = true
-  HS_ENV.do_hs("history rm =#{script_name}! #{pos}", false)
+  HS_ENV.do_hs("history rm =#{script_name}! #{obj.number}", false)
 }, msg: 'replce the argument')
 
 selector.register_keys_virtual(%w[d D], lambda { |min, max, _|
-  HS_ENV.do_hs("history rm =#{script_name}! #{min}..#{max}", false)
+  # FIXME: obj.number?
+  HS_ENV.do_hs("history rm =#{script_name}! #{min + offset + 1}..#{max + offset + 1}", false)
   selector.load(load_history.call)
   selector.exit_virtual
 }, msg: 'delete the history', recur: true)
 
 args = begin
   res = selector.run(sequence: SEQUENCE)
-  res.content
+  res.content.content
 rescue Selector::Empty
   puts 'History is empty'
   exit

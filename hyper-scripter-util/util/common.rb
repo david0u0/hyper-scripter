@@ -91,12 +91,10 @@ class Selector
   end
 
   # Initiate the selector
-  # @param offset [Integer, #read] the first visual number of the candidates
-  def initialize(options, offset = 1)
+  def initialize(options)
     load(options)
     @search_string = ''
     @number = nil
-    @offset = offset
     @callbacks = {}
     @virtual_callbacks = {}
     @enter_overriden = false
@@ -116,16 +114,13 @@ class Selector
       raise Empty if option_count == 0
 
       line_count = 0
-      display_pos = @offset + pos
-
       @virtual_state.set_point(pos) unless @virtual_state.nil?
 
       if sequence.length == 0
         @options.each_with_index do |option, i|
-          cur_display_pos = @offset + i
           is_virtual_selected = @virtual_state.nil? ? false : @virtual_state.in_range?(i)
           leading = pos == i ? '>' : ' '
-          gen_line = ->(content) { "#{leading} #{cur_display_pos}. #{content}" }
+          gen_line = ->(option) { "#{leading} #{i}. #{option}" }
           line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
           option = self.class.color_line(option, @search_string, is_virtual_selected)
           option = gen_line.call(option)
@@ -178,7 +173,7 @@ class Selector
           end
         when ENTER
           mode = :normal
-          pos = [@number - @offset, 0].max
+          pos = [@number, 0].max
           pos = [pos, option_count - 1].min
         else
           @number = @number * 10 + resp.to_i if resp =~ /[0-9]/
@@ -209,7 +204,7 @@ class Selector
             @number = resp.to_i
           elsif (resp == ENTER) && @virtual_state.nil? && !@enter_overriden
             # default enter behavior, for non-virtual mode
-            return self.class.make_result(display_pos, @options[pos])
+            return self.class.make_result(pos, @options[pos])
           else
             callbacks = @virtual_state.nil? ? @callbacks : @virtual_callbacks
             callbacks.each do |key, cur_callback|
@@ -232,15 +227,13 @@ class Selector
       next unless callback
 
       if @virtual_state.nil?
-        callback.cb.call(display_pos, @options[pos])
-        return self.class.make_result(display_pos, @options[pos]) unless callback.recur
+        callback.cb.call(pos, @options[pos])
+        return self.class.make_result(pos, @options[pos]) unless callback.recur
       else
         min, max = @virtual_state.get_range
-        display_min = min + @offset
-        display_max = max + @offset
         opts = @options[min..max]
-        callback.cb.call(display_min, display_max, opts)
-        return self.class.make_multi_result(display_min, display_max, opts) unless callback.recur
+        callback.cb.call(min, max, opts)
+        return self.class.make_multi_result(min, max, opts) unless callback.recur
       end
 
       # for options count change
@@ -270,6 +263,7 @@ class Selector
   end
 
   def self.color_line(option, search_string, is_virtual_selected)
+    option = option.to_s
     if is_virtual_selected
       return option.gsub(search_string, "#{YELLOW_BG_RED}#{search_string}#{YELLOW_BG}") if search_string.length > 0
     elsif search_string.length > 0
@@ -288,7 +282,7 @@ class Selector
           else
             (i + pos) % len
           end
-      return i if @options[i].include?(@search_string)
+      return i if @options[i].to_s.include?(@search_string)
     end
     nil
   end

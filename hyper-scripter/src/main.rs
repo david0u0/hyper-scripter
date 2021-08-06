@@ -532,11 +532,19 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 let args: Vec<String> = serde_json::from_str(&args)?;
                 if with_name {
                     print!("{}", entry.name.key());
+                    if !args.is_empty() {
+                        print!(" ");
+                    }
                 }
+                let mut first = true;
                 for arg in args {
-                    print!(" {}", util::to_display_args(arg)?);
+                    if !first {
+                        print!(" ");
+                    }
+                    first = false;
+                    print!("{}", util::to_display_args(arg)?);
                 }
-                println!();
+                println!("");
             }
         }
         sub => unimplemented!("{:?}", sub),

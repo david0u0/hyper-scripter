@@ -204,9 +204,14 @@ impl ScriptTest {
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
-    pub fn run(&self, args: Option<&str>) -> Result<String> {
-        let s = format!("{} ={}", args.unwrap_or_default(), self.name);
-        run(&s)
+    pub fn filter<'a>(&'a self, filter: &'a str) -> ScriptTestWithFilter<'a> {
+        ScriptTestWithFilter {
+            sctipr: self,
+            filter,
+        }
+    }
+    pub fn run(&self, args: &str) -> Result<String> {
+        self.filter("").run(args)
     }
     pub fn assert_tags<const N: usize>(
         &self,
@@ -239,5 +244,15 @@ impl ScriptTest {
     }
     pub fn can_find_by_name(&self) -> Result {
         self.can_find(&format!("={}", self.name))
+    }
+}
+pub struct ScriptTestWithFilter<'a> {
+    sctipr: &'a ScriptTest,
+    filter: &'a str,
+}
+impl<'a> ScriptTestWithFilter<'a> {
+    pub fn run(&self, args: &str) -> Result<String> {
+        let s = format!("{} ={} {}", self.filter, self.sctipr.name, args);
+        run(&s)
     }
 }

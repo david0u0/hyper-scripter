@@ -5,6 +5,7 @@
 
 require 'json'
 require_relative './common'
+require_relative './selector'
 
 def split_args(args)
   index = args.index('--')

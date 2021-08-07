@@ -79,17 +79,10 @@ impl<'a> DBEvent<'a> {
     }
 }
 
-struct Args {
-    args: Option<String>,
-}
-struct Time {
-    time: NaiveDateTime,
-}
 macro_rules! select_last_arg {
-    ($ty:ident, $select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
+    ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
         static EXEC_TY: &'static str = EventType::Exec.get_str();
-        sqlx::query_as_unchecked!(
-            $ty,
+        sqlx::query!(
             "
             WITH args AS (
                 SELECT args, max(time) as time FROM events
@@ -253,7 +246,7 @@ impl Historian {
     ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
         let limit = limit as i64;
         let offset = offset as i64;
-        let res = select_last_arg!(Args, "args", id, offset, limit)
+        let res = select_last_arg!("args", id, offset, limit)
             .fetch_all(&*self.pool.read().unwrap())
             .await?;
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
@@ -302,36 +295,24 @@ impl Historian {
         min: NonZeroU64,
         max: Option<NonZeroU64>,
     ) -> Result<Option<IgnoreResult>, DBError> {
-        let min = min.get() as i64 - 1;
-        let pool = self.pool.read().unwrap();
-        let last_time = select_last_arg!(Time, "time", script_id, min, 1)
-            .fetch_one(&*pool)
-            .await?
-            .time;
-        let first_time = if let Some(max) = max {
-            let max = max.get() as i64 - 1;
-            let t = select_last_arg!(Time, "time", script_id, max, 1)
-                .fetch_optional(&*pool)
-                .await?;
-            t.map(|t| t.time)
+        let offset = min.get() as i64 - 1;
+        let limit = if let Some(max) = max {
+            (max.get() - min.get()) as i64
         } else {
-            None
+            -1
         };
-        log::debug!("刪除最晚事件：{}，最早 {:?}", last_time, first_time);
 
-        if let Some(first_time) = first_time {
-            ignore_arg!(
-                pool,
-                "script_id = ? AND time <= ? AND time > ?",
-                script_id,
-                last_time,
-                first_time
-            );
-        } else {
-            ignore_arg!(pool, "script_id = ? AND time <= ?", script_id, last_time);
+        let pool = self.pool.read().unwrap();
+        let args_vec = select_last_arg!("args", script_id, offset, limit)
+            .fetch_all(&*pool)
+            .await?;
+
+        for args in args_vec {
+            // TODO: 有沒有更有效的方法？
+            ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args.args);
         }
 
-        if min == 0 {
+        if offset == 0 {
             log::info!("ignore last args");
             let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));
@@ -347,7 +328,7 @@ impl Historian {
         let offset = number as i64 - 1;
         let pool = self.pool.read().unwrap();
 
-        let args = select_last_arg!(Args, "args", script_id, offset, 1)
+        let args = select_last_arg!("args", script_id, offset, 1)
             .fetch_one(&*pool)
             .await?
             .args;

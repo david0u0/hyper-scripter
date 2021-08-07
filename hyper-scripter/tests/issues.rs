@@ -193,10 +193,36 @@ fn test_multifuzz() {
     }
 
     t2.can_find("multifuzz/t").unwrap();
-    t1.run(None).unwrap();
+    t1.run("").unwrap();
     t1.can_find("multifuzz/t").unwrap();
-    t2.run(None).unwrap();
+    t2.run("").unwrap();
     t2.can_find("multifuzz/t").unwrap();
 
     pref.can_find("multifuzz").unwrap();
+}
+
+#[test]
+fn test_history_rm_range() {
+    println!("移除一整段事件");
+    let _g = setup();
+
+    let t1 = ScriptTest::new("test", None);
+    t1.run("sep").unwrap();
+    t1.run("a").unwrap();
+    t1.run("b").unwrap();
+    t1.run("sep").unwrap();
+    let t2 = ScriptTest::new("test2", None);
+    t1.run("a").unwrap();
+    t1.run("b").unwrap();
+    let show_history = || -> Vec<String> {
+        let s = run(format!("history show {}", t1.get_name())).unwrap();
+        s.split('\n').map(|s| s.to_owned()).collect()
+    };
+    t1.can_find("-").expect("用最近期詢問找不到？");
+    assert_eq!(show_history(), vec!["b", "a", "sep"]);
+
+    run(format!("history rm {} 1..3", t1.get_name())).unwrap(); // rm b & a
+    assert_eq!(show_history(), vec!["sep"]);
+
+    t2.can_find("-").expect("刪除整段事件未能影響近期詢問");
 }

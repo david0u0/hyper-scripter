@@ -2,7 +2,7 @@ use super::{
     extract_help, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
 };
 use crate::config::Config;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
@@ -144,10 +144,10 @@ pub async fn fmt_list<W: Write>(
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
-    let latest_script_id = match script_repo.latest_mut(1, false) {
-        Some(script) => script.id,
-        None => return Ok(()),
-    };
+    let latest_script_id = script_repo
+        .latest_mut(1, false)
+        .ok_or_else(|| Error::Empty)?
+        .id;
 
     if let DisplayStyle::Long(table) = &mut opt.display_style {
         if opt.grouping != Grouping::Tree {

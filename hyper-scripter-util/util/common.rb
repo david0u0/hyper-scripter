@@ -1,11 +1,3 @@
-require 'io/console'
-
-RED = "\033[0;31m".freeze
-YELLOW_BG = "\033[0;43m".freeze
-YELLOW_BG_RED = "\033[31;43m".freeze
-NC = "\033[0m".freeze
-ENTER = "\r".freeze
-
 class HSEnv
   ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID',
               source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze

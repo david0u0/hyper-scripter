@@ -1,3 +1,11 @@
+require 'io/console'
+
+RED = "\033[0;31m".freeze
+YELLOW_BG = "\033[0;43m".freeze
+YELLOW_BG_RED = "\033[31;43m".freeze
+NC = "\033[0m".freeze
+ENTER = "\r".freeze
+
 class Selector
   class Empty < StandardError
   end
@@ -45,7 +53,7 @@ class Selector
       raise Empty if option_count == 0
 
       line_count = 0
-      @virtual_state.set_point(pos) unless @virtual_state.nil?
+      @virtual_state&.set_point(pos)
 
       if sequence.length == 0
         @options.each_with_index do |option, i|
@@ -97,11 +105,8 @@ class Selector
       elsif mode == :number
         case resp
         when "\b", "\c?"
-          if @number == 0
-            mode = :normal
-          else
-            @number /= 10
-          end
+          @number /= 10
+          mode = :normal if @number == 0
         when ENTER
           mode = :normal
           pos = [@number, 0].max
@@ -170,7 +175,7 @@ class Selector
       # for options count change
       new_options = @options.length
       pos = [@options.length - 1, pos].min
-      @virtual_state.truncate_by_length(@options.length) unless @virtual_state.nil?
+      @virtual_state&.truncate_by_length(@options.length)
     end
   end
 

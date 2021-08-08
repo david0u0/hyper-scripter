@@ -162,7 +162,7 @@ fn test_edit_without_change() {
     run("e test1 | echo $NAME").unwrap();
     run("e test2 | echo $NAME").unwrap();
     assert_eq!("test2", run("-").unwrap());
-    run("e test1").unwrap(); // nothing changed!
+    run("e test1").unwrap(); // nothing changed! FIXME: 其實應該記錄一筆讀取事件…但是很難測…
     assert_eq!("test2", run("-").unwrap());
     run("e test1 | echo $NAME").unwrap();
     assert_eq!("test1\ntest1", run("-").unwrap());

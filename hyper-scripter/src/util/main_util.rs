@@ -286,6 +286,7 @@ pub async fn after_script(
                     false
                 } else {
                     log::info!("舊本未變動，不記錄事件");
+                    // FIXME: 其實應該記錄一筆讀取事件…
                     true
                 });
             }

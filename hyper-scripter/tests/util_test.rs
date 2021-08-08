@@ -40,13 +40,13 @@ fn test_import() {
 
     assert!(check_exist(&[".gitignore"]));
 
-    assert_ls_len(15, Some("all"), None);
+    assert_ls_len(16, Some("all"), None);
 
     run(format!("-f util import --namespace imported {}", dir)).unwrap();
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
     assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
     run("-f imported which").expect_err("命名空間汙染了標籤！");
-    assert_ls_len(21, Some("all"), None);
+    assert_ls_len(22, Some("all"), None);
 }
 
 fn test_collect() {
@@ -119,7 +119,7 @@ fn test_collect() {
     assert_eq!(run("-f tag youest").unwrap(), "殼已破碎");
     assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(22, Some("all"), None);
+    assert_ls_len(23, Some("all"), None);
 }
 
 #[test]

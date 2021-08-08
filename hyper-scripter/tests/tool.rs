@@ -2,8 +2,7 @@ use hyper_scripter::config::{Config, PromptLevel};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::ExitStatus;
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Mutex, MutexGuard, Once};
 
 lazy_static::lazy_static! {

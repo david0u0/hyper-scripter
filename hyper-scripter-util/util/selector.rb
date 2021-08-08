@@ -167,7 +167,7 @@ class Selector
         return self.class.make_result(pos, @options[pos]) unless callback.recur
       else
         min, max = @virtual_state.get_range
-        opts = @options[min..max]
+        opts = @options[min..max - 1]
         callback.cb.call(min, max, opts)
         return self.class.make_multi_result(min, max, opts) unless callback.recur
       end

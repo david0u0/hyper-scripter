@@ -3,7 +3,6 @@
 mod tool;
 
 use hyper_scripter::path::{HS_PRE_RUN, HS_REDIRECT};
-use regex::Regex;
 use std::fs::{canonicalize, write};
 use tool::*;
 const MSG: &str = "你好，腳本人！";
@@ -210,9 +209,6 @@ fn test_rm() {
         "不要刪我 QmmmmQ",
         run("-f removed my/namespace/super-test").unwrap()
     );
-    let file_path = run("-f removed which -").unwrap();
-    let re = Regex::new(r".+my/namespace/\d{14}-super-test\.sh$").unwrap();
-    assert!(re.is_match(&file_path), "路徑被刪除改爛：{}", file_path);
 
     assert_eq!("矻立不搖", run("longlive").unwrap());
 

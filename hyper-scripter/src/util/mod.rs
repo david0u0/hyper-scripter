@@ -177,19 +177,6 @@ pub fn write_file(path: &Path, content: &str) -> Result<()> {
 pub fn remove(script_path: &Path) -> Result<()> {
     handle_fs_res(&[&script_path], remove_file(&script_path))
 }
-pub fn change_name_only<F: Fn(&str) -> String>(full_name: &str, transform: F) -> String {
-    let mut arr: Vec<_> = full_name.split('/').collect();
-    let len = arr.len();
-    if len == 0 {
-        unreachable!();
-    } else if len == 1 {
-        transform(full_name)
-    } else {
-        let new = transform(arr[len - 1]);
-        arr[len - 1] = &new;
-        arr.join("/")
-    }
-}
 pub fn mv(origin: &Path, new: &Path) -> Result<()> {
     log::info!("修改 {:?} 為 {:?}", origin, new);
     // NOTE: 創建資料夾和檔案

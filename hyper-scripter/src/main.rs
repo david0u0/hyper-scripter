@@ -1,11 +1,9 @@
-use chrono::Utc;
 use hyper_scripter::args::{self, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
-use hyper_scripter::script::ScriptName;
 use hyper_scripter::script_repo::{RecentFilter, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
@@ -298,13 +296,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     log::debug!("真的刪除腳本！");
                     to_purge.push((entry.name.clone(), entry.ty.clone()));
                 } else {
-                    let time_str = Utc::now().format("%Y%m%d%H%M%S");
-                    let new_name = util::change_name_only(&entry.name.to_string(), |name| {
-                        format!("{}-{}", time_str, name)
-                    });
-                    log::debug!("不要真的刪除腳本，改用標籤隱藏之：{}", new_name);
-                    let new_name = Some(ScriptName::Named(new_name));
-                    let res = main_util::mv(&mut entry, new_name, None, delete_tag.clone()).await;
+                    log::debug!("不要真的刪除腳本，改用標籤隱藏之：{:?}", entry.name);
+                    let res = main_util::mv(&mut entry, None, None, delete_tag.clone()).await;
                     match res {
                         Err(Error::PathNotFound(_)) => {
                             log::warn!("{:?} 實體不存在，消滅之", entry.name);

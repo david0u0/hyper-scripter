@@ -161,13 +161,7 @@ fn test_history_args_rm_last() {
 }
 
 #[test]
-fn test_archaeology() {
-    let _g = setup();
-    // TODO
-}
-
-#[test]
-fn test_neglect() {
+fn test_neglect_archaeology() {
     let _g = setup();
     let t1 = ScriptTest::new("1", None);
     let t2 = ScriptTest::new("2", None);
@@ -183,17 +177,33 @@ fn test_neglect() {
 
     t1.can_find_by_name().unwrap();
     t2.can_find_by_name().unwrap();
+    t1.archaeology()
+        .can_find_by_name()
+        .expect_err("考古找到太新的腳本");
+    t2.archaeology()
+        .can_find_by_name()
+        .expect_err("考古找到太新的腳本");
+
     neg1.can_find_by_name().unwrap_err();
     neg2.can_find_by_name().unwrap_err();
+    neg1.archaeology()
+        .can_find_by_name()
+        .expect("考古找到不到舊腳本");
+    neg2.archaeology()
+        .can_find_by_name()
+        .expect("考古找到不到舊腳本");
 
     run(format!("cat ={}!", neg1.get_name())).unwrap();
     neg1.can_find_by_name()
         .expect_err("讀取事件破壞了忽視的狀態");
+    neg1.archaeology().can_find_by_name().unwrap();
 
     run(format!("mv ={}!", neg1.get_name())).unwrap();
     neg1.can_find_by_name().expect("移動事件沒有解除忽視狀態");
+    neg1.archaeology().can_find_by_name().unwrap_err();
 
     neg2.can_find_by_name().unwrap_err();
     run(format!("={}!", neg2.get_name())).unwrap();
     neg2.can_find_by_name().expect("執行事件沒有解除忽視狀態");
+    neg2.archaeology().can_find_by_name().unwrap_err();
 }

@@ -203,9 +203,15 @@ impl ScriptTest {
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
+    pub fn archaeology<'a>(&'a self) -> ScriptTestWithFilter<'a> {
+        ScriptTestWithFilter {
+            script: self,
+            filter: "-A",
+        }
+    }
     pub fn filter<'a>(&'a self, filter: &'a str) -> ScriptTestWithFilter<'a> {
         ScriptTestWithFilter {
-            sctipr: self,
+            script: self,
             filter,
         }
     }
@@ -233,25 +239,37 @@ impl ScriptTest {
         );
     }
     pub fn can_find(&self, command: &str) -> Result {
-        let command = format!("ls --plain --grouping=none --name {}", command);
-        let res = run(&command)?;
-        if res == self.name {
-            Ok(())
-        } else {
-            Err(Error::other(format!("想找 {} 卻找到 {}", self.name, res)))
-        }
+        self.filter("").can_find(command)
     }
     pub fn can_find_by_name(&self) -> Result {
-        self.can_find(&format!("={}", self.name))
+        self.filter("").can_find_by_name()
     }
 }
 pub struct ScriptTestWithFilter<'a> {
-    sctipr: &'a ScriptTest,
+    script: &'a ScriptTest,
     filter: &'a str,
 }
 impl<'a> ScriptTestWithFilter<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
-        let s = format!("{} ={} {}", self.filter, self.sctipr.name, args);
+        let s = format!("{} ={} {}", self.filter, self.script.name, args);
         run(&s)
+    }
+    pub fn can_find(&self, command: &str) -> Result {
+        let command = format!(
+            "{} ls --plain --grouping=none --name {}",
+            self.filter, command
+        );
+        let res = run(&command)?;
+        if res == self.script.name {
+            Ok(())
+        } else {
+            Err(Error::other(format!(
+                "想找 {} 卻找到 {}",
+                self.script.name, res
+            )))
+        }
+    }
+    pub fn can_find_by_name(&self) -> Result {
+        self.can_find(&format!("={}", self.script.name))
     }
 }

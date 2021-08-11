@@ -9,7 +9,7 @@ require_relative './selector'
 
 class Option
   def initialize(content, number)
-    @content = content.strip
+    @content = content
     @number = number
   end
 
@@ -21,6 +21,7 @@ end
 
 class Historian < Selector
   attr_reader :script_name
+
   def initialize(args)
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{args}", false)
     arg_obj = JSON.parse(arg_obj_str)
@@ -53,16 +54,17 @@ class Historian < Selector
     register_all
   end
 
+  def process_option(content, number)
+    Option.new(content, number)
+  end
+
   def run(sequence: '')
-    res = begin
-      super(sequence: sequence)
-    rescue Selector::Empty
-      puts 'History is empty'
-      exit
-    rescue Selector::Quit
-      exit
-    end
-    res
+    super(sequence: sequence)
+  rescue Selector::Empty
+    puts 'History is empty'
+    exit
+  rescue Selector::Quit
+    exit
   end
 
   def run_as_main(sequence: '')
@@ -104,7 +106,8 @@ class Historian < Selector
 
   def get_options
     history = HS_ENV.do_hs("history show =#{@script_name}! --limit #{@limit} --offset #{@offset}", false)
-    history.lines.each_with_index.map { |s, i| Option.new(s, i + @offset + 1) }
+    opts = history.lines.each_with_index.map { |s, i| process_option(s.strip, i + @offset + 1) }
+    opts.reject { |opt| opt.nil? }
   end
 
   def load_options
@@ -117,20 +120,31 @@ class Historian < Selector
       load_options
     }, msg: 'delete the history', recur: true)
 
-    register_keys_virtual(%w[d D], lambda { |min, max, _|
+    register_keys_virtual(%w[d D], lambda { |min, max, options|
+      last_num = nil
+      options.each do |opt|
+        # TODO: test this and try to make it work
+        raise 'Not a continuous range!' unless last_num.nil? || (last_num + 1 == opt.number)
+
+        last_num = opt.number
+      end
+
       # FIXME: obj.number?
       HS_ENV.do_hs("history rm =#{@script_name}! #{min + @offset + 1}..#{max + @offset + 1}", false)
       load_options
       exit_virtual
     }, msg: 'delete the history', recur: true)
   end
+
+  # prevent the call to `util/historian` screw up historical query
+  # e.g. hs util/historian !
+  def self.rm_run_id
+    HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
+  end
 end
 
 if __FILE__ == $0
-  # prevent the call to `util/historian` screw up historical query
-  # e.g. hs util/historian !
-  HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
-
+  Historian.rm_run_id
   def split_args(args)
     index = args.index('--')
     if index.nil?

@@ -30,8 +30,9 @@ class Selector
   end
 
   # Initiate the selector
-  def initialize(options)
+  def initialize(options, offset: 1)
     load(options)
+    @display_offset = offset
     @search_string = ''
     @number = nil
     @callbacks = {}
@@ -59,7 +60,7 @@ class Selector
         @options.each_with_index do |option, i|
           is_virtual_selected = @virtual_state.nil? ? false : @virtual_state.in_range?(i)
           leading = pos == i ? '>' : ' '
-          gen_line = ->(option) { "#{leading} #{i}. #{option}" }
+          gen_line = ->(option) { "#{leading} #{i + @display_offset}. #{option}" }
           line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
           option = self.class.color_line(option, @search_string, is_virtual_selected)
           option = gen_line.call(option)
@@ -109,7 +110,8 @@ class Selector
           mode = :normal if @number == 0
         when ENTER
           mode = :normal
-          pos = [@number, 0].max
+          pos = [@number, @display_offset].max
+          pos -= @display_offset
           pos = [pos, option_count - 1].min
         else
           @number = @number * 10 + resp.to_i if resp =~ /[0-9]/

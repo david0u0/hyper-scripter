@@ -1,4 +1,4 @@
-require_relative '../util/selector.rb'
+require_relative '../util/selector'
 
 class Option
   def initialize(content, number)
@@ -16,7 +16,7 @@ opts = %w[a b c d e f g]
 opts = opts.map.with_index { |opt, i| Option.new(opt, i) }
 
 mode = :normal
-selector = Selector.new(opts.clone)
+selector = Selector.new(opts.clone, offset: 2)
 
 selector.register_keys(%w[A], ->(_, obj) { puts obj }, recur: true)
 selector.register_keys(%w[p], ->(_, obj) { puts obj.content }, recur: true)

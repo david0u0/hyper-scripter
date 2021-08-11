@@ -40,7 +40,7 @@ fn test_nevigation() {
 
     assert_eq!(
         vec!["d", "10-f"],
-        do_select_lines("3\r p jkkkjjjkkkkjjjjj\r")
+        do_select_lines("5\r p jkkkjjjkkkkjjjjj\r")
     );
     assert_eq!("12-g", do_select("99\r\r"));
 
@@ -50,7 +50,7 @@ fn test_nevigation() {
     );
     assert_eq!(
         vec!["c", "12-g", "b", "12-g"],
-        do_select_lines("2\rp /2-\rA np n\r")
+        do_select_lines("4\rp /2-\rA np n\r")
     );
 }
 
@@ -71,7 +71,7 @@ fn test_range() {
             "c",
             "d",
         ],
-        do_select_lines("jjA v 1\rp \rA\rAA l \rA\r kkkp \rA\r l vkkv /2\rnP")
+        do_select_lines("jjA v 3\rp \rA\rAA l \rA\r kkkp \rA\r l vkkv /2\rnP")
     );
 }
 

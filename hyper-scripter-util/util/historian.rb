@@ -49,7 +49,7 @@ class Historian < Selector
 
     warn "historian for #{@script_name}"
 
-    super(get_options)
+    super(get_options, offset: @offset + 1)
 
     register_all
   end

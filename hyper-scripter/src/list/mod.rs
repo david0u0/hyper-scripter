@@ -8,7 +8,14 @@ use crate::{error::Result, query::ListQuery, script::ScriptInfo, script_time::Sc
 use colored::{ColoredString, Colorize};
 use std::borrow::Cow;
 
-fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> Result<&'a str> {
+fn extract_help<'a>(
+    buff: &'a mut String,
+    script: &ScriptInfo,
+    is_unknown: bool,
+) -> Result<&'a str> {
+    if is_unknown {
+        return Ok("");
+    }
     let script_path = crate::path::open_script(&script.name, &script.ty, None)?;
     *buff = crate::util::read_file(&script_path)?;
     let mut helps = crate::extract_msg::extract_help_from_content(buff);

@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::{IntoScriptName, ScriptInfo};
 use crate::script_repo::{RepoEntry, ScriptRepo};
+use crate::util::get_display_type;
 use fxhash::FxHashSet as HashSet;
 use std::sync::Once;
 
@@ -152,11 +153,11 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
 
     let term = Term::stderr();
 
-    let color = Config::get().get_color(&script.ty)?;
+    let ty = get_display_type(&script.ty);
     let msg = format!(
         "{} [Y/N]",
-        format!("{}({})?", script.name, script.ty)
-            .color(color)
+        format!("{}({})?", script.name, ty.display())
+            .color(ty.color())
             .bold(),
     );
 

@@ -5,6 +5,8 @@ use crate::path::{get_home, get_template_path};
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
+use colored::Color;
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};
 use std::io::{Read, Write};
@@ -340,4 +342,34 @@ fn write_prepare_script<W: Write>(
             TemplateRenderError::IOError(err, ..) => err,
             e => panic!("解析模版錯誤：{}", e),
         })
+}
+
+pub struct DisplayType<'a> {
+    ty: &'a ScriptType,
+    color: Option<Color>,
+}
+impl<'a> DisplayType<'a> {
+    pub fn is_unknown(&self) -> bool {
+        self.color.is_none()
+    }
+    pub fn color(&self) -> Color {
+        self.color.unwrap_or(Color::BrightBlack)
+    }
+    pub fn display(&self) -> Cow<'a, str> {
+        if self.is_unknown() {
+            Cow::Owned(format!("{}, unknown", self.ty))
+        } else {
+            Cow::Borrowed(self.ty.as_ref())
+        }
+    }
+}
+pub fn get_display_type(ty: &ScriptType) -> DisplayType {
+    let conf = Config::get();
+    match conf.get_color(ty) {
+        Err(e) => {
+            log::warn!("取腳本顏色時出錯：{}，視為未知類別", e);
+            DisplayType { ty, color: None }
+        }
+        Ok(c) => DisplayType { ty, color: Some(c) },
+    }
 }

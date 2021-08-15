@@ -71,7 +71,7 @@ Dir.chdir(\"{{birthplace_abs}}\")
 {{#each content}}{{{this}}}
 {{/each}} ";
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Display, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct ScriptType(String);
 impl From<&str> for ScriptType {
@@ -94,11 +94,6 @@ impl FromStr for ScriptType {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(s.to_owned().into())
-    }
-}
-impl std::fmt::Display for ScriptType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
     }
 }
 impl Default for ScriptType {

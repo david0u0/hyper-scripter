@@ -1,21 +1,21 @@
 use super::{
     extract_help, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
 };
-use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;
 use crate::tag::Tag;
+use crate::util::get_display_type;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
 use std::hash::Hash;
 use std::io::Write;
 
-fn ident_string(style: &DisplayIdentStyle, script: &ScriptInfo) -> Result<String> {
+fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> Result<String> {
     Ok(match style {
-        DisplayIdentStyle::Normal => format!("{}({})", script.name, script.ty),
+        DisplayIdentStyle::Normal => format!("{}({})", script.name, ty),
         DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
         DisplayIdentStyle::Name => script.name.to_string(),
         DisplayIdentStyle::NameAndFile => format!(
@@ -91,7 +91,8 @@ pub fn fmt_meta<W: Write>(
     is_latest: bool,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let color = Config::get().get_color(&script.ty)?;
+    let ty = get_display_type(&script.ty);
+    let color = ty.color();
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             let last_txt = if is_latest && !opt.plain {
@@ -104,10 +105,10 @@ pub fn fmt_meta<W: Write>(
                 last_txt,
                 style(opt.plain, script.name.key(), |s| s.color(color).bold()),
             );
-            let ty_txt = style(opt.plain, &script.ty, |s| s.color(color).bold());
+            let ty_txt = style(opt.plain, ty.display(), |s| s.color(color).bold());
 
             let mut buff = String::new();
-            let help_msg = extract_help(&mut buff, script)?;
+            let help_msg = extract_help(&mut buff, script, ty.is_unknown())?;
 
             let row = row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
             table.add_row(row);
@@ -116,7 +117,7 @@ pub fn fmt_meta<W: Write>(
             if is_latest && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
-            let ident = ident_string(ident_style, script)?;
+            let ident = ident_string(ident_style, &*ty.display(), script)?;
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
                 if is_latest {

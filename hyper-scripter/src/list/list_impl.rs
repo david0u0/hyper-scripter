@@ -13,17 +13,17 @@ use prettytable::{cell, format, row, Cell, Row, Table};
 use std::hash::Hash;
 use std::io::Write;
 
-fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> Result<String> {
-    Ok(match style {
+fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> String {
+    match style {
         DisplayIdentStyle::Normal => format!("{}({})", script.name, ty),
-        DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
+        DisplayIdentStyle::File => script.file_path_fallback().to_string_lossy().to_string(),
         DisplayIdentStyle::Name => script.name.to_string(),
         DisplayIdentStyle::NameAndFile => format!(
             "{}({})",
             script.name.to_string(),
-            script.file_path()?.to_string_lossy().to_string()
+            script.file_path_fallback().to_string_lossy().to_string()
         ),
-    })
+    }
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -108,7 +108,7 @@ pub fn fmt_meta<W: Write>(
             let ty_txt = style(opt.plain, ty.display(), |s| s.color(color).bold());
 
             let mut buff = String::new();
-            let help_msg = extract_help(&mut buff, script, ty.is_unknown())?;
+            let help_msg = extract_help(&mut buff, script);
 
             let row = row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
             table.add_row(row);
@@ -117,7 +117,7 @@ pub fn fmt_meta<W: Write>(
             if is_latest && !opt.plain {
                 write!(w, "{}", "*".color(Color::Yellow).bold())?;
             }
-            let ident = ident_string(ident_style, &*ty.display(), script)?;
+            let ident = ident_string(ident_style, &*ty.display(), script);
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
                 if is_latest {

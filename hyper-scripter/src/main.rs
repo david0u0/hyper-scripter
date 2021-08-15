@@ -241,7 +241,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Which { script_query } => {
             let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("定位 {:?}", entry.name);
-            let p = path::get_home().join(entry.file_path()?);
+            // NOTE: 不檢查存在與否
+            let p = path::get_home().join(entry.file_path_fallback());
             println!("{}", p.to_string_lossy());
         }
         Subs::Cat { script_query } => {

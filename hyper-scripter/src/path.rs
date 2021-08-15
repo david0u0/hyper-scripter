@@ -123,20 +123,25 @@ pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
 }
 pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
     let name = ScriptName::Anonymous(id);
-    let path = get_home().join(name.to_file_path(ty)?);
-    Ok(path)
+    open_script(&name, ty, None)
 }
 
+/// 若 `check_exist` 有值，則會檢查存在性
+/// 需注意：要找已存在的腳本時，允許未知的腳本類型
+/// 此情況下會使用 to_file_path_fallback 方法，即以類型名當作擴展名
 pub fn open_script(
     name: &ScriptName,
     ty: &ScriptType,
-    check_sxist: Option<bool>,
+    check_exist: Option<bool>,
 ) -> Result<PathBuf> {
-    let script_path = match &name {
-        ScriptName::Anonymous(id) => open_anonymous(*id, ty)?,
-        ScriptName::Named(_) => get_home().join(name.to_file_path(ty)?),
+    let script_path = if check_exist == Some(true) {
+        name.to_file_path_fallback(ty)
+    } else {
+        name.to_file_path(ty)?
     };
-    if let Some(should_exist) = check_sxist {
+    let script_path = get_home().join(script_path);
+
+    if let Some(should_exist) = check_exist {
         if !script_path.exists() && should_exist {
             return Err(
                 Error::PathNotFound(vec![script_path]).context("開腳本失敗：應存在卻不存在")
@@ -183,8 +188,9 @@ mod test {
     }
     #[test]
     fn test_open() {
-        let second = "second".to_owned();
-        let second_name = second.to_owned().into_script_name().unwrap();
+        let second_name = "second".to_owned().into_script_name().unwrap();
+        let not_exist = "not-exist".to_owned().into_script_name().unwrap();
+
         let p = open_script(&second_name, &"rb".into(), Some(false)).unwrap();
         assert_eq!(p, get_home().join("second.rb"));
 
@@ -199,15 +205,20 @@ mod test {
             join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
-        match open_script(
-            &"not-exist".to_owned().into_script_name().unwrap(),
-            &"sh".into(),
-            Some(true),
-        )
-        .unwrap_err()
-        {
+        match open_script(&not_exist, &"sh".into(), Some(true)).unwrap_err() {
             Error::PathNotFound(name) => assert_eq!(name[0], get_home().join("not-exist.sh")),
             _ => unreachable!(),
         }
+
+        // NOTE: 如果是要找已存在的腳本，可以允許為不存在的類型，此情況下直接將類別的名字當作擴展名
+        let err = open_script(&second_name, &"no-such-type".into(), None).unwrap_err();
+        assert!(matches!(err, Error::UnknownType(_)));
+        let err = open_script(&second_name, &"no-such-type".into(), Some(false)).unwrap_err();
+        assert!(matches!(err, Error::UnknownType(_)));
+        let p = open_script(&second_name, &"no-such-type".into(), Some(true)).unwrap();
+        assert_eq!(p, get_home().join("second.no-such-type"));
+        // 用類別名當擴展名仍找不到，當然還是要報錯
+        let err = open_script(&not_exist, &"no-such-type".into(), Some(true)).unwrap_err();
+        assert!(matches!(err, Error::PathNotFound(_)));
     }
 }

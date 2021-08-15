@@ -32,18 +32,18 @@ struct LongFormatter {
 }
 struct TrimmedScriptInfo<'b>(Cow<'b, str>, &'b ScriptInfo);
 
-fn ident_string(style: DisplayIdentStyle, ty: &str, t: &TrimmedScriptInfo<'_>) -> Result<String> {
+fn ident_string(style: DisplayIdentStyle, ty: &str, t: &TrimmedScriptInfo<'_>) -> String {
     let TrimmedScriptInfo(name, script) = t;
-    Ok(match style {
+    match style {
         DisplayIdentStyle::Normal => format!("{}({})", name, ty),
-        DisplayIdentStyle::File => script.file_path()?.to_string_lossy().to_string(),
+        DisplayIdentStyle::File => script.file_path_fallback().to_string_lossy().to_string(),
         DisplayIdentStyle::Name => name.to_string(),
         DisplayIdentStyle::NameAndFile => format!(
             "{}({})",
             name.to_string(),
-            script.file_path()?.to_string_lossy().to_string()
+            script.file_path_fallback().to_string_lossy().to_string()
         ),
-    })
+    }
 }
 
 impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
@@ -61,7 +61,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatte
     fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
-        let ident = ident_string(self.ident_style, &*ty.display(), t)?;
+        let ident = ident_string(self.ident_style, &*ty.display(), t);
         let ident = style(self.plain, ident, |s| s.color(ty.color()).bold());
         if self.latest_script_id == script.id && !self.plain {
             write!(f, "{}", "*".color(Color::Yellow).bold())?;
@@ -88,7 +88,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
         write!(f, "{}", ident)?;
 
         let mut buff = String::new();
-        let help_msg = extract_help(&mut buff, script, ty.is_unknown())?;
+        let help_msg = extract_help(&mut buff, script);
 
         let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
         self.table.add_row(row);

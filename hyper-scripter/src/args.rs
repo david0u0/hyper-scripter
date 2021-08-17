@@ -1,5 +1,6 @@
 use crate::config::{Alias, Config};
 use crate::error::Result;
+use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, RangeQuery, ScriptQuery};
 use crate::script::ScriptName;
@@ -94,6 +95,12 @@ pub enum Subs {
     #[structopt(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
+    #[structopt(name = "ls-complete", settings = &[AllowLeadingHyphen, DisableHelpFlags, TrailingVarArg, AppSettings::Hidden])]
+    LSComplete { args: Vec<String> },
+    #[structopt(
+        about = "Prints this message, the help of the given subcommand(s), or a script's help message.",
+        setting = AllowLeadingHyphen
+    )]
     Help { args: Vec<String> },
     #[structopt(about = "Print the help message of env variables")]
     EnvHelp {
@@ -102,7 +109,7 @@ pub enum Subs {
     },
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
-    #[structopt(about = "Edit hyper script")]
+    #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
     Edit {
         #[structopt(
             long,
@@ -250,14 +257,14 @@ pub enum History {
     },
 }
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(StructOpt, Debug, Serialize, Default)]
 #[structopt(settings = &[AllArgsOverrideSelf])]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項
     #[structopt(short, long, help = "Show verbose information.")]
     pub long: bool,
     #[structopt(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
-    pub grouping: String,
+    pub grouping: Grouping,
     #[structopt(long, help = "No color and other decoration.")]
     pub plain: bool,
     #[structopt(long, help = "Show file path to the script.", conflicts_with = "long")]
@@ -367,6 +374,23 @@ impl Root {
             }
             Some(Subs::Help { args }) => {
                 print_help(args.iter())?;
+            }
+            Some(Subs::LSComplete { args }) => {
+                let args = std::iter::once("hs").chain(args.iter().map(AsRef::as_ref));
+                *self = match Root::from_iter_safe(args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::warn!("補全時出錯 {}", e);
+                        // NOTE: -V 或 --help 也會走到這裡
+                        std::process::exit(1)
+                    }
+                };
+                self.subcmd = Some(Subs::LS(List {
+                    name: true,
+                    plain: true,
+                    ..Default::default()
+                }));
+                log::info!("補完模式，參數為 {:?}", self);
             }
             None => {
                 log::info!("無參數模式");

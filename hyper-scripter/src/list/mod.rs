@@ -4,9 +4,16 @@ pub use list_impl::*;
 mod tree;
 mod tree_lib;
 
-use crate::{error::Result, query::ListQuery, script::ScriptInfo, script_time::ScriptTime};
+use crate::{
+    error::{Error, Result},
+    query::ListQuery,
+    script::ScriptInfo,
+    script_time::ScriptTime,
+};
 use colored::{ColoredString, Colorize};
+use serde::Serialize;
 use std::borrow::Cow;
+use std::str::FromStr;
 
 fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
     fn inner(buff: &mut String, script: &ScriptInfo) -> Result {
@@ -44,7 +51,7 @@ pub enum DisplayStyle<T, U> {
     Short(DisplayIdentStyle, U),
     Long(T),
 }
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub enum Grouping {
     Tag,
     Tree,
@@ -55,14 +62,21 @@ impl Grouping {
         self == Grouping::None
     }
 }
-impl<T: AsRef<str>> From<T> for Grouping {
-    fn from(s: T) -> Self {
-        match s.as_ref() {
+impl Default for Grouping {
+    fn default() -> Self {
+        Grouping::None
+    }
+}
+impl FromStr for Grouping {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        let g = match s {
             "tag" => Grouping::Tag,
             "tree" => Grouping::Tree,
             "none" => Grouping::None,
             _ => unreachable!(),
-        }
+        };
+        Ok(g)
     }
 }
 

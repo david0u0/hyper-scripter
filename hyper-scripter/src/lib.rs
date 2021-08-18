@@ -27,4 +27,3 @@ pub enum Either<T, U> {
     One(T),
     Two(U),
 }
-

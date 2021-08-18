@@ -55,16 +55,18 @@ async fn main_err_handle() -> Result<Vec<Error>> {
             .collect();
         match AliasRoot::from_iter_safe(&hs_args) {
             Ok(alias_root) => {
-                // FIXME: load config
-                if let Some(new_args) = expand_alias(&alias_root, &hs_args) {
-                    for arg in new_args.skip(1) {
-                        print!("{} ", arg);
-                    }
-                } else {
-                    for arg in args.iter() {
+                fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>) {
+                    for arg in iter {
                         print!("{} ", arg);
                     }
                 }
+                let p = path::compute_home_path_optional(alias_root.hs_home.as_ref())?;
+                let conf = Config::load(&p)?;
+                if let Some(new_args) = expand_alias(&alias_root, &hs_args, &conf) {
+                    print_iter(new_args.skip(1));
+                } else {
+                    print_iter(args.iter());
+                };
             }
             Err(e) => {
                 log::warn!("展開別名時出錯 {}", e);

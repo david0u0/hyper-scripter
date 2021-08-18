@@ -280,18 +280,14 @@ pub struct List {
 }
 
 fn set_home(p: &Option<String>) -> Result {
-    match p {
-        Some(p) => path::set_home(p)?,
-        None => path::set_home_from_sys()?,
-    }
+    path::set_home(p.as_ref())?;
     Config::init()
 }
 
-fn find_alias<'a>(root: &'a AliasRoot) -> Option<(&'static Alias, &'a [String])> {
+fn find_alias<'a>(root: &'a AliasRoot, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
     match &root.subcmd {
         Some(alias_mod::Subs::Other(v)) => {
             let first = v.first().unwrap().as_str();
-            let conf = Config::get();
             if let Some(alias) = conf.alias.get(first) {
                 log::info!("別名 {} => {:?}", first, alias);
                 Some((alias, v))
@@ -325,8 +321,9 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
 pub fn expand_alias<'a, T: 'a + AsRef<str>>(
     alias_root: &'a AliasRoot,
     args: &'a [T],
+    conf: &'a Config,
 ) -> Option<impl Iterator<Item = &'a str>> {
-    if let Some((alias, remaining_args)) = find_alias(&alias_root) {
+    if let Some((alias, remaining_args)) = find_alias(&alias_root, conf) {
         let base_len = args.len() - remaining_args.len();
         let base_args = args.iter().take(base_len).map(AsRef::as_ref);
         let after_args = alias.after.iter().map(AsRef::as_ref);
@@ -351,7 +348,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
         Ok(alias_root) => {
             log::trace!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.hs_home)?;
-            if let Some(new_args) = expand_alias(&alias_root, &args) {
+            if let Some(new_args) = expand_alias(&alias_root, &args, Config::get()) {
                 // log::trace!("新的參數為 {:?}", new_args);
                 return Ok(Root::from_iter(new_args));
             }

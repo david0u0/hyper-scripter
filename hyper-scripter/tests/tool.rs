@@ -57,7 +57,7 @@ pub fn get_home() -> PathBuf {
     canonicalize(HOME).unwrap()
 }
 pub fn load_conf() -> Config {
-    Config::load().unwrap()
+    Config::load(hyper_scripter::path::get_home()).unwrap()
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();
@@ -79,7 +79,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
 
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        hyper_scripter::path::set_home(&home).unwrap();
+        hyper_scripter::path::set_home(Some(&home)).unwrap();
         Config::init().unwrap();
     });
 

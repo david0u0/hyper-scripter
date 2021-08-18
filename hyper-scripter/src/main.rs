@@ -71,7 +71,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
             Err(e) => {
                 log::warn!("展開別名時出錯 {}", e);
                 // NOTE: -V 或 --help 也會走到這裡
-                std::process::exit(1)
+                return Err(Error::Completion);
             }
         }
         return Ok(vec![]);
@@ -95,7 +95,7 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
-    root.set_home_unless_alias()?;
+    root.set_home_unless_set()?;
     let conf = Config::get();
     let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
     let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;

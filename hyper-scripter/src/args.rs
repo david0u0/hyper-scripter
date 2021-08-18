@@ -1,5 +1,5 @@
 use crate::config::{Alias, Config};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, RangeQuery, ScriptQuery};
@@ -27,6 +27,9 @@ macro_rules! def_root {
         #[derive(StructOpt, Debug, Serialize)]
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
+            #[structopt(skip = true)]
+            home_is_set: bool,
+
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
             #[structopt(long, global = true, help = "Do not record history")]
@@ -341,7 +344,8 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     use structopt::clap::{Error as ClapError, ErrorKind::VersionDisplayed};
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
-        let root = Root::from_iter(args);
+        let mut root = Root::from_iter(args);
+        root.home_is_set = false;
         return Ok(root);
     }
     match AliasRoot::from_iter_safe(&args) {
@@ -372,8 +376,8 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
 
 impl Root {
     /// 若帶了 --no-alias 選項，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
-    pub fn set_home_unless_alias(&self) -> Result {
-        if self.no_alias {
+    pub fn set_home_unless_set(&self) -> Result {
+        if !self.home_is_set {
             set_home(&self.hs_home)?;
         }
         Ok(())
@@ -395,15 +399,20 @@ impl Root {
                 print_help(args.iter())?;
             }
             Some(Subs::LSComplete { args }) => {
+                if self.home_is_set {
+                    // NOTE: 此前有設定過腳本之家，會導致多次設定的問題，多半是因為忘了加 --no-alias
+                    return Err(Error::Completion);
+                }
                 let args = std::iter::once("hs").chain(args.iter().map(AsRef::as_ref));
                 *self = match Root::from_iter_safe(args) {
                     Ok(t) => t,
                     Err(e) => {
                         log::warn!("補全時出錯 {}", e);
                         // NOTE: -V 或 --help 也會走到這裡
-                        std::process::exit(1)
+                        return Err(Error::Completion);
                     }
                 };
+                self.home_is_set = false;
                 self.subcmd = Some(Subs::LS(List {
                     name: true,
                     plain: true,

@@ -1,4 +1,4 @@
-use hyper_scripter::args::{self, History, List, Root, Subs};
+use hyper_scripter::args::{self, expand_alias, AliasRoot, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -12,6 +12,7 @@ use hyper_scripter::{
     util::{self, main_util, main_util::EditTagArgs},
 };
 use hyper_scripter_historian::Historian;
+use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
@@ -43,6 +44,36 @@ async fn main_err_handle() -> Result<Vec<Error>> {
         print!("{}", dumped);
         return Ok(vec![]);
     }
+
+    if let Root {
+        subcmd: Some(Subs::ExpandAlias { args }),
+        ..
+    } = &root
+    {
+        let hs_args: Vec<_> = std::iter::once("hs")
+            .chain(args.iter().map(AsRef::as_ref))
+            .collect();
+        match AliasRoot::from_iter_safe(&hs_args) {
+            Ok(alias_root) => {
+                if let Some(new_args) = expand_alias(&alias_root, &hs_args) {
+                    for arg in new_args.skip(1) {
+                        print!("{} ", arg);
+                    }
+                } else {
+                    for arg in args.iter() {
+                        print!("{} ", arg);
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("展開別名時出錯 {}", e);
+                // NOTE: -V 或 --help 也會走到這裡
+                std::process::exit(1)
+            }
+        }
+        return Ok(vec![]);
+    }
+
     let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
         log::info!("存入改變後的設定檔");

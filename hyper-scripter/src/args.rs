@@ -82,6 +82,7 @@ mod alias_mod {
         subcmd: Subs
     }
 }
+pub use alias_mod::Root as AliasRoot;
 
 def_root! {
     subcmd: Subs
@@ -97,6 +98,9 @@ pub enum Subs {
     )]
     #[structopt(name = "ls-complete", settings = &[AllowLeadingHyphen, DisableHelpFlags, TrailingVarArg, AppSettings::Hidden])]
     LSComplete { args: Vec<String> },
+    #[structopt(settings = &[AllowLeadingHyphen, DisableHelpFlags, TrailingVarArg, AppSettings::Hidden])]
+    ExpandAlias { args: Vec<String> },
+
     #[structopt(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message.",
         setting = AllowLeadingHyphen
@@ -283,7 +287,7 @@ fn set_home(p: &Option<String>) -> Result {
     Config::init()
 }
 
-fn find_alias<'a>(root: &'a alias_mod::Root) -> Option<(&'static Alias, &'a [String])> {
+fn find_alias<'a>(root: &'a AliasRoot) -> Option<(&'static Alias, &'a [String])> {
     match &root.subcmd {
         Some(alias_mod::Subs::Other(v)) => {
             let first = v.first().unwrap().as_str();
@@ -318,6 +322,24 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     std::process::exit(0);
 }
 
+pub fn expand_alias<'a, T: 'a + AsRef<str>>(
+    alias_root: &'a AliasRoot,
+    args: &'a [T],
+) -> Option<impl Iterator<Item = &'a str>> {
+    if let Some((alias, remaining_args)) = find_alias(&alias_root) {
+        let base_len = args.len() - remaining_args.len();
+        let base_args = args.iter().take(base_len).map(AsRef::as_ref);
+        let after_args = alias.after.iter().map(AsRef::as_ref);
+        let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
+        let new_args = base_args.chain(after_args).chain(remaining_args);
+
+        // log::trace!("新的參數為 {:?}", new_args);
+        Some(new_args)
+    } else {
+        None
+    }
+}
+
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     use structopt::clap::{Error as ClapError, ErrorKind::VersionDisplayed};
     if args.iter().any(|s| s == "--no-alias") {
@@ -326,17 +348,11 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
         set_home(&root.hs_home)?;
         return Ok(root);
     }
-    match alias_mod::Root::from_iter_safe(&args) {
+    match AliasRoot::from_iter_safe(&args) {
         Ok(alias_root) => {
             log::trace!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.hs_home)?;
-            if let Some((alias, remaining_args)) = find_alias(&alias_root) {
-                let base_len = args.len() - remaining_args.len();
-                let base_args = args.iter().take(base_len);
-                let after_args = alias.after.iter();
-                let remaining_args = remaining_args.iter().skip(1);
-                let new_args = base_args.chain(after_args).chain(remaining_args);
-
+            if let Some(new_args) = expand_alias(&alias_root, &args) {
                 // log::trace!("新的參數為 {:?}", new_args);
                 return Ok(Root::from_iter(new_args));
             }

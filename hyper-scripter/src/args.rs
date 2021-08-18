@@ -345,7 +345,6 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
         let root = Root::from_iter(args);
-        set_home(&root.hs_home)?;
         return Ok(root);
     }
     match AliasRoot::from_iter_safe(&args) {
@@ -375,6 +374,13 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
 }
 
 impl Root {
+    /// 若帶了 --no-alias 選項，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
+    pub fn set_home_unless_alias(&self) -> Result {
+        if self.no_alias {
+            set_home(&self.hs_home)?;
+        }
+        Ok(())
+    }
     pub fn sanitize(&mut self) -> Result {
         match &self.subcmd {
             Some(Subs::Other(args)) => {

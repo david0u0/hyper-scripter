@@ -55,6 +55,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
             .collect();
         match AliasRoot::from_iter_safe(&hs_args) {
             Ok(alias_root) => {
+                // FIXME: load config
                 if let Some(new_args) = expand_alias(&alias_root, &hs_args) {
                     for arg in new_args.skip(1) {
                         print!("{} ", arg);
@@ -92,6 +93,7 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
+    root.set_home_unless_alias()?;
     let conf = Config::get();
     let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
     let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;

@@ -38,11 +38,13 @@ async fn main() {
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
+    let root = main_util::handle_completion(root)?;
     if root.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);
         return Ok(vec![]);
     }
+
     let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
         log::info!("存入改變後的設定檔");
@@ -61,6 +63,7 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
+    root.set_home_unless_set()?;
     let conf = Config::get();
     let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
     let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;

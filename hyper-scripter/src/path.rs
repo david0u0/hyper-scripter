@@ -62,12 +62,9 @@ fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf
     Ok(here.join(path))
 }
 
-pub fn set_home_from_sys() -> Result {
-    set_home(get_sys_home()?)
-}
-pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
+fn compute_home_path<T: AsRef<Path>>(p: T) -> Result<PathBuf> {
     let path = join_path(".", p)?;
-    log::debug!("使用路徑：{:?}", path);
+    log::debug!("計算路徑：{:?}", path);
     if !path.exists() {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
         handle_fs_res(&[&path], create_dir(&path))?;
@@ -77,12 +74,26 @@ pub fn set_home<T: AsRef<Path>>(p: T) -> Result {
             let redirect = read_file(&redirect)?;
             let redirect = redirect.trim();
             log::info!("重導向至 {}", redirect);
-            return set_home(redirect);
+            return compute_home_path(redirect);
         }
     }
+    Ok(path)
+}
+pub fn compute_home_path_optional<T: AsRef<Path>>(p: Option<T>) -> Result<PathBuf> {
+    match p {
+        Some(p) => compute_home_path(p),
+        None => compute_home_path(get_sys_home()?),
+    }
+}
+pub fn set_home_from_sys() -> Result {
+    set_home(Option::<&'static str>::None)
+}
+pub fn set_home<T: AsRef<Path>>(p: Option<T>) -> Result {
+    let path = compute_home_path_optional(p)?;
     PATH.set(path);
     Ok(())
 }
+
 #[cfg(not(test))]
 pub fn get_home() -> &'static Path {
     PATH.get().as_ref()

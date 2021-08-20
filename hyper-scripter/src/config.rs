@@ -8,7 +8,7 @@ use colored::Color;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
@@ -30,8 +30,8 @@ where
     Ok(v)
 }
 
-fn config_file() -> PathBuf {
-    path::get_home().join(CONFIG_FILE)
+fn config_file(home: &Path) -> PathBuf {
+    home.join(CONFIG_FILE)
 }
 
 fn is_false(b: &bool) -> bool {
@@ -164,8 +164,8 @@ impl Default for Config {
     }
 }
 impl Config {
-    pub fn load() -> Result<Self> {
-        let path = config_file();
+    pub fn load(p: &Path) -> Result<Self> {
+        let path = config_file(p);
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
             Ok(s) => {
@@ -190,7 +190,7 @@ impl Config {
     }
 
     pub fn store(&self) -> Result {
-        let path = config_file();
+        let path = config_file(path::get_home());
         log::info!("寫入設定檔至 {:?}…", path);
         match util::handle_fs_res(&[&path], std::fs::metadata(&path)) {
             Ok(meta) => {
@@ -214,7 +214,7 @@ impl Config {
     }
 
     pub fn init() -> Result {
-        CONFIG.set(Config::load()?);
+        CONFIG.set(Config::load(path::get_home())?);
         Ok(())
     }
     #[cfg(not(test))]
@@ -266,7 +266,6 @@ mod test {
     use toml::{from_str, to_string_pretty};
     #[test]
     fn test_config_serde() {
-        path::set_home_from_sys().unwrap();
         let c1 = Config {
             main_tag_filter: "a,^b,c".parse().unwrap(),
             ..Default::default()

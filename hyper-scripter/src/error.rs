@@ -48,6 +48,8 @@ pub enum Error {
     NoPreviousArgs,
     DontFuzz,
     Empty,
+
+    Completion,
 }
 
 impl<T: 'static + Send + Sync + std::error::Error> From<T> for Error {

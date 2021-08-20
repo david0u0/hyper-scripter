@@ -1,4 +1,5 @@
-use crate::args::Subs;
+use crate::args::{AliasRoot, Completion, List, Root, Subs};
+use crate::config::Config;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::path;
 use crate::query::{self, EditQuery};
@@ -6,6 +7,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
+use crate::Either;
 use hyper_scripter_historian::Historian;
 use std::path::{Path, PathBuf};
 
@@ -294,4 +296,57 @@ pub async fn after_script(
     }
     entry.update(|info| info.write()).await?;
     Ok(true)
+}
+
+pub fn handle_completion(root: Either<Root, Completion>) -> Result<Root> {
+    use structopt::StructOpt;
+    match root {
+        Either::One(root) => Ok(root),
+        Either::Two(completion) => match completion {
+            Completion::LS { args } => {
+                let mut new_root = match Root::from_iter_safe(args) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::warn!("補全時出錯 {}", e);
+                        // NOTE: -V 或 --help 也會走到這裡
+                        return Err(Error::Completion);
+                    }
+                };
+                new_root.home_is_set = false;
+                new_root.subcmd = Some(Subs::LS(List {
+                    name: true,
+                    plain: true,
+                    ..Default::default()
+                }));
+                new_root.sanitize_flags();
+                log::info!("補完模式，參數為 {:?}", new_root);
+                Ok(new_root)
+            }
+            Completion::Alias { args } => {
+                match AliasRoot::from_iter_safe(&args) {
+                    Ok(alias_root) => {
+                        fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>) {
+                            for arg in iter {
+                                print!("{} ", arg);
+                            }
+                        }
+
+                        let p = path::compute_home_path_optional(alias_root.hs_home.as_ref())?;
+                        let conf = Config::load(&p)?;
+                        if let Some(new_args) = alias_root.expand_alias(&args, &conf) {
+                            print_iter(new_args);
+                        } else {
+                            print_iter(args.iter());
+                        };
+                        std::process::exit(0);
+                    }
+                    Err(e) => {
+                        log::warn!("展開別名時出錯 {}", e);
+                        // NOTE: -V 或 --help 也會走到這裡
+                        Err(Error::Completion)
+                    }
+                }
+            }
+        },
+    }
 }

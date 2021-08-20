@@ -55,8 +55,12 @@ pub async fn do_list_query<'a>(
             }
         }
     }
-
-    Ok(ret)
+    if ret.is_empty() {
+        log::debug!("列表查不到東西，卻又不是因為 pattern not match，想必是因為使用者取消了模糊搜");
+        Err(Error::DontFuzz)
+    } else {
+        Ok(ret)
+    }
 }
 
 pub async fn do_script_query<'b>(

@@ -7,6 +7,15 @@ autotests = false
 categories = ["command-line-utilities"]
 license = "MIT OR Apache-2.0"
 description = "The script managing tool for script lovers"
+default-run = "hs"
+
+[[bin]]
+name = "hs"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "gen-completion"
+path = "src/bin/gen_completion.rs"
 
 [[test]]
 name = "issues"
@@ -23,10 +32,6 @@ path = "tests/util_test.rs"
 [[test]]
 name = "history"
 path = "tests/history.rs"
-
-[[bin]]
-name = "hs"
-path = "src/main.rs"
 
 [features]
 default = []

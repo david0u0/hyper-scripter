@@ -1,4 +1,4 @@
-use hyper_scripter::args::{self, expand_alias, AliasRoot, History, List, Root, Subs};
+use hyper_scripter::args::{self, History, List, Root, Subs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -12,7 +12,6 @@ use hyper_scripter::{
     util::{self, main_util, main_util::EditTagArgs},
 };
 use hyper_scripter_historian::Historian;
-use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
@@ -39,41 +38,10 @@ async fn main() {
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
+    let root = main_util::handle_completion(root)?;
     if root.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);
-        return Ok(vec![]);
-    }
-
-    if let Root {
-        subcmd: Some(Subs::ExpandAlias { args }),
-        ..
-    } = &root
-    {
-        let hs_args: Vec<_> = std::iter::once("hs")
-            .chain(args.iter().map(AsRef::as_ref))
-            .collect();
-        match AliasRoot::from_iter_safe(&hs_args) {
-            Ok(alias_root) => {
-                fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>) {
-                    for arg in iter {
-                        print!("{} ", arg);
-                    }
-                }
-                let p = path::compute_home_path_optional(alias_root.hs_home.as_ref())?;
-                let conf = Config::load(&p)?;
-                if let Some(new_args) = expand_alias(&alias_root, &hs_args, &conf) {
-                    print_iter(new_args.skip(1));
-                } else {
-                    print_iter(args.iter());
-                };
-            }
-            Err(e) => {
-                log::warn!("展開別名時出錯 {}", e);
-                // NOTE: -V 或 --help 也會走到這裡
-                return Err(Error::Completion);
-            }
-        }
         return Ok(vec![]);
     }
 

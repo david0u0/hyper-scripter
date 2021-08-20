@@ -1,17 +1,21 @@
 use crate::config::{Alias, Config};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, FilterQuery, ListQuery, RangeQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
+use crate::Either;
 use serde::Serialize;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
 };
 use structopt::StructOpt;
+
+mod completion;
+pub use completion::*;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
@@ -28,7 +32,7 @@ macro_rules! def_root {
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
             #[structopt(skip = true)]
-            home_is_set: bool,
+            pub home_is_set: bool,
 
             #[structopt(long, hidden = true)]
             pub dump_args: bool,
@@ -84,6 +88,41 @@ mod alias_mod {
     def_root! {
         subcmd: Subs
     }
+
+    fn find_alias<'a>(root: &'a AliasRoot, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
+        match &root.subcmd {
+            Some(alias_mod::Subs::Other(v)) => {
+                let first = v.first().unwrap().as_str();
+                if let Some(alias) = conf.alias.get(first) {
+                    log::info!("別名 {} => {:?}", first, alias);
+                    Some((alias, v))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    impl Root {
+        pub fn expand_alias<'a, T: 'a + AsRef<str>>(
+            &'a self,
+            args: &'a [T],
+            conf: &'a Config,
+        ) -> Option<impl Iterator<Item = &'a str>> {
+            if let Some((alias, remaining_args)) = find_alias(self, conf) {
+                let base_len = args.len() - remaining_args.len();
+                let base_args = args.iter().take(base_len).map(AsRef::as_ref);
+                let after_args = alias.after.iter().map(AsRef::as_ref);
+                let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
+                let new_args = base_args.chain(after_args).chain(remaining_args);
+
+                // log::trace!("新的參數為 {:?}", new_args);
+                Some(new_args)
+            } else {
+                None
+            }
+        }
+    }
 }
 pub use alias_mod::Root as AliasRoot;
 
@@ -99,11 +138,6 @@ pub enum Subs {
     #[structopt(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
-    #[structopt(name = "ls-complete", settings = &[AllowLeadingHyphen, DisableHelpFlags, TrailingVarArg, AppSettings::Hidden])]
-    LSComplete { args: Vec<String> },
-    #[structopt(settings = &[AllowLeadingHyphen, DisableHelpFlags, TrailingVarArg, AppSettings::Hidden])]
-    ExpandAlias { args: Vec<String> },
-
     #[structopt(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message.",
         setting = AllowLeadingHyphen
@@ -287,21 +321,6 @@ fn set_home(p: &Option<String>) -> Result {
     Config::init()
 }
 
-fn find_alias<'a>(root: &'a AliasRoot, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
-    match &root.subcmd {
-        Some(alias_mod::Subs::Other(v)) => {
-            let first = v.first().unwrap().as_str();
-            if let Some(alias) = conf.alias.get(first) {
-                log::info!("別名 {} => {:?}", first, alias);
-                Some((alias, v))
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
 fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
     let c: structopt::clap::App = Root::clap();
@@ -321,25 +340,6 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     std::process::exit(0);
 }
 
-pub fn expand_alias<'a, T: 'a + AsRef<str>>(
-    alias_root: &'a AliasRoot,
-    args: &'a [T],
-    conf: &'a Config,
-) -> Option<impl Iterator<Item = &'a str>> {
-    if let Some((alias, remaining_args)) = find_alias(&alias_root, conf) {
-        let base_len = args.len() - remaining_args.len();
-        let base_args = args.iter().take(base_len).map(AsRef::as_ref);
-        let after_args = alias.after.iter().map(AsRef::as_ref);
-        let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
-        let new_args = base_args.chain(after_args).chain(remaining_args);
-
-        // log::trace!("新的參數為 {:?}", new_args);
-        Some(new_args)
-    } else {
-        None
-    }
-}
-
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     use structopt::clap::{Error as ClapError, ErrorKind::VersionDisplayed};
     if args.iter().any(|s| s == "--no-alias") {
@@ -352,7 +352,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
         Ok(alias_root) => {
             log::trace!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.hs_home)?;
-            if let Some(new_args) = expand_alias(&alias_root, &args, Config::get()) {
+            if let Some(new_args) = alias_root.expand_alias(&args, Config::get()) {
                 // log::trace!("新的參數為 {:?}", new_args);
                 return Ok(Root::from_iter(new_args));
             }
@@ -367,7 +367,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
             std::process::exit(0);
         }
         Err(e) => {
-            log::warn!("解析別名參數出錯： {}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
+            log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
             Root::from_iter(args);
             unreachable!()
         }
@@ -381,6 +381,12 @@ impl Root {
             set_home(&self.hs_home)?;
         }
         Ok(())
+    }
+    pub fn sanitize_flags(&mut self) {
+        if self.all {
+            self.timeless = true;
+            self.filter = vec!["all,^removed".parse().unwrap()];
+        }
     }
     pub fn sanitize(&mut self) -> Result {
         match &self.subcmd {
@@ -398,28 +404,6 @@ impl Root {
             Some(Subs::Help { args }) => {
                 print_help(args.iter())?;
             }
-            Some(Subs::LSComplete { args }) => {
-                if self.home_is_set {
-                    // NOTE: 此前有設定過腳本之家，會導致多次設定的問題，多半是因為忘了加 --no-alias
-                    return Err(Error::Completion);
-                }
-                let args = std::iter::once("hs").chain(args.iter().map(AsRef::as_ref));
-                *self = match Root::from_iter_safe(args) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        log::warn!("補全時出錯 {}", e);
-                        // NOTE: -V 或 --help 也會走到這裡
-                        return Err(Error::Completion);
-                    }
-                };
-                self.home_is_set = false;
-                self.subcmd = Some(Subs::LS(List {
-                    name: true,
-                    plain: true,
-                    ..Default::default()
-                }));
-                log::info!("補完模式，參數為 {:?}", self);
-            }
             None => {
                 log::info!("無參數模式");
                 self.subcmd = Some(Subs::Edit {
@@ -433,20 +417,20 @@ impl Root {
             }
             _ => (),
         }
-        if self.all {
-            self.timeless = true;
-            self.filter = vec!["all,^removed".parse().unwrap()];
-        }
+        self.sanitize_flags();
         Ok(())
     }
 }
 
-pub fn handle_args(args: Vec<String>) -> Result<Root> {
+pub fn handle_args(args: Vec<String>) -> Result<Either<Root, Completion>> {
+    if let Some(completion) = Completion::from_args(&args)? {
+        return Ok(Either::Two(completion));
+    }
     let mut root = handle_alias_args(args)?;
     log::debug!("命令行物件：{:?}", root);
 
     root.sanitize()?;
-    Ok(root)
+    Ok(Either::One(root))
 }
 
 #[cfg(test)]

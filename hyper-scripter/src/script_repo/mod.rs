@@ -323,7 +323,7 @@ impl ScriptRepo {
             let hide_by_time = if let Some((mut time_bound, archaeology)) = time_bound {
                 if let Some(neglect) = record.neglect {
                     log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
-                    time_bound = neglect;
+                    time_bound = std::cmp::max(neglect, time_bound);
                 }
                 let overtime = time_bound > script.last_time_without_read();
                 archaeology ^ overtime

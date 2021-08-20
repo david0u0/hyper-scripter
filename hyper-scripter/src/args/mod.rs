@@ -436,16 +436,20 @@ pub fn handle_args(args: Vec<String>) -> Result<Either<Root, Completion>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn build_args<'a>(args: &'a str) -> Vec<String> {
-        std::iter::once("hs")
+    fn build_args<'a>(args: &'a str) -> Root {
+        let v: Vec<_> = std::iter::once("hs")
             .chain(args.split(' '))
             .map(|s| s.to_owned())
-            .collect()
+            .collect();
+        match handle_args(v).unwrap() {
+            Either::One(root) => root,
+            _ => panic!(),
+        }
     }
     #[test]
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
-        let args = handle_args(build_args("alias trash -f removed")).unwrap();
+        let args = build_args("alias trash -f removed");
         assert_eq!(args.filter, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
@@ -462,7 +466,7 @@ mod test {
     }
     #[test]
     fn test_strange_alias() {
-        let args = handle_args(build_args("-f e e -t e something -T e")).unwrap();
+        let args = build_args("-f e e -t e something -T e");
         assert_eq!(args.filter, vec!["e".parse().unwrap()]);
         assert_eq!(args.all, false);
         match &args.subcmd {
@@ -481,7 +485,7 @@ mod test {
             }
         }
 
-        let args = handle_args(build_args("la -l")).unwrap();
+        let args = build_args("la -l");
         assert_eq!(args.filter, vec!["all,^removed".parse().unwrap()]);
         assert_eq!(args.all, true);
         match &args.subcmd {

@@ -1,6 +1,6 @@
 _The (over-killing) script managing tool for script lovers._
 
-[![demo](https://asciinema.org/a/421900.svg)](https://asciinema.org/a/421900)
+[![demo](https://asciinema.org/a/431499.svg)](https://asciinema.org/a/431499)
 
 # Install
 

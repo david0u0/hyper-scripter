@@ -26,7 +26,6 @@ complete -c hs -n "__fish_use_subcommand" -s h -l help -d 'Prints help informati
 complete -c hs -n "__fish_use_subcommand" -s V -l version -d 'Prints version information'
 complete -c hs -n "__fish_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
 complete -c hs -n "__fish_use_subcommand" -f -a "env-help" -d 'Print the help message of env variables'
-complete -c hs -n "__fish_use_subcommand" -f -a "load-utils"
 complete -c hs -n "__fish_use_subcommand" -f -a "edit" -d 'Edit hyper script'
 complete -c hs -n "__fish_use_subcommand" -f -a "alias" -d 'Manage alias'
 complete -c hs -n "__fish_use_subcommand" -f -a "run" -d 'Run the script'
@@ -57,15 +56,6 @@ complete -c hs -n "__fish_seen_subcommand_from env-help" -s A -l archaeology -d 
 complete -c hs -n "__fish_seen_subcommand_from env-help" -l no-alias
 complete -c hs -n "__fish_seen_subcommand_from env-help" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from env-help" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -l recent -d 'Show scripts within recent days.'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -s h -l help -d 'Prints help information'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -s V -l version -d 'Prints version information'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -l no-trace -d 'Do not record history'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -s A -l archaeology -d 'Show scripts NOT within recent days'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -l no-alias
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
-complete -c hs -n "__fish_seen_subcommand_from load-utils" -l timeless -d 'Show scripts of all time.'
 
 complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`'
 complete -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags

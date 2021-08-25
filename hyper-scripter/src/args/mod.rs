@@ -189,7 +189,7 @@ pub enum Subs {
         dummy: bool,
         #[structopt(long, short, default_value = "1")]
         repeat: u64,
-        #[structopt(long, short)]
+        #[structopt(long, short, help = "Use arguments from previous run")]
         previous_args: bool,
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,

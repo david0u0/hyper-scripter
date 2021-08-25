@@ -234,7 +234,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 repeat,
                 dummy,
                 &mut entry,
-                &args,
+                args,
                 historian,
                 &mut ret.errs,
                 previous_args,

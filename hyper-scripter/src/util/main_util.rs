@@ -155,33 +155,29 @@ pub async fn run_n_times(
     repeat: u64,
     dummy: bool,
     entry: &mut RepoEntry<'_>,
-    mut args: &[String],
+    mut args: Vec<String>,
     historian: Historian,
     res: &mut Vec<Error>,
-    previous_args: bool,
+    use_previous_args: bool,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
 
-    let previous_arg_vec: Vec<String>;
-    if previous_args {
-        if !args.is_empty() {
-            return Err(RedundantOpt::CommandArgs.into());
-        }
+    if use_previous_args {
         match historian.last_args(entry.id).await? {
             None => return Err(Error::NoPreviousArgs),
             Some(arg_str) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
-                previous_arg_vec =
+                let mut previous_arg_vec: Vec<String> =
                     serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
-                args = &previous_arg_vec;
-                // else 空字串當它是空陣列
+                previous_arg_vec.extend(args.into_iter());
+                args = previous_arg_vec;
             }
         }
     }
 
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    entry.update(|info| info.exec(content, args)).await?;
+    entry.update(|info| info.exec(content, &args)).await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");

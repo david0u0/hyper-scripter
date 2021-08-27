@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 pub mod main_util;
+pub mod serde;
 
 pub fn illegal_name(s: &str) -> bool {
     s.starts_with('-')

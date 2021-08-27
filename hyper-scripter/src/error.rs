@@ -8,6 +8,7 @@ pub enum SysPath {
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FormatCode {
+    PromptLevel,
     Config,
     ScriptName,
     Regex,

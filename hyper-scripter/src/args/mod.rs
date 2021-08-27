@@ -1,4 +1,4 @@
-use crate::config::{Alias, Config};
+use crate::config::{Alias, Config, PromptLevel};
 use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
@@ -71,6 +71,8 @@ macro_rules! def_root {
                 conflicts_with = "recent"
             )]
             pub timeless: bool,
+            #[structopt(long, possible_values(&["never", "always", "smart"]), help = "Prompt level of fuzzy finder.")]
+            pub prompt_level: Option<PromptLevel>,
 
             #[structopt(subcommand)]
             pub $sub: Option<$sub_type>,

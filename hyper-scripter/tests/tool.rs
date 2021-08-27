@@ -81,12 +81,10 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     ONCE.call_once(|| {
         hyper_scripter::path::set_home(Some(&home)).unwrap();
         Config::init().unwrap();
+        Config::set_prompt_level(Some(PromptLevel::Never));
     });
 
     run_with_home(HOME, "alias e edit --fast").unwrap(); // 這時資料夾還沒建好，如果用 run 又會因為 canonicalize 而出問題
-    let mut conf = load_conf();
-    conf.prompt_level = PromptLevel::Never;
-    conf.store().unwrap();
 
     guard
 }
@@ -113,7 +111,7 @@ pub fn run<T: ToString>(args: T) -> Result<String> {
     run_with_home(&*home.to_string_lossy(), args)
 }
 pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String> {
-    let mut full_args = vec!["-H", home];
+    let mut full_args = vec!["-H", home, "--prompt-level", "never"];
     let args = args.to_string();
     let args_vec: Vec<&str> = if args.find('|').is_some() {
         let (first, second) = args.split_once("|").unwrap();

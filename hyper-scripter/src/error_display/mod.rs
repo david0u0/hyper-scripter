@@ -47,6 +47,7 @@ impl Display for Error {
                     ScriptQuery => write!(f, "script query")?,
                     Tag => write!(f, "tag")?,
                     FilterQuery => write!(f, "tag filter")?,
+                    PromptLevel => write!(f, "prompt level")?,
                     NonEmptyArray => {
                         write!(f, "non-empty array")?;
                         return Ok(());

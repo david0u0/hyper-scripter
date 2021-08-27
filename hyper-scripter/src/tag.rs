@@ -1,7 +1,7 @@
 use crate::error::{Error, FormatCode::Tag as TagCode};
 use crate::util::illegal_name;
+use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::FxHashSet as HashSet;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
 
@@ -42,23 +42,8 @@ pub struct TagFilter {
     pub append: bool,
     pub mandatory: bool,
 }
-impl<'de> Deserialize<'de> for TagFilter {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
-    }
-}
-impl Serialize for TagFilter {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
+impl_de_by_from_str!(TagFilter);
+impl_ser_by_to_string!(TagFilter);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagControl {

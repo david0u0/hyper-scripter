@@ -1,5 +1,5 @@
 use crate::error::{Error, FormatCode::RangeQuery as RangeQueryCode, Result};
-use serde::Serialize;
+use crate::impl_ser_by_to_string;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 
@@ -67,12 +67,4 @@ impl std::fmt::Display for RangeQuery {
     }
 }
 
-impl Serialize for RangeQuery {
-    fn serialize<S: serde::Serializer>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<S::Ok, S::Error> {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
+impl_ser_by_to_string!(RangeQuery);

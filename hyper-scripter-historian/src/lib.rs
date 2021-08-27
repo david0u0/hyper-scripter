@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate derive_more;
-
 use chrono::NaiveDateTime;
 use sqlx::{error::Error as DBError, Pool, Sqlite, SqlitePool};
 use std::num::NonZeroU64;

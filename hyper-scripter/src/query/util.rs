@@ -83,7 +83,7 @@ pub async fn do_script_query<'b>(
         }
         ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
         ScriptQueryInner::Fuzz(name) => {
-            let level = force_prompt_level.unwrap_or(Config::get().prompt_level);
+            let level = force_prompt_level.unwrap_or(Config::get_prompt_level());
             let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
             let need_prompt: bool;
             let entry = match fuzz_res {

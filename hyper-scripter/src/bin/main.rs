@@ -64,6 +64,8 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     root.set_home_unless_set()?;
+    Config::set_prompt_level(root.prompt_level);
+
     let conf = Config::get();
     let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
     let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;

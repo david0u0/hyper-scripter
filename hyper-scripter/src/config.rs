@@ -4,16 +4,19 @@ use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::state::State;
 use crate::tag::{TagFilter, TagFilterGroup};
 use crate::util;
+use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use colored::Color;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
 
 static CONFIG: State<Config> = State::new();
+static PROMPT_LEVEL: State<PromptLevel> = State::new();
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
 where
@@ -56,10 +59,13 @@ impl From<Vec<String>> for Alias {
     }
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(Display, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum PromptLevel {
+    #[display(fmt = "always")]
     Always,
+    #[display(fmt = "never")]
     Never,
+    #[display(fmt = "smart")]
     Smart,
 }
 impl PromptLevel {
@@ -73,13 +79,27 @@ impl PromptLevel {
         self == PromptLevel::Smart
     }
 }
+impl FromStr for PromptLevel {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        let l = match s {
+            "always" => PromptLevel::Always,
+            "never" => PromptLevel::Never,
+            "smart" => PromptLevel::Smart,
+            _ => return Err(Error::Format(FormatCode::PromptLevel, s.to_owned())),
+        };
+        Ok(l)
+    }
+}
+impl_ser_by_to_string!(PromptLevel);
+impl_de_by_from_str!(PromptLevel);
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
-    pub prompt_level: PromptLevel,
+    prompt_level: PromptLevel,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
     pub tag_filters: Vec<NamedTagFilter>,
@@ -217,6 +237,16 @@ impl Config {
         CONFIG.set(Config::load(path::get_home())?);
         Ok(())
     }
+
+    pub fn set_prompt_level(l: Option<PromptLevel>) {
+        let c = Config::get();
+        let l = l.unwrap_or(c.prompt_level); // TODO: 測試由設定檔設定 prompt-level 的情境？
+        PROMPT_LEVEL.set(l);
+    }
+    pub fn get_prompt_level() -> PromptLevel {
+        *PROMPT_LEVEL.get()
+    }
+
     #[cfg(not(test))]
     pub fn get() -> &'static Config {
         CONFIG.get()

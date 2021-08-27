@@ -5,7 +5,7 @@ main_tag_filter = 'none'
 
 editor = ["vim"]
 
-prompt_level = "Always"
+prompt_level = "always" # 亂搞 prompt level，確保全名搜尋不會觸發提示
 
 [[tag_filters]]
 content = '+pin,util'

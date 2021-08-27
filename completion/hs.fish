@@ -2,13 +2,15 @@ function __hs_list_scripts
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
     if echo $cmd_arr[-1] | string match -q -r ".*!\$"
-        set orig_cmd "$cmd_arr[1] -f all --timeless $cmd_arr[2..]"
         set bang 1
+        set cmd "hs -f all --timeless"
+    else
+        set cmd (eval "command hs completion alias $orig_cmd" 2>/dev/null)
+        if [ $status -ne 0 ]
+            return
+        end
     end
-    set cmd (eval "command hs completion alias $orig_cmd" 2>/dev/null)
-    if [ $status -ne 0 ]
-        return
-    end
+    
     set list (eval "command hs completion ls $cmd" 2>/dev/null)
     if [ $status -ne 0 ]
         return

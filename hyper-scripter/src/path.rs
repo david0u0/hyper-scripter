@@ -1,4 +1,5 @@
 use crate::error::{Contextable, Error, Result};
+use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::state::State;
@@ -130,11 +131,9 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
-    Ok((ScriptName::Anonymous(id), open_anonymous(id, ty)?))
-}
-pub fn open_anonymous(id: u32, ty: &ScriptType) -> Result<PathBuf> {
-    let name = ScriptName::Anonymous(id);
-    open_script(&name, ty, None)
+    let name = id.into_script_name().unwrap();
+    let path = open_script(&name, ty, None)?; // NOTE: max + 1 的邏輯已足以確保不會產生衝突的腳本，不檢查了！
+    Ok((name, path))
 }
 
 /// 若 `check_exist` 有值，則會檢查存在性
@@ -176,7 +175,6 @@ pub fn get_template_path(ty: &ScriptType) -> Result<PathBuf> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::IntoScriptName;
     #[test]
     fn test_anonymous_ids() {
         let mut ids = get_anonymous_ids().unwrap();
@@ -191,7 +189,7 @@ mod test {
             p,
             join_path("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
         );
-        let p = open_anonymous(5, &"js".into()).unwrap();
+        let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(
             p,
             join_path("./.test_hyper_scripter/.anonymous", "5.js").unwrap()

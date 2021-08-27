@@ -37,7 +37,7 @@ impl FromStr for ScriptName {
     }
 }
 impl ScriptName {
-    pub fn valid(s: &str) -> Result<Option<u32>> {
+    pub fn valid(mut s: &str, fuzzing: bool) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
         let reg = regex::Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(s);
@@ -48,6 +48,9 @@ impl ScriptName {
                 Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
             }
         } else {
+            if s.ends_with('/') && fuzzing {
+                s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
+            }
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
             for s in s.split('/') {
                 if illegal_name(s) {
@@ -260,11 +263,16 @@ pub trait IntoScriptName {
     fn into_script_name(self) -> Result<ScriptName>;
 }
 
+impl IntoScriptName for u32 {
+    fn into_script_name(self) -> Result<ScriptName> {
+        Ok(ScriptName::Anonymous(self))
+    }
+}
 impl IntoScriptName for String {
     fn into_script_name(self) -> Result<ScriptName> {
         log::debug!("解析腳本名：{}", self);
-        if let Some(id) = ScriptName::valid(&self)? {
-            Ok(ScriptName::Anonymous(id))
+        if let Some(id) = ScriptName::valid(&self, false)? {
+            id.into_script_name()
         } else {
             Ok(ScriptName::Named(self))
         }

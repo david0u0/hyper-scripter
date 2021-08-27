@@ -2,7 +2,7 @@ use super::{ListQuery, ScriptQuery, ScriptQueryInner};
 use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
-use crate::script::{IntoScriptName, ScriptInfo};
+use crate::script::ScriptInfo;
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::util::get_display_type;
 use fxhash::FxHashSet as HashSet;
@@ -145,9 +145,7 @@ pub async fn do_script_query_strict<'b>(
         }
     }
 
-    Err(Error::ScriptNotFound(
-        script_query.clone().into_script_name()?.to_string(),
-    ))
+    Err(Error::ScriptNotFound(script_query.to_string()))
 }
 
 static CTRLC_HANDLE: Once = Once::new();

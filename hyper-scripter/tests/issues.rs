@@ -239,3 +239,20 @@ fn test_history_rm_range() {
         "另一個腳本的歷史爛掉了"
     );
 }
+
+#[test]
+fn test_fuzz_end_with_slash() {
+    println!("測試以`/`結尾的腳本名");
+    let _g = setup();
+
+    let t = ScriptTest::new("test/slash", None);
+    t.can_find("test/").unwrap();
+    t.can_find("t/").unwrap();
+    t.can_find("slash/").unwrap();
+
+    t.can_find("sla//").expect_err("兩個`/`結尾仍不可行");
+    t.can_find("/sla").unwrap_err();
+
+    run("e illegal/").expect_err("不應創建以`/`結尾的腳本");
+    run("mv - illegal/").expect_err("不應創建以`/`結尾的腳本");
+}

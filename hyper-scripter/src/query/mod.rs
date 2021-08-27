@@ -2,6 +2,7 @@ use crate::error::{
     Contextable, Error, FormatCode::FilterQuery as FilterQueryCode, FormatCode::Regex as RegexCode,
     FormatCode::ScriptQuery as ScriptQueryCode, Result,
 };
+use crate::impl_ser_by_to_string;
 use crate::script::{IntoScriptName, ScriptName};
 use crate::tag::TagFilter;
 use regex::Regex;
@@ -89,15 +90,7 @@ impl std::fmt::Display for ScriptQuery {
         Ok(())
     }
 }
-impl Serialize for ScriptQuery {
-    fn serialize<S: serde::Serializer>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<S::Ok, S::Error> {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
+impl_ser_by_to_string!(ScriptQuery);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ScriptQueryInner {
@@ -159,7 +152,7 @@ impl FromStr for ScriptQuery {
         } else if s.starts_with('^') {
             ScriptQueryInner::Prev(parse_prev(s)?)
         } else {
-            ScriptName::valid(s).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
+            ScriptName::valid(s, true).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
             ScriptQueryInner::Fuzz(s.to_owned())
         };
         Ok(ScriptQuery { inner, bang })

@@ -2,7 +2,7 @@ use crate::config::{Alias, Config, PromptLevel};
 use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
-use crate::query::{EditQuery, FilterQuery, ListQuery, RangeQuery, ScriptQuery};
+use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptQuery};
 use crate::script::ScriptName;
 use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
@@ -16,6 +16,8 @@ use structopt::StructOpt;
 
 mod completion;
 pub use completion::*;
+mod tags;
+pub use tags::*;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
@@ -32,6 +34,7 @@ macro_rules! def_root {
         #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
         pub struct Root {
             #[structopt(skip = true)]
+            #[serde(skip)]
             pub home_is_set: bool,
 
             #[structopt(long, hidden = true)]
@@ -245,15 +248,7 @@ pub enum Subs {
     #[structopt(
         about = "Manage script tags. If a tag filter is given, store it to config, otherwise show tag information."
     )]
-    Tags {
-        #[structopt(short, long, conflicts_with = "switch-activated")]
-        unset: Option<String>,
-        #[structopt(short, long, conflicts_with = "unset")]
-        switch_activated: Option<String>,
-
-        #[structopt(parse(try_from_str), conflicts_with_all = &["unset", "switch-activated"])]
-        tag_filter: Option<FilterQuery>,
-    },
+    Tags(Tags),
     #[structopt(about = "Manage script history")]
     History {
         #[structopt(subcommand)]
@@ -391,20 +386,25 @@ impl Root {
         }
     }
     pub fn sanitize(&mut self) -> Result {
-        match &self.subcmd {
+        match &mut self.subcmd {
             Some(Subs::Other(args)) => {
+                let mut args = std::mem::replace(args, vec![]);
+                let script = args.remove(0);
                 let run = Subs::Run {
                     dummy: false,
                     previous_args: false,
                     repeat: 1,
-                    script_query: args[0].parse()?,
-                    args: args[1..args.len()].to_vec(),
+                    script_query: script.parse()?,
+                    args,
                 };
                 log::info!("執行模式 {:?}", run);
                 self.subcmd = Some(run);
             }
             Some(Subs::Help { args }) => {
                 print_help(args.iter())?;
+            }
+            Some(Subs::Tags(tags)) => {
+                tags.sanitize();
             }
             None => {
                 log::info!("無參數模式");

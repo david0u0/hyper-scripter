@@ -84,11 +84,16 @@ fn test_history_args_rm() {
     let recorded = run("history show receiver").unwrap();
     assert_list(&recorded, &["second", "third"]);
 
-    assert_eq!(run("run -p -").unwrap(), "second", "沒有刪成功？");
+    assert_eq!(run("run -p").unwrap(), "second", "沒有刪成功？");
+    assert_eq!(
+        run("run -p - trailing").unwrap(),
+        "second trailing",
+        "沒有把參數往後接？"
+    );
 
-    run("history rm receiver 2").unwrap(); // 幹掉 "third"
+    run("history rm receiver 2").unwrap(); // 幹掉 "second"
     let recorded = run("history show receiver").unwrap();
-    assert_list(&recorded, &["second"]);
+    assert_list(&recorded, &["second trailing", "third"]);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use hyper_scripter::args::{self, History, List, Root, Subs};
+use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -377,9 +377,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
             }
         }
-        Subs::Tags {
-            unset: Some(name), ..
-        } => {
+        Subs::Tags(Tags {
+            subcmd: Some(TagsSubs::Unset { name }),
+        }) => {
             let conf = conf_mut!();
             let pos = conf
                 .tag_filters
@@ -391,10 +391,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 })?;
             conf.tag_filters.remove(pos);
         }
-        Subs::Tags {
-            switch_activated: Some(name),
-            ..
-        } => {
+        Subs::Tags(Tags {
+            subcmd: Some(TagsSubs::Toggle { name }),
+        }) => {
             let conf = conf_mut!();
             let filter = conf
                 .tag_filters
@@ -406,40 +405,50 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 })?;
             filter.inactivated = !filter.inactivated;
         }
-        Subs::Tags {
-            tag_filter: None, ..
-        } => {
-            print!("known tags:\n  ");
-            for t in repo.iter_known_tags() {
-                print!("{} ", t);
-            }
-            println!();
-            println!("tag filters:");
-            for filter in conf.tag_filters.iter() {
-                let content = &filter.content;
-                print!("  {} = [{}]", filter.name, content);
-                if content.mandatory {
+        Subs::Tags(Tags {
+            subcmd: Some(TagsSubs::LS { known }),
+        }) => {
+            let print_known = || {
+                let mut first = true;
+                for t in repo.iter_known_tags() {
+                    if !first {
+                        print!(" ");
+                    }
+                    first = false;
+                    print!("{}", t);
+                }
+            };
+            if known {
+                print_known();
+            } else {
+                print!("known tags:\n  ");
+                print_known();
+                println!("");
+                println!("tag filters:");
+                for filter in conf.tag_filters.iter() {
+                    let content = &filter.content;
+                    print!("  {} = [{}]", filter.name, content);
+                    if content.mandatory {
+                        print!(" (mandatory)")
+                    }
+                    if filter.inactivated {
+                        print!(" (inactivated)")
+                    }
+                    println!()
+                }
+                println!("main tag filter:");
+                print!("  [{}]", conf.main_tag_filter);
+                if conf.main_tag_filter.mandatory {
                     print!(" (mandatory)")
                 }
-                if filter.inactivated {
-                    print!(" (inactivated)")
-                }
-                println!()
+                println!();
             }
-            println!("main tag filter:");
-            print!("  [{}]", conf.main_tag_filter);
-            if conf.main_tag_filter.mandatory {
-                print!(" (mandatory)")
-            }
-            println!();
         }
-        Subs::Tags {
-            tag_filter: Some(filter),
-            ..
-        } => {
+        Subs::Tags(Tags {
+            subcmd: Some(TagsSubs::Set { content, name }),
+        }) => {
             let conf = conf_mut!();
-            let content = filter.content;
-            if let Some(name) = filter.name {
+            if let Some(name) = name {
                 log::debug!("處理篩選器 {:?}", name);
                 let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
                 if let Some(existing_filter) = tag_filters.iter_mut().find(|f| f.name == name) {
@@ -448,7 +457,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 } else {
                     log::info!("新增篩選器 {} {}", name, content);
                     tag_filters.push(NamedTagFilter {
-                        content,
+                        content: content,
                         name,
                         inactivated: false,
                     });

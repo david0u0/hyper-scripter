@@ -408,15 +408,21 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::LS { known }),
         }) => {
-            if known {
+            let print_known = || {
+                let mut first = true;
                 for t in repo.iter_known_tags() {
-                    print!("{} ", t);
+                    if !first {
+                        print!(" ");
+                    }
+                    first = false;
+                    print!("{}", t);
                 }
+            };
+            if known {
+                print_known();
             } else {
                 print!("known tags:\n  ");
-                for t in repo.iter_known_tags() {
-                    print!("{} ", t);
-                }
+                print_known();
                 println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {

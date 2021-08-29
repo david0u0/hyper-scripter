@@ -306,6 +306,13 @@ pub fn handle_completion(root: Either<Root, Completion>) -> Result<Root> {
         Either::Two(completion) => match completion {
             Completion::LS { args } => {
                 let mut new_root = match Root::from_iter_safe(args) {
+                    Ok(Root {
+                        subcmd: Some(Subs::Tags(_)),
+                        ..
+                    }) => {
+                        // TODO: 在補全腳本中處理，而不要在這邊
+                        return Err(Error::Completion);
+                    }
                     Ok(t) => t,
                     Err(e) => {
                         log::warn!("補全時出錯 {}", e);

@@ -1,10 +1,9 @@
 use crate::error::{
-    Contextable, Error, FormatCode::FilterQuery as FilterQueryCode, FormatCode::Regex as RegexCode,
-    FormatCode::ScriptQuery as ScriptQueryCode, Result,
+    Contextable, Error, FormatCode::Regex as RegexCode, FormatCode::ScriptQuery as ScriptQueryCode,
+    Result,
 };
 use crate::impl_ser_by_to_string;
 use crate::script::{IntoScriptName, ScriptName};
-use crate::tag::TagFilter;
 use regex::Regex;
 use serde::Serialize;
 use std::str::FromStr;
@@ -156,36 +155,5 @@ impl FromStr for ScriptQuery {
             ScriptQueryInner::Fuzz(s.to_owned())
         };
         Ok(ScriptQuery { inner, bang })
-    }
-}
-
-#[derive(Debug, Serialize)]
-pub struct FilterQuery {
-    pub name: Option<String>,
-    pub content: TagFilter,
-}
-
-impl FromStr for FilterQuery {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        let arr: Vec<&str> = s.split('=').collect();
-        match AsRef::<[&str]>::as_ref(&arr) {
-            [s] => {
-                log::trace!("解析無名篩選器：{}", s);
-                Ok(FilterQuery {
-                    name: None,
-                    content: s.parse()?,
-                })
-            }
-            [name, s] => {
-                log::trace!("解析有名篩選器：{} = {}", name, s);
-                Ok(FilterQuery {
-                    // TODO: 檢查名字
-                    name: Some(name.to_string()),
-                    content: s.parse()?,
-                })
-            }
-            _ => Err(Error::Format(FilterQueryCode, s.to_owned())),
-        }
     }
 }

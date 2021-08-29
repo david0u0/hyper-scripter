@@ -1,5 +1,3 @@
-use crate::error::{Error, Result};
-use crate::query::FilterQuery;
 use crate::tag::TagFilter;
 use serde::Serialize;
 use structopt::StructOpt;

@@ -15,7 +15,6 @@ pub enum FormatCode {
     RangeQuery,
     ScriptQuery,
     Tag,
-    FilterQuery,
     NonEmptyArray,
 }
 

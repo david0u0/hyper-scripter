@@ -1,8 +1,19 @@
 function __hs_list_tags
     # TODO: different home?
-    echo "+all"
+    if [ "$argv" = "append" ]
+        set append 1
+    end
+    if set -q append
+        echo "+all"
+    else
+        echo "all"
+    end
     for tag in (string split ' ' (hs --no-alias tags ls --known))
-        echo +$tag
+        if set -q append
+            echo +$tag
+        else
+            echo $tag
+        end
     end
 end
 
@@ -178,8 +189,8 @@ complete -c hs -n "__fish_prev_arg_in tags" -f -a "toggle"
 complete -c hs -n "__fish_seen_subcommand_from tags" -s n -l name
 complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name
 complete -c hs -n "__fish_seen_subcommand_from ls" -s k -l known # FIXME: 這會補到另一個 ls 上 =_=
-complete -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags)"
-complete -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags)"
+complete -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags append)"
+complete -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"
 
 complete -c hs -n "__fish_seen_subcommand_from history" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from history" -l recent -d 'Show scripts within recent days.'

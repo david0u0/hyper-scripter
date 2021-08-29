@@ -9,7 +9,7 @@ use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
     path,
-    util::{self, main_util, main_util::EditTagArgs},
+    util::{self, main_util, main_util::EditTagArgs, print_iter},
 };
 use hyper_scripter_historian::Historian;
 
@@ -211,18 +211,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let content = util::read_file(&script_path)?;
 
             let helps = extract_help_from_content(&content);
-            for msg in helps {
-                println!("{}", msg);
-            }
+            print_iter(helps, "\n");
+            println!("");
+
             let envs = extract_env_from_content(&content);
-            let mut first = true;
-            for msg in envs {
-                if first {
-                    first = false;
-                    println!("");
-                }
-                println!("{}", msg);
-            }
+            print_iter(envs, "\n");
         }
         Subs::Run {
             script_query,
@@ -408,21 +401,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::LS { known }),
         }) => {
-            let print_known = || {
-                let mut first = true;
-                for t in repo.iter_known_tags() {
-                    if !first {
-                        print!(" ");
-                    }
-                    first = false;
-                    print!("{}", t);
-                }
-            };
             if known {
-                print_known();
+                print_iter(repo.iter_known_tags(), " ");
             } else {
                 print!("known tags:\n  ");
-                print_known();
+                print_iter(repo.iter_known_tags(), " ");
                 println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
@@ -544,14 +527,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                         print!(" ");
                     }
                 }
-                let mut first = true;
-                for arg in args {
-                    if !first {
-                        print!(" ");
-                    }
-                    first = false;
-                    print!("{}", util::to_display_args(arg)?);
-                }
+                print_iter(args.into_iter().map(|s| util::to_display_args(s)), " ");
                 println!("");
             }
         }

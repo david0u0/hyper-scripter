@@ -225,7 +225,7 @@ fn get_or_create_tamplate(ty: &ScriptType) -> Result<String> {
 }
 
 // 如果有需要跳脫的字元就吐 json 格式，否則就照原字串
-pub fn to_display_args(arg: String) -> Result<String> {
+pub fn to_display_args(arg: String) -> String {
     let mut need_escape = false;
     for ch in arg.chars() {
         match ch {
@@ -236,12 +236,11 @@ pub fn to_display_args(arg: String) -> Result<String> {
         }
     }
 
-    let escaped: String =
-        serde_json::to_string(&arg).context("超級異常的狀況…把字串轉成 json 也能出錯")?;
+    let escaped: String = serde_json::to_string(&arg).unwrap();
     if need_escape || arg != escaped[1..escaped.len() - 1] {
-        Ok(escaped)
+        escaped
     } else {
-        Ok(arg)
+        arg
     }
 }
 
@@ -372,5 +371,16 @@ pub fn get_display_type(ty: &ScriptType) -> DisplayType {
             DisplayType { ty, color: None }
         }
         Ok(c) => DisplayType { ty, color: Some(c) },
+    }
+}
+
+pub fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>, sep: &str) {
+    let mut first = true;
+    for t in iter {
+        if !first {
+            print!("{}", sep);
+        }
+        first = false;
+        print!("{}", t);
     }
 }

@@ -417,6 +417,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 for t in repo.iter_known_tags() {
                     print!("{} ", t);
                 }
+                println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
                     let content = &filter.content;

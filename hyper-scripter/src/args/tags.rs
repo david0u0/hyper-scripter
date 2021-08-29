@@ -1,5 +1,6 @@
 use crate::tag::TagFilter;
 use serde::Serialize;
+use structopt::clap::AppSettings::AllowLeadingHyphen;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug, Serialize)]
@@ -9,6 +10,7 @@ pub struct Tags {
 }
 
 #[derive(StructOpt, Debug, Serialize)]
+#[structopt(settings = &[AllowLeadingHyphen])]
 pub enum TagsSubs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),

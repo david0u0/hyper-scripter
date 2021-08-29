@@ -26,7 +26,7 @@ fn test_tags() {
 
     run("tesjs").expect_err("標籤沒有篩選掉不該出現的腳本！可能是上上個操作把設定檔寫爛了");
     run("tags all").unwrap();
-    run("tags no-hidden=all").unwrap();
+    run("tags --name no-hidden all").unwrap();
     run("tesjs").expect("沒吃到設定檔的標籤？");
     run("tags test").unwrap();
     run("tesjs").expect("命名空間沒賦與它標籤？");
@@ -98,7 +98,7 @@ fn test_prev() {
 
     run("e test-prev1 | echo 'test prev 1'").unwrap();
     run("e test-prev2 | echo 'test prev 2'").unwrap();
-    run("e test-prev3 -n | echo 'test prev 3'").unwrap();
+    run("e test-prev3 --no-template | echo 'test prev 3'").unwrap();
 
     assert_eq!(run("^2").unwrap(), "test prev 2");
     assert_eq!(run("^2").unwrap(), "test prev 3");

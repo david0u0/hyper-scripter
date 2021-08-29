@@ -13,9 +13,11 @@ use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
     pub content: TagFilter,
+    /// 是否要把命名空間也做為標籤
     pub append_namespace: bool,
-
+    /// 命令行參數裡帶著 tag 選項，例如 hs edit --tag some-tag edit
     pub explicit_tag: bool,
+    /// 命令行參數裡帶著 filter 選項，例如 hs --filter some-tag edit
     pub explicit_filter: bool,
 }
 
@@ -103,8 +105,8 @@ pub async fn edit_or_create(
             }};
         }
 
-        match query::do_script_query(&query, script_repo, false, None).await {
-            Err(Error::DontFuzz) => new_named!(),
+        match query::do_script_query(&query, script_repo, false, false).await {
+            Err(Error::DontFuzz) => new_named!(), // TODO: 手動測試文件？
             Ok(None) => new_named!(),
             Ok(Some(entry)) => {
                 if ty.is_some() {
@@ -125,6 +127,9 @@ pub async fn edit_or_create(
             Err(e) => return Err(e),
         }
     } else {
+        if tags.explicit_filter {
+            return Err(RedundantOpt::Filter.into());
+        }
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");
         path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?

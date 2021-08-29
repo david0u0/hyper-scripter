@@ -67,7 +67,7 @@ pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
     force_all: bool,
-    force_prompt_level: Option<PromptLevel>,
+    forbid_prompt: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
     let all = script_query.bang || force_all;
@@ -83,7 +83,11 @@ pub async fn do_script_query<'b>(
         }
         ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
         ScriptQueryInner::Fuzz(name) => {
-            let level = force_prompt_level.unwrap_or(Config::get_prompt_level());
+            let level = if forbid_prompt {
+                PromptLevel::Never
+            } else {
+                Config::get_prompt_level()
+            };
             let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
             let need_prompt: bool;
             let entry = match fuzz_res {
@@ -132,14 +136,13 @@ pub async fn do_script_query_strict<'b>(
 ) -> Result<RepoEntry<'b>> {
     // FIXME: 一旦 NLL 進化就修掉這段 unsafe
     let ptr = script_repo as *mut ScriptRepo;
-    if let Some(info) = do_script_query(script_query, unsafe { &mut *ptr }, false, None).await? {
+    if let Some(info) = do_script_query(script_query, unsafe { &mut *ptr }, false, false).await? {
         return Ok(info);
     }
 
     #[cfg(not(feature = "benching"))]
     if !script_query.bang {
-        let filtered =
-            do_script_query(script_query, script_repo, true, Some(PromptLevel::Never)).await?;
+        let filtered = do_script_query(script_query, script_repo, true, true).await?;
         if let Some(filtered) = filtered {
             return Err(Error::ScriptIsFiltered(filtered.name.key().to_string()));
         }

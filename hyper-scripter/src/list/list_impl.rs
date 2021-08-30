@@ -10,6 +10,7 @@ use crate::util::get_display_type;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
+use std::cmp::Reverse;
 use std::hash::Hash;
 use std::io::Write;
 
@@ -52,23 +53,6 @@ impl TagsKey {
         let mut tags: Vec<_> = tags.collect();
         tags.sort();
         TagsKey(tags)
-    }
-    fn partial_cmp(&self, other: &TagsKey) -> Option<std::cmp::Ordering> {
-        let mut self_slice: &[_] = &self.0;
-        let mut other_slice: &[_] = &other.0;
-        while !self_slice.is_empty() && !other_slice.is_empty() {
-            let (t1, t2) = (&self_slice[0], &other_slice[0]);
-            let cmp = t1.partial_cmp(t2);
-            if cmp != Some(std::cmp::Ordering::Equal) {
-                return cmp;
-            }
-            self_slice = &self_slice[1..];
-            other_slice = &other_slice[1..];
-        }
-        self.0.len().partial_cmp(&other.0.len())
-    }
-    fn cmp(&self, other: &TagsKey) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
@@ -181,7 +165,8 @@ pub async fn fmt_list<W: Write>(
 
             let mut scripts: Vec<_> = script_map.into_iter().collect();
 
-            scripts.sort_by(|(t1, _), (t2, _)| t1.cmp(t2));
+            scripts.sort_by_key(|(_, v)| v.iter().map(|s| *s.created_time).max());
+
             for (tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {
                     let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
@@ -209,7 +194,7 @@ fn fmt_group<W: Write>(
     latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
+    scripts.sort_by_key(|s| Reverse(s.last_time()));
     let mut scripts = scripts.iter();
     if let Some(script) = scripts.next() {
         let is_latest = script.id == latest_script_id;

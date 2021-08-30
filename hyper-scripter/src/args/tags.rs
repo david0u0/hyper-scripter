@@ -25,6 +25,8 @@ pub enum TagsSubs {
     LS {
         #[structopt(long, short)]
         known: bool,
+        #[structopt(long, short, conflicts_with = "after")]
+        named: bool,
     },
     Toggle {
         name: String,
@@ -34,7 +36,12 @@ pub enum TagsSubs {
 impl Tags {
     pub fn sanitize(&mut self) {
         match self.subcmd.as_ref() {
-            None => self.subcmd = Some(TagsSubs::LS { known: false }),
+            None => {
+                self.subcmd = Some(TagsSubs::LS {
+                    named: false,
+                    known: false,
+                })
+            }
             Some(TagsSubs::Other(args)) => {
                 let args = ["tags", "set"]
                     .iter()

@@ -399,9 +399,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             filter.inactivated = !filter.inactivated;
         }
         Subs::Tags(Tags {
-            subcmd: Some(TagsSubs::LS { known }),
+            subcmd: Some(TagsSubs::LS { named, known }),
         }) => {
-            if known {
+            if named {
+                print_iter(conf.tag_filters.iter().map(|f| &f.name), " ");
+            } else if known {
                 print_iter(repo.iter_known_tags(), " ");
             } else {
                 print!("known tags:\n  ");

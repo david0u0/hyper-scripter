@@ -1,3 +1,7 @@
+function __hs_list_named_filters
+    string split ' ' (hs --no-alias tags ls --named)
+end
+
 function __hs_list_tags
     # TODO: different home?
     if [ "$argv" = "append" ]
@@ -191,6 +195,9 @@ complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name
 complete -c hs -n "__fish_seen_subcommand_from ls" -s k -l known # FIXME: 這會補到另一個 ls 上 =_=
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags append)"
 complete -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"
+complete -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"
+complete -c hs -n "__fish_seen_subcommand_from unset" -f -a "(__hs_list_named_filters)"
+complete -c hs -n "__fish_seen_subcommand_from toggle" -f -a "(__hs_list_named_filters)"
 
 complete -c hs -n "__fish_seen_subcommand_from history" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from history" -l recent -d 'Show scripts within recent days.'

@@ -50,14 +50,33 @@ impl<T: AsRef<str>> FuzzKey for T {
 }
 
 #[derive(Copy, Clone)]
-struct MyRaw(*const str);
-unsafe impl Send for MyRaw {}
-impl MyRaw {
-    fn new(s: &str) -> Self {
+struct MyRaw<T>(T);
+unsafe impl<T> Send for MyRaw<T> {}
+impl MyRaw<*const str> {
+    fn new(s: &str) -> MyRaw<*const str> {
         MyRaw(s as *const str)
     }
-    unsafe fn get(&self) -> &'static str {
+    unsafe fn get(&self) -> &str {
         &*self.0
+    }
+}
+
+enum MyCow {
+    Borrowed(MyRaw<*const str>),
+    Owned(String),
+}
+impl MyCow {
+    fn new(s: Cow<'_, str>) -> Self {
+        match s {
+            Cow::Borrowed(s) => MyCow::Borrowed(MyRaw::new(s)),
+            Cow::Owned(s) => MyCow::Owned(s),
+        }
+    }
+    unsafe fn get(&self) -> &str {
+        match self {
+            MyCow::Borrowed(s) => s.get(),
+            MyCow::Owned(s) => &*s,
+        }
     }
 }
 
@@ -68,14 +87,13 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
     let mut data_vec: Vec<(i64, T)> = iter.map(|t| (0, t)).collect();
-    // NOTE: 當鍵是 Cow::Owned 可能會太早釋放，一定要先存起來
-    let keys: Vec<_> = data_vec.iter().map(|(_, data)| data.fuzz_key()).collect();
     let sep = MyRaw::new(sep);
 
     crate::set_once!(MATCHER, Default::default);
 
-    let score_fut = keys.iter().map(|key| {
-        let key = MyRaw::new(key.as_ref());
+    let score_fut = data_vec.iter_mut().map(|(score, data)| {
+        let key = MyCow::new(data.fuzz_key());
+        let score_ptr = MyRaw(score as *mut _);
         spawn_blocking(move || {
             // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
             let key = unsafe { key.get() };
@@ -91,21 +109,22 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
                     len,
                     computed_score
                 );
-                Some(computed_score)
-            } else {
-                None
+                // SAFETY: 怎麼可能有多個人持有同個元素的分數
+                unsafe {
+                    *score_ptr.0 = computed_score;
+                }
             }
         })
     });
 
-    let scores = join_all(score_fut).await;
-    let mut best_score = 0;
-    for (score, (score_mut, _)) in scores.into_iter().zip(data_vec.iter_mut()) {
-        if let Some(score) = score? {
-            best_score = std::cmp::max(best_score, score);
-            *score_mut = score;
-        }
-    }
+    join_all(score_fut).await;
+    // NOTE: 算分數就別平行做了，不然要搞原子性，可能得不償失
+    let best_score = data_vec
+        .iter()
+        .map(|(score, _)| *score)
+        .max()
+        .unwrap_or_default();
+
     if best_score == 0 {
         log::info!("模糊搜沒搜到東西 {}", name);
         return Ok(None);
@@ -117,17 +136,17 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
         if score == best_score && ans.is_none() {
             ans = Some(data);
         } else if is_multifuzz(score, best_score) {
-            log::debug!("找到一個分數相近者：{} {}", data.fuzz_key(), score);
+            log::warn!("找到一個分數相近者：{} {}", data.fuzz_key(), score);
             multifuzz_vec.push(data);
         }
     }
 
     let ans = ans.unwrap();
     if multifuzz_vec.is_empty() {
-        log::info!("模糊搜到一個東西 {:?}", ans.fuzz_key());
+        log::info!("模糊搜到一個東西 {}", ans.fuzz_key());
         Ok(Some(FuzzResult::new_single(ans, best_score)))
     } else {
-        log::warn!("模糊搜到太多東西");
+        log::warn!("模糊搜到太多東西，主要為結果為 {}", ans.fuzz_key());
         Ok(Some(FuzzResult::new_multi(ans, multifuzz_vec)))
     }
 }

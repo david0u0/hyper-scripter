@@ -30,9 +30,10 @@ class Historian < Selector
     @offset = show_obj['offset']
     @limit = show_obj['limit']
 
-    filters = arg_obj['filter']
-    timeless = arg_obj['timeless']
-    recent = arg_obj['recent']
+    root_args = arg_obj['root_args']
+    filters = root_args['filter']
+    timeless = root_args['timeless']
+    recent = root_args['recent']
     script_query = show_obj['script']
 
     # ask the actual script by ls command

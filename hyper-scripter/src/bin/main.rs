@@ -1,4 +1,4 @@
-use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs};
+use hyper_scripter::args::{self, History, List, Root, RootArgs, Subs, Tags, TagsSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -39,7 +39,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
     let root = main_util::handle_completion(root)?;
-    if root.dump_args {
+    if root.root_args.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);
         return Ok(vec![]);
@@ -64,23 +64,33 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     root.set_home_unless_set()?;
-    Config::set_prompt_level(root.prompt_level);
 
+    let RootArgs {
+        no_trace,
+        archaeology,
+        filter,
+        recent,
+        timeless,
+        prompt_level,
+        ..
+    } = root.root_args;
+
+    Config::set_prompt_level(prompt_level);
     let conf = Config::get();
     let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
     let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;
 
-    let recent = if root.timeless {
+    let recent = if timeless {
         None
     } else {
-        root.recent.or(conf.recent).map(|recent| RecentFilter {
+        recent.or(conf.recent).map(|recent| RecentFilter {
             recent,
-            archaeology: root.archaeology,
+            archaeology: archaeology,
         })
     };
 
     let historian = Historian::new(path::get_home().to_owned()).await?;
-    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), root.no_trace, need_journal)
+    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), no_trace, need_journal)
         .await
         .context("讀取歷史記錄失敗")?;
 
@@ -91,14 +101,14 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         main_util::load_templates()?;
     }
 
-    let explicit_filter = !root.filter.is_empty();
+    let explicit_filter = !filter.is_empty();
     let mut ret = MainReturn {
         conf: None,
         errs: vec![],
     };
     {
         let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
-        for filter in root.filter.into_iter() {
+        for filter in filter.into_iter() {
             tag_group.push(filter);
         }
         repo.filter_by_tag(&tag_group);

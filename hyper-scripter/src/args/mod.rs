@@ -28,75 +28,79 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowExternalSubcommands,
 ];
 
-macro_rules! def_root {
-    ($sub:ident: $sub_type:ty) => {
-        #[derive(StructOpt, Debug, Serialize)]
-        #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
-        pub struct Root {
-            #[structopt(skip = true)]
-            #[serde(skip)]
-            pub home_is_set: bool,
-
-            #[structopt(long, hidden = true)]
-            pub dump_args: bool,
-            #[structopt(long, global = true, help = "Do not record history")]
-            pub no_trace: bool,
-            #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
-            pub archaeology: bool,
-            #[structopt(long, global = true)]
-            pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
-            #[structopt(short = "H", long, help = "Path to hyper script home")]
-            pub hs_home: Option<String>,
-            #[structopt(
-                short,
-                long,
-                global = true,
-                parse(try_from_str),
-                conflicts_with = "all",
-                number_of_values = 1,
-                help = "Filter by tags, e.g. `all,^mytag`"
-            )]
-            pub filter: Vec<TagFilter>,
-            #[structopt(
-                short,
-                long,
-                global = true,
-                conflicts_with = "recent",
-                help = "Shorthand for `-f=all,^removed --timeless`"
-            )]
-            all: bool,
-            #[structopt(long, global = true, help = "Show scripts within recent days.")]
-            pub recent: Option<u32>,
-            #[structopt(
-                long,
-                global = true,
-                help = "Show scripts of all time.",
-                conflicts_with = "recent"
-            )]
-            pub timeless: bool,
-            #[structopt(long, possible_values(&["never", "always", "smart"]), help = "Prompt level of fuzzy finder.")]
-            pub prompt_level: Option<PromptLevel>,
-
-            #[structopt(subcommand)]
-            pub $sub: Option<$sub_type>,
-        }
-    };
+#[derive(StructOpt, Debug, Serialize)]
+pub struct RootArgs {
+    #[structopt(long, hidden = true)]
+    pub dump_args: bool,
+    #[structopt(long, global = true, help = "Do not record history")]
+    pub no_trace: bool,
+    #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+    pub archaeology: bool,
+    #[structopt(long, global = true)]
+    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
+    #[structopt(short = "H", long, help = "Path to hyper script home")]
+    pub hs_home: Option<String>,
+    #[structopt(
+        short,
+        long,
+        global = true,
+        parse(try_from_str),
+        conflicts_with = "all",
+        number_of_values = 1,
+        help = "Filter by tags, e.g. `all,^mytag`"
+    )]
+    pub filter: Vec<TagFilter>,
+    #[structopt(
+        short,
+        long,
+        global = true,
+        conflicts_with = "recent",
+        help = "Shorthand for `-f=all,^removed --timeless`"
+    )]
+    all: bool,
+    #[structopt(long, global = true, help = "Show scripts within recent days.")]
+    pub recent: Option<u32>,
+    #[structopt(
+        long,
+        global = true,
+        help = "Show scripts of all time.",
+        conflicts_with = "recent"
+    )]
+    pub timeless: bool,
+    #[structopt(long, possible_values(&["never", "always", "smart"]), help = "Prompt level of fuzzy finder.")]
+    pub prompt_level: Option<PromptLevel>,
 }
 
-mod alias_mod {
-    use super::*;
-    #[derive(StructOpt, Debug, Serialize)]
-    pub enum Subs {
-        #[structopt(external_subcommand)]
-        Other(Vec<String>),
-    }
-    def_root! {
-        subcmd: Subs
-    }
+#[derive(StructOpt, Debug, Serialize)]
+#[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
+pub struct Root {
+    #[structopt(skip = true)]
+    #[serde(skip)]
+    pub home_is_set: bool,
+    #[structopt(flatten)]
+    pub root_args: RootArgs,
+    #[structopt(subcommand)]
+    pub subcmd: Option<Subs>,
+}
 
-    fn find_alias<'a>(root: &'a AliasRoot, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
-        match &root.subcmd {
-            Some(alias_mod::Subs::Other(v)) => {
+#[derive(StructOpt, Debug, Serialize)]
+pub enum AliasSubs {
+    #[structopt(external_subcommand)]
+    Other(Vec<String>),
+}
+#[derive(StructOpt, Debug, Serialize)]
+#[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
+pub struct AliasRoot {
+    #[structopt(flatten)]
+    pub root_args: RootArgs,
+    #[structopt(subcommand)]
+    pub subcmd: Option<AliasSubs>,
+}
+impl AliasRoot {
+    fn find_alias<'a>(&'a self, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
+        match &self.subcmd {
+            None => None,
+            Some(AliasSubs::Other(v)) => {
                 let first = v.first().unwrap().as_str();
                 if let Some(alias) = conf.alias.get(first) {
                     log::info!("別名 {} => {:?}", first, alias);
@@ -105,34 +109,26 @@ mod alias_mod {
                     None
                 }
             }
-            _ => None,
         }
     }
-    impl Root {
-        pub fn expand_alias<'a, T: 'a + AsRef<str>>(
-            &'a self,
-            args: &'a [T],
-            conf: &'a Config,
-        ) -> Option<impl Iterator<Item = &'a str>> {
-            if let Some((alias, remaining_args)) = find_alias(self, conf) {
-                let base_len = args.len() - remaining_args.len();
-                let base_args = args.iter().take(base_len).map(AsRef::as_ref);
-                let after_args = alias.after.iter().map(AsRef::as_ref);
-                let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
-                let new_args = base_args.chain(after_args).chain(remaining_args);
+    pub fn expand_alias<'a, T: 'a + AsRef<str>>(
+        &'a self,
+        args: &'a [T],
+        conf: &'a Config,
+    ) -> Option<impl Iterator<Item = &'a str>> {
+        if let Some((alias, remaining_args)) = self.find_alias(conf) {
+            let base_len = args.len() - remaining_args.len();
+            let base_args = args.iter().take(base_len).map(AsRef::as_ref);
+            let after_args = alias.after.iter().map(AsRef::as_ref);
+            let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
+            let new_args = base_args.chain(after_args).chain(remaining_args);
 
-                // log::trace!("新的參數為 {:?}", new_args);
-                Some(new_args)
-            } else {
-                None
-            }
+            // log::trace!("新的參數為 {:?}", new_args);
+            Some(new_args)
+        } else {
+            None
         }
     }
-}
-pub use alias_mod::Root as AliasRoot;
-
-def_root! {
-    subcmd: Subs
 }
 
 #[derive(StructOpt, Debug, Serialize)]
@@ -348,7 +344,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     match AliasRoot::from_iter_safe(&args) {
         Ok(alias_root) => {
             log::trace!("別名命令行物件 {:?}", alias_root);
-            set_home(&alias_root.hs_home)?;
+            set_home(&alias_root.root_args.hs_home)?;
             if let Some(new_args) = alias_root.expand_alias(&args, Config::get()) {
                 // log::trace!("新的參數為 {:?}", new_args);
                 return Ok(Root::from_iter(new_args));
@@ -375,14 +371,14 @@ impl Root {
     /// 若帶了 --no-alias 選項，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
     pub fn set_home_unless_set(&self) -> Result {
         if !self.home_is_set {
-            set_home(&self.hs_home)?;
+            set_home(&self.root_args.hs_home)?;
         }
         Ok(())
     }
     pub fn sanitize_flags(&mut self) {
-        if self.all {
-            self.timeless = true;
-            self.filter = vec!["all,^removed".parse().unwrap()];
+        if self.root_args.all {
+            self.root_args.timeless = true;
+            self.root_args.filter = vec!["all,^removed".parse().unwrap()];
         }
     }
     pub fn sanitize(&mut self) -> Result {
@@ -452,7 +448,7 @@ mod test {
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
         let args = build_args("alias trash -f removed");
-        assert_eq!(args.filter, vec![]);
+        assert_eq!(args.root_args.filter, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
                 unset,
@@ -469,8 +465,8 @@ mod test {
     #[test]
     fn test_strange_alias() {
         let args = build_args("-f e e -t e something -T e");
-        assert_eq!(args.filter, vec!["e".parse().unwrap()]);
-        assert_eq!(args.all, false);
+        assert_eq!(args.root_args.filter, vec!["e".parse().unwrap()]);
+        assert_eq!(args.root_args.all, false);
         match &args.subcmd {
             Some(Subs::Edit {
                 edit_query,
@@ -488,8 +484,8 @@ mod test {
         }
 
         let args = build_args("la -l");
-        assert_eq!(args.filter, vec!["all,^removed".parse().unwrap()]);
-        assert_eq!(args.all, true);
+        assert_eq!(args.root_args.filter, vec!["all,^removed".parse().unwrap()]);
+        assert_eq!(args.root_args.all, true);
         match &args.subcmd {
             Some(Subs::LS(opt)) => {
                 assert_eq!(opt.long, true);

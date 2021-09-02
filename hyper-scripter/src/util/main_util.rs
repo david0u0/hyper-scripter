@@ -321,7 +321,7 @@ pub fn handle_completion(root: Either<Root, Completion>) -> Result<Root> {
                     }
                 };
                 new_root.home_is_set = false;
-                new_root.dump_args = false;
+                new_root.root_args.dump_args = false;
                 new_root.subcmd = Some(Subs::LS(List {
                     name: true,
                     plain: true,
@@ -340,7 +340,9 @@ pub fn handle_completion(root: Either<Root, Completion>) -> Result<Root> {
                             }
                         }
 
-                        let p = path::compute_home_path_optional(alias_root.hs_home.as_ref())?;
+                        let p = path::compute_home_path_optional(
+                            alias_root.root_args.hs_home.as_ref(),
+                        )?;
                         let conf = Config::load(&p)?;
                         if let Some(new_args) = alias_root.expand_alias(&args, &conf) {
                             print_iter(new_args);

@@ -1,5 +1,4 @@
 use super::NO_FLAG_SETTINGS;
-use crate::error::{Error, Result};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -11,19 +10,13 @@ pub enum Completion {
 }
 
 impl Completion {
-    pub fn from_args(args: &[String]) -> Result<Option<Completion>> {
+    pub fn from_args(args: &[String]) -> Option<Completion> {
         let args = &args[1..];
         if args.first().map(AsRef::as_ref) == Some("completion") {
             log::info!("補全模式 {:?}", args);
-            match Completion::from_iter_safe(args) {
-                Ok(c) => Ok(Some(c)),
-                Err(e) => {
-                    log::warn!("解析補全參數出錯：{}", e);
-                    Err(Error::Completion)
-                }
-            }
+            Some(Completion::from_iter(args))
         } else {
-            Ok(None)
+            None
         }
     }
 }

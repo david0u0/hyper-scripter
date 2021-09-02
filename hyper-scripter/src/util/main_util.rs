@@ -323,7 +323,6 @@ pub fn handle_completion(root: Either<Root, Completion>) -> Result<Root> {
                         return Err(Error::Completion);
                     }
                 };
-                new_root.home_is_set = false;
                 new_root.root_args.dump_args = false;
                 new_root.subcmd = Some(Subs::LS(List {
                     name: true,

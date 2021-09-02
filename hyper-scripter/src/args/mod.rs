@@ -74,9 +74,9 @@ pub struct RootArgs {
 #[derive(StructOpt, Debug, Serialize)]
 #[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
 pub struct Root {
-    #[structopt(skip = true)]
+    #[structopt(skip = false)]
     #[serde(skip)]
-    pub home_is_set: bool,
+    home_is_set: bool,
     #[structopt(flatten)]
     pub root_args: RootArgs,
     #[structopt(subcommand)]
@@ -89,7 +89,7 @@ pub enum AliasSubs {
     Other(Vec<String>),
 }
 #[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
+#[structopt(settings = NO_FLAG_SETTINGS)]
 pub struct AliasRoot {
     #[structopt(flatten)]
     pub root_args: RootArgs,
@@ -334,30 +334,21 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
 }
 
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
-    use structopt::clap::{Error as ClapError, ErrorKind::VersionDisplayed};
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
-        let mut root = Root::from_iter(args);
-        root.home_is_set = false;
+        let root = Root::from_iter(args);
         return Ok(root);
     }
     match AliasRoot::from_iter_safe(&args) {
         Ok(alias_root) => {
-            log::trace!("別名命令行物件 {:?}", alias_root);
+            log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home)?;
-            if let Some(new_args) = alias_root.expand_alias(&args, Config::get()) {
-                // log::trace!("新的參數為 {:?}", new_args);
-                return Ok(Root::from_iter(new_args));
-            }
-            let root = Root::from_iter(args);
+            let mut root = match alias_root.expand_alias(&args, Config::get()) {
+                Some(new_args) => Root::from_iter(new_args),
+                None => Root::from_iter(&args),
+            };
+            root.home_is_set = true;
             Ok(root)
-        }
-        Err(ClapError {
-            kind: VersionDisplayed,
-            ..
-        }) => {
-            // `from_iter_safe` 中已打印出版本，不再多做事，直接退出
-            std::process::exit(0);
         }
         Err(e) => {
             log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
@@ -368,7 +359,8 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
 }
 
 impl Root {
-    /// 若帶了 --no-alias 選項，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
+    /// 若帶了 --no-alias 選項，或是補全模式，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
+    /// 在補全模式中意義重大，因為使用者可能會用 -H 指定別的腳本之家
     pub fn set_home_unless_set(&self) -> Result {
         if !self.home_is_set {
             set_home(&self.root_args.hs_home)?;
@@ -414,7 +406,7 @@ impl Root {
 }
 
 pub fn handle_args(args: Vec<String>) -> Result<Either<Root, Completion>> {
-    if let Some(completion) = Completion::from_args(&args)? {
+    if let Some(completion) = Completion::from_args(&args) {
         return Ok(Either::Two(completion));
     }
     let mut root = handle_alias_args(args)?;

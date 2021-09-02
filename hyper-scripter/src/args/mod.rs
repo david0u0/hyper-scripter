@@ -384,17 +384,10 @@ impl Root {
     pub fn sanitize(&mut self) -> Result {
         match &mut self.subcmd {
             Some(Subs::Other(args)) => {
-                let mut args = std::mem::replace(args, vec![]);
-                let script = args.remove(0);
-                let run = Subs::Run {
-                    dummy: false,
-                    previous_args: false,
-                    repeat: 1,
-                    script_query: script.parse()?,
-                    args,
-                };
-                log::info!("執行模式 {:?}", run);
-                self.subcmd = Some(run);
+                let args =
+                    std::array::IntoIter::new(["hs", "run"]).chain(args.iter().map(|s| s.as_str()));
+                self.subcmd = Some(Subs::from_iter(args));
+                log::info!("執行模式 {:?}", self.subcmd);
             }
             Some(Subs::Help { args }) => {
                 print_help(args.iter())?;
@@ -493,6 +486,47 @@ mod test {
             }
             _ => {
                 panic!("{:?} should be edit...", args);
+            }
+        }
+    }
+    #[test]
+    fn test_default_run_tags() {
+        // TODO
+    }
+    #[test]
+    fn test_external_run_tags() {
+        let args = build_args("-f test --dummy -r 42 =script -a --");
+        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        assert_eq!(args.root_args.all, false);
+        match args.subcmd {
+            Some(Subs::Run {
+                dummy: true,
+                previous_args: false,
+                repeat: 42,
+                script_query,
+                args,
+            }) => {
+                assert_eq!(script_query, "=script".parse().unwrap());
+                assert_eq!(args, vec!["-a", "--"]);
+            }
+            _ => {
+                panic!("{:?} should be run...", args);
+            }
+        }
+
+        let args = build_args("-f test --dump-args tags --name myname +mytag");
+        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        assert_eq!(args.root_args.all, false);
+        assert!(args.root_args.dump_args);
+        match args.subcmd {
+            Some(Subs::Tags(Tags {
+                subcmd: Some(TagsSubs::Set { name, content }),
+            })) => {
+                assert_eq!(name, Some("myname".to_owned()));
+                assert_eq!(content, "+mytag".parse().unwrap());
+            }
+            _ => {
+                panic!("{:?} should be tags...", args);
             }
         }
     }

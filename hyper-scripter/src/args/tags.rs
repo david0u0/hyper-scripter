@@ -43,12 +43,9 @@ impl Tags {
                 })
             }
             Some(TagsSubs::Other(args)) => {
-                let args = ["tags", "set"]
-                    .iter()
-                    .map(|s| *s)
+                let args = std::array::IntoIter::new(["tags", "set"])
                     .chain(args.iter().map(|s| s.as_str()));
-                let subcmd = TagsSubs::from_iter(args);
-                self.subcmd = Some(subcmd);
+                self.subcmd = Some(TagsSubs::from_iter(args));
             }
             _ => (),
         }

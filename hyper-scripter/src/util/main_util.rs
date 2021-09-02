@@ -63,7 +63,8 @@ pub async fn mv(
             }
             info.write();
         })
-        .await
+        .await?;
+    Ok(())
 }
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
 pub async fn edit_or_create(
@@ -182,7 +183,7 @@ pub async fn run_n_times(
 
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    entry.update(|info| info.exec(content, &args)).await?;
+    let run_id = entry.update(|info| info.exec(content, &args)).await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");
@@ -195,7 +196,7 @@ pub async fn run_n_times(
             &*entry,
             &args,
             &entry.exec_time.as_ref().unwrap().data().unwrap().0,
-            entry.last_event_id(),
+            run_id,
         );
         let ret_code: i32;
         match run_res {
@@ -206,7 +207,9 @@ pub async fn run_n_times(
             Err(e) => return Err(e),
             Ok(_) => ret_code = 0,
         }
-        entry.update(|info| info.exec_done(ret_code)).await?;
+        entry
+            .update(|info| info.exec_done(ret_code, run_id))
+            .await?;
     }
     Ok(())
 }

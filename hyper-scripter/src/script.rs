@@ -159,7 +159,8 @@ pub struct ScriptInfo {
     pub neglect_time: Option<ScriptTime>,
     /// (content, args)
     pub exec_time: Option<ScriptTime<(String, String)>>,
-    pub exec_done_time: Option<ScriptTime<i32>>,
+    /// (return code, main event id)
+    pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
     #[deref]
     /// 用來區隔「時間資料」和「其它元資料」，並偵測其它元資料的修改
     timeless_info: TimelessScriptInfo,
@@ -231,9 +232,9 @@ impl ScriptInfo {
         self.exec_time = Some(ScriptTime::now((content, args_ser)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
     }
-    pub fn exec_done(&mut self, code: i32) {
+    pub fn exec_done(&mut self, code: i32, main_event_id: i64) {
         log::trace!("{:?} 執行結果為 {}", self, code);
-        self.exec_done_time = Some(ScriptTime::now(code));
+        self.exec_done_time = Some(ScriptTime::now((code, main_event_id)));
     }
     pub fn neglect(&mut self) {
         self.neglect_time = Some(ScriptTime::now(()))

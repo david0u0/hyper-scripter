@@ -123,7 +123,7 @@ impl DBEnv {
         Ok(id as i64)
     }
 
-    async fn handle_change(&self, info: &ScriptInfo, main_event_id: i64) -> Result<i64> {
+    async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
             assert!(self.modifies_script);
@@ -149,7 +149,7 @@ impl DBEnv {
         let mut last_event_id = 0;
 
         if let Some(time) = info.exec_done_time.as_ref() {
-            if let Some(&code) = time.data() {
+            if let Some(&(code, main_event_id)) = time.data() {
                 log::debug!("{:?} 的執行完畢事件", info.name);
                 last_event_id = self
                     .historian

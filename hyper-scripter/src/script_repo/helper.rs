@@ -12,32 +12,20 @@ pub struct Iter<'b> {
 }
 #[derive(Deref, Debug)]
 pub struct RepoEntry<'b> {
-    /// 記錄「上一筆創造出來的事件」的 id
-    pub(super) last_event_id: i64,
     #[deref]
     pub(super) info: &'b mut ScriptInfo,
     pub(super) env: &'b DBEnv, // XXX: 一旦 async trait 可用了就把這裡變成 trait，不要對實作編程
 }
 
 impl<'b> RepoEntry<'b> {
-    pub fn last_event_id(&self) -> i64 {
-        self.last_event_id
-    }
     pub(super) fn new(info: &'b mut ScriptInfo, env: &'b DBEnv) -> Self {
-        RepoEntry {
-            info,
-            env,
-            last_event_id: 0,
-        }
+        RepoEntry { info, env }
     }
-    pub async fn update<F: FnOnce(&mut ScriptInfo)>(&mut self, handler: F) -> Result {
+    /// 回傳值為「上一筆記錄到的事件的 id」
+    pub async fn update<F: FnOnce(&mut ScriptInfo)>(&mut self, handler: F) -> Result<i64> {
         handler(self.info);
-        let last_event_id = self
-            .env
-            .handle_change(self.info, self.last_event_id)
-            .await?;
-        self.last_event_id = last_event_id;
-        Ok(())
+        let last_event_id = self.env.handle_change(self.info).await?;
+        Ok(last_event_id)
     }
     pub fn into_inner(self) -> &'b ScriptInfo {
         self.info

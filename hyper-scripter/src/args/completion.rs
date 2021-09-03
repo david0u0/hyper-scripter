@@ -4,9 +4,15 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum Completion {
     #[structopt(settings = NO_FLAG_SETTINGS)]
-    LS { args: Vec<String> },
+    LS {
+        #[structopt(required = true, min_values = 1)]
+        args: Vec<String>,
+    },
     #[structopt(settings = NO_FLAG_SETTINGS)]
-    Alias { args: Vec<String> },
+    Alias {
+        #[structopt(required = true, min_values = 1)]
+        args: Vec<String>,
+    },
 }
 
 impl Completion {

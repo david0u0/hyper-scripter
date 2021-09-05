@@ -33,6 +33,10 @@ path = "tests/util_test.rs"
 name = "history"
 path = "tests/history.rs"
 
+[[test]]
+name = "fuzzy"
+path = "tests/fuzzy.rs"
+
 [features]
 default = []
 hard-home = []

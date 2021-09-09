@@ -48,8 +48,12 @@ impl ScriptName {
                 Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
             }
         } else {
-            if s.ends_with('/') && fuzzing {
-                s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
+            if fuzzing {
+                if s == "." {
+                    return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
+                } else if s.ends_with('/') {
+                    s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
+                }
             }
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
             for s in s.split('/') {

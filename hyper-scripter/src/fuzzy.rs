@@ -3,13 +3,13 @@ use crate::state::State;
 use futures::future::join_all;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
+use std::cmp::{Ordering, PartialOrd};
 use tokio::task::spawn_blocking;
 
-const MID_SCORE: i64 = 4100; // TODO: 好好決定這個魔法數字
+const MID_SCORE: i64 = 800; // TODO: 好好決定這個魔法數字
 
 fn is_multifuzz(score: i64, best_score: i64) -> bool {
-    // best_score * 0.7 < score
-    best_score * 7 < score * 10
+    best_score - score < 2 // 吃掉「正常排序就命中」的差異
 }
 
 #[derive(Debug)]
@@ -20,7 +20,8 @@ pub enum FuzzResult<T> {
 }
 pub use FuzzResult::*;
 impl<T> FuzzResult<T> {
-    fn new_single(ans: T, score: i64) -> Self {
+    fn new_single(ans: T, score: FuzzScore) -> Self {
+        let score = score.score * 100 / score.len as i64;
         match score {
             0..=MID_SCORE => Low(ans),
             _ => High(ans),
@@ -80,13 +81,37 @@ impl MyCow {
     }
 }
 
+#[derive(Default, PartialEq, Eq, Debug, Clone, Copy)]
+pub struct FuzzScore {
+    len: usize,
+    score: i64,
+}
+impl FuzzScore {
+    fn is_default(&self) -> bool {
+        self.len == 0
+    }
+}
+impl PartialOrd for FuzzScore {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.score.cmp(&other.score) {
+            Ordering::Equal => Some(other.len.cmp(&self.len)),
+            res @ _ => Some(res),
+        }
+    }
+}
+impl Ord for FuzzScore {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
     sep: &str,
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
-    let mut data_vec: Vec<(i64, T)> = iter.map(|t| (0, t)).collect();
+    let mut data_vec: Vec<_> = iter.map(|t| (FuzzScore::default(), t)).collect();
     let sep = MyRaw::new(sep);
 
     crate::set_once!(MATCHER, Default::default);
@@ -100,18 +125,11 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
             let score = my_fuzz(key, unsafe { raw_name.get() }, unsafe { sep.get() });
 
             if let Some(score) = score {
-                let len = key.chars().count() as i64;
-                let computed_score = score * score * 10 / len as i64;
-                log::trace!(
-                    "將分數正交化：{} * {} * 10 / {} = {}",
-                    score,
-                    score,
-                    len,
-                    computed_score
-                );
+                let len = key.chars().count();
                 // SAFETY: 怎麼可能有多個人持有同個元素的分數
+                assert_ne!(len, 0);
                 unsafe {
-                    *score_ptr.0 = computed_score;
+                    *score_ptr.0 = FuzzScore { score, len };
                 }
             }
         })
@@ -125,7 +143,7 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
         .max()
         .unwrap_or_default();
 
-    if best_score == 0 {
+    if best_score.is_default() {
         log::info!("模糊搜沒搜到東西 {}", name);
         return Ok(None);
     }
@@ -135,8 +153,8 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     for (score, data) in data_vec.into_iter() {
         if score == best_score && ans.is_none() {
             ans = Some(data);
-        } else if is_multifuzz(score, best_score) {
-            log::warn!("找到一個分數相近者：{} {}", data.fuzz_key(), score);
+        } else if is_multifuzz(score.score, best_score.score) {
+            log::warn!("找到一個分數相近者：{} {:?}", data.fuzz_key(), score);
             multifuzz_vec.push(data);
         }
     }
@@ -146,7 +164,11 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
         log::info!("模糊搜到一個東西 {}", ans.fuzz_key());
         Ok(Some(FuzzResult::new_single(ans, best_score)))
     } else {
-        log::warn!("模糊搜到太多東西，主要為結果為 {}", ans.fuzz_key());
+        log::warn!(
+            "模糊搜到太多東西，主要為結果為 {} {:?}",
+            ans.fuzz_key(),
+            best_score
+        );
         Ok(Some(FuzzResult::new_multi(ans, multifuzz_vec)))
     }
 }
@@ -271,13 +293,13 @@ mod test {
                 ret.sort();
                 (ans, ret)
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", res),
         }
     }
     fn extract_high<'a>(res: FuzzResult<&'a str>) -> &'a str {
         match res {
             High(t) => t,
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", res),
         }
     }
     async fn do_fuzz<'a>(name: &'a str, v: &'a Vec<&'a str>) -> Option<FuzzResult<&'a str>> {
@@ -313,7 +335,9 @@ mod test {
         let t2 = "測試腳本23456";
         let vec = vec![t1, t2];
         let res = do_fuzz("測試", &vec).await.unwrap();
-        assert_eq!(extract_high(res), t1, "模糊搜尋無法找出較短者");
+        let (ans, v) = extract_multifuzz(res);
+        assert_eq!(ans, "測試腳本1");
+        assert_eq!(v, vec);
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_reorder_fuzz() {

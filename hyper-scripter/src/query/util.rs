@@ -89,24 +89,22 @@ pub async fn do_script_query<'b>(
                 Config::get_prompt_level()
             };
             let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
-            let need_prompt: bool;
+            let mut is_low = false;
+            let mut is_multi_fuzz = false;
             let entry = match fuzz_res {
-                Some(fuzzy::High(entry)) => {
-                    need_prompt = false;
-                    entry
-                }
+                Some(fuzzy::High(entry)) => entry,
                 Some(fuzzy::Low(entry)) => {
-                    need_prompt = true;
+                    is_low = true;
                     entry
                 }
                 #[cfg(feature = "benching")]
                 Some(fuzzy::Multi { ans, .. }) => {
-                    need_prompt = true;
+                    is_multi_fuzz = true;
                     ans
                 }
                 #[cfg(not(feature = "benching"))]
                 Some(fuzzy::Multi { ans, others }) => {
-                    need_prompt = true;
+                    is_multi_fuzz = true;
                     // NOTE: 從一堆分數相近者中選出最新的
                     // 但注意不要是「正解」的前綴，否則使用者可能永遠無法用模糊搜拿到名字比較短的候選者
                     // 例如 正解：ab 候選：ab1，且候選人較新
@@ -123,7 +121,15 @@ pub async fn do_script_query<'b>(
                 }
                 None => return Ok(None),
             };
-            if (need_prompt && !level.never()) || level.always() {
+            let need_prompt = {
+                match level {
+                    PromptLevel::Always => true,
+                    PromptLevel::Never => false,
+                    PromptLevel::Smart => is_low || is_multi_fuzz,
+                    PromptLevel::OnMultiFuzz => is_multi_fuzz,
+                }
+            };
+            if need_prompt {
                 prompt_fuzz_acceptable(&*entry)?;
             }
             Ok(Some(entry))

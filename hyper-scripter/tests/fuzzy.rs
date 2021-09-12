@@ -31,7 +31,7 @@ fn unwrap_fuzz(target: Str, candidate: &mut Vec<Str>) -> Vec<Str> {
 
 const DISCORD_RUN: Str = "discord/run";
 const DISCORD_DIR: Str = "discord/dir";
-const DIR: Str = "/dir";
+const DIR: Str = "dir";
 
 const CB_RUN: Str = "cb/run";
 const CROUCHING_DRAGON_RUN: Str = "crouching-dragon/run";

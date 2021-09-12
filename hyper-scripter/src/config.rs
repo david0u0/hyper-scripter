@@ -67,17 +67,8 @@ pub enum PromptLevel {
     Never,
     #[display(fmt = "smart")]
     Smart,
-}
-impl PromptLevel {
-    pub fn always(self) -> bool {
-        self == PromptLevel::Always
-    }
-    pub fn never(self) -> bool {
-        self == PromptLevel::Never
-    }
-    pub fn smart(self) -> bool {
-        self == PromptLevel::Smart
-    }
+    #[display(fmt = "on_multi_fuzz")]
+    OnMultiFuzz,
 }
 impl FromStr for PromptLevel {
     type Err = Error;
@@ -86,6 +77,7 @@ impl FromStr for PromptLevel {
             "always" => PromptLevel::Always,
             "never" => PromptLevel::Never,
             "smart" => PromptLevel::Smart,
+            "on-multi-fuzz" => PromptLevel::OnMultiFuzz,
             _ => return Err(Error::Format(FormatCode::PromptLevel, s.to_owned())),
         };
         Ok(l)

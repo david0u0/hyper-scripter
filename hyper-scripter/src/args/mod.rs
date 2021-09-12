@@ -67,7 +67,7 @@ pub struct RootArgs {
         conflicts_with = "recent"
     )]
     pub timeless: bool,
-    #[structopt(long, possible_values(&["never", "always", "smart"]), help = "Prompt level of fuzzy finder.")]
+    #[structopt(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
 }
 

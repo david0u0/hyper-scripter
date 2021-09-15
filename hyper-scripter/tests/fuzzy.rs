@@ -3,9 +3,8 @@ use hyper_scripter::fuzzy::*;
 
 type Str = &'static str;
 
-fn unwrap_fuzz(target: Str, candidate: &mut Vec<Str>) -> Vec<Str> {
+fn unwrap_fuzz(target: Str, candidate: &[Str]) -> Vec<Str> {
     let _ = env_logger::try_init();
-    candidate.sort();
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let res = rt.block_on(async {
         fuzz(target, candidate.iter().map(|t| *t), "/")
@@ -16,7 +15,6 @@ fn unwrap_fuzz(target: Str, candidate: &mut Vec<Str>) -> Vec<Str> {
     match res {
         Multi { ans, mut others } => {
             others.push(ans);
-            others.sort();
             others
         }
         High(s) => {
@@ -27,6 +25,16 @@ fn unwrap_fuzz(target: Str, candidate: &mut Vec<Str>) -> Vec<Str> {
             vec![s]
         }
     }
+}
+
+macro_rules! assert_vec {
+    ($v1:expr, $v2:expr) => {
+        let mut v1 = $v1.clone();
+        v1.sort();
+        let mut v2 = $v2.clone();
+        v2.sort();
+        assert_eq!(v1, v2);
+    };
 }
 
 const DISCORD_RUN: Str = "discord/run";
@@ -52,30 +60,40 @@ const VCS2: Str = "dir/vcs2";
 #[test]
 fn test_fuzzy_1() {
     assert_eq!(
-        unwrap_fuzz(DIR, &mut vec![DISCORD_RUN, DISCORD_DIR]),
+        unwrap_fuzz(DIR, &vec![DISCORD_RUN, DISCORD_DIR]),
         vec![DISCORD_DIR]
     );
 }
 
 #[test]
 fn test_fuzzy_2() {
-    let mut v = vec![CB_RUN, CROUCHING_DRAGON_RUN];
-    assert_eq!(unwrap_fuzz(RUN, &mut v), v);
+    let v = vec![CB_RUN, CROUCHING_DRAGON_RUN];
+    assert_vec!(unwrap_fuzz(RUN, &v), v);
 }
 
 #[test]
 fn test_fuzzy_3() {
-    let mut v = vec![HS_COMMIT, FISH_CONFIG, UTIL_COMMIT];
-    assert_eq!(unwrap_fuzz(CI, &mut v), v);
+    let v = vec![HS_COMMIT, FISH_CONFIG, UTIL_COMMIT];
+    assert_vec!(unwrap_fuzz(CI, &v), v);
 }
 
 #[test]
 fn test_fuzzy_4() {
-    let mut v = vec![REF, REGRUN];
-    assert_eq!(unwrap_fuzz(RE, &mut v), v);
+    let v = vec![REF, REGRUN];
+    assert_vec!(unwrap_fuzz(RE, &v), v);
 }
 
 #[test]
 fn test_fuzzy_5() {
-    assert_eq!(unwrap_fuzz(VCS2, &mut vec![VCS2, VCS_32]), vec![VCS2]);
+    assert_vec!(unwrap_fuzz(VCS2, &vec![VCS2, VCS_32]), vec![VCS2]);
+}
+
+const HYPER_SCRIPTER: Str = "hyper-scripter";
+const SCRIPT: Str = "script";
+const GGSCRIPT: Str = "ggscript";
+
+#[test]
+fn test_fuzzy_6() {
+    let v = vec![SCRIPT, HYPER_SCRIPTER, GGSCRIPT];
+    assert_vec!(unwrap_fuzz(SCRIPT, &v), vec![HYPER_SCRIPTER, SCRIPT]);
 }

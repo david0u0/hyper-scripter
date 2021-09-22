@@ -4,7 +4,7 @@ use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
-use hyper_scripter::script_repo::{RecentFilter, ScriptRepo};
+use hyper_scripter::script_repo::{RecentFilter, RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
 use hyper_scripter::{
@@ -215,8 +215,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::Help { args } => {
             let script_query: ScriptQuery = args[0].parse()?;
-            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
+            create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
 
@@ -259,11 +260,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             print!("{}", content);
-            entry.update(|info| info.read()).await?;
+            create_read_event(&mut entry).await?;
         }
         Subs::EnvHelp { script_query } => {
-            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("打印 {:?} 的環境變數", entry.name);
+            create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             let envs = extract_env_from_content(&content);
@@ -546,4 +548,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         sub => unimplemented!("{:?}", sub),
     }
     Ok(ret)
+}
+
+async fn create_read_event(entry: &mut RepoEntry<'_>) -> Result<i64> {
+    entry.update(|info| info.read()).await
 }

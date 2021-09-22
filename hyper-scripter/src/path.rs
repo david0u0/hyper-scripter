@@ -54,17 +54,24 @@ fn get_sys_home() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }
 
-fn join_path<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
+pub fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+    join_path_abs(".", path)
+}
+fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
     let path = path.as_ref();
     if path.is_absolute() {
         return Ok(path.to_owned());
     }
-    let here = canonicalize(base)?;
-    Ok(here.join(path))
+    let base = base.as_ref();
+    // NOTE: 若 base 不存在，`canonicalize` 會造成問題
+    // 但前幾行已先處理掉絕對路徑，故出問題機會很小
+    let base_res = canonicalize(&base);
+    let base = handle_fs_res(&[base], base_res)?;
+    Ok(base.join(path))
 }
 
 fn compute_home_path<T: AsRef<Path>>(p: T) -> Result<PathBuf> {
-    let path = join_path(".", p)?;
+    let path = join_here_abs(p)?;
     log::debug!("計算路徑：{:?}", path);
     if !path.exists() {
         log::info!("路徑 {:?} 不存在，嘗試創建之", path);
@@ -101,7 +108,7 @@ pub fn get_home() -> &'static Path {
 }
 #[cfg(test)]
 pub fn get_home() -> &'static Path {
-    crate::set_once!(PATH, || { join_path(".", ".test_hyper_scripter").unwrap() });
+    crate::set_once!(PATH, || { join_here_abs(".test_hyper_scripter").unwrap() });
     PATH.get().as_ref()
 }
 
@@ -187,12 +194,12 @@ mod test {
         assert_eq!(name, ScriptName::Anonymous(6));
         assert_eq!(
             p,
-            join_path("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
+            join_path_abs("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
         );
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(
             p,
-            join_path("./.test_hyper_scripter/.anonymous", "5.js").unwrap()
+            join_path_abs("./.test_hyper_scripter/.anonymous", "5.js").unwrap()
         );
     }
     #[test]
@@ -211,7 +218,7 @@ mod test {
         .unwrap();
         assert_eq!(
             p,
-            join_path("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
+            join_path_abs("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
         );
 
         match open_script(&not_exist, &"sh".into(), Some(true)).unwrap_err() {

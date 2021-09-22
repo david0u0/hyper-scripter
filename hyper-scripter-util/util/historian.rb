@@ -7,6 +7,15 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
+# Try to parse script query and get the script name
+# If the script is full name (starts with `=`), we can save an `hs ls` command
+def process_script_query(query)
+  if query.start_with?('=')
+    return query[1..].chomp('!')
+  end
+  nil
+end
+
 class Option
   def initialize(content, number)
     @content = content
@@ -29,24 +38,26 @@ class Historian < Selector
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
-
-    root_args = arg_obj['root_args']
-    filters = root_args['filter']
-    timeless = root_args['timeless']
-    recent = root_args['recent']
     script_query = show_obj['script']
+    @script_name = process_script_query(script_query)
+    if @script_name.nil?
+      root_args = arg_obj['root_args']
+      filters = root_args['filter']
+      timeless = root_args['timeless']
+      recent = root_args['recent']
 
-    # ask the actual script by ls command
-    filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
-    time_str = if recent.nil?
-                 timeless ? '--timeless' : ''
-               else
-                 "--recent #{recent}"
-               end
-    @script_name = HS_ENV.do_hs(
-      "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
-      false
-    ).strip
+      # ask the actual script by ls command
+      filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
+      time_str = if recent.nil?
+                   timeless ? '--timeless' : ''
+                 else
+                   "--recent #{recent}"
+                 end
+      @script_name = HS_ENV.do_hs(
+        "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
+        false
+      ).strip
+    end
 
     warn "historian for #{@script_name}"
 
@@ -86,7 +97,7 @@ class Historian < Selector
 
     args = run(sequence: sequence).content.content
 
-    cmd = "=#{@script_name}! #{args}" # known issue: \n \t \" will not be handled properly
+    cmd = "=#{@script_name}! -- #{args}" # known issue: \n \t \" will not be handled properly
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
         case ENV['SHELL'].split('/').last
@@ -107,7 +118,14 @@ class Historian < Selector
 
   def get_options
     history = HS_ENV.do_hs("history show =#{@script_name}! --limit #{@limit} --offset #{@offset}", false)
-    opts = history.lines.each_with_index.map { |s, i| process_option(s.strip, i + @offset + 1) }
+    opts = history.lines.each_with_index.map do |s, i|
+      s = s.strip
+      if s == "" # ignore empty args
+        nil
+      else
+        process_option(s, i + @offset + 1)
+      end
+    end
     opts.reject { |opt| opt.nil? }
   end
 

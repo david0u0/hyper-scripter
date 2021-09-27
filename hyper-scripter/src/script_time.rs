@@ -35,7 +35,7 @@ impl<T> ScriptTime<T> {
             changed: Some(data),
         }
     }
-    pub fn new_or_else<F: Fn() -> Self>(time: Option<NaiveDateTime>, default: F) -> Self {
+    pub fn new_or_else<F: FnOnce() -> Self>(time: Option<NaiveDateTime>, default: F) -> Self {
         match time {
             Some(time) => ScriptTime {
                 time,
@@ -45,14 +45,7 @@ impl<T> ScriptTime<T> {
         }
     }
     pub fn new_or(time: Option<NaiveDateTime>, default: Self) -> Self {
-        if let Some(time) = time {
-            ScriptTime {
-                time,
-                changed: None,
-            }
-        } else {
-            default
-        }
+        ScriptTime::new_or_else(time, || default)
     }
     pub fn new(time: NaiveDateTime) -> Self {
         ScriptTime {

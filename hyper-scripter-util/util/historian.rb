@@ -10,9 +10,8 @@ require_relative './selector'
 # Try to parse script query and get the script name
 # If the script is full name (starts with `=`), we can save an `hs ls` command
 def process_script_query(query)
-  if query.start_with?('=')
-    return query[1..].chomp('!')
-  end
+  return query[1..-1].chomp('!') if query.start_with?('=')
+
   nil
 end
 
@@ -60,6 +59,7 @@ class Historian < Selector
     end
 
     warn "historian for #{@script_name}"
+    HS_ENV.do_hs("cat =#{@script_name}!", false)
 
     super(get_options, offset: @offset + 1)
 
@@ -120,7 +120,7 @@ class Historian < Selector
     history = HS_ENV.do_hs("history show =#{@script_name}! --limit #{@limit} --offset #{@offset}", false)
     opts = history.lines.each_with_index.map do |s, i|
       s = s.strip
-      if s == "" # ignore empty args
+      if s == '' # ignore empty args
         nil
       else
         process_option(s, i + @offset + 1)

@@ -265,10 +265,18 @@ pub fn need_write(arg: &Subs) -> bool {
     use Subs::*;
     match arg {
         Edit { .. } => true,
-        MV { .. } => true,
         CP { .. } => true,
         RM { .. } => true,
         LoadUtils { .. } => true,
+        MV {
+            ty,
+            tags,
+            new,
+            origin: _,
+        } => {
+            // TODO: 好好測試這個
+            ty.is_some() || tags.is_some() || new.is_some()
+        }
         _ => false,
     }
 }

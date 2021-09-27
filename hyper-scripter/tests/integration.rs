@@ -47,6 +47,7 @@ fn test_mv_cp() {
         "改了腳本類型舊檔案還留著？"
     );
 
+    run("mv 1").expect("應該允許空的 mv，作為 touch 的功能");
     run("mv 1 -t +hide").unwrap();
     run("-").expect_err("用 mv 修改標籤失敗？");
 

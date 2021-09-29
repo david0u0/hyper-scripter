@@ -1,10 +1,7 @@
 use crate::error::Result;
 use crate::state::State;
 use futures::future::join_all;
-use fuzzy_matcher::{
-    skim::{SkimMatcherV2, SkimScoreConfig},
-    FuzzyMatcher,
-};
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::borrow::Cow;
 use std::cmp::{Ordering, PartialOrd};
 use tokio::task::spawn_blocking;
@@ -117,12 +114,7 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     let mut data_vec: Vec<_> = iter.map(|t| (FuzzScore::default(), t)).collect();
     let sep = MyRaw::new(sep);
 
-    crate::set_once!(MATCHER, || {
-        SkimMatcherV2::default().score_config(SkimScoreConfig {
-            bonus_first_char_multiplier: 1,
-            ..Default::default()
-        })
-    });
+    crate::set_once!(MATCHER, SkimMatcherV2::default);
 
     let score_fut = data_vec.iter_mut().map(|(score, data)| {
         let key = MyCow::new(data.fuzz_key());

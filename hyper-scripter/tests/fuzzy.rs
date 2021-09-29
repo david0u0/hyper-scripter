@@ -88,12 +88,11 @@ fn test_fuzzy_5() {
     assert_vec!(unwrap_fuzz(VCS2, &vec![VCS2, VCS_32]), vec![VCS2]);
 }
 
-const HYPER_SCRIPTER: Str = "hyper-scripter";
-const SCRIPT: Str = "script";
-const GGSCRIPT: Str = "ggscript";
+const HYPER_SCRIPTER: Str = "dir/hyper-scripter";
+const SCRIPT: Str = "dir/script";
 
 #[test]
 fn test_fuzzy_6() {
-    let v = vec![SCRIPT, HYPER_SCRIPTER, GGSCRIPT];
-    assert_vec!(unwrap_fuzz(SCRIPT, &v), vec![HYPER_SCRIPTER, SCRIPT]);
+    let v = vec![SCRIPT, HYPER_SCRIPTER];
+    assert_eq!(unwrap_fuzz(SCRIPT, &v), vec![SCRIPT]);
 }

@@ -8,6 +8,7 @@ use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
 use crate::Either;
 use serde::Serialize;
+use std::path::PathBuf;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
@@ -274,6 +275,8 @@ pub enum History {
         with_name: bool,
         #[structopt(short, long, default_value = "0")]
         offset: u32,
+        #[structopt(short, long)]
+        path: Option<PathBuf>,
     },
     Neglect {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]

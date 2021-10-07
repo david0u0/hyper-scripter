@@ -12,7 +12,6 @@ description = "Database tool for hyper-scripter. Not indetended to be used direc
 log = "0.4.8"
 chrono = { version = "0.4.7", features = ["serde"] }
 sqlx = { version = "0.4.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate", "any" ] }
-tokio = { version = "0.2.22", features = ["full"] }
 
 [dependencies.openssl]
 version = "0.10.29"

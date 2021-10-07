@@ -528,10 +528,17 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     limit,
                     with_name,
                     offset,
+                    path,
                 },
         } => {
+            let path = match path {
+                Some(p) => Some(util::normalize_path(path::join_here_abs(p)?)),
+                None => None,
+            };
             let entry = query::do_script_query_strict(&script, &mut repo).await?;
-            let args_list = historian.last_args_list(entry.id, limit, offset).await?;
+            let args_list = historian
+                .last_args_list(entry.id, limit, offset, path.as_deref())
+                .await?;
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);
                 let args: Vec<String> = serde_json::from_str(&args)?;

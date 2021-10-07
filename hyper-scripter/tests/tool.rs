@@ -1,4 +1,7 @@
-use hyper_scripter::config::{Config, PromptLevel};
+use hyper_scripter::{
+    config::{Config, PromptLevel},
+    util::normalize_path,
+};
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -54,7 +57,9 @@ impl Error {
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub fn get_home() -> PathBuf {
-    canonicalize(HOME).unwrap()
+    let here = canonicalize(".").unwrap();
+    let p = here.join(HOME);
+    normalize_path(p)
 }
 pub fn load_conf() -> Config {
     Config::load(hyper_scripter::path::get_home()).unwrap()
@@ -67,7 +72,7 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
-    let home: PathBuf = HOME.into(); // 不要想用 get_home，因為 canonicalize 若路徑不存在就會炸裂
+    let home: PathBuf = get_home();
     match std::fs::remove_dir_all(&home) {
         Ok(_) => (),
         Err(e) => {
@@ -84,7 +89,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         Config::set_prompt_level(Some(PromptLevel::Never));
     });
 
-    run_with_home(HOME, "alias e edit --fast").unwrap(); // 這時資料夾還沒建好，如果用 run 又會因為 canonicalize 而出問題
+    run_with_home(HOME, "alias e edit --fast").unwrap();
 
     guard
 }

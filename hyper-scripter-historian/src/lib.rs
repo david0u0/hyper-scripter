@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use sqlx::{error::Error as DBError, Pool, Sqlite, SqlitePool};
 use std::num::NonZeroU64;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 mod db;
@@ -10,6 +10,7 @@ pub mod migration;
 pub use event::*;
 
 const ZERO: i64 = 0;
+const EMPTY_STR: &str = "";
 
 #[derive(Debug, Clone)]
 pub struct Historian {
@@ -21,8 +22,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
     sqlx::query!(
         "
         INSERT INTO events
-        (script_id, type, cmd, args, content, time, main_event_id)
-        VALUES(?, ?, ?, ?, ?, ?, ?)
+        (script_id, type, cmd, args, content, time, main_event_id, path)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
         ",
         event.script_id,
         event.ty,
@@ -30,7 +31,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.args,
         event.content,
         event.time,
-        event.main_event_id
+        event.main_event_id,
+        event.path
     )
     .execute(pool)
     .await?;
@@ -47,6 +49,7 @@ struct DBEvent<'a> {
     cmd: &'a str,
     time: NaiveDateTime,
     args: Option<&'a str>,
+    path: Option<&'a str>,
     content: Option<&'a str>,
     main_event_id: i64,
 }
@@ -60,10 +63,15 @@ impl<'a> DBEvent<'a> {
             main_event_id: ZERO,
             content: None,
             args: None,
+            path: None,
         }
     }
     fn args(mut self, value: &'a str) -> Self {
         self.args = Some(value);
+        self
+    }
+    fn path(mut self, value: &'a str) -> Self {
+        self.path = Some(value);
         self
     }
     fn content(mut self, value: &'a str) -> Self {
@@ -78,13 +86,19 @@ impl<'a> DBEvent<'a> {
 
 macro_rules! select_last_arg {
     ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
+        select_last_arg!($select, $script_id, $offset, $limit, "", )
+    }};
+    ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
         static EXEC_TY: &'static str = EventType::Exec.get_str();
         sqlx::query!(
             "
             WITH args AS (
                 SELECT args, max(time) as time FROM events
-                WHERE type = ? AND script_id = ? AND NOT ignored
-                GROUP BY args
+                WHERE type = ? AND script_id = ? AND NOT ignored "
+                +
+                $where
+                +
+                " GROUP BY args
                 ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
@@ -92,8 +106,9 @@ macro_rules! select_last_arg {
             ",
             EXEC_TY,
             $script_id,
+            $($var, )*
             $limit,
-            $offset
+            $offset,
         )
     }};
 }
@@ -174,7 +189,11 @@ impl Historian {
         let mut db_event = DBEvent::new(event.script_id, time, &ty, &cmd);
         let id = match &event.data {
             EventData::Write | EventData::Read => self.raw_record(db_event).await?,
-            EventData::Exec { content, args } => {
+            EventData::Exec {
+                content,
+                args,
+                path,
+            } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
                     "
@@ -194,7 +213,9 @@ impl Historian {
                     }
                 }
                 db_event.content = content;
-                self.raw_record(db_event.args(args)).await?
+                let path = path.to_string_lossy();
+                self.raw_record(db_event.path(path.as_ref()).args(args))
+                    .await?
             }
             EventData::ExecDone {
                 code,
@@ -240,12 +261,24 @@ impl Historian {
         id: i64,
         limit: u32,
         offset: u32,
+        path: Option<&Path>,
     ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
         let limit = limit as i64;
         let offset = offset as i64;
-        let res = select_last_arg!("args", id, offset, limit)
-            .fetch_all(&*self.pool.read().unwrap())
-            .await?;
+        let no_path = path.is_none();
+        let path = path.map(|p| p.to_string_lossy());
+        let path = path.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
+        let res = select_last_arg!(
+            "args",
+            id,
+            offset,
+            limit,
+            "AND (? OR path = ?)",
+            no_path,
+            path
+        )
+        .fetch_all(&*self.pool.read().unwrap())
+        .await?;
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
     }
 

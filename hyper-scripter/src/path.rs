@@ -64,7 +64,7 @@ fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<Pat
     }
     let base = base.as_ref();
     // NOTE: 若 base 不存在，`canonicalize` 會造成問題
-    // 但前幾行已先處理掉絕對路徑，故出問題機會很小
+    // 但前幾行已先處理掉絕對路徑，故出問題機會很小，而且這種問題本來就沒救了
     let base_res = canonicalize(&base);
     let base = handle_fs_res(&[base], base_res)?;
     Ok(base.join(path))

@@ -161,8 +161,8 @@ pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
     pub neglect_time: Option<ScriptTime>,
-    /// (content, args)
-    pub exec_time: Option<ScriptTime<(String, String)>>,
+    /// (content, args, path)
+    pub exec_time: Option<ScriptTime<(String, String, PathBuf)>>,
     /// (return code, main event id)
     pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
     #[deref]
@@ -230,10 +230,10 @@ impl ScriptInfo {
         self.read_time = now.clone();
         self.write_time = now;
     }
-    pub fn exec(&mut self, content: String, args: &[String]) {
+    pub fn exec(&mut self, content: String, args: &[String], path: PathBuf) {
         log::trace!("{:?} 執行內容為 {}", self, content);
         let args_ser = serde_json::to_string(args).unwrap();
-        self.exec_time = Some(ScriptTime::now((content, args_ser)));
+        self.exec_time = Some(ScriptTime::now((content, args_ser, path)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
     }
     pub fn exec_done(&mut self, code: i32, main_event_id: i64) {

@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use std::path::Path;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EventType {
@@ -10,8 +11,15 @@ pub enum EventType {
 
 #[derive(Debug)]
 pub enum EventData<'a> {
-    Exec { content: &'a str, args: &'a str },
-    ExecDone { code: i32, main_event_id: i64 },
+    Exec {
+        content: &'a str,
+        args: &'a str,
+        path: &'a Path,
+    },
+    ExecDone {
+        code: i32,
+        main_event_id: i64,
+    },
     Read,
     Write,
 }

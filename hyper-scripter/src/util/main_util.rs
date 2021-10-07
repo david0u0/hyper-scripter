@@ -181,9 +181,10 @@ pub async fn run_n_times(
         }
     }
 
+    let here = super::normalize_path(path::join_here_abs(".")?);
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    let run_id = entry.update(|info| info.exec(content, &args)).await?;
+    let run_id = entry.update(|info| info.exec(content, &args, here)).await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");

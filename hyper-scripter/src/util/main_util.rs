@@ -165,11 +165,13 @@ pub async fn run_n_times(
     historian: Historian,
     res: &mut Vec<Error>,
     use_last_args: bool,
+    path: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
 
     if use_last_args {
-        match historian.last_args(entry.id).await? {
+        let path = super::option_map_res(path, |p| path::normalize_path(p))?;
+        match historian.last_args(entry.id, path.as_deref()).await? {
             None => return Err(Error::NoPreviousArgs),
             Some(arg_str) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
@@ -181,9 +183,7 @@ pub async fn run_n_times(
         }
     }
 
-    let here = path::join_here_abs(".")
-        .ok()
-        .map(|p| super::normalize_path(p));
+    let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
     let run_id = entry.update(|info| info.exec(content, &args, here)).await?;

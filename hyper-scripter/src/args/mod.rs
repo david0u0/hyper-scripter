@@ -193,7 +193,7 @@ pub enum Subs {
         repeat: u64,
         #[structopt(long, short, help = "Use arguments from last run")]
         last_args: bool,
-        #[structopt(long, short)]
+        #[structopt(long, short, requires = "last-args")]
         path: Option<PathBuf>,
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,

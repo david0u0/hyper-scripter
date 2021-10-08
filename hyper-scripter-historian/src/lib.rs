@@ -240,16 +240,22 @@ impl Historian {
         Ok(id)
     }
 
-    pub async fn last_args(&self, id: i64) -> Result<Option<String>, DBError> {
+    pub async fn last_args(&self, id: i64, path: Option<&Path>) -> Result<Option<String>, DBError> {
         let ty = EventType::Exec.get_str();
+        let no_path = path.is_none();
+        let path = path.map(|p| p.to_string_lossy());
+        let path = path.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
         let res = sqlx::query!(
             "
             SELECT args FROM events
             WHERE type = ? AND script_id = ? AND NOT ignored
+            AND (? OR path = ?)
             ORDER BY time DESC LIMIT 1
             ",
             ty,
-            id
+            id,
+            no_path,
+            path
         )
         .fetch_optional(&*self.pool.read().unwrap())
         .await?;

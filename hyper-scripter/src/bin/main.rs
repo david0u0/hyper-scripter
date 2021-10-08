@@ -245,6 +245,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 historian,
                 &mut ret.errs,
                 last_args,
+                path,
             )
             .await?;
         }
@@ -532,10 +533,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     path,
                 },
         } => {
-            let path = match path {
-                Some(p) => Some(util::normalize_path(path::join_here_abs(p)?)),
-                None => None,
-            };
+            let path = util::option_map_res(path, |p| path::normalize_path(p))?;
             let entry = query::do_script_query_strict(&script, &mut repo).await?;
             let args_list = historian
                 .last_args_list(entry.id, limit, offset, path.as_deref())

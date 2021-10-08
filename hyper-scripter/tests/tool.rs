@@ -1,6 +1,6 @@
 use hyper_scripter::{
     config::{Config, PromptLevel},
-    util::normalize_path,
+    path::normalize_path,
 };
 use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
@@ -57,9 +57,7 @@ impl Error {
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub fn get_home() -> PathBuf {
-    let here = canonicalize(".").unwrap();
-    let p = here.join(HOME);
-    normalize_path(p)
+    normalize_path(HOME).unwrap()
 }
 pub fn load_conf() -> Config {
     Config::load(hyper_scripter::path::get_home()).unwrap()

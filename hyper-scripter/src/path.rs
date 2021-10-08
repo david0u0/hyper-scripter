@@ -5,7 +5,7 @@ use crate::script_type::ScriptType;
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use std::fs::{canonicalize, create_dir, read_dir};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
 pub const HS_PRE_RUN: &str = ".hs_prerun.sh";
@@ -68,6 +68,34 @@ fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<Pat
     let base_res = canonicalize(&base);
     let base = handle_fs_res(&[base], base_res)?;
     Ok(base.join(path))
+}
+
+pub fn normalize_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+    let path = crate::path::join_here_abs(path)?;
+    let mut components = path.components().peekable();
+    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
+        components.next();
+        PathBuf::from(c.as_os_str())
+    } else {
+        PathBuf::new()
+    };
+
+    for component in components {
+        match component {
+            Component::Prefix(..) => unreachable!(),
+            Component::RootDir => {
+                ret.push(component.as_os_str());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                ret.pop();
+            }
+            Component::Normal(c) => {
+                ret.push(c);
+            }
+        }
+    }
+    Ok(ret)
 }
 
 fn compute_home_path<T: AsRef<Path>>(p: T) -> Result<PathBuf> {

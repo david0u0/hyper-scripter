@@ -434,12 +434,13 @@ impl Historian {
                     SELECT id FROM events
                     WHERE script_id = ?
                       AND args = e.args
+                      AND path = e.path
                     ORDER BY time DESC
                     LIMIT 1
                   )
                 FROM
                   (
-                    SELECT distinct args
+                    SELECT distinct args, path
                     FROM events
                     WHERE script_id = ?
                       AND NOT ignored

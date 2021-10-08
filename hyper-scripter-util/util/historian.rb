@@ -37,6 +37,7 @@ class Historian < Selector
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
+    @path = show_obj['path']
     script_query = show_obj['script']
     @script_name = process_script_query(script_query)
     if @script_name.nil?
@@ -117,7 +118,8 @@ class Historian < Selector
   end
 
   def get_options
-    history = HS_ENV.do_hs("history show =#{@script_name}! --limit #{@limit} --offset #{@offset}", false)
+    path_str = @path.nil? ? '' : "--path #{@path}"
+    history = HS_ENV.do_hs("history show =#{@script_name}! #{path_str} --limit #{@limit} --offset #{@offset}", false)
     opts = history.lines.each_with_index.map do |s, i|
       s = s.strip
       if s == '' # ignore empty args

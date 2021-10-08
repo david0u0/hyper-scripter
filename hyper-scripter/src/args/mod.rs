@@ -191,8 +191,10 @@ pub enum Subs {
         dummy: bool,
         #[structopt(long, short, default_value = "1")]
         repeat: u64,
-        #[structopt(long, short, help = "Use arguments from previous run")]
-        previous_args: bool,
+        #[structopt(long, short, help = "Use arguments from last run")]
+        last_args: bool,
+        #[structopt(long, short)]
+        path: Option<PathBuf>,
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
         #[structopt(help = "Command line args to pass to the script")]
@@ -496,8 +498,9 @@ mod test {
         match args.subcmd {
             Some(Subs::Run {
                 dummy: true,
-                previous_args: false,
+                last_args: false,
                 repeat: 42,
+                path: None,
                 script_query,
                 args,
             }) => {

@@ -213,7 +213,7 @@ impl Historian {
                     }
                 }
                 db_event.content = content;
-                let path = path.to_string_lossy();
+                let path = path.map(|p| p.to_string_lossy()).unwrap_or_default();
                 self.raw_record(db_event.path(path.as_ref()).args(args))
                     .await?
             }

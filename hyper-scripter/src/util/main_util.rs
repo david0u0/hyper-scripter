@@ -164,11 +164,11 @@ pub async fn run_n_times(
     mut args: Vec<String>,
     historian: Historian,
     res: &mut Vec<Error>,
-    use_previous_args: bool,
+    use_last_args: bool,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
 
-    if use_previous_args {
+    if use_last_args {
         match historian.last_args(entry.id).await? {
             None => return Err(Error::NoPreviousArgs),
             Some(arg_str) => {
@@ -181,7 +181,9 @@ pub async fn run_n_times(
         }
     }
 
-    let here = super::normalize_path(path::join_here_abs(".")?);
+    let here = path::join_here_abs(".")
+        .ok()
+        .map(|p| super::normalize_path(p));
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
     let run_id = entry.update(|info| info.exec(content, &args, here)).await?;

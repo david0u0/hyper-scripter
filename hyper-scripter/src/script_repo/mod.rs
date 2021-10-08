@@ -206,7 +206,7 @@ impl DBEnv {
                         data: EventData::Exec {
                             content,
                             args,
-                            path,
+                            path: path.as_deref(),
                         },
                         time: **time,
                     })

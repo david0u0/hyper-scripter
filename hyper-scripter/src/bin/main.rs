@@ -232,8 +232,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             script_query,
             dummy,
             args,
-            previous_args,
+            last_args,
             repeat,
+            path,
         } => {
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             main_util::run_n_times(
@@ -243,7 +244,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 args,
                 historian,
                 &mut ret.errs,
-                previous_args,
+                last_args,
             )
             .await?;
         }

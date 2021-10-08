@@ -60,7 +60,6 @@ complete -c hs -n "__fish_use_subcommand" -l timeless -d 'Show scripts of all ti
 complete -c hs -n "__fish_use_subcommand" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_use_subcommand" -s V -l version -d 'Prints version information'
 complete -c hs -n "__fish_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
-complete -c hs -n "__fish_use_subcommand" -f -a "env-help" -d 'Print the help message of env variables'
 complete -c hs -n "__fish_use_subcommand" -f -a "edit" -d 'Edit hyper script'
 complete -c hs -n "__fish_use_subcommand" -f -a "alias" -d 'Manage alias'
 complete -c hs -n "__fish_use_subcommand" -f -a "run" -d 'Run the script'
@@ -81,14 +80,6 @@ complete -c hs -n "__fish_seen_subcommand_from help" -l no-trace -d 'Do not reco
 complete -c hs -n "__fish_seen_subcommand_from help" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from help" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from help" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
-complete -c hs -n "__fish_seen_subcommand_from env-help" -l recent -d 'Show scripts within recent days.'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -s h -l help -d 'Prints help information'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -s V -l version -d 'Prints version information'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -l no-trace -d 'Do not record history'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -s A -l archaeology -d 'Show scripts NOT within recent days'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
-complete -c hs -n "__fish_seen_subcommand_from env-help" -l timeless -d 'Show scripts of all time.'
 
 complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`'
 complete -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags
@@ -114,7 +105,8 @@ complete -c hs -n "__fish_seen_subcommand_from run" -s r -l repeat
 complete -c hs -n "__fish_seen_subcommand_from run" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from run" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from run" -l dummy -d 'Add a dummy run history instead of actually running it'
-complete -c hs -n "__fish_seen_subcommand_from run" -s p -l previous-args
+complete -c hs -n "__fish_seen_subcommand_from run" -s l -l last-args
+complete -c hs -n "__fish_seen_subcommand_from run" -s p -l path
 complete -c hs -n "__fish_seen_subcommand_from run" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_seen_subcommand_from run" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from run" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
@@ -232,6 +224,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm-id" -s a -l all -d 'Shorthand 
 complete -c hs -n "__fish_seen_subcommand_from rm-id" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_seen_subcommand_from show" -s l -l limit
 complete -c hs -n "__fish_seen_subcommand_from show" -s o -l offset
+complete -c hs -n "__fish_seen_subcommand_from show" -s p -l path
 complete -c hs -n "__fish_seen_subcommand_from show" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from show" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from show" -l with-name

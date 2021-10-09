@@ -54,7 +54,7 @@ fn get_sys_home() -> Result<PathBuf> {
     Ok(".test_hyper_scripter".into())
 }
 
-pub fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     join_path_abs(".", path)
 }
 fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
@@ -71,7 +71,7 @@ fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<Pat
 }
 
 pub fn normalize_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
-    let path = crate::path::join_here_abs(path)?;
+    let path = join_here_abs(path)?;
     let mut components = path.components().peekable();
     let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
         components.next();

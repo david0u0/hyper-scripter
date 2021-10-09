@@ -2,6 +2,7 @@
 #[path = "tool.rs"]
 mod tool;
 
+use std::path::PathBuf;
 use tool::*;
 
 fn assert_list(actual: &str, expected: &[&str]) {
@@ -208,7 +209,49 @@ fn test_neglect_archaeology() {
     neg1.archaeology().can_find_by_name().unwrap_err();
 
     neg2.can_find_by_name().unwrap_err();
-    run!(dir: "aa", "={}!", neg2.get_name()).unwrap();
+    run!("={}!", neg2.get_name()).unwrap();
     neg2.can_find_by_name().expect("執行事件沒有解除忽視狀態");
     neg2.archaeology().can_find_by_name().unwrap_err();
+}
+
+#[test]
+fn test_event_path() {
+    let _g = setup();
+    fn init_dir(s: &str) -> PathBuf {
+        let tmp_dir = std::env::temp_dir();
+        let p = tmp_dir.join(s);
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+    let dir_a = init_dir("a");
+    let dir_b = init_dir("b");
+    let dir_c = init_dir("c");
+
+    run!("e . | # do nothing").unwrap();
+    run!(dir: dir_a.clone(), "- a").unwrap();
+    run!(dir: dir_b.clone(), "- b").unwrap();
+    run!(dir: dir_c.clone(), "- c").unwrap();
+    run!(dir: dir_a.clone(), "- c").unwrap();
+
+    let do_test = move || {
+        let recorded = run!("history show").unwrap();
+        assert_list(&recorded, &["c", "b", "a"]);
+
+        let recorded = run!("history show --path {}", dir_a.to_string_lossy()).unwrap();
+        assert_list(&recorded, &["c", "a"]);
+
+        let recorded = run!("history show --path {}", dir_c.to_string_lossy()).unwrap();
+        assert_list(&recorded, &["c"]);
+
+        let recorded = run!(
+            "history show --path {}/test/../../b",
+            dir_b.to_string_lossy()
+        )
+        .unwrap();
+        assert_list(&recorded, &["b"]);
+    };
+
+    do_test();
+    run!("history tidy -").unwrap();
+    do_test();
 }

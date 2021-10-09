@@ -2,7 +2,6 @@ use hyper_scripter::{
     config::{Config, PromptLevel},
     path::normalize_path,
 };
-use std::fs::canonicalize;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
@@ -40,11 +39,7 @@ macro_rules! run {
 }
 
 pub fn get_exe_abs() -> String {
-    canonicalize(EXE)
-        .unwrap()
-        .to_string_lossy()
-        .as_ref()
-        .to_owned()
+    normalize_path(EXE).unwrap().to_string_lossy().to_string()
 }
 
 #[derive(Debug)]
@@ -147,7 +142,11 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     full_args.extend(&args_vec);
 
     log::info!("開始執行 {:?}", args_vec);
-    let mut cmd = Command::new(EXE);
+    let mut cmd = Command::new(normalize_path(EXE).unwrap());
+    if let Some(dir) = env.dir {
+        log::info!("使用路徑 {}", dir.to_string_lossy());
+        cmd.current_dir(dir);
+    }
     let mut child = cmd
         .args(&full_args)
         .stdout(Stdio::piped())

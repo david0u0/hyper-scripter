@@ -105,8 +105,8 @@ complete -c hs -n "__fish_seen_subcommand_from run" -s r -l repeat
 complete -c hs -n "__fish_seen_subcommand_from run" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from run" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from run" -l dummy -d 'Add a dummy run history instead of actually running it'
-complete -c hs -n "__fish_seen_subcommand_from run" -s l -l last-args
-complete -c hs -n "__fish_seen_subcommand_from run" -s p -l path
+complete -c hs -n "__fish_seen_subcommand_from run" -s p -l previous-args
+complete -c hs -n "__fish_seen_subcommand_from run" -s d -l dir
 complete -c hs -n "__fish_seen_subcommand_from run" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_seen_subcommand_from run" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from run" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
@@ -224,7 +224,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm-id" -s a -l all -d 'Shorthand 
 complete -c hs -n "__fish_seen_subcommand_from rm-id" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_seen_subcommand_from show" -s l -l limit
 complete -c hs -n "__fish_seen_subcommand_from show" -s o -l offset
-complete -c hs -n "__fish_seen_subcommand_from show" -s p -l path
+complete -c hs -n "__fish_seen_subcommand_from show" -s d -l dir
 complete -c hs -n "__fish_seen_subcommand_from show" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from show" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from show" -l with-name

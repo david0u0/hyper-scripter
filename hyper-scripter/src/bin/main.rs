@@ -232,9 +232,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             script_query,
             dummy,
             args,
-            last_args,
+            previous_args,
             repeat,
-            path,
+            dir,
         } => {
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             main_util::run_n_times(
@@ -244,8 +244,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 args,
                 historian,
                 &mut ret.errs,
-                last_args,
-                path,
+                previous_args,
+                dir,
             )
             .await?;
         }
@@ -530,13 +530,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     limit,
                     with_name,
                     offset,
-                    path,
+                    dir,
                 },
         } => {
-            let path = util::option_map_res(path, |p| path::normalize_path(p))?;
+            let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let entry = query::do_script_query_strict(&script, &mut repo).await?;
             let args_list = historian
-                .last_args_list(entry.id, limit, offset, path.as_deref())
+                .previous_args_list(entry.id, limit, offset, dir.as_deref())
                 .await?;
             for args in args_list {
                 log::debug!("嘗試打印參數 {}", args);

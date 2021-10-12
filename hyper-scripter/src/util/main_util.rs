@@ -164,14 +164,14 @@ pub async fn run_n_times(
     mut args: Vec<String>,
     historian: Historian,
     res: &mut Vec<Error>,
-    use_last_args: bool,
-    path: Option<PathBuf>,
+    use_previous_args: bool,
+    dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
 
-    if use_last_args {
-        let path = super::option_map_res(path, |p| path::normalize_path(p))?;
-        match historian.last_args(entry.id, path.as_deref()).await? {
+    if use_previous_args {
+        let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
+        match historian.previous_args(entry.id, dir.as_deref()).await? {
             None => return Err(Error::NoPreviousArgs),
             Some(arg_str) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);

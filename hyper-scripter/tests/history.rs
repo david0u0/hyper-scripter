@@ -85,9 +85,9 @@ fn test_history_args_rm() {
     let recorded = run!("history show receiver").unwrap();
     assert_list(&recorded, &["second", "third"]);
 
-    assert_eq!(run!("run -l").unwrap(), "second", "沒有刪成功？");
+    assert_eq!(run!("run -p").unwrap(), "second", "沒有刪成功？");
     assert_eq!(
-        run!("run -l - trailing").unwrap(),
+        run!("run -p - trailing").unwrap(),
         "second trailing",
         "沒有把參數往後接？"
     );
@@ -134,33 +134,33 @@ fn test_history_args_rm_last() {
 
     run!("history rm A 2").unwrap(); // Ax
 
-    assert_eq!(run!("run -l -").unwrap(), "Bzz");
+    assert_eq!(run!("run -p -").unwrap(), "Bzz");
     run!("history rm - 1").unwrap(); // Bzz
     run!("history rm - 1").unwrap(); // Bz
-    assert_eq!(run!("run -l").unwrap(), "Az");
+    assert_eq!(run!("run -p").unwrap(), "Az");
     run!("history rm - 1").unwrap(); // Az
-    assert_eq!(run!("run -l -").unwrap(), "By");
+    assert_eq!(run!("run -p -").unwrap(), "By");
 
     // Make some noise HAHA
     {
         maybe_dummy("B", "w");
         maybe_dummy("A", "w");
 
-        assert_eq!(run!("run -l -").unwrap(), "Aw");
+        assert_eq!(run!("run -p -").unwrap(), "Aw");
         run!("history rm B 1").unwrap(); // Bw
-        assert_eq!(run!("run -l -").unwrap(), "Aw");
+        assert_eq!(run!("run -p -").unwrap(), "Aw");
         run!("history rm A 1").unwrap(); // Aw
     }
 
-    assert_eq!(run!("run -l -").unwrap(), "By"); // Ax already removed
+    assert_eq!(run!("run -p -").unwrap(), "By"); // Ax already removed
     run!("history rm - 1").unwrap(); // By
-    assert_eq!(run!("run -l -").unwrap(), "Ay");
+    assert_eq!(run!("run -p -").unwrap(), "Ay");
     run!("history rm - 1").unwrap(); // Ay
-    run!("run -l A").expect_err("previous args exist !?"); // fail, won't affect ordering
+    run!("run -p A").expect_err("previous args exist !?"); // fail, won't affect ordering
 
-    assert_eq!(run!("run -l B").unwrap(), "Bx");
+    assert_eq!(run!("run -p B").unwrap(), "Bx");
     run!("history rm - 1").unwrap(); // Bx
-    run!("run -l B").expect_err("previous args exist !?");
+    run!("run -p B").expect_err("previous args exist !?");
 
     assert_eq!(run!("run -").unwrap(), "A"); // read time
     assert_eq!(run!("run ^^").unwrap(), "C"); // create time
@@ -237,14 +237,14 @@ fn test_event_path() {
         let recorded = run!("history show").unwrap();
         assert_list(&recorded, &["c", "b", "a"]);
 
-        let recorded = run!("history show --path {}", dir_a.to_string_lossy()).unwrap();
+        let recorded = run!("history show --dir {}", dir_a.to_string_lossy()).unwrap();
         assert_list(&recorded, &["c", "a"]);
 
-        let recorded = run!("history show --path {}", dir_c.to_string_lossy()).unwrap();
+        let recorded = run!("history show --dir {}", dir_c.to_string_lossy()).unwrap();
         assert_list(&recorded, &["c"]);
 
         let recorded = run!(
-            "history show --path {}/test/../../b",
+            "history show --dir {}/test/../../b",
             dir_b.to_string_lossy()
         )
         .unwrap();

@@ -22,7 +22,7 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
     sqlx::query!(
         "
         INSERT INTO events
-        (script_id, type, cmd, args, content, time, main_event_id, path)
+        (script_id, type, cmd, args, content, time, main_event_id, dir)
         VALUES(?, ?, ?, ?, ?, ?, ?, ?)
         ",
         event.script_id,
@@ -32,7 +32,7 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.content,
         event.time,
         event.main_event_id,
-        event.path
+        event.dir
     )
     .execute(pool)
     .await?;
@@ -49,7 +49,7 @@ struct DBEvent<'a> {
     cmd: &'a str,
     time: NaiveDateTime,
     args: Option<&'a str>,
-    path: Option<&'a str>,
+    dir: Option<&'a str>,
     content: Option<&'a str>,
     main_event_id: i64,
 }
@@ -63,15 +63,15 @@ impl<'a> DBEvent<'a> {
             main_event_id: ZERO,
             content: None,
             args: None,
-            path: None,
+            dir: None,
         }
     }
     fn args(mut self, value: &'a str) -> Self {
         self.args = Some(value);
         self
     }
-    fn path(mut self, value: &'a str) -> Self {
-        self.path = Some(value);
+    fn dir(mut self, value: &'a str) -> Self {
+        self.dir = Some(value);
         self
     }
     fn content(mut self, value: &'a str) -> Self {
@@ -189,11 +189,7 @@ impl Historian {
         let mut db_event = DBEvent::new(event.script_id, time, &ty, &cmd);
         let id = match &event.data {
             EventData::Write | EventData::Read => self.raw_record(db_event).await?,
-            EventData::Exec {
-                content,
-                args,
-                path,
-            } => {
+            EventData::Exec { content, args, dir } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
                     "
@@ -213,8 +209,8 @@ impl Historian {
                     }
                 }
                 db_event.content = content;
-                let path = path.map(|p| p.to_string_lossy()).unwrap_or_default();
-                self.raw_record(db_event.path(path.as_ref()).args(args))
+                let dir = dir.map(|p| p.to_string_lossy()).unwrap_or_default();
+                self.raw_record(db_event.dir(dir.as_ref()).args(args))
                     .await?
             }
             EventData::ExecDone {
@@ -240,51 +236,47 @@ impl Historian {
         Ok(id)
     }
 
-    pub async fn last_args(&self, id: i64, path: Option<&Path>) -> Result<Option<String>, DBError> {
+    pub async fn previous_args(
+        &self,
+        id: i64,
+        dir: Option<&Path>,
+    ) -> Result<Option<String>, DBError> {
         let ty = EventType::Exec.get_str();
-        let no_path = path.is_none();
-        let path = path.map(|p| p.to_string_lossy());
-        let path = path.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
+        let no_dir = dir.is_none();
+        let dir = dir.map(|p| p.to_string_lossy());
+        let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
         let res = sqlx::query!(
             "
             SELECT args FROM events
             WHERE type = ? AND script_id = ? AND NOT ignored
-            AND (? OR path = ?)
+            AND (? OR dir = ?)
             ORDER BY time DESC LIMIT 1
             ",
             ty,
             id,
-            no_path,
-            path
+            no_dir,
+            dir
         )
         .fetch_optional(&*self.pool.read().unwrap())
         .await?;
         Ok(res.map(|res| res.args.unwrap_or_default()))
     }
 
-    pub async fn last_args_list(
+    pub async fn previous_args_list(
         &self,
         id: i64,
         limit: u32,
         offset: u32,
-        path: Option<&Path>,
+        dir: Option<&Path>,
     ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
         let limit = limit as i64;
         let offset = offset as i64;
-        let no_path = path.is_none();
-        let path = path.map(|p| p.to_string_lossy());
-        let path = path.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
-        let res = select_last_arg!(
-            "args",
-            id,
-            offset,
-            limit,
-            "AND (? OR path = ?)",
-            no_path,
-            path
-        )
-        .fetch_all(&*self.pool.read().unwrap())
-        .await?;
+        let no_dir = dir.is_none();
+        let dir = dir.map(|p| p.to_string_lossy());
+        let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
+        let res = select_last_arg!("args", id, offset, limit, "AND (? OR dir = ?)", no_dir, dir)
+            .fetch_all(&*self.pool.read().unwrap())
+            .await?;
         Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
     }
 
@@ -434,13 +426,13 @@ impl Historian {
                     SELECT id FROM events
                     WHERE script_id = ?
                       AND args = e.args
-                      AND path = e.path
+                      AND dir = e.dir
                     ORDER BY time DESC
                     LIMIT 1
                   )
                 FROM
                   (
-                    SELECT distinct args, path
+                    SELECT distinct args, dir
                     FROM events
                     WHERE script_id = ?
                       AND NOT ignored

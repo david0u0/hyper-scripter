@@ -197,7 +197,7 @@ impl DBEnv {
                 .await?;
         }
         if let Some(time) = info.exec_time.as_ref() {
-            if let Some((content, args, path)) = time.data() {
+            if let Some((content, args, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
                 last_event_id = self
                     .historian
@@ -206,7 +206,7 @@ impl DBEnv {
                         data: EventData::Exec {
                             content,
                             args,
-                            path: path.as_deref(),
+                            dir: dir.as_deref(),
                         },
                         time: **time,
                     })

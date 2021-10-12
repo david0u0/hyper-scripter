@@ -115,6 +115,7 @@ impl Default for Config {
         }
         Config {
             last_modified: None,
+            recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
             editor: vec!["vim".to_string()],
             prompt_level: PromptLevel::Smart,
             tag_filters: vec![
@@ -136,8 +137,7 @@ impl Default for Config {
             ],
             main_tag_filter: "+all".parse().unwrap(),
             categories: ScriptTypeConfig::default_script_types(),
-            alias: vec![
-                // FIXME: 一旦陣列實作了 intoiterator 就用陣列
+            alias: std::array::IntoIter::new([
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls", "--grouping", "none"]),
@@ -145,15 +145,12 @@ impl Default for Config {
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "removed", "*"]),
                 gen_alias("tree", &["ls", "--grouping", "tree"]),
                 gen_alias("t", &["tags"]),
-                gen_alias("p", &["run", "-p"]),
+                gen_alias("p", &["run", "--previous-args"]),
                 gen_alias("pc", &["=util/historian!", "c", "--"]),
                 gen_alias("h", &["=util/historian!"]),
-            ]
-            .into_iter()
+            ])
             .collect(),
-            recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
-            // FIXME: 一旦陣列實作了 intoiterator 就用陣列
-            env: vec![
+            env: std::array::IntoIter::new([
                 ("NAME", "{{name}}"),
                 ("HS_HOME", "{{hs_home}}"),
                 ("HS_CMD", "{{hs_cmd}}"),
@@ -168,8 +165,7 @@ impl Default for Config {
                 ),
                 ("HS_EXE", "{{hs_exe}}"),
                 ("HS_SOURCE", "{{hs_home}}/.hs_source"),
-            ]
-            .into_iter()
+            ])
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),
         }

@@ -8,6 +8,7 @@ use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
 use crate::Either;
 use serde::Serialize;
+use std::path::PathBuf;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
     DisableHelpSubcommand, DisableVersion, TrailingVarArg,
@@ -190,8 +191,10 @@ pub enum Subs {
         dummy: bool,
         #[structopt(long, short, default_value = "1")]
         repeat: u64,
-        #[structopt(long, short, help = "Use arguments from previous run")]
+        #[structopt(long, short, help = "Use arguments from last run")]
         previous_args: bool,
+        #[structopt(long, short, requires = "previous-args")]
+        dir: Option<PathBuf>,
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
         #[structopt(help = "Command line args to pass to the script")]
@@ -274,6 +277,8 @@ pub enum History {
         with_name: bool,
         #[structopt(short, long, default_value = "0")]
         offset: u32,
+        #[structopt(short, long)]
+        dir: Option<PathBuf>,
     },
     Neglect {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
@@ -495,6 +500,7 @@ mod test {
                 dummy: true,
                 previous_args: false,
                 repeat: 42,
+                dir: None,
                 script_query,
                 args,
             }) => {

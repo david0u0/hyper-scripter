@@ -1,27 +1,46 @@
-use hyper_scripter::config::{Config, PromptLevel};
-use std::fs::canonicalize;
+use hyper_scripter::{
+    config::{Config, PromptLevel},
+    path::normalize_path,
+};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Mutex, MutexGuard, Once};
 
+const HOME_RELATIVE: &str = "./.hyper_scripter";
 lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
+    static ref HOME: PathBuf = normalize_path(HOME_RELATIVE).unwrap();
 }
+
 #[cfg(not(debug_assertions))]
 const EXE: &'static str = "../target/release/hs";
 #[cfg(debug_assertions)]
 const EXE: &str = "../target/debug/hs";
 
-pub fn get_exe_abs() -> String {
-    canonicalize(EXE)
-        .unwrap()
-        .to_string_lossy()
-        .as_ref()
-        .to_owned()
+#[derive(Debug, Default)]
+pub struct RunEnv {
+    pub home: Option<PathBuf>,
+    pub dir: Option<PathBuf>,
 }
 
-const HOME: &str = "./.hyper_scripter";
+#[macro_export]
+macro_rules! run {
+    ($($key:ident: $val:expr,)* $lit:literal) => ({
+        run!($($key: $val,)* $lit,)
+    });
+    ($($key:ident: $val:expr,)* $lit:literal, $($arg:tt)*) => ({
+        let env = RunEnv{
+            $($key: Some($val.into()),)*
+            ..Default::default()
+        };
+        run_with_env(env, format!($lit, $($arg)*))
+    });
+}
+
+pub fn get_exe_abs() -> String {
+    normalize_path(EXE).unwrap().to_string_lossy().to_string()
+}
 
 #[derive(Debug)]
 enum ErrorInner {
@@ -54,20 +73,20 @@ impl Error {
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub fn get_home() -> PathBuf {
-    canonicalize(HOME).unwrap()
+    HOME.clone()
 }
 pub fn load_conf() -> Config {
     Config::load(hyper_scripter::path::get_home()).unwrap()
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();
-    run("rm --purge * -f all").unwrap();
+    run!("rm --purge * -f all").unwrap();
     g
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
-    let home: PathBuf = HOME.into(); // 不要想用 get_home，因為 canonicalize 若路徑不存在就會炸裂
+    let home: PathBuf = get_home();
     match std::fs::remove_dir_all(&home) {
         Ok(_) => (),
         Err(e) => {
@@ -84,7 +103,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         Config::set_prompt_level(Some(PromptLevel::Never));
     });
 
-    run_with_home(HOME, "alias e edit --fast").unwrap(); // 這時資料夾還沒建好，如果用 run 又會因為 canonicalize 而出問題
+    run!("alias e edit --fast").unwrap();
 
     guard
 }
@@ -106,12 +125,11 @@ pub fn check_exist(p: &[&str]) -> bool {
     let file = join_path(p);
     file.exists()
 }
-pub fn run<T: ToString>(args: T) -> Result<String> {
-    let home = get_home();
-    run_with_home(&*home.to_string_lossy(), args)
-}
-pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String> {
-    let mut full_args = vec!["-H", home, "--prompt-level", "never"];
+
+pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
+    let home = env.home.unwrap_or_else(|| get_home());
+    let home = home.to_string_lossy();
+    let mut full_args = vec!["-H", home.as_ref(), "--prompt-level", "never"];
     let args = args.to_string();
     let args_vec: Vec<&str> = if args.find('|').is_some() {
         let (first, second) = args.split_once("|").unwrap();
@@ -124,7 +142,11 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String> {
     full_args.extend(&args_vec);
 
     log::info!("開始執行 {:?}", args_vec);
-    let mut cmd = Command::new(EXE);
+    let mut cmd = Command::new(normalize_path(EXE).unwrap());
+    if let Some(dir) = env.dir {
+        log::info!("使用路徑 {}", dir.to_string_lossy());
+        cmd.current_dir(dir);
+    }
     let mut child = cmd
         .args(&full_args)
         .stdout(Stdio::piped())
@@ -153,11 +175,11 @@ pub fn run_with_home<T: ToString>(home: &str, args: T) -> Result<String> {
 }
 
 fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
-    let ls_res = run(format!(
+    let ls_res = run!(
         "ls {} --grouping none --plain --name {}",
         filter.map(|f| format!("-f {}", f)).unwrap_or_default(),
         query.unwrap_or_default()
-    ))
+    )
     .unwrap();
     ls_res
         .split(' ')
@@ -191,7 +213,7 @@ impl ScriptTest {
     }
     pub fn new(name: &str, tags: Option<&str>) -> Self {
         let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
-        run(format!("e {} ={} | echo $HS_TAGS", tags_str, name)).unwrap();
+        run!("e {} ={} | echo $HS_TAGS", tags_str, name).unwrap();
         ScriptTest {
             name: name.to_owned(),
         }
@@ -199,7 +221,7 @@ impl ScriptTest {
     pub fn assert_not_exist(&self, args: Option<&str>, msg: Option<&str>) {
         let s = format!("cat {} ={}", args.unwrap_or_default(), self.name);
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
-        run(&s).expect_err(&format!("{} 找到東西{}", s, msg));
+        run!("{}", s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
     pub fn archaeology<'a>(&'a self) -> ScriptTestWithFilter<'a> {
         ScriptTestWithFilter {
@@ -225,7 +247,7 @@ impl ScriptTest {
         let s = format!("{} ={}", args.unwrap_or_default(), self.name);
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
 
-        let res = run(&s).expect(&format!("執行 {} 失敗{}", s, msg));
+        let res = run!("{}", s).expect(&format!("執行 {} 失敗{}", s, msg));
         let mut actual_tags: Vec<_> = res.split(' ').filter(|s| !s.is_empty()).collect();
         actual_tags.sort();
         let mut expected_tags: Vec<_> = tags.iter().map(|s| *s).collect();
@@ -250,14 +272,14 @@ pub struct ScriptTestWithFilter<'a> {
 impl<'a> ScriptTestWithFilter<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
         let s = format!("{} ={} {}", self.filter, self.script.name, args);
-        run(&s)
+        run!("{}", s)
     }
     pub fn can_find(&self, command: &str) -> Result {
         let command = format!(
             "{} ls --plain --grouping=none --name {}",
             self.filter, command
         );
-        let res = run(&command)?;
+        let res = run!("{}", command)?;
         if res == self.script.name {
             Ok(())
         } else {

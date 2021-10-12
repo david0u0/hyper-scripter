@@ -22,17 +22,17 @@ class HSEnv
     output
   end
 
+  def exec_hs(arg, all)
+    cmd = hs_command_str(arg, all)
+    exec cmd.to_s
+  end
+
   def env_var(var_name)
     k = ENV_MAP[var_name]
     v = ENV[k]
     raise StandardError, "No environment variable #{k} found" if v.nil?
 
     v
-  end
-
-  def exec_hs(arg, all = true)
-    cmd = hs_command_str(arg, all)
-    exec cmd.to_s
   end
 
   private

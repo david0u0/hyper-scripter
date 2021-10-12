@@ -12,40 +12,41 @@ fn test_import() {
     let dir = dir.to_string_lossy();
     log::info!("把待匯入的腳本放進 {}", dir);
 
-    run("e copy/test -t +innate | echo 我要留下來").unwrap();
-    run(format!(
+    run!("e copy/test -t +innate | echo 我要留下來").unwrap();
+    run!(
         "e my/innate -t +innate | rm {} -rf && cp tests/to_be_import {} -r",
-        dir, dir
-    ))
+        dir,
+        dir
+    )
     .unwrap();
-    run("-f my -").unwrap();
-    assert_eq!(run("-f copy -").unwrap(), "我要留下來");
+    run!("-f my -").unwrap();
+    assert_eq!(run!("-f copy -").unwrap(), "我要留下來");
 
-    run("tags something-evil").unwrap();
-    run(format!("-f util import {}", dir)).unwrap();
-    run("-f innate which myinnate").unwrap();
+    run!("tags something-evil").unwrap();
+    run!("-f util import {}", dir).unwrap();
+    run!("-f innate which myinnate").unwrap();
 
-    assert_eq!(run("-f my test").unwrap(), "安安，紅寶石");
-    assert_eq!(run("-f tag mytest").unwrap(), "安安，紅寶石");
-    assert_eq!(run("-f tag youtest").unwrap(), "殼已破碎");
-    assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
+    assert_eq!(run!("-f my test").unwrap(), "安安，紅寶石");
+    assert_eq!(run!("-f tag mytest").unwrap(), "安安，紅寶石");
+    assert_eq!(run!("-f tag youtest").unwrap(), "殼已破碎");
+    assert_eq!(run!("-f nameless -").unwrap(), "安安，匿名殼");
     assert_eq!(
-        run("-f copy -").unwrap(),
+        run!("-f copy -").unwrap(),
         "我要留下來",
         "匯入的腳本覆蓋掉舊腳本了"
     );
 
-    run("-f something-evil which -").expect_err("標籤匯入錯了？");
-    run("tags +all").unwrap();
+    run!("-f something-evil which -").expect_err("標籤匯入錯了？");
+    run!("tags +all").unwrap();
 
     assert!(check_exist(&[".gitignore"]));
 
     assert_ls_len(16, Some("all"), None);
 
-    run(format!("-f util import --namespace imported {}", dir)).unwrap();
+    run!("-f util import --namespace imported {}", dir).unwrap();
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
-    assert_eq!(run("-a imported/my/tes").unwrap(), "安安，紅寶石");
-    run("-f imported which").expect_err("命名空間汙染了標籤！");
+    assert_eq!(run!("-a imported/my/tes").unwrap(), "安安，紅寶石");
+    run!("-f imported which").expect_err("命名空間汙染了標籤！");
     assert_ls_len(22, Some("all"), None);
 }
 
@@ -66,7 +67,7 @@ fn test_collect() {
         format!("={}", name)
     }
 
-    run("e noughty-txt.sh -T txt | echo 別收集我").unwrap();
+    run!("e noughty-txt.sh -T txt | echo 別收集我").unwrap();
 
     let named = create_all(
         "this/is/a/collect/t.est",
@@ -96,28 +97,25 @@ fn test_collect() {
     remove_file(get_home().join("util/git")).unwrap(); // 刪掉 txt 檔
     remove_file(get_home().join(".anonymous/3")).unwrap(); // 刪掉 txt 檔
     remove_dir_all(get_home().join("my")).unwrap(); // 刪掉 myinnate 和 mytest
-    run("-f innate ls myinnate").expect("還沒跑 collect 就壞掉了？");
-    run("-f my ls mytest").expect("還沒跑 collect 就壞掉了？");
-    run(format!("-f all {}", named)).expect_err("還沒收集就出現了，嚇死");
+    run!("-f innate ls myinnate").expect("還沒跑 collect 就壞掉了？");
+    run!("-f my ls mytest").expect("還沒跑 collect 就壞掉了？");
+    run!("-f all {}", named).expect_err("還沒收集就出現了，嚇死");
 
-    run("collect").unwrap();
+    run!("collect").unwrap();
 
-    assert_eq!(
-        run(format!("-f this {}", named)).unwrap(),
-        "這是一個收集測試"
-    );
-    assert_eq!(run(format!("-f is {}", named)).unwrap(), "這是一個收集測試");
-    assert_eq!(run(named_txt).unwrap(), "這是一個文字檔收集測試");
-    assert_eq!(run(".10").unwrap(), "這是一個匿名收集測試");
-    assert_eq!(run(".100").unwrap(), "這是一個匿名文字檔收集測試");
+    assert_eq!(run!("-f this {}", named).unwrap(), "這是一個收集測試");
+    assert_eq!(run!("-f is {}", named).unwrap(), "這是一個收集測試");
+    assert_eq!(run!("{}", named_txt).unwrap(), "這是一個文字檔收集測試");
+    assert_eq!(run!(".10").unwrap(), "這是一個匿名收集測試");
+    assert_eq!(run!(".100").unwrap(), "這是一個匿名文字檔收集測試");
 
-    run("-f all ls myinnate").expect_err("跑了 collect 沒有刪成功");
-    run("-f all ls =my/test").expect_err("跑了 collect 沒有刪成功"); // 需要 exact 因為還有另一個 imported/my/test
-    run("-f all ls =util/git").expect_err("跑了 collect 沒有刪成功"); // 同上
-    run("-f all ls .3").expect_err("跑了 collect 沒有刪成功");
+    run!("-f all ls myinnate").expect_err("跑了 collect 沒有刪成功");
+    run!("-f all ls =my/test").expect_err("跑了 collect 沒有刪成功"); // 需要 exact 因為還有另一個 imported/my/test
+    run!("-f all ls =util/git").expect_err("跑了 collect 沒有刪成功"); // 同上
+    run!("-f all ls .3").expect_err("跑了 collect 沒有刪成功");
 
-    assert_eq!(run("-f tag youest").unwrap(), "殼已破碎");
-    assert_eq!(run("-f nameless -").unwrap(), "安安，匿名殼");
+    assert_eq!(run!("-f tag youest").unwrap(), "殼已破碎");
+    assert_eq!(run!("-f nameless -").unwrap(), "安安，匿名殼");
 
     assert_ls_len(23, Some("all"), None);
 }

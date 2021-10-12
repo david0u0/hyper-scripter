@@ -197,13 +197,17 @@ impl DBEnv {
                 .await?;
         }
         if let Some(time) = info.exec_time.as_ref() {
-            if let Some((content, args)) = time.data() {
+            if let Some((content, args, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
                 last_event_id = self
                     .historian
                     .record(&Event {
                         script_id: info.id,
-                        data: EventData::Exec { content, args },
+                        data: EventData::Exec {
+                            content,
+                            args,
+                            dir: dir.as_deref(),
+                        },
                         time: **time,
                     })
                     .await?;

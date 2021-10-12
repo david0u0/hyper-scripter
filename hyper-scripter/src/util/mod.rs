@@ -384,3 +384,10 @@ pub fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>, sep: &str
         print!("{}", t);
     }
 }
+
+pub fn option_map_res<T, F: FnOnce(T) -> Result<T>>(opt: Option<T>, f: F) -> Result<Option<T>> {
+    Ok(match opt {
+        Some(t) => Some(f(t)?),
+        None => None,
+    })
+}

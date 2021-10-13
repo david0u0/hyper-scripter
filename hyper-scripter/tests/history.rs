@@ -217,12 +217,12 @@ fn test_neglect_archaeology() {
 #[test]
 fn test_event_path() {
     let _g = setup();
-    fn init_dir(s: &str) -> PathBuf {
-        let tmp_dir = std::env::temp_dir();
+    let tmp_dir = std::env::temp_dir();
+    let init_dir = |s: &str| -> PathBuf {
         let p = tmp_dir.join(s);
         std::fs::create_dir_all(&p).unwrap();
         p
-    }
+    };
     let dir_a = init_dir("a");
     let dir_b = init_dir("b");
     let dir_c = init_dir("c");
@@ -249,6 +249,10 @@ fn test_event_path() {
         )
         .unwrap();
         assert_list(&recorded, &["b"]);
+
+        let recorded = run!(dir: tmp_dir.clone(), "history show --dir gg/../bb/../a")
+            .expect("相對路徑就壞了？");
+        assert_list(&recorded, &["c", "a"]);
     };
 
     do_test();

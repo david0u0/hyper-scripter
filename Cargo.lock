@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "chrono",
  "colored",
@@ -867,7 +867,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-historian"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "chrono",
  "log",
@@ -878,7 +878,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-util"
-version = "0.4.5"
+version = "0.4.6"
 
 [[package]]
 name = "idna"

@@ -151,16 +151,17 @@ fn run_bench_with<F>(
             let _ = setup();
             for (name, tag_arr) in data.data.iter() {
                 let tag_str = gen_tag_string(tag_arr);
-                run(format!(
+                run!(
                     "--no-alias edit --fast --no-template -t {} {} | echo $NAME",
-                    tag_str, name
-                ))
+                    tag_str,
+                    name
+                )
                 .unwrap();
             }
         },
         |_| {
             for arg in args.iter() {
-                let _ = run(arg);
+                let _ = run!("{}", arg);
             }
         },
     );

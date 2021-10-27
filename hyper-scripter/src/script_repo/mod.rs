@@ -68,10 +68,11 @@ impl DBEnv {
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
         let neglect = info.neglect_time.as_ref().map(|t| **t);
+        let exec_count = info.exec_count as i32;
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
-            (script_id, last_time, read, write, exec, exec_done, neglect) VALUES(?, ?, ?, ?, ?, ?, ?)
+            (script_id, last_time, read, write, exec, exec_done, neglect, exec_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             ",
             info.id,
             last_time,
@@ -79,7 +80,8 @@ impl DBEnv {
             *info.write_time,
             exec_time,
             exec_done_time,
-            neglect
+            neglect,
+            exec_count
         )
         .execute(&self.info_pool)
         .await?;
@@ -303,23 +305,24 @@ impl ScriptRepo {
                         t
                     }
                 }),
-            )
-            .created_time(record.created_time);
+            );
 
+            builder.created_time(record.created_time);
+            builder.exec_count(record.exec_count as u64);
             if let Some(time) = record.write {
-                builder = builder.write_time(time);
+                builder.write_time(time);
             }
             if let Some(time) = record.read {
-                builder = builder.read_time(time);
+                builder.read_time(time);
             }
             if let Some(time) = record.exec {
-                builder = builder.exec_time(time);
+                builder.exec_time(time);
             }
             if let Some(time) = record.exec_done {
-                builder = builder.exec_done_time(time);
+                builder.exec_done_time(time);
             }
             if let Some(time) = record.neglect {
-                builder = builder.neglect_time(time);
+                builder.neglect_time(time);
             }
 
             let script = builder.build();

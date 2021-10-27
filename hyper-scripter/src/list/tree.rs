@@ -1,5 +1,5 @@
 use super::{
-    extract_help, style, time_str,
+    exec_time_str, extract_help, style,
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
@@ -13,12 +13,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::io::Write;
 
-const TITLE: &[&str] = &[
-    "type",
-    "last write time",
-    "last execute time",
-    "help message",
-];
+const TITLE: &[&str] = &["type", "write", "execute", "help message"];
 
 struct ShortFormatter {
     plain: bool,
@@ -90,7 +85,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
         let mut buff = String::new();
         let help_msg = extract_help(&mut buff, script);
 
-        let row = row![c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
+        let row = row![c->ty_txt, c->script.write_time, c->exec_time_str(script), help_msg];
         self.table.add_row(row);
         Ok(())
     }

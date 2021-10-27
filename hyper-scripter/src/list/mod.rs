@@ -8,7 +8,6 @@ use crate::{
     error::{Error, Result},
     query::ListQuery,
     script::ScriptInfo,
-    script_time::ScriptTime,
 };
 use colored::{ColoredString, Colorize};
 use serde::Serialize;
@@ -32,10 +31,10 @@ fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
     helps.next().unwrap_or_default()
 }
 
-fn time_str<T>(time: &Option<ScriptTime<T>>) -> Cow<'static, str> {
-    match time {
+fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {
+    match &script.exec_time {
         None => Cow::Borrowed("Never"),
-        Some(t) => Cow::Owned(t.to_string()),
+        Some(t) => Cow::Owned(format!("{}({})", t, script.exec_count)),
     }
 }
 

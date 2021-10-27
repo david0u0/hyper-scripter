@@ -1,5 +1,6 @@
 use super::{
-    extract_help, style, time_str, tree, DisplayIdentStyle, DisplayStyle, Grouping, ListOptions,
+    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grouping,
+    ListOptions,
 };
 use crate::error::{Error, Result};
 use crate::query::do_list_query;
@@ -94,7 +95,8 @@ pub fn fmt_meta<W: Write>(
             let mut buff = String::new();
             let help_msg = extract_help(&mut buff, script);
 
-            let row = row![name_txt, c->ty_txt, c->script.write_time, c->time_str(&script.exec_time), help_msg];
+            let row =
+                row![name_txt, c->ty_txt, c->script.write_time, c->exec_time_str(script), help_msg];
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, w) => {
@@ -115,13 +117,7 @@ pub fn fmt_meta<W: Write>(
     }
     Ok(())
 }
-const TITLE: &[&str] = &[
-    "name",
-    "type",
-    "last write time",
-    "last execute time",
-    "help message",
-];
+const TITLE: &[&str] = &["name", "type", "write", "execute", "help message"];
 pub async fn fmt_list<W: Write>(
     w: &mut W,
     script_repo: &'_ mut ScriptRepo,

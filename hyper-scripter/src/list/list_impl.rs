@@ -165,7 +165,8 @@ pub async fn fmt_list<W: Write>(
 
             let mut scripts: Vec<_> = script_map.into_iter().collect();
 
-            scripts.sort_by_key(|(_, v)| v.iter().map(|s| *s.created_time).max());
+            // NOTE: 以群組中執行次數的最大值排序
+            scripts.sort_by_key(|(_, v)| v.iter().map(|s| s.exec_count).max());
 
             for (tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {

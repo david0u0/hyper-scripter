@@ -165,6 +165,7 @@ pub struct ScriptInfo {
     pub exec_time: Option<ScriptTime<(String, String, Option<PathBuf>)>>,
     /// (return code, main event id)
     pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
+    pub exec_count: u64,
     #[deref]
     /// 用來區隔「時間資料」和「其它元資料」，並偵測其它元資料的修改
     timeless_info: TimelessScriptInfo,
@@ -201,6 +202,7 @@ impl ScriptInfo {
             exec_time: None,
             exec_done_time: None,
             neglect_time: None,
+            exec_count: 0,
             timeless_info,
         }
     }
@@ -235,6 +237,7 @@ impl ScriptInfo {
         let args_ser = serde_json::to_string(args).unwrap();
         self.exec_time = Some(ScriptTime::now((content, args_ser, dir)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
+        self.exec_count += 1;
     }
     pub fn exec_done(&mut self, code: i32, main_event_id: i64) {
         log::trace!("{:?} 執行結果為 {}", self, code);
@@ -260,6 +263,7 @@ impl ScriptInfo {
             write_time: None,
             exec_done_time: None,
             neglect_time: None,
+            exec_count: 0,
         }
     }
 }
@@ -298,35 +302,33 @@ pub struct ScriptBuilder {
     exec_time: Option<NaiveDateTime>,
     neglect_time: Option<NaiveDateTime>,
     exec_done_time: Option<NaiveDateTime>,
+    exec_count: u64,
     id: i64,
     tags: HashSet<Tag>,
     ty: ScriptType,
 }
 
 impl ScriptBuilder {
-    pub fn exec_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn exec_count(&mut self, count: u64) {
+        self.exec_count = count;
+    }
+    pub fn exec_time(&mut self, time: NaiveDateTime) {
         self.exec_time = Some(time);
-        self
     }
-    pub fn exec_done_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn exec_done_time(&mut self, time: NaiveDateTime) {
         self.exec_done_time = Some(time);
-        self
     }
-    pub fn read_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn read_time(&mut self, time: NaiveDateTime) {
         self.read_time = Some(time);
-        self
     }
-    pub fn write_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn write_time(&mut self, time: NaiveDateTime) {
         self.write_time = Some(time);
-        self
     }
-    pub fn neglect_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn neglect_time(&mut self, time: NaiveDateTime) {
         self.neglect_time = Some(time);
-        self
     }
-    pub fn created_time(mut self, time: NaiveDateTime) -> Self {
+    pub fn created_time(&mut self, time: NaiveDateTime) {
         self.created_time = Some(time);
-        self
     }
     pub fn build(self) -> ScriptInfo {
         let created_time = ScriptTime::new_or_else(self.created_time, || ScriptTime::now(()));
@@ -336,6 +338,7 @@ impl ScriptBuilder {
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
             neglect_time: self.neglect_time.map(ScriptTime::new),
+            exec_count: self.exec_count,
             timeless_info: TimelessScriptInfo {
                 changed: false,
                 id: self.id,

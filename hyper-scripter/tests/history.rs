@@ -2,7 +2,6 @@
 #[path = "tool.rs"]
 mod tool;
 
-use std::path::PathBuf;
 use tool::*;
 
 fn assert_list(actual: &str, expected: &[&str]) {
@@ -218,41 +217,44 @@ fn test_neglect_archaeology() {
 fn test_event_path() {
     let _g = setup();
     let tmp_dir = std::env::temp_dir();
-    let init_dir = |s: &str| -> PathBuf {
+    let init_dir = |s: &str| -> (String, String) {
         let p = tmp_dir.join(s);
         std::fs::create_dir_all(&p).unwrap();
-        p
+        (p.to_string_lossy().to_string(), s.to_owned())
     };
-    let dir_a = init_dir("a");
-    let dir_b = init_dir("b");
-    let dir_c = init_dir("c");
+    let (dir_a, rel_a) = init_dir("a");
+    let (dir_b, rel_b) = init_dir("b");
+    let (dir_c, _) = init_dir("c");
 
-    run!("e . | # do nothing").unwrap();
-    run!(dir: dir_a.clone(), "- a").unwrap();
-    run!(dir: dir_b.clone(), "- b").unwrap();
-    run!(dir: dir_c.clone(), "- c").unwrap();
-    run!(dir: dir_a.clone(), "- c").unwrap();
+    run!("e . | echo $1").unwrap();
+    run!(dir: &dir_a, "- a").unwrap();
+    run!(dir: &dir_b, "- b").unwrap();
+    run!(dir: &dir_c, "- c").unwrap();
+    run!(dir: &dir_a, "- c").unwrap();
 
     let do_test = move || {
         let recorded = run!("history show").unwrap();
         assert_list(&recorded, &["c", "b", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_a.to_string_lossy()).unwrap();
+        let recorded = run!("history show --dir {}", dir_a).unwrap();
         assert_list(&recorded, &["c", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_c.to_string_lossy()).unwrap();
+        let recorded = run!("history show --dir {}", dir_c).unwrap();
         assert_list(&recorded, &["c"]);
 
-        let recorded = run!(
-            "history show --dir {}/test/../../b",
-            dir_b.to_string_lossy()
-        )
-        .unwrap();
+        let recorded = run!("history show --dir {}/test/../../{}", dir_b, rel_b).unwrap();
         assert_list(&recorded, &["b"]);
 
-        let recorded = run!(dir: tmp_dir.clone(), "history show --dir gg/../bb/../a")
+        let recorded = run!(dir: &tmp_dir, "history show --dir gg/../bb/../{}", rel_a)
             .expect("相對路徑就壞了？");
         assert_list(&recorded, &["c", "a"]);
+
+        let output =
+            run!(dir: &tmp_dir, "--no-trace run -p --dir {}", dir_b).expect("執行前一次參數壞了？");
+        assert_eq!(output, "b");
+
+        let recorded = run!("history show --dir a/b/c/d").expect("路徑不存在就壞了？");
+        assert_list(&recorded, &[]);
     };
 
     do_test();

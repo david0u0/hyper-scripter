@@ -171,14 +171,14 @@ mod test {
             .map(|(id, (name, ty))| {
                 let id = id as i64;
                 let time = NaiveDateTime::from_timestamp(id, 0);
-                ScriptInfo::builder(
+                let mut builder = ScriptInfo::builder(
                     id,
                     name.to_owned().into_script_name().unwrap(),
                     ty.into(),
                     vec![].into_iter(),
-                )
-                .created_time(time)
-                .build()
+                );
+                builder.created_time(time);
+                builder.build()
             })
             .collect()
     }

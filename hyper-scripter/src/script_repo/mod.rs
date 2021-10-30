@@ -413,11 +413,10 @@ impl ScriptRepo {
         self.iter_mut(true).find(|e| e.id == id)
     }
 
-    pub async fn remove(&mut self, name: &ScriptName) -> Result {
-        if let Some(info) = self.map.remove(&*name.key()) {
-            log::debug!("從資料庫刪除腳本 {:?}", info);
-            self.db_env.handle_delete(info.id).await?;
-        }
+    pub async fn remove(&mut self, id: i64) -> Result {
+        // TODO: 從 map 中刪掉？但如果之後沒其它用途似乎也未必需要...
+        log::debug!("從資料庫刪除腳本 {:?}", id);
+        self.db_env.handle_delete(id).await?;
         Ok(())
     }
     pub fn entry(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {

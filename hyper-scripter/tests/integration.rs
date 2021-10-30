@@ -218,6 +218,12 @@ fn test_rm() {
 
     assert!(!check_exist(&["longlive.sh"]));
     run!("-f all which").expect_err("沒有確實消滅掉一切");
+
+    // ---- 測試用 ! 來刪除 ----
+    run!("e -t hide hidden | echo 隱藏腳本，請用 ! 刪除我").unwrap();
+    run!("rm --purge hidden").expect_err("沒加 ! 就刪掉了？");
+    run!("rm --purge hidden!").expect("用了 ! 沒刪成功？");
+    run!("rm --purge hidden!").expect_err("連續刪兩次？");
 }
 
 #[test]

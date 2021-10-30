@@ -209,8 +209,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
             let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
             if !should_keep {
-                let name = entry.name.clone();
-                repo.remove(&name).await?
+                let id = entry.id;
+                repo.remove(id).await?
             }
         }
         Subs::Help { args } => {
@@ -302,28 +302,28 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::RM { queries, purge } => {
             let delete_tag: Option<TagFilter> = Some("+removed".parse().unwrap());
-            let mut to_purge = vec![];
+            let mut to_purge = vec![]; // (name, ty, id)
             for mut entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 if purge {
                     log::debug!("真的刪除腳本！");
-                    to_purge.push((entry.name.clone(), entry.ty.clone()));
+                    to_purge.push((entry.name.clone(), entry.ty.clone(), entry.id));
                 } else {
                     log::debug!("不要真的刪除腳本，改用標籤隱藏之：{:?}", entry.name);
                     let res = main_util::mv(&mut entry, None, None, delete_tag.clone()).await;
                     match res {
                         Err(Error::PathNotFound(_)) => {
                             log::warn!("{:?} 實體不存在，消滅之", entry.name);
-                            to_purge.push((entry.name.clone(), entry.ty.clone()));
+                            to_purge.push((entry.name.clone(), entry.ty.clone(), entry.id));
                         }
                         Err(e) => return Err(e),
                         _ => (),
                     }
                 }
             }
-            for (name, ty) in to_purge.into_iter() {
+            for (name, ty, id) in to_purge.into_iter() {
                 let p = path::open_script(&name, &ty, None)?;
-                repo.remove(&name).await?;
+                repo.remove(id).await?;
                 if let Err(e) = util::remove(&p) {
                     log::warn!("刪除腳本實體遭遇錯誤：{}", e);
                 }

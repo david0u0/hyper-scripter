@@ -215,6 +215,7 @@ fn test_neglect_archaeology() {
 
 #[test]
 fn test_event_path() {
+    // TODO: soft link
     let _g = setup();
     let tmp_dir = std::env::temp_dir();
     let init_dir = |s: &str| -> (String, String) {

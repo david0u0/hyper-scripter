@@ -145,7 +145,8 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let mut cmd = Command::new(normalize_path(EXE).unwrap());
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
-        cmd.current_dir(dir);
+        cmd.current_dir(&dir);
+        cmd.env("PWD", dir);
     }
     let mut child = cmd
         .args(&full_args)

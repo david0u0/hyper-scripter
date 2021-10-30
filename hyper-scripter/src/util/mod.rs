@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::extract_msg::extract_env_from_content;
-use crate::path::{get_home, get_template_path};
+use crate::path::{get_home, get_template_path, normalize_path};
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
@@ -279,7 +279,7 @@ pub fn prepare_script<T: AsRef<str>>(
     let has_content = !content.is_empty();
     let is_new = !path.exists();
     if is_new {
-        let birthplace_abs = handle_fs_res(&["."], std::env::current_dir())?;
+        let birthplace_abs = normalize_path(".")?;
         let birthplace = relative_to_home(&birthplace_abs);
 
         // NOTE: 創建資料夾和檔案

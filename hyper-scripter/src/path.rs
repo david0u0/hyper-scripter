@@ -4,7 +4,7 @@ use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
-use std::fs::{canonicalize, create_dir, read_dir};
+use std::fs::{create_dir, read_dir};
 use std::path::{Component, Path, PathBuf};
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
@@ -55,19 +55,14 @@ fn get_sys_home() -> Result<PathBuf> {
 }
 
 fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
-    join_path_abs(".", path)
-}
-fn join_path_abs<B: AsRef<Path>, P: AsRef<Path>>(base: B, path: P) -> Result<PathBuf> {
     let path = path.as_ref();
     if path.is_absolute() {
         return Ok(path.to_owned());
     }
-    let base = base.as_ref();
-    // NOTE: 若 base 不存在，`canonicalize` 會造成問題
-    // 但前幾行已先處理掉絕對路徑，故出問題機會很小，而且這種問題本來就沒救了
-    let base_res = canonicalize(&base);
-    let base = handle_fs_res(&[base], base_res)?;
-    Ok(base.join(path))
+    // NOTE: 用 $PWD 可以取到 symlink 還沒解開前的路徑
+    // 若用 std::env::current_dir，該路徑已為真實路徑
+    let here = std::env::var("PWD")?;
+    Ok(AsRef::<Path>::as_ref(&here).join(path))
 }
 
 pub fn normalize_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
@@ -222,12 +217,12 @@ mod test {
         assert_eq!(name, ScriptName::Anonymous(6));
         assert_eq!(
             p,
-            join_path_abs("./.test_hyper_scripter/.anonymous", "6.sh").unwrap()
+            join_here_abs("./.test_hyper_scripter/.anonymous/6.sh").unwrap()
         );
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(
             p,
-            join_path_abs("./.test_hyper_scripter/.anonymous", "5.js").unwrap()
+            join_here_abs("./.test_hyper_scripter/.anonymous/5.js").unwrap()
         );
     }
     #[test]
@@ -246,7 +241,7 @@ mod test {
         .unwrap();
         assert_eq!(
             p,
-            join_path_abs("./.test_hyper_scripter/.anonymous", "1.sh").unwrap()
+            join_here_abs("./.test_hyper_scripter/.anonymous/1.sh").unwrap()
         );
 
         match open_script(&not_exist, &"sh".into(), Some(true)).unwrap_err() {

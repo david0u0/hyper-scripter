@@ -13,8 +13,12 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+pub mod completion_util;
 pub mod main_util;
 pub mod serde;
+
+pub mod init_repo;
+pub use init_repo::init_repo;
 
 pub fn illegal_name(s: &str) -> bool {
     s.starts_with('-')
@@ -344,6 +348,7 @@ fn write_prepare_script<W: Write>(
         })
 }
 
+/// 可用來表示「未知類別」的概念 TODO: 測試之
 pub struct DisplayType<'a> {
     ty: &'a ScriptType,
     color: Option<Color>,

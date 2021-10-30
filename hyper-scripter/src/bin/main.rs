@@ -1,17 +1,19 @@
-use hyper_scripter::args::{self, History, List, Root, RootArgs, Subs, Tags, TagsSubs};
+use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
-use hyper_scripter::error::{Contextable, Error, RedundantOpt, Result};
+use hyper_scripter::error::{Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
+use hyper_scripter::path;
 use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
-use hyper_scripter::script_repo::{RecentFilter, RepoEntry, ScriptRepo};
+use hyper_scripter::script_repo::RepoEntry;
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::TagFilter;
-use hyper_scripter::{
-    path,
-    util::{self, main_util, main_util::EditTagArgs, print_iter},
+use hyper_scripter::util::{
+    self, completion_util,
+    main_util::{self, EditTagArgs},
+    print_iter,
 };
-use hyper_scripter_historian::Historian;
+use hyper_scripter::Either;
 
 #[tokio::main]
 async fn main() {
@@ -38,7 +40,13 @@ async fn main() {
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
-    let root = main_util::handle_completion(root)?;
+    let root = match root {
+        Either::One(root) => root,
+        Either::Two(comp) => {
+            completion_util::handle_completion(comp).await?;
+            std::process::exit(0);
+        }
+    };
     if root.root_args.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);
@@ -64,55 +72,18 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     root.set_home_unless_set()?;
+    Config::set_prompt_level(root.root_args.prompt_level);
+    let explicit_filter = !root.root_args.filter.is_empty();
 
-    let RootArgs {
-        no_trace,
-        archaeology,
-        filter,
-        recent,
-        timeless,
-        prompt_level,
-        ..
-    } = root.root_args;
-
-    Config::set_prompt_level(prompt_level);
     let conf = Config::get();
-    let mut need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
-    let (pool, init) = hyper_scripter::db::get_pool(&mut need_journal).await?;
+    let need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
+    let mut repo = util::init_repo(root.root_args, need_journal).await?;
+    let historian = repo.historian().clone();
 
-    let recent = if timeless {
-        None
-    } else {
-        recent.or(conf.recent).map(|recent| RecentFilter {
-            recent,
-            archaeology: archaeology,
-        })
-    };
-
-    let historian = Historian::new(path::get_home().to_owned()).await?;
-    let mut repo = ScriptRepo::new(pool, recent, historian.clone(), no_trace, need_journal)
-        .await
-        .context("讀取歷史記錄失敗")?;
-
-    if init {
-        log::info!("初次使用，載入好用工具和預執行腳本");
-        main_util::load_utils(&mut repo).await?;
-        main_util::prepare_pre_run()?;
-        main_util::load_templates()?;
-    }
-
-    let explicit_filter = !filter.is_empty();
     let mut ret = MainReturn {
         conf: None,
         errs: vec![],
     };
-    {
-        let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
-        for filter in filter.into_iter() {
-            tag_group.push(filter);
-        }
-        repo.filter_by_tag(&tag_group);
-    }
 
     macro_rules! conf_mut {
         () => {{

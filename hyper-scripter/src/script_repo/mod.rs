@@ -18,7 +18,7 @@ pub struct RecentFilter {
     pub archaeology: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DBEnv {
     no_trace: bool,
     info_pool: SqlitePool,

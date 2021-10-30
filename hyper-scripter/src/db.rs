@@ -4,7 +4,8 @@ use sqlx::{
     SqlitePool,
 };
 
-/// 有可能改變 need_journal 的值。若為初始化，不論如何都使用 journal
+/// 有可能改變 need_journal 的值。
+/// 若為初始化，或資料庫已被 journal 鎖住，則不論如何都使用 journal
 pub async fn get_pool(need_journal: &mut bool) -> Result<(SqlitePool, bool)> {
     let file = crate::path::get_home().join(".script_info.db");
     if !file.exists() {

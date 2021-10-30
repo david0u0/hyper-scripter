@@ -1,4 +1,5 @@
 function __hs_list_named_filters
+    # TODO: different home?
     string split ' ' (hs --no-alias tags ls --named)
 end
 

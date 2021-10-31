@@ -5,6 +5,8 @@ use structopt::StructOpt;
 pub enum Completion {
     #[structopt(settings = NO_FLAG_SETTINGS)]
     LS {
+        #[structopt(long)]
+        name: Option<String>, // NOTE: 不用 ScriptName，因為有 `hs/` 這種輸入要考慮
         #[structopt(required = true, min_values = 1)]
         args: Vec<String>,
     },

@@ -25,30 +25,37 @@ end
 function __hs_list_scripts
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
+
     if echo $cmd_arr[-1] | string match -q -r ".*!\$"
         set bang 1
         set cmd "hs -f all --timeless"
+        set name_arg "--name (string replace ! '' $cmd_arr[-1])"
     else
+        if [ -n "$cmd_arr[-1]" ]
+            set name_arg "--name $cmd_arr[-1]"
+        end
+
         set cmd (eval "command hs completion alias $orig_cmd" 2>/dev/null)
         if [ $status -ne 0 ]
             return
         end
     end
-    
-    set list (eval "command hs completion ls $cmd" 2>/dev/null)
+
+    set list (eval "command hs completion ls $name_arg $cmd" 2>/dev/null)
     if [ $status -ne 0 ]
         return
     end
     for script in (string split ' ' $list)
+        # NOTE: duplicate the script name to mimic the "reorder fuzzy search"
         if set -q bang
-            echo $script!
+            echo $script!\t$script!
         else
-            echo $script
+            echo $script\t$script
         end
     end
 end
 
-complete -c hs -a "(__hs_list_scripts)"
+complete -k -c hs -a "(__hs_list_scripts)"
 
 complete -c hs -n "__fish_use_subcommand" -s H -l hs-home -d 'Path to hyper script home'
 complete -c hs -n "__fish_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"

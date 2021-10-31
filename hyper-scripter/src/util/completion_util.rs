@@ -2,15 +2,28 @@ use super::{init_repo, print_iter};
 use crate::args::{AliasRoot, Completion, Root, Subs};
 use crate::config::Config;
 use crate::error::{Error, Result};
+use crate::fuzzy::{fuzz, FuzzResult};
 use crate::path;
-use crate::query::do_list_query;
+use crate::script_repo::{RepoEntry, ScriptRepo};
 use std::cmp::Reverse;
 use structopt::StructOpt;
 
+async fn fuzz_arr<'a>(name: &str, repo: &'a mut ScriptRepo) -> Result<Vec<RepoEntry<'a>>> {
+    let res = fuzz(name, repo.iter_mut(false), "/").await?;
+    Ok(match res {
+        None => vec![],
+        Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],
+        Some(FuzzResult::Multi { ans, mut others }) => {
+            others.push(ans);
+            others
+        }
+    })
+}
+
 pub async fn handle_completion(comp: Completion) -> Result {
     match comp {
-        Completion::LS { args } => {
-            let new_root = match Root::from_iter_safe(args) {
+        Completion::LS { name, args } => {
+            let mut new_root = match Root::from_iter_safe(args) {
                 Ok(Root {
                     subcmd: Some(Subs::Tags(_)),
                     ..
@@ -27,9 +40,15 @@ pub async fn handle_completion(comp: Completion) -> Result {
             };
             log::info!("補完模式，參數為 {:?}", new_root);
             new_root.set_home_unless_set()?;
+            new_root.sanitize_flags();
             let mut repo = init_repo(new_root.root_args, false).await?;
 
-            let mut scripts = do_list_query(&mut repo, &[]).await?;
+            let mut scripts = if let Some(name) = name {
+                fuzz_arr(&name, &mut repo).await?
+            } else {
+                repo.iter_mut(false).collect()
+            };
+
             scripts.sort_by_key(|s| Reverse(s.last_time()));
             print_iter(scripts.iter().map(|s| s.name.key()), " ");
 

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Mutex, MutexGuard, Once};
 
-const HOME_RELATIVE: &str = "./.hyper_scripter";
+pub const HOME_RELATIVE: &str = "./.hyper_scripter";
 lazy_static::lazy_static! {
     static ref LOCK: Mutex<()> = Mutex::new(());
     static ref HOME: PathBuf = normalize_path(HOME_RELATIVE).unwrap();

@@ -103,8 +103,8 @@ fn compute_home_path<T: AsRef<Path>>(p: T) -> Result<PathBuf> {
         let redirect = path.join(HS_REDIRECT);
         if redirect.is_file() {
             let redirect = read_file(&redirect)?;
-            let redirect = redirect.trim();
-            log::info!("重導向至 {}", redirect);
+            let redirect = path.join(redirect.trim());
+            log::info!("重導向至 {:?}", redirect);
             return compute_home_path(redirect);
         }
     }

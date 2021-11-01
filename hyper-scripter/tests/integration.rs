@@ -2,8 +2,8 @@
 #[path = "tool.rs"]
 mod tool;
 
-use hyper_scripter::path::{HS_PRE_RUN, HS_REDIRECT};
-use std::fs::{canonicalize, write};
+use hyper_scripter::path::{normalize_path, HS_PRE_RUN, HS_REDIRECT};
+use std::fs::write;
 use tool::*;
 const MSG: &str = "你好，腳本人！";
 
@@ -302,13 +302,11 @@ fn test_bang() {
 #[test]
 fn test_redirect() {
     let _g = setup();
-    let redirected = canonicalize("./")
-        .unwrap()
-        .join(".hyper_scripter_redirect")
-        .to_string_lossy()
-        .into_owned();
+    // NOTE: 重導向若為相對路徑，則其基準是當前的腳本之家
+    let redirected = "../.hyper_scripter_redirect";
+    let redirected_abs = normalize_path(get_home().join(redirected)).unwrap();
 
-    match std::fs::remove_dir_all(&redirected) {
+    match std::fs::remove_dir_all(&redirected_abs) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -317,9 +315,9 @@ fn test_redirect() {
         }
     }
 
-    write(get_home().join(HS_REDIRECT), redirected.as_bytes()).unwrap();
-    run!("e --fast test | echo 我在 $(realpath $(dirname $0))").unwrap();
-    assert_eq!(run!("-").unwrap(), format!("我在 {}", redirected));
+    write(get_home().join(HS_REDIRECT), redirected).unwrap();
+    run!("e --fast test | echo $(realpath $(dirname $0))").unwrap();
+    assert_eq!(run!("-").unwrap(), redirected_abs.to_string_lossy());
 }
 
 #[test]

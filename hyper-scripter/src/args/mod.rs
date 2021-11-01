@@ -52,6 +52,13 @@ pub struct RootArgs {
     )]
     pub filter: Vec<TagFilter>,
     #[structopt(
+        long,
+        conflicts_with = "all",
+        number_of_values = 1,
+        help = "Toggle named filter temporarily"
+    )]
+    pub toggle: Vec<String>, // TODO: new type?
+    #[structopt(
         short,
         long,
         global = true,

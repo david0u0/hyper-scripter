@@ -1,9 +1,10 @@
 use super::main_util;
 use crate::args::RootArgs;
 use crate::config::Config;
-use crate::error::{Contextable, Result};
+use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script_repo::{RecentFilter, ScriptRepo};
+use fxhash::FxHashSet as HashSet;
 use hyper_scripter_historian::Historian;
 
 /// 即使 `need_journal=false` 也可能使用 journal，具體條件同 `crate::db::get_pool`
@@ -12,6 +13,7 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
         no_trace,
         archaeology,
         filter,
+        toggle,
         recent,
         timeless,
         ..
@@ -41,7 +43,12 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
         main_util::load_templates()?;
     }
 
-    let mut tag_group = conf.get_tag_filter_group(); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
+    // TODO: 測試 toggle 功能，以及名字不存在的錯誤
+    let mut toggle: HashSet<_> = toggle.into_iter().collect();
+    let mut tag_group = conf.get_tag_filter_group(&mut toggle);
+    if let Some(name) = toggle.into_iter().next() {
+        return Err(Error::TagFilterNotFound(name));
+    }
     for filter in filter.into_iter() {
         tag_group.push(filter);
     }

@@ -6,7 +6,7 @@ use crate::tag::{TagFilter, TagFilterGroup};
 use crate::util;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use colored::Color;
-use fxhash::FxHashMap as HashMap;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -264,14 +264,15 @@ impl Config {
             .get(ty)
             .ok_or_else(|| Error::UnknownType(ty.to_string()))
     }
-    pub fn get_tag_filter_group(&self) -> TagFilterGroup {
+    pub fn get_tag_filter_group(&self, toggle: &mut HashSet<String>) -> TagFilterGroup {
         let mut group = TagFilterGroup::default();
         for f in self.tag_filters.iter() {
-            if f.inactivated {
+            let inactivated = f.inactivated ^ toggle.remove(&f.name);
+            if inactivated {
                 log::debug!("{:?} 未啟用", f);
                 continue;
             }
-            group.push(f.content.clone());
+            group.push(f.content.clone()); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
         }
         group.push(self.main_tag_filter.clone());
         group

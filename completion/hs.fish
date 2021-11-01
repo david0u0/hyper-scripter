@@ -61,6 +61,7 @@ complete -c hs -n "__fish_use_subcommand" -s H -l hs-home -d 'Path to hyper scri
 complete -c hs -n "__fish_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_use_subcommand" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
+complete -c hs -n "__fish_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"
 complete -c hs -n "__fish_use_subcommand" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_use_subcommand" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_use_subcommand" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
@@ -191,7 +192,7 @@ complete -c hs -n "__fish_prev_arg_in tags" -f -a "set"
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "ls"
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "toggle"
 complete -c hs -n "__fish_seen_subcommand_from tags" -s n -l name
-complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name
+complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name -r -f -a "(__hs_list_named_filters)"
 complete -c hs -n "__fish_seen_subcommand_from ls" -s k -l known # FIXME: 這會補到另一個 ls 上 =_=
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags append)"
 complete -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"

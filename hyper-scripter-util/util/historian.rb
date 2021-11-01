@@ -45,6 +45,7 @@ class Historian < Selector
       filters = root_args['filter']
       timeless = root_args['timeless']
       recent = root_args['recent']
+      # TODO: toggle
 
       # ask the actual script by ls command
       filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')

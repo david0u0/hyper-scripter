@@ -2,14 +2,14 @@ use super::{init_repo, print_iter};
 use crate::args::{AliasRoot, Completion, Root, Subs};
 use crate::config::Config;
 use crate::error::{Error, Result};
-use crate::fuzzy::{fuzz, FuzzResult};
+use crate::fuzzy::{fuzz_with_multifuzz_ratio, FuzzResult};
 use crate::path;
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use std::cmp::Reverse;
 use structopt::StructOpt;
 
 async fn fuzz_arr<'a>(name: &str, repo: &'a mut ScriptRepo) -> Result<Vec<RepoEntry<'a>>> {
-    let res = fuzz(name, repo.iter_mut(false), "/").await?;
+    let res = fuzz_with_multifuzz_ratio(name, repo.iter_mut(false), "/", 0.6).await?;
     Ok(match res {
         None => vec![],
         Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],

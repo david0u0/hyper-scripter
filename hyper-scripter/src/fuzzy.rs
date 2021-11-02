@@ -104,11 +104,19 @@ impl Ord for FuzzScore {
         self.partial_cmp(other).unwrap()
     }
 }
-
 pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
     sep: &str,
+) -> Result<Option<FuzzResult<T>>> {
+    fuzz_with_multifuzz_ratio(name, iter, sep, 1.0).await
+}
+
+pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
+    name: &str,
+    iter: impl Iterator<Item = T>,
+    sep: &str,
+    multifuzz_ratio: f64,
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
     let mut data_vec: Vec<_> = iter.map(|t| (FuzzScore::default(), t)).collect();
@@ -148,12 +156,14 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
         return Ok(None);
     }
 
+    let best_score_normalized = (best_score.score as f64 * multifuzz_ratio) as i64;
+
     let mut ans = None;
     let mut multifuzz_vec = vec![];
     for (score, data) in data_vec.into_iter() {
         if score == best_score && ans.is_none() {
             ans = Some(data);
-        } else if is_multifuzz(score.score, best_score.score) {
+        } else if is_multifuzz(score.score, best_score_normalized) {
             log::warn!("找到一個分數相近者：{} {:?}", data.fuzz_key(), score);
             multifuzz_vec.push(data);
         }

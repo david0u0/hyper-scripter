@@ -103,7 +103,7 @@ pub async fn do_script_query<'b>(
                     ans
                 }
                 #[cfg(not(feature = "benching"))]
-                Some(fuzzy::Multi { ans, others }) => {
+                Some(fuzzy::Multi { ans, others, .. }) => {
                     is_multi_fuzz = true;
                     // NOTE: 從一堆分數相近者中選出最新的
                     // 但注意不要是「正解」的前綴，否則使用者可能永遠無法用模糊搜拿到名字比較短的候選者

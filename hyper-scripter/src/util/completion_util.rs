@@ -8,13 +8,24 @@ use crate::script_repo::{RepoEntry, ScriptRepo};
 use std::cmp::Reverse;
 use structopt::StructOpt;
 
+fn sort(v: &mut Vec<RepoEntry<'_>>) {
+    v.sort_by_key(|s| Reverse(s.last_time()));
+}
+
 async fn fuzz_arr<'a>(name: &str, repo: &'a mut ScriptRepo) -> Result<Vec<RepoEntry<'a>>> {
     let res = fuzz_with_multifuzz_ratio(name, repo.iter_mut(false), "/", 0.6).await?;
     Ok(match res {
         None => vec![],
         Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],
-        Some(FuzzResult::Multi { ans, mut others }) => {
+        Some(FuzzResult::Multi {
+            ans,
+            mut others,
+            mut still_others,
+        }) => {
             others.push(ans);
+            sort(&mut others);
+            sort(&mut still_others);
+            others.append(&mut still_others);
             others
         }
     })
@@ -43,13 +54,14 @@ pub async fn handle_completion(comp: Completion) -> Result {
             new_root.sanitize_flags();
             let mut repo = init_repo(new_root.root_args, false).await?;
 
-            let mut scripts = if let Some(name) = name {
+            let scripts = if let Some(name) = name {
                 fuzz_arr(&name, &mut repo).await?
             } else {
-                repo.iter_mut(false).collect()
+                let mut t: Vec<_> = repo.iter_mut(false).collect();
+                sort(&mut t);
+                t
             };
 
-            scripts.sort_by_key(|s| Reverse(s.last_time()));
             print_iter(scripts.iter().map(|s| s.name.key()), " ");
 
             Ok(())

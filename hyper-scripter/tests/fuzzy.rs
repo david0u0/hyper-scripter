@@ -13,7 +13,9 @@ fn unwrap_fuzz(target: Str, candidate: &[Str]) -> Vec<Str> {
             .unwrap()
     });
     match res {
-        Multi { ans, mut others } => {
+        Multi {
+            ans, mut others, ..
+        } => {
             others.push(ans);
             others
         }

@@ -16,7 +16,11 @@ fn is_multifuzz(score: i64, best_score: i64) -> bool {
 pub enum FuzzResult<T> {
     High(T),
     Low(T),
-    Multi { ans: T, others: Vec<T> },
+    Multi {
+        ans: T,
+        others: Vec<T>,
+        still_others: Vec<T>,
+    },
 }
 pub use FuzzResult::*;
 impl<T> FuzzResult<T> {
@@ -27,8 +31,12 @@ impl<T> FuzzResult<T> {
             _ => High(ans),
         }
     }
-    fn new_multi(ans: T, others: Vec<T>) -> Self {
-        Multi { ans, others }
+    fn new_multi(ans: T, others: Vec<T>, still_others: Vec<T>) -> Self {
+        Multi {
+            ans,
+            others,
+            still_others,
+        }
     }
     pub fn get_ans(self) -> T {
         match self {
@@ -160,17 +168,21 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
 
     let mut ans = None;
     let mut multifuzz_vec = vec![];
+    let mut secondary_multifuzz_vec = vec![];
     for (score, data) in data_vec.into_iter() {
         if score == best_score && ans.is_none() {
             ans = Some(data);
-        } else if is_multifuzz(score.score, best_score_normalized) {
+        } else if is_multifuzz(score.score, best_score.score) {
             log::warn!("找到一個分數相近者：{} {:?}", data.fuzz_key(), score);
             multifuzz_vec.push(data);
+        } else if is_multifuzz(score.score, best_score_normalized) {
+            log::warn!("找到一個分數稍微相近者：{} {:?}", data.fuzz_key(), score);
+            secondary_multifuzz_vec.push(data);
         }
     }
 
     let ans = ans.unwrap();
-    if multifuzz_vec.is_empty() {
+    if multifuzz_vec.is_empty() && secondary_multifuzz_vec.is_empty() {
         log::info!("模糊搜到一個東西 {}", ans.fuzz_key());
         Ok(Some(FuzzResult::new_single(ans, best_score)))
     } else {
@@ -179,7 +191,11 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
             ans.fuzz_key(),
             best_score
         );
-        Ok(Some(FuzzResult::new_multi(ans, multifuzz_vec)))
+        Ok(Some(FuzzResult::new_multi(
+            ans,
+            multifuzz_vec,
+            secondary_multifuzz_vec,
+        )))
     }
 }
 
@@ -294,7 +310,7 @@ mod test {
 
     fn extract_multifuzz<'a>(res: FuzzResult<&'a str>) -> (&'a str, Vec<&'a str>) {
         match res {
-            Multi { ans, others } => {
+            Multi { ans, others, .. } => {
                 let mut ret = vec![];
                 ret.push(ans);
                 for data in others.into_iter() {

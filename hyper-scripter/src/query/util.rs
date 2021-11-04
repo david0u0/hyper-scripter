@@ -112,7 +112,7 @@ pub async fn do_script_query<'b>(
                     let prefix = prefix.as_ref();
                     let true_ans = others
                         .into_iter()
-                        .filter(|t| !fuzzy::is_prefix(prefix, t.name.key().as_ref(), SEP))
+                        .filter(|t| !fuzzy::is_prefix(prefix, &*t.name.key(), SEP))
                         .max_by_key(|t| t.last_time());
                     match true_ans {
                         Some(t) if t.last_time() > ans.last_time() => t,

@@ -2,31 +2,50 @@ use super::{init_repo, print_iter};
 use crate::args::{AliasRoot, Completion, Root, Subs};
 use crate::config::Config;
 use crate::error::{Error, Result};
-use crate::fuzzy::{fuzz_with_multifuzz_ratio, FuzzResult};
+use crate::fuzzy::{fuzz_with_multifuzz_ratio, is_prefix, FuzzResult};
 use crate::path;
-use crate::script_repo::{RepoEntry, ScriptRepo};
+use crate::script_repo::RepoEntry;
 use std::cmp::Reverse;
 use structopt::StructOpt;
+
+const SEP: &str = "/";
 
 fn sort(v: &mut Vec<RepoEntry<'_>>) {
     v.sort_by_key(|s| Reverse(s.last_time()));
 }
 
-async fn fuzz_arr<'a>(name: &str, repo: &'a mut ScriptRepo) -> Result<Vec<RepoEntry<'a>>> {
-    let res = fuzz_with_multifuzz_ratio(name, repo.iter_mut(false), "/", 0.6).await?;
+async fn fuzz_arr<'a>(
+    name: &str,
+    iter: impl Iterator<Item = RepoEntry<'a>>,
+) -> Result<Vec<RepoEntry<'a>>> {
+    // TODO: 測試這個複雜的函式，包括前綴和次級結果
+    let res = fuzz_with_multifuzz_ratio(name, iter, SEP, 0.6).await?;
     Ok(match res {
         None => vec![],
         Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],
         Some(FuzzResult::Multi {
             ans,
-            mut others,
+            others,
             mut still_others,
         }) => {
-            others.push(ans);
-            sort(&mut others);
+            let prefix = ans.name.key();
+            let mut first_others = vec![];
+            let mut prefixed_others = vec![];
+            for candidate in others.into_iter() {
+                if is_prefix(&*prefix, &*candidate.name.key(), SEP) {
+                    prefixed_others.push(candidate);
+                } else {
+                    first_others.push(candidate);
+                }
+            }
+            first_others.push(ans);
+
+            sort(&mut first_others);
+            sort(&mut prefixed_others);
             sort(&mut still_others);
-            others.append(&mut still_others);
-            others
+            first_others.append(&mut prefixed_others);
+            first_others.append(&mut still_others);
+            first_others
         }
     })
 }
@@ -54,10 +73,11 @@ pub async fn handle_completion(comp: Completion) -> Result {
             new_root.sanitize_flags();
             let mut repo = init_repo(new_root.root_args, false).await?;
 
+            let iter = repo.iter_mut(false);
             let scripts = if let Some(name) = name {
-                fuzz_arr(&name, &mut repo).await?
+                fuzz_arr(&name, iter).await?
             } else {
-                let mut t: Vec<_> = repo.iter_mut(false).collect();
+                let mut t: Vec<_> = iter.collect();
                 sort(&mut t);
                 t
             };

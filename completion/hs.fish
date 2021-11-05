@@ -3,6 +3,10 @@ function __hs_list_named_filters
     string split ' ' (hs --no-alias tags ls --named)
 end
 
+function __hs_list_types
+    string split ' ' (hs completion types (commandline -j))
+end
+
 function __hs_list_tags
     # TODO: different home?
     if [ "$argv" = "append" ]
@@ -90,7 +94,7 @@ complete -c hs -n "__fish_seen_subcommand_from help" -s A -l archaeology -d 'Sho
 complete -c hs -n "__fish_seen_subcommand_from help" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from help" -l timeless -d 'Show scripts of all time.'
 
-complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`'
+complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags
 complete -c hs -n "__fish_seen_subcommand_from edit" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -l recent -d 'Show scripts within recent days.'
@@ -169,7 +173,7 @@ complete -c hs -n "__fish_seen_subcommand_from cp" -l no-trace -d 'Do not record
 complete -c hs -n "__fish_seen_subcommand_from cp" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from cp" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from cp" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_seen_subcommand_from mv" -s T -l ty -d 'Type of the script, e.g. `sh`'
+complete -c hs -n "__fish_seen_subcommand_from mv" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
 complete -c hs -n "__fish_seen_subcommand_from mv" -s t -l tags
 complete -c hs -n "__fish_seen_subcommand_from mv" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from mv" -l recent -d 'Show scripts within recent days.'

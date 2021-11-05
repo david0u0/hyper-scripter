@@ -97,7 +97,7 @@ pub struct Config {
     pub tag_filters: Vec<NamedTagFilter>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub alias: HashMap<String, Alias>,
-    pub categories: HashMap<ScriptType, ScriptTypeConfig>,
+    pub types: HashMap<ScriptType, ScriptTypeConfig>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
     #[serde(skip)]
@@ -136,7 +136,7 @@ impl Default for Config {
                 },
             ],
             main_tag_filter: "+all".parse().unwrap(),
-            categories: ScriptTypeConfig::default_script_types(),
+            types: ScriptTypeConfig::default_script_types(),
             alias: std::array::IntoIter::new([
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
@@ -260,7 +260,7 @@ impl Config {
         Ok(Color::from(c))
     }
     pub fn get_script_conf(&self, ty: &ScriptType) -> Result<&ScriptTypeConfig> {
-        self.categories
+        self.types
             .get(ty)
             .ok_or_else(|| Error::UnknownType(ty.to_string()))
     }

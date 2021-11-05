@@ -18,7 +18,7 @@ name = 'no-hidden'
 [[tag_filters]]
 content = '+m/all,^removed'
 name = 'no-removed'
-[categories.js-i]
+[types.js-i]
 ext = 'js'
 color = 'bright cyan'
 cmd = 'node'
@@ -42,27 +42,27 @@ after = [
     'oh-nooooo'
 ]
 
-[categories.md]
+[types.md]
 ext = 'md'
 color = 'bright black'
 args = []
 env = []
 
-[categories.sh]
+[types.sh]
 ext = 'sh'
 color = 'bright magenta'
 cmd = 'bash'
 args = ['{{path}}']
 env = []
 
-[categories.rb]
+[types.rb]
 ext = 'rb'
 color = 'bright red'
 cmd = 'ruby'
 args = ['{{path}}']
 env = []
 
-[categories.vorpal]
+[types.vorpal]
 ext = 'js'
 color = 'bright cyan'
 cmd = 'node'
@@ -72,14 +72,14 @@ env = [[
     '{{{script_dir}}}/node_modules',
 ]]
 
-[categories.tmux]
+[types.tmux]
 ext = 'sh'
 color = 'white'
 cmd = 'sh'
 args = ['{{path}}']
 env = []
 
-[categories.txt]
+[types.txt]
 color = 'bright black'
 args = []
 env = []

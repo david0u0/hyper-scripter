@@ -170,7 +170,7 @@ fn test_edit_without_change() {
 
 #[test]
 fn test_multifuzz() {
-    use hyper_scripter::fuzzy::*;
+    use hyper_scripter::{fuzzy::*, SEP};
 
     println!("模糊搜撞在一起時的特殊行為 1. 取最新者 2. 不可為「正解」的後綴");
     let _g = setup();
@@ -181,7 +181,7 @@ fn test_multifuzz() {
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let res = rt.block_on(async {
-        fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), "/")
+        fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), SEP)
             .await
             .unwrap()
             .unwrap()

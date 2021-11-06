@@ -5,21 +5,17 @@ use crate::error::{Error, Result};
 use crate::fuzzy::{fuzz_with_multifuzz_ratio, is_prefix, FuzzResult};
 use crate::path;
 use crate::script_repo::RepoEntry;
+use crate::SEP;
 use std::cmp::Reverse;
 use structopt::StructOpt;
-
-const SEP: &str = "/";
 
 fn sort(v: &mut Vec<RepoEntry<'_>>) {
     v.sort_by_key(|s| Reverse(s.last_time()));
 }
 
-fn extract_conf(args: &[String]) -> Result<(Config, AliasRoot)> {
+fn parse_alias_root(args: &[String]) -> Result<AliasRoot> {
     match AliasRoot::from_iter_safe(args) {
-        Ok(root) => {
-            let p = path::compute_home_path_optional(root.root_args.hs_home.as_ref())?;
-            Ok((Config::load(&p)?, root))
-        }
+        Ok(root) => Ok(root),
         Err(e) => {
             log::warn!("展開別名時出錯 {}", e);
             // NOTE: -V 或 --help 也會走到這裡
@@ -101,17 +97,20 @@ pub async fn handle_completion(comp: Completion) -> Result {
             Ok(())
         }
         Completion::Alias { args } => {
-            let (conf, alias_root) = extract_conf(&args)?;
-            if let Some(new_args) = alias_root.expand_alias(&args, &conf) {
+            let root = parse_alias_root(&args)?;
+            let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref())?;
+            let conf = Config::load(&home)?;
+            if let Some(new_args) = root.expand_alias(&args, &conf) {
                 print_iter(new_args, " ");
             } else {
                 print_iter(args.iter(), " ");
             }
             Ok(())
         }
-        Completion::Types { args } => {
-            let (conf, _) = extract_conf(&args)?;
-            print_iter(conf.types.keys(), " ");
+        Completion::Home { args } => {
+            let root = parse_alias_root(&args)?;
+            let home = root.root_args.hs_home.ok_or_else(|| Error::Completion)?;
+            print!("{}", home);
             Ok(())
         }
     }

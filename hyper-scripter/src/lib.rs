@@ -23,6 +23,7 @@ pub mod state;
 pub mod tag;
 pub mod util;
 
+pub const SEP: &str = "/";
 pub enum Either<T, U> {
     One(T),
     Two(U),

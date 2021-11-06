@@ -246,6 +246,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 println!("{}", msg);
             }
         }
+        Subs::Types => {
+            print_iter(conf.types.keys(), " ");
+        }
         Subs::LS(List {
             long,
             grouping,

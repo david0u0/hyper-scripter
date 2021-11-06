@@ -1,14 +1,21 @@
-function __hs_list_named_filters
-    # TODO: different home?
-    string split ' ' (hs --no-alias tags ls --named)
+function __hs_extract_home_and_run
+    set cmd (commandline -j)
+    set hs_home (eval "hs completion home $cmd" 2>/dev/null)
+    if [ $status -eq 0 ]
+        set home_args "-H $hs_home"
+    end
+    eval "hs --no-alias $home_args $argv" 2>/dev/null
 end
 
 function __hs_list_types
-    string split ' ' (hs completion types (commandline -j))
+    string split ' ' (__hs_extract_home_and_run types)
+end
+
+function __hs_list_named_filters
+    string split ' ' (__hs_extract_home_and_run tags ls --named)
 end
 
 function __hs_list_tags
-    # TODO: different home?
     if [ "$argv" = "append" ]
         set append 1
     end
@@ -17,7 +24,7 @@ function __hs_list_tags
     else
         echo "all"
     end
-    for tag in (string split ' ' (hs --no-alias tags ls --known))
+    for tag in (string split ' ' (__hs_extract_home_and_run tags ls --known))
         if set -q append
             echo +$tag
         else

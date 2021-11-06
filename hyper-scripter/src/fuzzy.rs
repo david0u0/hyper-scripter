@@ -329,7 +329,7 @@ mod test {
         }
     }
     async fn do_fuzz<'a>(name: &'a str, v: &'a Vec<&'a str>) -> Option<FuzzResult<&'a str>> {
-        fuzz(name, v.iter().map(|s| *s), "/").await.unwrap()
+        fuzz(name, v.iter().map(|s| *s), ":").await.unwrap()
     }
     #[tokio::test(threaded_scheduler)]
     async fn test_fuzz() {
@@ -368,28 +368,28 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn test_reorder_fuzz() {
         let _ = env_logger::try_init();
-        let t1 = "a/c";
-        let t2 = "b/a";
-        let t3 = "a/b";
+        let t1 = "a:c";
+        let t2 = "b:a";
+        let t3 = "a:b";
         let vec = vec![t1, t2, t3];
 
         let res = do_fuzz("ab", &vec).await.unwrap();
         let (ans, v) = extract_multifuzz(res);
-        assert_eq!(ans, "a/b");
-        assert_eq!(v, vec!["a/b", "b/a"]);
+        assert_eq!(ans, "a:b");
+        assert_eq!(v, vec!["a:b", "b:a"]);
 
         let res = do_fuzz("ba", &vec).await.unwrap();
         let (ans, v) = extract_multifuzz(res);
-        assert_eq!(ans, "b/a");
-        assert_eq!(v, vec!["a/b", "b/a"]);
+        assert_eq!(ans, "b:a");
+        assert_eq!(v, vec!["a:b", "b:a"]);
 
         let res = do_fuzz("ca", &vec).await.unwrap();
-        assert_eq!(extract_high(res), "a/c");
+        assert_eq!(extract_high(res), "a:c");
 
         let res = do_fuzz("a", &vec).await.unwrap();
         let (ans, v) = extract_multifuzz(res);
-        assert_eq!(ans, "a/c"); // 真的同分，只好以順序決定了
-        assert_eq!(v, vec!["a/b", "a/c", "b/a"]);
+        assert_eq!(ans, "a:c"); // 真的同分，只好以順序決定了
+        assert_eq!(v, vec!["a:b", "a:c", "b:a"]);
     }
     #[test]
     fn test_reorder() {

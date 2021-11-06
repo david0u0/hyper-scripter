@@ -5,10 +5,9 @@ use crate::fuzzy;
 use crate::script::ScriptInfo;
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::util::get_display_type;
+use crate::SEP;
 use fxhash::FxHashSet as HashSet;
 use std::sync::Once;
-
-const SEP: &str = "/";
 
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,

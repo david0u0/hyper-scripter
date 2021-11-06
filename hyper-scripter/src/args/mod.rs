@@ -229,6 +229,8 @@ pub enum Subs {
     },
     #[structopt(about = "List hyper scripts")]
     LS(List),
+    #[structopt(about = "List all existing types")]
+    Types,
     #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(long, short)]

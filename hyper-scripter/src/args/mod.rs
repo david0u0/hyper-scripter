@@ -84,7 +84,7 @@ pub struct RootArgs {
 pub struct Root {
     #[structopt(skip = false)]
     #[serde(skip)]
-    home_is_set: bool,
+    is_from_alias: bool,
     #[structopt(flatten)]
     pub root_args: RootArgs,
     #[structopt(subcommand)]
@@ -361,7 +361,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
                 Some(new_args) => Root::from_iter(new_args),
                 None => Root::from_iter(&args),
             };
-            root.home_is_set = true;
+            root.is_from_alias = true;
             Ok(root)
         }
         Err(e) => {
@@ -375,8 +375,8 @@ fn handle_alias_args(args: Vec<String>) -> Result<Root> {
 impl Root {
     /// 若帶了 --no-alias 選項，或是補全模式，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
     /// 在補全模式中意義重大，因為使用者可能會用 -H 指定別的腳本之家
-    pub fn set_home_unless_set(&self) -> Result {
-        if !self.home_is_set {
+    pub fn set_home_unless_from_alias(&self) -> Result {
+        if !self.is_from_alias {
             set_home(&self.root_args.hs_home)?;
         }
         Ok(())

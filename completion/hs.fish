@@ -18,16 +18,25 @@ end
 function __hs_list_tags
     if [ "$argv" = "append" ]
         set append 1
+    else if [ "$argv" = "both" ]
+        set append 1
+        set no_append 1
+    else
+        set no_append 1
     end
+
     if set -q append
         echo "+all"
-    else
+    end
+    if set -q no_append
         echo "all"
     end
+
     for tag in (string split ' ' (__hs_extract_home_and_run tags ls --known))
         if set -q append
             echo +$tag
-        else
+        end
+        if set -q no_append
             echo $tag
         end
     end
@@ -102,7 +111,7 @@ complete -c hs -n "__fish_seen_subcommand_from help" -s a -l all -d 'Shorthand f
 complete -c hs -n "__fish_seen_subcommand_from help" -l timeless -d 'Show scripts of all time.'
 
 complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
-complete -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags
+complete -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags -r -f -a "(__hs_list_tags both)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from edit" -s n -l no-template
@@ -181,7 +190,7 @@ complete -c hs -n "__fish_seen_subcommand_from cp" -s A -l archaeology -d 'Show 
 complete -c hs -n "__fish_seen_subcommand_from cp" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from cp" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_seen_subcommand_from mv" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
-complete -c hs -n "__fish_seen_subcommand_from mv" -s t -l tags
+complete -c hs -n "__fish_seen_subcommand_from mv" -s t -l tags -r -f -a "(__hs_list_tags both)"
 complete -c hs -n "__fish_seen_subcommand_from mv" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags)"
 complete -c hs -n "__fish_seen_subcommand_from mv" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from mv" -s h -l help -d 'Prints help information'

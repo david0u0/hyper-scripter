@@ -71,7 +71,7 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
-    root.set_home_unless_set()?;
+    root.set_home_unless_from_alias()?;
     Config::set_prompt_level(root.root_args.prompt_level);
     let explicit_filter = !root.root_args.filter.is_empty();
 

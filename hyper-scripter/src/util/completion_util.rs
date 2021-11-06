@@ -79,7 +79,7 @@ pub async fn handle_completion(comp: Completion) -> Result {
                 }
             };
             log::info!("補完模式，參數為 {:?}", new_root);
-            new_root.set_home_unless_set()?;
+            new_root.set_home_unless_from_alias()?;
             new_root.sanitize_flags();
             let mut repo = init_repo(new_root.root_args, false).await?;
 

@@ -1,3 +1,4 @@
+use fxhash::FxHashMap as HashMap;
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Error, RedundantOpt, Result};
@@ -7,7 +8,7 @@ use hyper_scripter::path;
 use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
 use hyper_scripter::script_repo::RepoEntry;
 use hyper_scripter::script_time::ScriptTime;
-use hyper_scripter::tag::TagFilter;
+use hyper_scripter::tag::{Tag, TagFilter};
 use hyper_scripter::util::{
     self, completion_util,
     main_util::{self, EditTagArgs},
@@ -389,13 +390,26 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::LS { named, known }),
         }) => {
+            let mut known_tags_iter = || {
+                let mut map: HashMap<&Tag, u32> = Default::default();
+                for script in repo.iter_mut(true) {
+                    let script = script.into_inner();
+                    for tag in script.tags.iter() {
+                        let entry = map.entry(tag).or_insert(0);
+                        *entry += 1;
+                    }
+                }
+                let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k.clone(), v)).collect();
+                v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
+                v.into_iter().map(|(k, _)| k)
+            };
             if named {
                 print_iter(conf.tag_filters.iter().map(|f| &f.name), " ");
             } else if known {
-                print_iter(repo.iter_known_tags(), " ");
+                print_iter(known_tags_iter(), " ");
             } else {
                 print!("known tags:\n  ");
-                print_iter(repo.iter_known_tags(), " ");
+                print_iter(known_tags_iter(), " ");
                 println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {

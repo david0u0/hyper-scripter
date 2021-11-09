@@ -219,7 +219,7 @@ fn test_rm() {
     assert!(!check_exist(&["longlive.sh"]));
     run!("-f all which").expect_err("沒有確實消滅掉一切");
 
-    // ---- 測試用 ! 來刪除 ----
+    // NOTE: ---- 測試用 ! 來刪除 ----
     run!("e -t hide hidden | echo 隱藏腳本，請用 ! 刪除我").unwrap();
     run!("rm --purge hidden").expect_err("沒加 ! 就刪掉了？");
     run!("rm --purge hidden!").expect("用了 ! 沒刪成功？");
@@ -414,4 +414,33 @@ fn test_ls_query() {
         None,
         Some("showfuz wildcar* - =hide/exact! fzhid! !"),
     );
+}
+
+#[test]
+fn test_miss_event() {
+    let _g = setup();
+    let hidden = ScriptTest::new("1", Some("hide"));
+    let neglected = ScriptTest::new("3", None);
+    let normal = ScriptTest::new("2", None);
+    run!("history neglect {}", neglected.get_name()).unwrap();
+
+    let test_all = || {
+        hidden.can_find("!").unwrap_err();
+        hidden.can_find_by_name().unwrap_err();
+        hidden.can_find("!").expect("錯過事件無效？");
+
+        neglected.can_find("!").unwrap_err();
+        neglected.can_find_by_name().expect_err("neglect 無效？");
+        neglected.can_find("!").expect("錯過事件無效？");
+        neglected
+            .can_find_by_name()
+            .expect_err("錯過事件打破了時間篩選器？");
+
+        normal.can_find_by_name().unwrap();
+        normal.can_find("-").unwrap();
+        normal.can_find("!").expect_err("亂製造錯過事件？");
+    };
+
+    test_all();
+    test_all();
 }

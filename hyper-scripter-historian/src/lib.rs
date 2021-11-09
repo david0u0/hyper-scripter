@@ -188,7 +188,9 @@ impl Historian {
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
         let mut db_event = DBEvent::new(event.script_id, time, &ty, &cmd);
         let id = match &event.data {
-            EventData::Write | EventData::Read => self.raw_record(db_event).await?,
+            EventData::Write | EventData::Read | EventData::Miss => {
+                self.raw_record(db_event).await?
+            }
             EventData::Exec { content, args, dir } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(

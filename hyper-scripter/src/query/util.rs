@@ -148,7 +148,8 @@ pub async fn do_script_query_strict<'b>(
     #[cfg(not(feature = "benching"))]
     if !script_query.bang {
         let filtered = do_script_query(script_query, script_repo, true, true).await?;
-        if let Some(filtered) = filtered {
+        if let Some(mut filtered) = filtered {
+            filtered.update(|script| script.miss()).await?;
             return Err(Error::ScriptIsFiltered(filtered.name.key().to_string()));
         }
     }

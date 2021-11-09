@@ -160,6 +160,7 @@ pub struct TimelessScriptInfo {
 pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
+    pub miss_time: Option<ScriptTime>,
     pub neglect_time: Option<ScriptTime>,
     /// (content, args, dir)
     pub exec_time: Option<ScriptTime<(String, String, Option<PathBuf>)>>,
@@ -189,24 +190,11 @@ impl ScriptInfo {
         self.timeless_info.id = id;
     }
     pub fn cp(&self, new_name: ScriptName) -> Self {
-        let now = ScriptTime::now(());
-        let timeless_info = TimelessScriptInfo {
-            id: 0,
-            name: new_name,
-            created_time: now.clone(),
-            ..self.timeless_info.clone()
-        };
-        ScriptInfo {
-            read_time: now.clone(),
-            write_time: now.clone(),
-            exec_time: None,
-            exec_done_time: None,
-            neglect_time: None,
-            exec_count: 0,
-            timeless_info,
-        }
+        let builder = ScriptInfo::builder(0, new_name, self.ty.clone(), self.tags.iter().cloned());
+        builder.build()
     }
-    pub fn last_time_without_read(&self) -> NaiveDateTime {
+    /// `major time` 即不包含 `read` 和 `miss` 事件的時鼎
+    pub fn last_major_time(&self) -> NaiveDateTime {
         max!(
             *self.write_time,
             map(&self.exec_time),
@@ -217,6 +205,7 @@ impl ScriptInfo {
         max!(
             *self.read_time,
             *self.write_time,
+            map(&self.miss_time),
             map(&self.exec_time),
             map(&self.exec_done_time)
         )
@@ -231,6 +220,10 @@ impl ScriptInfo {
         let now = ScriptTime::now(());
         self.read_time = now.clone();
         self.write_time = now;
+    }
+    pub fn miss(&mut self) {
+        // TODO: 測試錯過事件
+        self.miss_time = Some(ScriptTime::now(()));
     }
     pub fn exec(&mut self, content: String, args: &[String], dir: Option<PathBuf>) {
         log::trace!("{:?} 執行內容為 {}", self, content);
@@ -258,6 +251,7 @@ impl ScriptInfo {
             ty,
             tags: tags.collect(),
             read_time: None,
+            miss_time: None,
             created_time: None,
             exec_time: None,
             write_time: None,
@@ -297,6 +291,7 @@ impl IntoScriptName for ScriptName {
 pub struct ScriptBuilder {
     pub name: ScriptName,
     read_time: Option<NaiveDateTime>,
+    miss_time: Option<NaiveDateTime>,
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
@@ -309,32 +304,44 @@ pub struct ScriptBuilder {
 }
 
 impl ScriptBuilder {
-    pub fn exec_count(&mut self, count: u64) {
+    pub fn exec_count(&mut self, count: u64) -> &mut Self {
         self.exec_count = count;
+        self
     }
-    pub fn exec_time(&mut self, time: NaiveDateTime) {
+    pub fn exec_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.exec_time = Some(time);
+        self
     }
-    pub fn exec_done_time(&mut self, time: NaiveDateTime) {
+    pub fn exec_done_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.exec_done_time = Some(time);
+        self
     }
-    pub fn read_time(&mut self, time: NaiveDateTime) {
+    pub fn read_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.read_time = Some(time);
+        self
     }
-    pub fn write_time(&mut self, time: NaiveDateTime) {
+    pub fn miss_time(&mut self, time: NaiveDateTime) -> &mut Self {
+        self.miss_time = Some(time);
+        self
+    }
+    pub fn write_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.write_time = Some(time);
+        self
     }
-    pub fn neglect_time(&mut self, time: NaiveDateTime) {
+    pub fn neglect_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.neglect_time = Some(time);
+        self
     }
-    pub fn created_time(&mut self, time: NaiveDateTime) {
+    pub fn created_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.created_time = Some(time);
+        self
     }
     pub fn build(self) -> ScriptInfo {
         let created_time = ScriptTime::new_or_else(self.created_time, || ScriptTime::now(()));
         ScriptInfo {
             write_time: ScriptTime::new_or(self.write_time, created_time.clone()),
             read_time: ScriptTime::new_or(self.read_time, created_time.clone()),
+            miss_time: self.miss_time.map(ScriptTime::new),
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
             neglect_time: self.neglect_time.map(ScriptTime::new),

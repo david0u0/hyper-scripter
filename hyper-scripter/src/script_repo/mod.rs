@@ -67,20 +67,23 @@ impl DBEnv {
         let last_time = info.last_time();
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
-        let neglect = info.neglect_time.as_ref().map(|t| **t);
+        let neglect_time = info.neglect_time.as_ref().map(|t| **t);
+        let miss_time = info.miss_time.as_ref().map(|t| **t);
         let exec_count = info.exec_count as i32;
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
-            (script_id, last_time, read, write, exec, exec_done, neglect, exec_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            (script_id, last_time, read, write, miss, exec, exec_done, neglect, exec_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
             ",
             info.id,
             last_time,
             *info.read_time,
             *info.write_time,
+            miss_time,
             exec_time,
             exec_done_time,
-            neglect,
+            neglect_time,
             exec_count
         )
         .execute(&self.info_pool)
@@ -198,6 +201,19 @@ impl DBEnv {
                 })
                 .await?;
         }
+        if let Some(time) = info.miss_time.as_ref() {
+            if time.has_changed() {
+                log::debug!("{:?} 的錯過事件", info.name);
+                last_event_id = self
+                    .historian
+                    .record(&Event {
+                        script_id: info.id,
+                        data: EventData::Miss,
+                        time: **time,
+                    })
+                    .await?;
+            }
+        }
         if let Some(time) = info.exec_time.as_ref() {
             if let Some((content, args, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
@@ -305,6 +321,9 @@ impl ScriptRepo {
             if let Some(time) = record.read {
                 builder.read_time(time);
             }
+            if let Some(time) = record.miss {
+                builder.miss_time(time);
+            }
             if let Some(time) = record.exec {
                 builder.exec_time(time);
             }
@@ -322,7 +341,7 @@ impl ScriptRepo {
                     log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
                     time_bound = std::cmp::max(neglect, time_bound);
                 }
-                let overtime = time_bound > script.last_time_without_read();
+                let overtime = time_bound > script.last_major_time();
                 archaeology ^ overtime
             } else {
                 false

@@ -222,7 +222,6 @@ impl ScriptInfo {
         self.write_time = now;
     }
     pub fn miss(&mut self) {
-        // TODO: 測試錯過事件
         self.miss_time = Some(ScriptTime::now(()));
     }
     pub fn exec(&mut self, content: String, args: &[String], dir: Option<PathBuf>) {

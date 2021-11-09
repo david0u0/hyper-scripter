@@ -128,7 +128,7 @@ fn test_edit_existing_bang() {
         )
         .await
         .expect_err("沒有 BANG! 就找到編輯的腳本！？");
-        matches!(err, Error::ScriptIsFiltered(s) if s == "test");
+        assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
         let (p, e) = edit_or_create(
             "test!".parse().unwrap(),

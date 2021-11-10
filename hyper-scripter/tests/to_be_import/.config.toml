@@ -1,7 +1,7 @@
 # NOTE: 亂搞近期篩選器，測試 --timeless 選項
 recent = 1
 
-main_tag_filter = 'none'
+main_tag_filter = 'none' # 亂搞主篩選器
 
 editor = ["vim"]
 
@@ -12,12 +12,13 @@ content = '+pin,util'
 name = 'pin'
 
 [[tag_filters]]
-content = '+m/all,^hide'
+content = '+all,^hide!'
 name = 'no-hidden'
 
 [[tag_filters]]
-content = '+m/all,^removed'
+content = '+all,^removed!'
 name = 'no-removed'
+
 [types.js-i]
 ext = 'js'
 color = 'bright cyan'

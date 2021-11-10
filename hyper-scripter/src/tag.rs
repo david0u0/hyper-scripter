@@ -93,19 +93,20 @@ impl FromStr for TagControl {
         })
     }
 }
-const OBLIGATION_PREFIX: &str = "m/";
+const MANDATORY_SUFFIX: &str = "!";
+const APPEND_PREFIX: &str = "+";
 impl FromStr for TagFilter {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
-        let append = if s.starts_with('+') {
-            s = &s[1..];
+        let append = if s.starts_with(APPEND_PREFIX) {
+            s = &s[APPEND_PREFIX.len()..];
             true
         } else {
             false
         };
 
-        let mandatory = if s.starts_with(OBLIGATION_PREFIX) {
-            s = &s[OBLIGATION_PREFIX.len()..];
+        let mandatory = if s.ends_with(MANDATORY_SUFFIX) {
+            s = &s[0..(s.len() - MANDATORY_SUFFIX.len())];
             true
         } else {
             false
@@ -130,10 +131,7 @@ impl Display for TagFilter {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let mut first = true;
         if self.append {
-            write!(w, "+")?;
-        }
-        if self.mandatory {
-            write!(w, "m/")?;
+            write!(w, "{}", APPEND_PREFIX)?;
         }
         for f in self.tags.iter() {
             if !first {
@@ -144,6 +142,9 @@ impl Display for TagFilter {
                 write!(w, "^")?;
             }
             write!(w, "{}", f.tag.0)?;
+        }
+        if self.mandatory {
+            write!(w, "{}", MANDATORY_SUFFIX)?;
         }
         Ok(())
     }

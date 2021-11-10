@@ -321,28 +321,36 @@ fn test_redirect() {
 }
 
 #[test]
-fn test_mandatory_tags() {
+fn test_mandatory_filter() {
     let _g = setup();
-    run!("e prj1/t | echo prj1/src").unwrap();
-    run!("e prj2/t | echo prj2/src").unwrap();
-    run!("e prj1/src/t | echo prj1/src").unwrap();
-    run!("e prj2/src/t | echo prj2/src").unwrap();
+    let t1 = ScriptTest::new("prj1/t", None);
+    let t2 = ScriptTest::new("prj2/t", None);
+    let t3 = ScriptTest::new("prj1/src/t", None);
+    let t4 = ScriptTest::new("prj2/src/t", None);
+    let t5 = ScriptTest::new("hide/prj2/src/t", None);
 
-    assert_ls(
-        vec!["prj1/t", "prj1/src/t", "prj2/t", "prj2/src/t"],
-        None,
-        None,
-    );
+    fn assert_ls_names<'a, const N: usize>(
+        arr: [&'a ScriptTest; N],
+        filter: Option<&str>,
+        query: Option<&str>,
+    ) {
+        let v: Vec<_> = arr.iter().map(|s| s.get_name()).collect();
+        assert_ls(v, filter, query);
+    }
 
-    run!("tags prj1").unwrap();
-    assert_ls(vec!["prj1/t", "prj1/src/t"], None, None);
-    assert_ls(vec!["prj1/src/t", "prj2/src/t"], Some("src"), None);
-    assert_ls(
-        vec!["prj1/t", "prj2/src/t", "prj1/src/t"],
-        Some("+src"),
-        None,
-    );
-    assert_ls(vec!["prj1/src/t"], Some("+m/src"), None);
+    assert_ls_names([&t1, &t2, &t3, &t4], None, None);
+    run!("ls -f all!").expect_err("只有強制篩選器不該有用");
+    // NOTE: 順便測試在參數上帶多個篩選器
+    assert_ls_names([&t3, &t4], None, Some("-f +src!"));
+    assert_ls_names([&t3, &t4], None, Some("-f +src! -f +prj1")); // +prj1 非強制，不影響
+    assert_ls_names([&t3], None, Some("-f +src! -f +prj1!")); // +prj1! 為強制，會影響
+
+    run!("tags +prj1").unwrap();
+    assert_ls_names([&t1, &t3], None, None);
+    assert_ls_names([&t3, &t4, &t5], Some("src"), None);
+    assert_ls_names([&t1, &t3, &t4], Some("+src"), None);
+    assert_ls_names([&t3], Some("+src!"), None);
+    assert_ls_names([&t4, &t5], None, Some("-f all -f +src! -f +prj2!"));
 }
 
 #[test]

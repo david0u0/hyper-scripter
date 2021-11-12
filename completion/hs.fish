@@ -46,9 +46,11 @@ function __hs_list_scripts
     else
         if [ -n "$cmd_arr[-1]" ]
             set name_arg "--name $cmd_arr[-1]"
+        else
+            set trailing "trailing"
         end
 
-        set cmd (eval "command hs completion alias $orig_cmd" 2>/dev/null)
+        set cmd (eval "command hs completion alias $orig_cmd $trailing" 2>/dev/null)
         if [ $status -ne 0 ]
             return
         end
@@ -68,7 +70,28 @@ function __hs_list_scripts
     end
 end
 
-complete -k -c hs -a "(__hs_list_scripts)"
+function __hs_not_run_arg
+    set orig_cmd (commandline -j)
+    set cmd_arr (string split ' ' $orig_cmd)
+
+    if [ -z "$cmd_arr[-1]" ]
+        # pad one word to the end of command. 
+        set trailing "trailing"
+    end
+
+    set cmd (eval "command hs completion alias $orig_cmd $trailing" 2>/dev/null)
+    set args (eval "command hs completion extract-run-args $cmd" 2>/dev/null)
+    if [ $status -ne 0 ]
+        return 0
+    end
+    if [ -z "$args" ]
+        return 0
+    else
+        return 1
+    end
+end
+
+complete -k -c hs -n "__hs_not_run_arg" -f -a "(__hs_list_scripts)"
 
 complete -c hs -n "__fish_use_subcommand" -s H -l hs-home -d 'Path to hyper script home'
 complete -k -c hs -n "__fish_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"

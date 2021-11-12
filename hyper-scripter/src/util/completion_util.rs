@@ -1,4 +1,4 @@
-use super::{init_repo, print_iter};
+use super::{init_repo, print_iter, to_display_args};
 use crate::args::{AliasRoot, Completion, Root, Subs};
 use crate::config::Config;
 use crate::error::{Error, Result};
@@ -93,8 +93,6 @@ pub async fn handle_completion(comp: Completion) -> Result {
             };
 
             print_iter(scripts.iter().map(|s| s.name.key()), " ");
-
-            Ok(())
         }
         Completion::Alias { args } => {
             let root = parse_alias_root(&args)?;
@@ -104,14 +102,29 @@ pub async fn handle_completion(comp: Completion) -> Result {
                 print_iter(new_args, " ");
             } else {
                 print_iter(args.iter(), " ");
-            }
-            Ok(())
+            };
         }
         Completion::Home { args } => {
             let root = parse_alias_root(&args)?;
             let home = root.root_args.hs_home.ok_or_else(|| Error::Completion)?;
             print!("{}", home);
-            Ok(())
+        }
+        Completion::ExtractRunArgs { args } => {
+            let mut root = Root::from_iter_safe(args).map_err(|e| {
+                log::warn!("補全時出錯 {}", e);
+                Error::Completion
+            })?;
+            root.sanitize()?;
+            match root.subcmd {
+                Some(Subs::Run { args, .. }) => {
+                    print_iter(args.into_iter().map(|s| to_display_args(s)), " ");
+                }
+                res @ _ => {
+                    log::warn!("非執行指令 {:?}", res);
+                    return Err(Error::Completion);
+                }
+            }
         }
     }
+    Ok(())
 }

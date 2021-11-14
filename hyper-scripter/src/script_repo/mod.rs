@@ -19,8 +19,17 @@ pub struct RecentFilter {
 }
 
 #[derive(Debug)]
+enum TraceOption {
+    Normal,
+    // record nothing
+    NoTrace,
+    // don't affect last time, only record history
+    Humble,
+}
+
+#[derive(Debug)]
 pub struct DBEnv {
-    no_trace: bool,
+    trace_opt: TraceOption,
     info_pool: SqlitePool,
     historian: Historian,
     modifies_script: bool,
@@ -64,6 +73,10 @@ impl DBEnv {
     }
 
     async fn update_last_time(&self, info: &ScriptInfo) -> Result {
+        if !matches!(self.trace_opt, TraceOption::Normal) {
+            return Ok(());
+        }
+
         let last_time = info.last_time();
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
@@ -147,7 +160,7 @@ impl DBEnv {
             .await?;
         }
 
-        if self.no_trace {
+        if matches!(self.trace_opt, TraceOption::NoTrace) {
             return Ok(0);
         }
 
@@ -278,7 +291,6 @@ impl ScriptRepo {
         pool: SqlitePool,
         recent: Option<RecentFilter>,
         historian: Historian,
-        no_trace: bool,
         modifies_script: bool,
     ) -> Result<ScriptRepo> {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
@@ -357,12 +369,18 @@ impl ScriptRepo {
             hidden_map,
             latest_name: None,
             db_env: DBEnv {
+                trace_opt: TraceOption::Normal,
                 info_pool: pool,
-                no_trace,
                 historian,
                 modifies_script,
             },
         })
+    }
+    pub fn no_trace(&mut self) {
+        self.db_env.trace_opt = TraceOption::NoTrace;
+    }
+    pub fn humble(&mut self) {
+        self.db_env.trace_opt = TraceOption::Humble;
     }
     // fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
     //     let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());

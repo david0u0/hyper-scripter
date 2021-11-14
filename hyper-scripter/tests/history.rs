@@ -23,9 +23,10 @@ fn test_history_args() {
 }
 
 #[test]
-fn test_no_trace() {
+fn test_humble_and_no_trace() {
     let _g = setup();
     // TODO
+    // 注意連續 humble 事件被刪除的後果（可能因為寫回的緣故，越刪除時間反而更新）
 }
 
 #[test]
@@ -250,6 +251,7 @@ fn test_event_path() {
             .expect("相對路徑就壞了？");
         assert_list(&recorded, &["c", "a"]);
 
+        // NOTE: 沒有 --no-trace 的話，下一次執行的順序會跑掉
         let output =
             run!(dir: &tmp_dir, "--no-trace run -p --dir {}", dir_b).expect("執行前一次參數壞了？");
         assert_eq!(output, "b");
@@ -262,3 +264,4 @@ fn test_event_path() {
     run!("history tidy -").unwrap();
     do_test();
 }
+

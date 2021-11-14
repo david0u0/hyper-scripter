@@ -11,6 +11,7 @@ use hyper_scripter_historian::Historian;
 pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptRepo> {
     let RootArgs {
         no_trace,
+        humble,
         archaeology,
         filter,
         toggle,
@@ -32,9 +33,14 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
     };
 
     let historian = Historian::new(path::get_home().to_owned()).await?;
-    let mut repo = ScriptRepo::new(pool, recent, historian, no_trace, need_journal)
+    let mut repo = ScriptRepo::new(pool, recent, historian, need_journal)
         .await
         .context("讀取歷史記錄失敗")?;
+    if no_trace {
+        repo.no_trace();
+    } else if humble {
+        repo.humble();
+    }
 
     if init {
         log::info!("初次使用，載入好用工具和預執行腳本");

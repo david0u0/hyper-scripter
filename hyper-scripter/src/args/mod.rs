@@ -31,16 +31,22 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 
 #[derive(StructOpt, Debug, Serialize)]
 pub struct RootArgs {
-    #[structopt(long, hidden = true)]
-    pub dump_args: bool,
-    #[structopt(long, global = true, help = "Do not record history")]
-    pub no_trace: bool,
-    #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
-    pub archaeology: bool,
-    #[structopt(long, global = true)]
-    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
     #[structopt(short = "H", long, help = "Path to hyper script home")]
     pub hs_home: Option<String>,
+    #[structopt(long, hidden = true)]
+    pub dump_args: bool,
+    #[structopt(long, help = "Do not record history")]
+    pub no_trace: bool,
+    #[structopt(
+        long,
+        conflicts_with = "no-trace",
+        help = "Do not affect script time (but will still record history)"
+    )]
+    pub humble: bool,
+    #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+    pub archaeology: bool,
+    #[structopt(long)]
+    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
     #[structopt(
         short,
         long,

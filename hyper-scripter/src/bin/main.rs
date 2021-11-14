@@ -6,7 +6,7 @@ use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_co
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
 use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
-use hyper_scripter::script_repo::RepoEntry;
+use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
 use hyper_scripter::util::{
@@ -390,26 +390,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::LS { named, known }),
         }) => {
-            let mut known_tags_iter = || {
-                let mut map: HashMap<&Tag, u32> = Default::default();
-                for script in repo.iter_mut(true) {
-                    let script = script.into_inner();
-                    for tag in script.tags.iter() {
-                        let entry = map.entry(tag).or_insert(0);
-                        *entry += 1;
-                    }
-                }
-                let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k.clone(), v)).collect();
-                v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
-                v.into_iter().map(|(k, _)| k)
-            };
             if named {
                 print_iter(conf.tag_filters.iter().map(|f| &f.name), " ");
             } else if known {
-                print_iter(known_tags_iter(), " ");
+                print_iter(known_tags_iter(&mut repo), " ");
             } else {
                 print!("known tags:\n  ");
-                print_iter(known_tags_iter(), " ");
+                print_iter(known_tags_iter(&mut repo), " ");
                 println!("");
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
@@ -546,4 +533,28 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
 
 async fn create_read_event(entry: &mut RepoEntry<'_>) -> Result<i64> {
     entry.update(|info| info.read()).await
+}
+
+fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag> {
+    use std::collections::hash_map::Entry::*;
+
+    let mut map: HashMap<&Tag, _> = Default::default();
+    for script in repo.iter_mut(true) {
+        let script = script.into_inner();
+        let date = script.last_major_time();
+        for tag in script.tags.iter() {
+            match map.entry(tag) {
+                Occupied(entry) => {
+                    let date_mut = entry.into_mut();
+                    *date_mut = std::cmp::max(date, *date_mut);
+                }
+                Vacant(entry) => {
+                    entry.insert(date);
+                }
+            }
+        }
+    }
+    let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k, v)).collect();
+    v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
+    v.into_iter().map(|(k, _)| k)
 }

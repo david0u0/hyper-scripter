@@ -15,6 +15,8 @@ use hyper_scripter::util::{
     print_iter,
 };
 use hyper_scripter::Either;
+use hyper_scripter::{db, migration};
+use hyper_scripter_historian::Historian;
 
 #[tokio::main]
 async fn main() {
@@ -54,6 +56,14 @@ async fn main_err_handle() -> Result<Vec<Error>> {
         return Ok(vec![]);
     }
 
+    root.set_home_unless_from_alias()?;
+
+    if matches!(root.subcmd, Some(Subs::Migrate)) {
+        migration::do_migrate(db::get_file()).await?;
+        Historian::do_migrate(path::get_home()).await?;
+        return Ok(vec![]);
+    }
+
     let res = main_inner(root).await?;
     if let Some(conf) = res.conf {
         log::info!("存入改變後的設定檔");
@@ -72,7 +82,6 @@ struct MainReturn {
 }
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
-    root.set_home_unless_from_alias()?;
     Config::set_prompt_level(root.root_args.prompt_level);
     let explicit_filter = !root.root_args.filter.is_empty();
 

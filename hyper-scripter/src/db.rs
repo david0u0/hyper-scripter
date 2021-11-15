@@ -3,11 +3,16 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
     SqlitePool,
 };
+use std::path::PathBuf;
+
+pub fn get_file() -> PathBuf {
+    crate::path::get_home().join(".script_info.db")
+}
 
 /// 有可能改變 need_journal 的值。
 /// 若為初始化，或資料庫已被 journal 鎖住，則不論如何都使用 journal
 pub async fn get_pool(need_journal: &mut bool) -> Result<(SqlitePool, bool)> {
-    let file = crate::path::get_home().join(".script_info.db");
+    let file = get_file();
     if !file.exists() {
         *need_journal = true;
         let pool = crate::migration::do_migrate(file).await?;

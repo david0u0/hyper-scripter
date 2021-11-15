@@ -264,4 +264,3 @@ fn test_event_path() {
     run!("history tidy -").unwrap();
     do_test();
 }
-

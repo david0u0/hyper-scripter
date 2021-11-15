@@ -127,7 +127,13 @@ pub fn check_exist(p: &[&str]) -> bool {
 }
 
 pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
-    let home = env.home.unwrap_or_else(|| get_home());
+    let home = match env.home {
+        Some(h) => {
+            log::info!("使用腳本之家 {:?}", h);
+            h
+        }
+        None => get_home(),
+    };
     let home = home.to_string_lossy();
     let mut full_args = vec!["-H", home.as_ref(), "--prompt-level", "never"];
     let args = args.to_string();

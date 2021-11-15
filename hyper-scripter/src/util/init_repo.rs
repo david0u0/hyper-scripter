@@ -35,7 +35,7 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
     let historian = Historian::new(path::get_home().to_owned()).await?;
     let mut repo = ScriptRepo::new(pool, recent, historian, need_journal)
         .await
-        .context("讀取歷史記錄失敗")?;
+        .context("載入腳本倉庫失敗")?;
     if no_trace {
         repo.no_trace();
     } else if humble {

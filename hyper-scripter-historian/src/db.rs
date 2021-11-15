@@ -2,12 +2,14 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
     SqlitePool,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub async fn get_pool(
-    hyper_scripter_path: impl AsRef<Path>,
-) -> Result<SqlitePool, sqlx::error::Error> {
-    let file = hyper_scripter_path.as_ref().join(".script_history.db");
+pub fn get_file(dir_path: impl AsRef<Path>) -> PathBuf {
+    dir_path.as_ref().join(".script_history.db")
+}
+
+pub async fn get_pool(dir_path: impl AsRef<Path>) -> Result<SqlitePool, sqlx::error::Error> {
+    let file = get_file(dir_path);
     let opt = SqliteConnectOptions::new()
         .filename(&file)
         .journal_mode(SqliteJournalMode::Off);

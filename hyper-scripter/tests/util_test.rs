@@ -8,19 +8,24 @@ use tool::*;
 
 fn test_import() {
     let tmp_dir = std::env::temp_dir();
-    let dir = tmp_dir.join("to_be_import");
-    let dir = dir.to_string_lossy();
+    let dir_path = tmp_dir.join("to_be_import");
+    let dir = dir_path.to_string_lossy();
     log::info!("把待匯入的腳本放進 {}", dir);
 
     run!("e copy/test -t +innate | echo 我要留下來").unwrap();
     run!(
         "e my/innate -t +innate | rm {} -rf && cp tests/to_be_import {} -r",
         dir,
-        dir
+        dir,
     )
     .unwrap();
+
     run!("-f my -").unwrap();
     assert_eq!(run!("-f copy -").unwrap(), "我要留下來");
+
+    run!(home: &dir_path, "--no-alias ls -la").expect_err("還沒升級就成功？");
+    run!(home: &dir_path, "migrate").unwrap(); // NOTE: 順便測試 migrate 功能
+    run!(home: &dir_path, "--no-alias ls -la").expect("升級了還失敗？");
 
     run!("tags something-evil").unwrap();
     run!("-f util import {}", dir).unwrap();

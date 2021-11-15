@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use sqlx::migrate::MigrateError;
 use sqlx::{error::Error as DBError, Pool, Sqlite, SqlitePool};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ const EMPTY_STR: &str = "";
 #[derive(Debug, Clone)]
 pub struct Historian {
     pool: Arc<RwLock<SqlitePool>>,
-    path: PathBuf,
+    dir_path: PathBuf,
 }
 
 async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64, DBError> {
@@ -160,17 +161,21 @@ impl Historian {
         let res = raw_record_event(pool, event).await;
         if res.is_err() {
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
-            *pool = db::get_pool(&self.path).await?;
+            *pool = db::get_pool(&self.dir_path).await?;
             return raw_record_event(pool, event).await;
         }
 
         res
     }
-    pub async fn new(path: PathBuf) -> Result<Self, DBError> {
-        db::get_pool(&path).await.map(|pool| Historian {
+    pub async fn new(dir_path: PathBuf) -> Result<Self, DBError> {
+        db::get_pool(&dir_path).await.map(|pool| Historian {
             pool: Arc::new(RwLock::new(pool)),
-            path,
+            dir_path,
         })
+    }
+    pub async fn do_migrate(dir_path: &Path) -> Result<(), MigrateError> {
+        migration::do_migrate(db::get_file(dir_path)).await?;
+        Ok(())
     }
 
     pub async fn remove(&self, script_id: i64) -> Result<(), DBError> {

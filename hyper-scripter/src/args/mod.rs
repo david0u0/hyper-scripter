@@ -165,6 +165,8 @@ pub enum Subs {
     },
     #[structopt(setting = AppSettings::Hidden)]
     LoadUtils,
+    #[structopt(about = "Migrate the database")]
+    Migrate,
     #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
     Edit {
         #[structopt(

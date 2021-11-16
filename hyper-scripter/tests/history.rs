@@ -156,11 +156,11 @@ fn test_history_args_rm_last() {
     run!("history rm - 1").unwrap(); // By
     assert_eq!(run!("run -p -").unwrap(), "Ay");
     run!("history rm - 1").unwrap(); // Ay
-    run!("run -p A").expect_err("previous args exist !?"); // fail, won't affect ordering
+    assert_eq!(run!("--no-trace -p A").expect("空的"), "A"); // no-trace, won't effect order
 
     assert_eq!(run!("run -p B").unwrap(), "Bx");
     run!("history rm - 1").unwrap(); // Bx
-    run!("run -p B").expect_err("previous args exist !?");
+    assert_eq!(run!("--no-trace -p B").expect("空的"), "B"); // no-trace, won't effect order
 
     assert_eq!(run!("run -").unwrap(), "A"); // read time
     assert_eq!(run!("run ^^").unwrap(), "C"); // create time

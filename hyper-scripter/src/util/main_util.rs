@@ -170,7 +170,7 @@ pub async fn run_n_times(
     if use_previous_args {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
-            None => return Err(Error::NoPreviousArgs),
+            None => log::warn!("無前一次參數，當作空的"),
             Some(arg_str) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
                 let mut previous_arg_vec: Vec<String> =

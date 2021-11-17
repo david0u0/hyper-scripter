@@ -108,6 +108,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             unset: false,
             before: Some(before),
             after,
+            ..
         } => {
             if !after.is_empty() {
                 log::info!("設定別名 {} {:?}", before, after);
@@ -139,12 +140,17 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Alias {
             unset: false,
             before: None,
+            short,
             ..
         } => {
             log::info!("印出所有別名");
             for (before, alias) in conf.alias.iter() {
-                let after = alias.after.join(" ");
-                println!("{}=\"{}\"", before, after);
+                print!("{}", before);
+                if !short {
+                    let after = alias.after.join(" ");
+                    print!("=\"{}\"", after);
+                }
+                println!("");
             }
         }
         Subs::Edit {

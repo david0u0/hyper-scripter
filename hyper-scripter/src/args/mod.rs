@@ -188,6 +188,8 @@ pub enum Subs {
     },
     #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
     Alias {
+        #[structopt(long, conflicts_with_all = &["before", "after"])]
+        short: bool,
         #[structopt(
             long,
             short,
@@ -459,10 +461,12 @@ mod test {
         match &args.subcmd {
             Some(Subs::Alias {
                 unset,
-                before: Some(before),
+                short,
                 after,
+                before: Some(before),
             }) => {
                 assert_eq!(*unset, false);
+                assert_eq!(*short, false);
                 assert_eq!(before, "trash");
                 assert_eq!(after, &["-f", "removed"]);
             }

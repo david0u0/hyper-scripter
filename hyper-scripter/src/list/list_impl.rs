@@ -125,10 +125,7 @@ pub async fn fmt_list<W: Write>(
 ) -> Result<()> {
     let mut opt = convert_opt(w, opt);
 
-    let latest_script_id = script_repo
-        .latest_mut(1, false)
-        .ok_or_else(|| Error::Empty)?
-        .id;
+    let latest_script_id = script_repo.latest_mut(1, false).map_or(-1, |s| s.id);
 
     if let DisplayStyle::Long(table) = &mut opt.display_style {
         if opt.grouping != Grouping::Tree {

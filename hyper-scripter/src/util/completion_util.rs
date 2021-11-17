@@ -101,7 +101,8 @@ pub async fn handle_completion(comp: Completion) -> Result {
             if let Some(new_args) = root.expand_alias(&args, &conf) {
                 print_iter(new_args, " ");
             } else {
-                print_iter(args.iter(), " ");
+                log::info!("並非別名");
+                return Err(Error::Completion);
             };
         }
         Completion::Home { args } => {

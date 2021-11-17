@@ -339,7 +339,7 @@ fn test_mandatory_filter() {
     }
 
     assert_ls_names([&t1, &t2, &t3, &t4], None, None);
-    run!("ls -f all!").expect_err("只有強制篩選器不該有用");
+    assert_ls_names([], None, Some("-f all!"));
     // NOTE: 順便測試在參數上帶多個篩選器
     assert_ls_names([&t3, &t4], None, Some("-f +src!"));
     assert_ls_names([&t3, &t4], None, Some("-f +src! -f +prj1")); // +prj1 非強制，不影響

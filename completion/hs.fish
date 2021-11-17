@@ -11,6 +11,15 @@ function __hs_list_types
     string split ' ' (__hs_extract_home_and_run types)
 end
 
+function __hs_expand_alias
+    set cmd (eval "command hs completion alias $argv" 2>/dev/null)
+    if [ $status -eq 0 ]
+        echo $cmd
+    else
+        echo $argv
+    end
+end
+
 function __hs_list_named_filters
     string split ' ' (__hs_extract_home_and_run tags ls --named)
 end
@@ -49,11 +58,7 @@ function __hs_list_scripts
         else
             set trailing "trailing"
         end
-
-        set cmd (eval "command hs completion alias $orig_cmd $trailing" 2>/dev/null)
-        if [ $status -ne 0 ]
-            return
-        end
+        set cmd "$orig_cmd $trailing"
     end
 
     set list (eval "command hs completion ls $name_arg $cmd" 2>/dev/null)
@@ -70,7 +75,12 @@ function __hs_list_scripts
     end
 end
 
-function __hs_not_run_arg
+function __hs_not_run_arg_or_alias
+    __hs_is_alias
+    if [ $status -eq 0 ]
+        return 1
+    end
+
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
 
@@ -79,8 +89,7 @@ function __hs_not_run_arg
         set trailing "trailing"
     end
 
-    set cmd (eval "command hs completion alias $orig_cmd $trailing" 2>/dev/null)
-    set args (eval "command hs completion extract-run-args $cmd" 2>/dev/null)
+    set args (eval "command hs completion extract-run-args $orig_cmd $trailing" 2>/dev/null)
     if [ $status -ne 0 ]
         return 0
     end
@@ -91,7 +100,36 @@ function __hs_not_run_arg
     end
 end
 
-complete -k -c hs -n "__hs_not_run_arg" -f -a "(__hs_list_scripts)"
+function __hs_list_alias
+    __hs_extract_home_and_run alias --short
+end
+
+function __hs_is_alias
+    set cmd (commandline -j)
+    set cmd_arr (string split ' ' $cmd)
+    if [ -n "$cmd_arr[-1]" ]
+        # remove the last argument
+        set cmd "$cmd_arr[1..-2]"
+    end
+    eval "command hs completion alias $cmd" 2>/dev/null
+end
+
+function __hs_alias_completion
+    set orig_cmd (commandline -j)
+    set cmd (__hs_expand_alias $orig_cmd)
+
+    set cmd_arr (string split ' ' $orig_cmd)
+    if [ -z "$cmd_arr[-1]" ]
+        # preserve the last white space
+        set space ' '
+    end
+
+    complete -C "$cmd$space"
+end
+
+complete -k -c hs -n "__hs_is_alias" -x -a "(__hs_alias_completion)"
+
+complete -k -c hs -n "__hs_not_run_arg_or_alias" -x -a "(__hs_list_scripts)"
 
 complete -c hs -n "__fish_use_subcommand" -s H -l hs-home -d 'Path to hyper script home'
 complete -k -c hs -n "__fish_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
@@ -105,6 +143,9 @@ complete -c hs -n "__fish_use_subcommand" -s a -l all -d 'Shorthand for `-f=all,
 complete -c hs -n "__fish_use_subcommand" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_use_subcommand" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_use_subcommand" -s V -l version -d 'Prints version information'
+
+complete -c hs -n "__fish_use_subcommand" -f -a "(__hs_list_alias)"
+
 complete -c hs -n "__fish_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
 complete -c hs -n "__fish_use_subcommand" -f -a "edit" -d 'Edit hyper script'
 complete -c hs -n "__fish_use_subcommand" -f -a "alias" -d 'Manage alias'

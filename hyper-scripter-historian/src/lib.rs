@@ -46,7 +46,7 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
 #[derive(Clone, Copy)]
 struct DBEvent<'a> {
     script_id: i64,
-    ty: &'a str,
+    ty: i8,
     cmd: &'a str,
     time: NaiveDateTime,
     args: Option<&'a str>,
@@ -55,7 +55,7 @@ struct DBEvent<'a> {
     main_event_id: i64,
 }
 impl<'a> DBEvent<'a> {
-    fn new(script_id: i64, time: NaiveDateTime, ty: &'a str, cmd: &'a str) -> Self {
+    fn new(script_id: i64, time: NaiveDateTime, ty: i8, cmd: &'a str) -> Self {
         DBEvent {
             script_id,
             time,
@@ -90,7 +90,7 @@ macro_rules! select_last_arg {
         select_last_arg!($select, $script_id, $offset, $limit, "", )
     }};
     ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
-        static EXEC_TY: &'static str = EventType::Exec.get_str();
+        const EXEC_TY: i8= EventType::Exec.get_code();
         sqlx::query!(
             "
             WITH args AS (
@@ -116,8 +116,8 @@ macro_rules! select_last_arg {
 
 macro_rules! ignore_arg {
     ($pool:expr, $cond:literal, $($var:expr),+) => {
-        let exec_ty = EventType::Exec.get_str();
-        let done_ty = EventType::ExecDone.get_str();
+        let exec_ty = EventType::Exec.get_code();
+        let done_ty = EventType::ExecDone.get_code();
         sqlx::query!(
             "
             UPDATE events SET ignored = true
@@ -188,10 +188,10 @@ impl Historian {
 
     pub async fn record(&self, event: &Event<'_>) -> Result<i64, DBError> {
         log::debug!("記錄事件 {:?}", event);
-        let ty = event.data.get_type().get_str();
+        let ty = event.data.get_type().get_code();
         let time = event.time;
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
-        let mut db_event = DBEvent::new(event.script_id, time, &ty, &cmd);
+        let mut db_event = DBEvent::new(event.script_id, time, ty, &cmd);
         let id = match &event.data {
             EventData::Write | EventData::Read | EventData::Miss => {
                 self.raw_record(db_event).await?
@@ -224,7 +224,7 @@ impl Historian {
                 code,
                 main_event_id,
             } => {
-                let exec_ty = EventType::Exec.get_str();
+                let exec_ty = EventType::Exec.get_code();
                 let ignored_res = sqlx::query!(
                     "SELECT ignored FROM events WHERE type = ? AND id = ?",
                     exec_ty,
@@ -248,7 +248,7 @@ impl Historian {
         id: i64,
         dir: Option<&Path>,
     ) -> Result<Option<String>, DBError> {
-        let ty = EventType::Exec.get_str();
+        let ty = EventType::Exec.get_code();
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
         let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
@@ -301,7 +301,7 @@ impl Historian {
         }
 
         let pool = self.pool.read().unwrap();
-        let exec_ty = EventType::Exec.get_str();
+        let exec_ty = EventType::Exec.get_code();
         let latest_record = sqlx::query!(
             "
             SELECT id, script_id FROM events
@@ -384,7 +384,7 @@ impl Historian {
             return Ok(());
         }
 
-        let exec_ty = EventType::Exec.get_str();
+        let exec_ty = EventType::Exec.get_code();
         sqlx::query!(
             "
             UPDATE events SET ignored = false, args = ?
@@ -404,7 +404,7 @@ impl Historian {
         script_id: i64,
         ty: EventType,
     ) -> Result<Option<NaiveDateTime>, DBError> {
-        let ty = ty.get_str();
+        let ty = ty.get_code();
         let time = sqlx::query!(
             "
             SELECT time FROM events
@@ -421,7 +421,7 @@ impl Historian {
 
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {
         let pool = self.pool.read().unwrap();
-        let exec_ty = EventType::Exec.get_str();
+        let exec_ty = EventType::Exec.get_code();
         // XXX: 笑死這啥鬼
         sqlx::query!(
             "

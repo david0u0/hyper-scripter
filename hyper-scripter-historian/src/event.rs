@@ -39,14 +39,14 @@ impl EventData<'_> {
 }
 
 impl EventType {
-    pub const fn get_str(&self) -> &'static str {
+    pub const fn get_code(&self) -> i8 {
         use EventType::*;
         match self {
-            ExecDone => "ExecDone",
-            Exec => "Exec",
-            Read => "Read",
-            Write => "Write",
-            Miss => "Miss",
+            Read => 0,
+            Write => 1,
+            Miss => 2,
+            Exec => 3,
+            ExecDone => 4,
         }
     }
 }

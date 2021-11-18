@@ -89,11 +89,13 @@ function __hs_not_run_arg_or_alias
         set trailing "trailing"
     end
 
-    set args (eval "command hs completion extract-run-args $orig_cmd $trailing" 2>/dev/null)
+    set run_args (eval "command hs completion parse-run $orig_cmd $trailing" 2>/dev/null)
     if [ $status -ne 0 ]
         return 0
     end
-    if [ -z "$args" ]
+
+    set run_args_arr (string split ' ' $run_args)
+    if [ -z "$run_args_arr[2]" ]
         return 0
     else
         return 1

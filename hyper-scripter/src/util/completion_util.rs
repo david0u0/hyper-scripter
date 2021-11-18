@@ -110,15 +110,19 @@ pub async fn handle_completion(comp: Completion) -> Result {
             let home = root.root_args.hs_home.ok_or_else(|| Error::Completion)?;
             print!("{}", home);
         }
-        Completion::ExtractRunArgs { args } => {
+        Completion::ParseRun { args } => {
             let mut root = Root::from_iter_safe(args).map_err(|e| {
                 log::warn!("補全時出錯 {}", e);
                 Error::Completion
             })?;
             root.sanitize()?;
             match root.subcmd {
-                Some(Subs::Run { args, .. }) => {
-                    print_iter(args.into_iter().map(|s| to_display_args(s)), " ");
+                Some(Subs::Run {
+                    script_query, args, ..
+                }) => {
+                    let iter = std::iter::once(script_query.to_string())
+                        .chain(args.into_iter().map(|s| to_display_args(s)));
+                    print_iter(iter, " ");
                 }
                 res @ _ => {
                     log::warn!("非執行指令 {:?}", res);

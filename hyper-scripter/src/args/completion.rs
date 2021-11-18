@@ -21,7 +21,7 @@ pub enum Completion {
         args: Vec<String>,
     },
     #[structopt(settings = NO_FLAG_SETTINGS)]
-    ExtractRunArgs {
+    ParseRun {
         #[structopt(required = true, min_values = 1)]
         args: Vec<String>,
     },

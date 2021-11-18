@@ -286,9 +286,9 @@ pub enum History {
         name = "rm-id",
         about = "Remove an event by it's id.\nUseful if you want to keep those illegal arguments from polluting the history."
     )]
-    RMID { event_id: u64 }, // TODO: 測試
+    RMID { event_id: u64 },
     #[structopt(about = "Humble an event by it's id")]
-    Humble { event_id: u64 }, // TODO: 測試
+    Humble { event_id: u64 },
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,
@@ -305,7 +305,7 @@ pub enum History {
         #[structopt(parse(try_from_str), required = true, min_values = 1)]
         queries: Vec<ListQuery>,
     },
-    #[structopt( settings = NO_FLAG_SETTINGS)] // TODO: 測試
+    #[structopt( settings = NO_FLAG_SETTINGS)]
     Amend {
         event_id: u64,
         #[structopt(help = "Command line args to pass to the script")]

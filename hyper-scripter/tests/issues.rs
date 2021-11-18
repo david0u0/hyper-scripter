@@ -61,18 +61,25 @@ fn test_hs_in_hs() {
     println!("若腳本甲裡呼叫了本程式去執行腳本乙，完成之後腳本甲的時間應較新");
     let _g = setup();
 
-    run!(
-        "e outer | echo 我在第一層 && {} -H {} inner",
-        get_exe_abs(),
-        get_home().to_string_lossy(),
-    )
-    .unwrap();
-    run!("e inner | echo '我在第幾層？'").unwrap();
+    let outer = ScriptTest::new("outer", None, Some("$HS_EXE -H $HS_HOME inner"));
+    let inner = ScriptTest::new("inner", None, Some("echo 我在第幾層？"));
 
-    assert_eq!(run!("-").unwrap(), "我在第幾層？");
-    assert_eq!(run!("outer").unwrap(), "我在第一層\n我在第幾層？");
-    assert_eq!(run!("-").unwrap(), "我在第一層\n我在第幾層？");
-    assert_eq!(run!("^2").unwrap(), "我在第幾層？");
+    inner.can_find("^2").unwrap_err();
+    outer.run("").unwrap();
+    inner.can_find("^2").unwrap();
+
+    outer.filter("--humble").run("").unwrap();
+    inner.can_find("^2").unwrap_err();
+
+    let outer_humble = ScriptTest::new(
+        "outer-humble",
+        None,
+        Some("$HS_EXE -H $HS_HOME history humble $HS_RUN_ID && $HS_EXE -H $HS_HOME inner"),
+    );
+
+    inner.can_find("-").unwrap_err();
+    outer_humble.run("").unwrap();
+    inner.can_find("-").unwrap();
 }
 
 #[test]
@@ -172,9 +179,9 @@ fn test_multifuzz() {
 
     println!("模糊搜撞在一起時的特殊行為 1. 取最新者 2. 不可為「正解」的後綴");
     let _g = setup();
-    let pref = ScriptTest::new("multifuzz", None);
-    let t1 = ScriptTest::new("multifuzz/t1", None);
-    let t2 = ScriptTest::new("multifuzz/t2", None);
+    let pref = ScriptTest::new("multifuzz", None, None);
+    let t1 = ScriptTest::new("multifuzz/t1", None, None);
+    let t2 = ScriptTest::new("multifuzz/t2", None, None);
 
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -204,12 +211,12 @@ fn test_history_rm_range() {
     println!("移除一整段事件");
     let _g = setup();
 
-    let t2 = ScriptTest::new("test2", None);
+    let t2 = ScriptTest::new("test2", None, None);
     t2.run("sep").unwrap();
     t2.run("a").unwrap();
     t2.run("b").unwrap();
 
-    let t1 = ScriptTest::new("test", None);
+    let t1 = ScriptTest::new("test", None, None);
     t1.run("sep").unwrap();
     t1.run("a").unwrap();
     t1.run("b").unwrap();
@@ -243,7 +250,7 @@ fn test_fuzz_end_with_slash() {
     println!("測試以`/`結尾的腳本名");
     let _g = setup();
 
-    let t = ScriptTest::new("test/slash", None);
+    let t = ScriptTest::new("test/slash", None, None);
     t.can_find("test/").unwrap();
     t.can_find("t/").unwrap();
     t.can_find("slash/").unwrap();

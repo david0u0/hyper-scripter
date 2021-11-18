@@ -242,34 +242,41 @@ fn test_namespace_reorder_search() {
 #[test]
 fn test_append_tags() {
     let _g = setup();
+    const CONTENT: Option<&str> = Some("echo $HS_TAGS");
     run!("tags global,test").unwrap();
-    let append_test = ScriptTest::new("append-test", Some("+append"));
-    let no_append_test = ScriptTest::new("no-append-test", Some("no-append"));
 
-    append_test.assert_tags(["global", "test", "append"], None, None);
+    pub fn assert_tags<const N: usize>(script: &ScriptTest, tags: [&str; N]) {
+        let res = script.filter("-a").run("").unwrap();
+        let mut actual_tags: Vec<_> = res.split(' ').filter(|s| !s.is_empty()).collect();
+        actual_tags.sort();
+        let mut expected_tags: Vec<_> = tags.iter().map(|s| *s).collect();
+        expected_tags.sort();
+        assert_eq!(expected_tags, actual_tags, "{:?} 的標籤不如預期", script);
+    }
+
+    let append_test = ScriptTest::new("append-test", Some("+append"), CONTENT);
+    let no_append_test = ScriptTest::new("no-append-test", Some("no-append"), CONTENT);
+
+    assert_tags(&append_test, ["global", "test", "append"]);
     no_append_test.assert_not_exist(None, None);
-    no_append_test.assert_tags(["no-append"], Some("-a"), None);
+    assert_tags(&no_append_test, ["no-append"]);
 
     run!("mv -f no-append no-append-test -t +eventually-append").unwrap();
 
-    no_append_test.assert_tags(
-        ["no-append", "eventually-append"],
-        Some("-a"),
-        Some("未能以 mv 附加標籤"),
-    );
-    append_test.assert_tags(["global", "test", "append"], None, Some("標籤被 mv 弄壞了"));
+    assert_tags(&no_append_test, ["no-append", "eventually-append"]);
+    assert_tags(&append_test, ["global", "test", "append"]);
     // 測試 ^all 的功能（無視一切先前的標籤）
-    let t1 = ScriptTest::new("non-global/namespace-test", Some("+^all"));
-    let t2 = ScriptTest::new("non-global/no-namespace-test", Some("^all"));
-    t1.assert_tags(["non-global"], Some("-a"), None);
-    t2.assert_tags([], Some("-a"), None);
+    let t1 = ScriptTest::new("non-global/namespace-test", Some("+^all"), CONTENT);
+    let t2 = ScriptTest::new("non-global/no-namespace-test", Some("^all"), CONTENT);
+    assert_tags(&t1, ["non-global"]);
+    assert_tags(&t2, []);
     // 測試 ^{some-tag} 的功能
-    let t1 = ScriptTest::new("only-test", Some("+^global"));
-    let t2 = ScriptTest::new("only-global", Some("+^test"));
-    let t3 = ScriptTest::new("nooooo", Some("^test"));
-    t1.assert_tags(["test"], None, None);
-    t2.assert_tags(["global"], None, None);
-    t3.assert_tags([], Some("-a"), None);
+    let t1 = ScriptTest::new("only-test", Some("+^global"), CONTENT);
+    let t2 = ScriptTest::new("only-global", Some("+^test"), CONTENT);
+    let t3 = ScriptTest::new("nooooo", Some("^test"), CONTENT);
+    assert_tags(&t1, ["test"]);
+    assert_tags(&t2, ["global"]);
+    assert_tags(&t3, []);
 }
 
 #[test]
@@ -323,11 +330,11 @@ fn test_redirect() {
 #[test]
 fn test_mandatory_filter() {
     let _g = setup();
-    let t1 = ScriptTest::new("prj1/t", None);
-    let t2 = ScriptTest::new("prj2/t", None);
-    let t3 = ScriptTest::new("prj1/src/t", None);
-    let t4 = ScriptTest::new("prj2/src/t", None);
-    let t5 = ScriptTest::new("hide/prj2/src/t", None);
+    let t1 = ScriptTest::new("prj1/t", None, None);
+    let t2 = ScriptTest::new("prj2/t", None, None);
+    let t3 = ScriptTest::new("prj1/src/t", None, None);
+    let t4 = ScriptTest::new("prj2/src/t", None, None);
+    let t5 = ScriptTest::new("hide/prj2/src/t", None, None);
 
     fn assert_ls_names<'a, const N: usize>(
         arr: [&'a ScriptTest; N],
@@ -427,9 +434,9 @@ fn test_ls_query() {
 #[test]
 fn test_miss_event() {
     let _g = setup();
-    let hidden = ScriptTest::new("1", Some("hide"));
-    let neglected = ScriptTest::new("3", None);
-    let normal = ScriptTest::new("2", None);
+    let hidden = ScriptTest::new("1", Some("hide"), None);
+    let neglected = ScriptTest::new("3", None, None);
+    let normal = ScriptTest::new("2", None, None);
     run!("history neglect {}", neglected.get_name()).unwrap();
 
     let test_all = || {

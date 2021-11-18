@@ -38,10 +38,6 @@ macro_rules! run {
     });
 }
 
-pub fn get_exe_abs() -> String {
-    normalize_path(EXE).unwrap().to_string_lossy().to_string()
-}
-
 #[derive(Debug)]
 enum ErrorInner {
     Other,
@@ -211,6 +207,7 @@ pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str
 }
 
 // TODO: 把整合測試的大部份地方改用這個結構
+#[derive(Debug)]
 pub struct ScriptTest {
     name: String,
 }
@@ -218,9 +215,10 @@ impl ScriptTest {
     pub fn get_name(&self) -> &str {
         &self.name
     }
-    pub fn new(name: &str, tags: Option<&str>) -> Self {
+    pub fn new(name: &str, tags: Option<&str>, content: Option<&str>) -> Self {
         let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
-        run!("e {} ={} | echo $HS_TAGS", tags_str, name).unwrap();
+        let content = content.unwrap_or("echo $NAME");
+        run!("e {} ={} | {}", tags_str, name, content).unwrap();
         ScriptTest {
             name: name.to_owned(),
         }
@@ -245,26 +243,6 @@ impl ScriptTest {
     pub fn run(&self, args: &str) -> Result<String> {
         self.filter("").run(args)
     }
-    pub fn assert_tags<const N: usize>(
-        &self,
-        tags: [&str; N],
-        args: Option<&str>,
-        msg: Option<&str>,
-    ) {
-        let s = format!("{} ={}", args.unwrap_or_default(), self.name);
-        let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
-
-        let res = run!("{}", s).expect(&format!("執行 {} 失敗{}", s, msg));
-        let mut actual_tags: Vec<_> = res.split(' ').filter(|s| !s.is_empty()).collect();
-        actual_tags.sort();
-        let mut expected_tags: Vec<_> = tags.iter().map(|s| *s).collect();
-        expected_tags.sort();
-        assert_eq!(
-            expected_tags, actual_tags,
-            "{} 的標籤不如預期{}",
-            self.name, msg
-        );
-    }
     pub fn can_find(&self, command: &str) -> Result {
         self.filter("").can_find(command)
     }
@@ -278,15 +256,14 @@ pub struct ScriptTestWithFilter<'a> {
 }
 impl<'a> ScriptTestWithFilter<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
-        let s = format!("{} ={} {}", self.filter, self.script.name, args);
-        run!("{}", s)
+        run!("{} ={} {}", self.filter, self.script.name, args)
     }
     pub fn can_find(&self, command: &str) -> Result {
-        let command = format!(
+        let res = run!(
             "{} ls --plain --grouping=none --name {}",
-            self.filter, command
-        );
-        let res = run!("{}", command)?;
+            self.filter,
+            command
+        )?;
         if res == self.script.name {
             Ok(())
         } else {

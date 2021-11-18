@@ -23,10 +23,87 @@ fn test_history_args() {
 }
 
 #[test]
-fn test_humble_and_no_trace() {
-    let _g = setup();
+fn test_no_trace() {
     // TODO
-    // 注意連續 humble 事件被刪除的後果（可能因為寫回的緣故，越刪除時間反而更新）
+}
+
+#[test]
+fn test_humble_amend_rm_id() {
+    let _g = setup();
+    // 注意刪除後 humble 事件為最新的後果（可能因為寫回的緣故，越刪除時間反而更新）
+    const CONTENT: &str = r#"
+    if [ "$1" = "h" ]; then
+        $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
+    elif [ "$1" = "r" ]; then
+        $HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID
+    elif [ "$1" = "a" ]; then
+        $HS_EXE -H $HS_HOME history amend $HS_RUN_ID do-the-amend
+    fi"#;
+
+    let test = ScriptTest::new("test", None, Some(CONTENT));
+    let baseline = ScriptTest::new("baseline", None, None);
+
+    fn assert_last(s: &ScriptTest) {
+        s.can_find("-").unwrap();
+    }
+    let assert_history = |list: &[&str]| {
+        let recorded = run!("history show {}", test.get_name()).unwrap();
+        assert_list(&recorded, list);
+    };
+
+    test.filter("--humble").run("flag-humble").unwrap();
+    assert_last(&baseline);
+    test.run("normal").unwrap();
+    assert_last(&test);
+    run!("history rm {} 1", test.get_name()).unwrap();
+    assert_last(&baseline); // `flag-humble` 為 humbe 事件，不會影響最新事件時間
+
+    test.run("h").unwrap();
+    assert_last(&baseline);
+    assert_history(&["h", "flag-humble"]);
+
+    test.run("r").unwrap();
+    assert_last(&baseline);
+    assert_history(&["h", "flag-humble"]);
+
+    test.filter("--dummy").run("r").unwrap(); // 因為是 --dummy 所以不會觸發 rm-id
+    assert_last(&test);
+    baseline.run("").unwrap();
+    test.run("r").unwrap();
+    assert_last(&baseline);
+    assert_history(&["r", "h", "flag-humble"]); // `r` 不會因為 rm-id 就被刪掉
+
+    run!("history rm {} 1", baseline.get_name()).unwrap();
+
+    test.run("normal").unwrap();
+    assert_history(&["normal", "r", "h", "flag-humble"]);
+    run!("history rm {} 1", test.get_name()).unwrap();
+    assert_last(&test); // 刪了一個還有一個
+    run!("history rm {} 1", test.get_name()).unwrap();
+    assert_last(&baseline); // `h` 為 humble，不會影響最新事件時間
+    assert_history(&["h", "flag-humble"]);
+
+    test.run("a").unwrap();
+    assert_last(&test);
+    assert_history(&["do-the-amend", "h", "flag-humble"]);
+
+    baseline.run("").unwrap();
+    test.run("h").unwrap();
+    assert_last(&baseline);
+    assert_history(&["h", "do-the-amend", "flag-humble"]);
+
+    // 測一下 --no-trace 會不會搞爛東西
+    run!("history rm {} 1..", test.get_name()).unwrap();
+    test.filter("--no-trace").run("a").unwrap();
+    test.filter("--no-trace").run("r").unwrap();
+    test.filter("--no-trace").run("h").unwrap();
+    assert_history(&[]);
+    // 測一下 --humble 會不會搞爛東西
+    test.filter("--humble").run("a").unwrap();
+    test.filter("--humble").run("r").unwrap();
+    test.filter("--humble").run("h").unwrap();
+    assert_history(&["h", "do-the-amend"]);
+    assert_last(&baseline);
 }
 
 #[test]
@@ -169,10 +246,10 @@ fn test_history_args_rm_last() {
 #[test]
 fn test_neglect_archaeology() {
     let _g = setup();
-    let t1 = ScriptTest::new("1", None);
-    let t2 = ScriptTest::new("2", None);
-    let neg1 = ScriptTest::new("neg1", None);
-    let neg2 = ScriptTest::new("neg2", None);
+    let t1 = ScriptTest::new("1", None, None);
+    let t2 = ScriptTest::new("2", None, None);
+    let neg1 = ScriptTest::new("neg1", None, None);
+    let neg2 = ScriptTest::new("neg2", None, None);
     t1.can_find_by_name().unwrap();
     t2.can_find_by_name().unwrap();
     neg1.can_find_by_name().unwrap();

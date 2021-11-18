@@ -56,4 +56,5 @@ pub struct Event<'a> {
     pub data: EventData<'a>,
     pub script_id: i64,
     pub time: NaiveDateTime,
+    pub humble: bool,
 }

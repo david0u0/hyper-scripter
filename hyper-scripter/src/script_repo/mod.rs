@@ -165,21 +165,28 @@ impl DBEnv {
         }
 
         let mut last_event_id = 0;
+        macro_rules! record_event {
+            ($time:expr, $data:expr) => {
+                self.historian.record(&Event {
+                    script_id: info.id,
+                    humble: matches!(self.trace_opt, TraceOption::Humble),
+                    time: $time,
+                    data: $data,
+                })
+            };
+        }
 
         if let Some(time) = info.exec_done_time.as_ref() {
             if let Some(&(code, main_event_id)) = time.data() {
                 log::debug!("{:?} 的執行完畢事件", info.name);
-                last_event_id = self
-                    .historian
-                    .record(&Event {
-                        script_id: info.id,
-                        data: EventData::ExecDone {
-                            code,
-                            main_event_id,
-                        },
-                        time: **time,
-                    })
-                    .await?;
+                last_event_id = record_event!(
+                    **time,
+                    EventData::ExecDone {
+                        code,
+                        main_event_id,
+                    }
+                )
+                .await?;
 
                 if last_event_id != 0 {
                     self.update_last_time(info).await?;
@@ -194,54 +201,30 @@ impl DBEnv {
 
         if info.read_time.has_changed() {
             log::debug!("{:?} 的讀取事件", info.name);
-            last_event_id = self
-                .historian
-                .record(&Event {
-                    script_id: info.id,
-                    data: EventData::Read,
-                    time: *info.read_time,
-                })
-                .await?;
+            last_event_id = record_event!(*info.read_time, EventData::Read).await?;
         }
         if info.write_time.has_changed() {
             log::debug!("{:?} 的寫入事件", info.name);
-            last_event_id = self
-                .historian
-                .record(&Event {
-                    script_id: info.id,
-                    data: EventData::Write,
-                    time: *info.write_time,
-                })
-                .await?;
+            last_event_id = record_event!(*info.write_time, EventData::Write).await?;
         }
         if let Some(time) = info.miss_time.as_ref() {
             if time.has_changed() {
                 log::debug!("{:?} 的錯過事件", info.name);
-                last_event_id = self
-                    .historian
-                    .record(&Event {
-                        script_id: info.id,
-                        data: EventData::Miss,
-                        time: **time,
-                    })
-                    .await?;
+                last_event_id = record_event!(**time, EventData::Miss).await?;
             }
         }
         if let Some(time) = info.exec_time.as_ref() {
             if let Some((content, args, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
-                last_event_id = self
-                    .historian
-                    .record(&Event {
-                        script_id: info.id,
-                        data: EventData::Exec {
-                            content,
-                            args,
-                            dir: dir.as_deref(),
-                        },
-                        time: **time,
-                    })
-                    .await?;
+                last_event_id = record_event!(
+                    **time,
+                    EventData::Exec {
+                        content,
+                        args,
+                        dir: dir.as_deref(),
+                    }
+                )
+                .await?;
             }
         }
 

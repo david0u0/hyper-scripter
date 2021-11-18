@@ -277,8 +277,9 @@ complete -c hs -n "__fish_seen_subcommand_from history" -s A -l archaeology -d '
 complete -c hs -n "__fish_seen_subcommand_from history" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_prev_arg_in history" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_prev_arg_in history" -f -a "rm"
-complete -c hs -n "__fish_prev_arg_in history" -f -a "rm-id" -d 'Remove history by the event\'s id
+complete -c hs -n "__fish_prev_arg_in history" -f -a "rm-id" -d 'Remove an event by it\'s id.
 Useful if you want to keep those illegal arguments from polluting the history.'
+complete -c hs -n "__fish_prev_arg_in history" -f -a "humble" -d 'Humble an event by it\'s id.'
 complete -c hs -n "__fish_prev_arg_in history" -f -a "show"
 complete -c hs -n "__fish_prev_arg_in history" -f -a "neglect"
 complete -c hs -n "__fish_prev_arg_in history" -f -a "amend"

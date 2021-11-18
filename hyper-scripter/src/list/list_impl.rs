@@ -2,7 +2,7 @@ use super::{
     exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grouping,
     ListOptions,
 };
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
 use crate::script_repo::ScriptRepo;

@@ -284,9 +284,11 @@ pub enum History {
     // TODO: 好想把它寫在 history rm 裡面...
     #[structopt(
         name = "rm-id",
-        about = "Remove history by the event's id\nUseful if you want to keep those illegal arguments from polluting the history."
+        about = "Remove an event by it's id.\nUseful if you want to keep those illegal arguments from polluting the history."
     )]
     RMID { event_id: u64 }, // TODO: 測試
+    #[structopt(about = "Humble an event by it's id")]
+    Humble { event_id: u64 }, // TODO: 測試
     Show {
         #[structopt(default_value = "-", parse(try_from_str))]
         script: ScriptQuery,

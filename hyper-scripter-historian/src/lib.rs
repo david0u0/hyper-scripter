@@ -23,8 +23,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
     sqlx::query!(
         "
         INSERT INTO events
-        (script_id, type, cmd, args, content, time, main_event_id, dir)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+        (script_id, type, cmd, args, content, time, main_event_id, dir, humble)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
         ",
         event.script_id,
         event.ty,
@@ -33,7 +33,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.content,
         event.time,
         event.main_event_id,
-        event.dir
+        event.dir,
+        event.humble
     )
     .execute(pool)
     .await?;
@@ -52,15 +53,17 @@ struct DBEvent<'a> {
     args: Option<&'a str>,
     dir: Option<&'a str>,
     content: Option<&'a str>,
+    humble: bool,
     main_event_id: i64,
 }
 impl<'a> DBEvent<'a> {
-    fn new(script_id: i64, time: NaiveDateTime, ty: i8, cmd: &'a str) -> Self {
+    fn new(script_id: i64, time: NaiveDateTime, ty: i8, cmd: &'a str, humble: bool) -> Self {
         DBEvent {
             script_id,
             time,
             ty,
             cmd,
+            humble,
             main_event_id: ZERO,
             content: None,
             args: None,
@@ -77,6 +80,10 @@ impl<'a> DBEvent<'a> {
     }
     fn content(mut self, value: &'a str) -> Self {
         self.content = Some(value);
+        self
+    }
+    fn humble(mut self) -> Self {
+        self.humble = true;
         self
     }
     fn main_event_id(mut self, value: i64) -> Self {
@@ -116,11 +123,16 @@ macro_rules! select_last_arg {
 
 macro_rules! ignore_arg {
     ($pool:expr, $cond:literal, $($var:expr),+) => {
+        ignore_or_humble_arg!("ignored", $pool, $cond, $($var),*)
+    }
+}
+macro_rules! ignore_or_humble_arg {
+    ($ignore_or_humble:literal, $pool:expr, $cond:literal, $($var:expr),+) => {
         let exec_ty = EventType::Exec.get_code();
         let done_ty = EventType::ExecDone.get_code();
         sqlx::query!(
             "
-            UPDATE events SET ignored = true
+            UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND
             "
                 + $cond,
@@ -132,7 +144,7 @@ macro_rules! ignore_arg {
 
         sqlx::query!(
             "
-            UPDATE events SET ignored = true
+            UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
                 SELECT id FROM events WHERE type = ? AND "
                 + $cond
@@ -143,8 +155,7 @@ macro_rules! ignore_arg {
             exec_ty,
             $($var),*
         )
-        .execute(&*$pool)
-        .await?;
+        .execute(&*$pool).await?
     };
 }
 
@@ -189,9 +200,8 @@ impl Historian {
     pub async fn record(&self, event: &Event<'_>) -> Result<i64, DBError> {
         log::debug!("記錄事件 {:?}", event);
         let ty = event.data.get_type().get_code();
-        let time = event.time;
         let cmd = std::env::args().collect::<Vec<_>>().join(" ");
-        let mut db_event = DBEvent::new(event.script_id, time, ty, &cmd);
+        let mut db_event = DBEvent::new(event.script_id, event.time, ty, &cmd, event.humble);
         let id = match &event.data {
             EventData::Write | EventData::Read | EventData::Miss => {
                 self.raw_record(db_event).await?
@@ -225,19 +235,30 @@ impl Historian {
                 main_event_id,
             } => {
                 let exec_ty = EventType::Exec.get_code();
-                let ignored_res = sqlx::query!(
-                    "SELECT ignored FROM events WHERE type = ? AND id = ?",
+                let main_event = sqlx::query!(
+                    "SELECT ignored, humble FROM events WHERE type = ? AND id = ?",
                     exec_ty,
                     main_event_id
                 )
                 .fetch_one(&*self.pool.read().unwrap())
                 .await?;
-                if ignored_res.ignored {
+                if main_event.ignored || main_event.humble {
                     return Ok(ZERO);
+                } else if main_event.humble {
+                    db_event.humble();
                 }
+
                 let code = code.to_string();
-                self.raw_record(db_event.content(&code).main_event_id(*main_event_id))
-                    .await?
+                let id = self
+                    .raw_record(db_event.content(&code).main_event_id(*main_event_id))
+                    .await?;
+
+                if main_event.humble {
+                    // XXX: 用很怪異的方式告訴外面的人不要記錄最新時間，醜死
+                    0
+                } else {
+                    id
+                }
             }
         };
         Ok(id)
@@ -295,8 +316,19 @@ impl Historian {
         })
     }
     pub async fn ignore_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+        self.process_args_by_id(false, event_id).await
+    }
+    pub async fn humble_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+        self.process_args_by_id(true, event_id).await
+    }
+    /// humble or ignore
+    async fn process_args_by_id(
+        &self,
+        is_humble: bool,
+        event_id: i64,
+    ) -> Result<Option<IgnoreResult>, DBError> {
         if event_id == ZERO {
-            log::info!("試圖忽略零事件，什麼都不做");
+            log::info!("試圖處理零事件，什麼都不做");
             return Ok(None);
         }
 
@@ -305,7 +337,7 @@ impl Historian {
         let latest_record = sqlx::query!(
             "
             SELECT id, script_id FROM events
-            WHERE type= ? AND script_id = (SELECT script_id FROM events WHERE id = ?)
+            WHERE type = ? AND script_id = (SELECT script_id FROM events WHERE id = ?)
             ORDER BY time DESC LIMIT 1
             ",
             exec_ty,
@@ -315,10 +347,16 @@ impl Historian {
         .await?;
         // TODO: check if this event is exec?
 
-        ignore_arg!(pool, "id = ?", event_id);
+        if is_humble {
+            ignore_or_humble_arg!("humble", pool, "id = ?", event_id);
+        } else {
+            ignore_arg!(pool, "id = ?", event_id);
+        }
 
         if latest_record.id == event_id {
-            log::info!("ignore last args");
+            // NOTE: 若 event_id 為最新但已被 ignored/humble，仍會被抓成 last_record 並進入這裡
+            // 但應該不致於有太大的效能問題
+            log::info!("process last args");
             let ret = self.make_ignore_result(latest_record.script_id).await?;
             return Ok(Some(ret));
         }
@@ -347,7 +385,7 @@ impl Historian {
             ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args.args);
         }
 
-        if offset == 0 {
+        if offset == ZERO {
             log::info!("ignore last args");
             let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));
@@ -370,7 +408,7 @@ impl Historian {
 
         ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
 
-        if offset == 0 {
+        if offset == ZERO {
             log::info!("ignore last args");
             let ret = self.make_ignore_result(script_id).await?;
             return Ok(Some(ret));
@@ -408,7 +446,7 @@ impl Historian {
         let time = sqlx::query!(
             "
             SELECT time FROM events
-            WHERE type = ? AND script_id = ? AND NOT ignored
+            WHERE type = ? AND script_id = ? AND NOT ignored AND NOT humble
             ORDER BY time DESC LIMIT 1
             ",
             ty,

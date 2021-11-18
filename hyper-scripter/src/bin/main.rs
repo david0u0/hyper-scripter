@@ -478,19 +478,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd: History::RMID { event_id },
         } => {
-            let res = historian.ignore_args_by_id(event_id as i64).await?;
-            if let Some(res) = res {
-                let mut entry = repo.get_mut_by_id(res.script_id).ok_or_else(|| {
-                    log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
-                    Error::ScriptNotFound(res.script_id.to_string())
-                })?;
-                entry
-                    .update(|info| {
-                        info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
-                        info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
-                    })
-                    .await?;
-            }
+            process_event_by_id(false, &mut repo, &historian, event_id).await?;
+        }
+        Subs::History {
+            subcmd: History::Humble { event_id },
+        } => {
+            process_event_by_id(true, &mut repo, &historian, event_id).await?;
         }
         Subs::History {
             subcmd: History::Amend { event_id, args },
@@ -572,4 +565,31 @@ fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag
     let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k, v)).collect();
     v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
     v.into_iter().map(|(k, _)| k)
+}
+
+async fn process_event_by_id(
+    is_humble: bool,
+    repo: &mut ScriptRepo,
+    historian: &Historian,
+    event_id: u64,
+) -> Result {
+    let event_id = event_id as i64;
+    let res = if is_humble {
+        historian.humble_args_by_id(event_id).await?
+    } else {
+        historian.ignore_args_by_id(event_id).await?
+    };
+    if let Some(res) = res {
+        let mut entry = repo.get_mut_by_id(res.script_id).ok_or_else(|| {
+            log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
+            Error::ScriptNotFound(res.script_id.to_string())
+        })?;
+        entry
+            .update(|info| {
+                info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
+                info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+            })
+            .await?;
+    }
+    Ok(())
 }

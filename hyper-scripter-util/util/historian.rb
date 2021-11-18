@@ -61,7 +61,6 @@ class Historian < Selector
     end
 
     warn "historian for #{@script_name}"
-    HS_ENV.do_hs("cat =#{@script_name}!", false)
 
     super(get_options, offset: @offset + 1)
 
@@ -160,13 +159,21 @@ class Historian < Selector
 
   # prevent the call to `util/historian` screw up historical query
   # e.g. hs util/historian !
+  def self.humble_run_id
+    HS_ENV.do_hs("history humble #{HS_ENV.env_var(:run_id)}", false)
+  end
+
   def self.rm_run_id
     HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
+  end
+
+  def read_script
+    HS_ENV.do_hs("cat =#{@script_name}!", false)
   end
 end
 
 if __FILE__ == $0
-  Historian.rm_run_id
+  Historian.humble_run_id
   def split_args(args)
     index = args.index('--')
     if index.nil?
@@ -178,5 +185,6 @@ if __FILE__ == $0
   sequence, args = split_args(ARGV)
 
   historian = Historian.new(args)
+  historian.read_script
   historian.run_as_main(sequence: sequence)
 end

@@ -25,6 +25,11 @@ pub enum Completion {
         #[structopt(required = true, min_values = 1)]
         args: Vec<String>,
     },
+    #[structopt(settings = NO_FLAG_SETTINGS)]
+    NoSubcommand {
+        #[structopt(required = true, min_values = 1)]
+        args: Vec<String>,
+    },
 }
 
 impl Completion {

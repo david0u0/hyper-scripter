@@ -133,33 +133,43 @@ complete -k -c hs -n "__hs_is_alias" -x -a "(__hs_alias_completion)"
 
 complete -k -c hs -n "__hs_not_run_arg_or_alias" -x -a "(__hs_list_scripts)"
 
-complete -c hs -n "__fish_use_subcommand" -s H -l hs-home -d 'Path to hyper script home'
-complete -k -c hs -n "__fish_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
-complete -c hs -n "__fish_use_subcommand" -l recent -d 'Show scripts within recent days.'
-complete -c hs -n "__fish_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
-complete -c hs -n "__fish_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"
-complete -c hs -n "__fish_use_subcommand" -l no-trace -d 'Do not record history'
-complete -c hs -n "__fish_use_subcommand" -l humble -d 'Do not affect script time (but will still record history)'
-complete -c hs -n "__fish_use_subcommand" -s A -l archaeology -d 'Show scripts NOT within recent days'
-complete -c hs -n "__fish_use_subcommand" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
-complete -c hs -n "__fish_use_subcommand" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_use_subcommand" -s h -l help -d 'Prints help information'
-complete -c hs -n "__fish_use_subcommand" -s V -l version -d 'Prints version information'
+function __hs_use_subcommand
+    set cmd (commandline -j)
+    set cmd_arr (string split ' ' $cmd)
+    if [ -n "$cmd_arr[-1]" ]
+        # remove the last argument
+        set cmd "$cmd_arr[1..-2]"
+    end
+    eval "command hs completion no-subcommand $cmd" 2>/dev/null
+end
 
-complete -c hs -n "__fish_use_subcommand" -f -a "(__hs_list_alias)"
+complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -F
+complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.'
+complete -c hs -n "__hs_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
+complete -c hs -n "__hs_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"
+complete -c hs -n "__hs_use_subcommand" -l no-trace -d 'Do not record history'
+complete -c hs -n "__hs_use_subcommand" -l humble -d 'Do not affect script time (but will still record history)'
+complete -c hs -n "__hs_use_subcommand" -s A -l archaeology -d 'Show scripts NOT within recent days'
+complete -c hs -n "__hs_use_subcommand" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
+complete -c hs -n "__hs_use_subcommand" -l timeless -d 'Show scripts of all time.'
+complete -c hs -n "__hs_use_subcommand" -s h -l help -d 'Prints help information'
+complete -c hs -n "__hs_use_subcommand" -s V -l version -d 'Prints version information'
 
-complete -c hs -n "__fish_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
-complete -c hs -n "__fish_use_subcommand" -f -a "edit" -d 'Edit hyper script'
-complete -c hs -n "__fish_use_subcommand" -f -a "alias" -d 'Manage alias'
-complete -c hs -n "__fish_use_subcommand" -f -a "run" -d 'Run the script'
-complete -c hs -n "__fish_use_subcommand" -f -a "which" -d 'Execute the script query and get the exact file'
-complete -c hs -n "__fish_use_subcommand" -f -a "cat" -d 'Print the script to standard output'
-complete -c hs -n "__fish_use_subcommand" -f -a "rm" -d 'Remove the script'
-complete -c hs -n "__fish_use_subcommand" -f -a "ls" -d 'List hyper scripts'
-complete -c hs -n "__fish_use_subcommand" -f -a "cp" -d 'Copy the script to another one'
-complete -c hs -n "__fish_use_subcommand" -f -a "mv" -d 'Move the script to another one'
-complete -c hs -n "__fish_use_subcommand" -f -a "tags" -d 'Manage script tags. If a tag filter is given, store it to config, otherwise show tag information.'
-complete -c hs -n "__fish_use_subcommand" -f -a "history" -d 'Manage script history'
+complete -c hs -n "__hs_use_subcommand" -f -a "(__hs_list_alias)"
+
+complete -c hs -n "__hs_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
+complete -c hs -n "__hs_use_subcommand" -f -a "edit" -d 'Edit hyper script'
+complete -c hs -n "__hs_use_subcommand" -f -a "alias" -d 'Manage alias'
+complete -c hs -n "__hs_use_subcommand" -f -a "run" -d 'Run the script'
+complete -c hs -n "__hs_use_subcommand" -f -a "which" -d 'Execute the script query and get the exact file'
+complete -c hs -n "__hs_use_subcommand" -f -a "cat" -d 'Print the script to standard output'
+complete -c hs -n "__hs_use_subcommand" -f -a "rm" -d 'Remove the script'
+complete -c hs -n "__hs_use_subcommand" -f -a "ls" -d 'List hyper scripts'
+complete -c hs -n "__hs_use_subcommand" -f -a "cp" -d 'Copy the script to another one'
+complete -c hs -n "__hs_use_subcommand" -f -a "mv" -d 'Move the script to another one'
+complete -c hs -n "__hs_use_subcommand" -f -a "tags" -d 'Manage script tags. If a tag filter is given, store it to config, otherwise show tag information.'
+complete -c hs -n "__hs_use_subcommand" -f -a "history" -d 'Manage script history'
 
 complete -k -c hs -n "__fish_seen_subcommand_from help" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
 complete -c hs -n "__fish_seen_subcommand_from help" -l recent -d 'Show scripts within recent days.'

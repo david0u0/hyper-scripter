@@ -94,6 +94,13 @@ pub async fn handle_completion(comp: Completion) -> Result {
 
             print_iter(scripts.iter().map(|s| s.name.key()), " ");
         }
+        Completion::NoSubcommand { args } => {
+            if let Ok(root) = parse_alias_root(&args) {
+                if root.subcmd.is_some() {
+                    return Err(Error::Completion);
+                }
+            } // else: 解析錯誤當然不可能有子命令啦
+        }
         Completion::Alias { args } => {
             let root = parse_alias_root(&args)?;
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref())?;

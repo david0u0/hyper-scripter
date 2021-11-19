@@ -206,8 +206,8 @@ pub enum Subs {
     Run {
         #[structopt(long, help = "Add a dummy run history instead of actually running it")]
         dummy: bool,
-        #[structopt(long, short, default_value = "1")]
-        repeat: u64,
+        #[structopt(long, short)]
+        repeat: Option<u64>,
         #[structopt(long, short, help = "Use arguments from last run")]
         previous_args: bool,
         #[structopt(long, short, requires = "previous-args")]

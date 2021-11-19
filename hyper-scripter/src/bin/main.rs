@@ -225,7 +225,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         } => {
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             main_util::run_n_times(
-                repeat,
+                repeat.unwrap_or(1),
                 dummy,
                 &mut entry,
                 args,

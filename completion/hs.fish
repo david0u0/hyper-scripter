@@ -103,6 +103,11 @@ function __hs_not_run_arg_or_alias
 end
 
 function __hs_list_alias
+    set cmd_arr (string split ' ' (commandline -j))
+    if [ $cmd_arr[2] = '--no-alias' ]
+        return
+    end
+
     __hs_extract_home_and_run alias --short
 end
 
@@ -120,13 +125,14 @@ function __hs_alias_completion
     set orig_cmd (commandline -j)
     set cmd (__hs_expand_alias $orig_cmd)
 
-    set cmd_arr (string split ' ' $orig_cmd)
-    if [ -z "$cmd_arr[-1]" ]
+    set orig_cmd_arr (string split ' ' $orig_cmd)
+    if [ -z "$orig_cmd_arr[-1]" ]
         # preserve the last white space
         set space ' '
     end
+    set cmd_arr (string split ' ' $cmd)
 
-    complete -C "$cmd$space"
+    complete -C "hs --no-alias $cmd_arr[2..]$space"
 end
 
 complete -k -c hs -n "__hs_is_alias" -x -a "(__hs_alias_completion)"
@@ -145,7 +151,7 @@ end
 
 complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -F
 complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
-complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.'
+complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.' -r -f -a ""
 complete -c hs -n "__hs_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
 complete -c hs -n "__hs_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"
 complete -c hs -n "__hs_use_subcommand" -l no-trace -d 'Do not record history'

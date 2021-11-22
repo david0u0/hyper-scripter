@@ -6,7 +6,6 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
-use hyper_scripter_historian::Historian;
 use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
@@ -160,7 +159,6 @@ pub async fn run_n_times(
     dummy: bool,
     entry: &mut RepoEntry<'_>,
     mut args: Vec<String>,
-    historian: Historian,
     res: &mut Vec<Error>,
     use_previous_args: bool,
     dir: Option<PathBuf>,
@@ -169,6 +167,7 @@ pub async fn run_n_times(
 
     if use_previous_args {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
+        let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
             None => log::warn!("無前一次參數，當作空的"),
             Some(arg_str) => {

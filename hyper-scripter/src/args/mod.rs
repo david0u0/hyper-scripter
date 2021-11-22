@@ -527,7 +527,7 @@ mod test {
             Some(Subs::Run {
                 dummy: true,
                 previous_args: false,
-                repeat: 42,
+                repeat: Some(42),
                 dir: None,
                 script_query,
                 args,

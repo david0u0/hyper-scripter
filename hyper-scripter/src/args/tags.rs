@@ -25,7 +25,7 @@ pub enum TagsSubs {
     LS {
         #[structopt(long, short)]
         known: bool,
-        #[structopt(long, short, conflicts_with = "after")]
+        #[structopt(long, short, conflicts_with = "known")]
         named: bool,
     },
     Toggle {

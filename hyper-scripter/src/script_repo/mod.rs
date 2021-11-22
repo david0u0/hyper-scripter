@@ -29,9 +29,9 @@ enum TraceOption {
 
 #[derive(Debug)]
 pub struct DBEnv {
+    pub info_pool: SqlitePool,
+    pub historian: Historian,
     trace_opt: TraceOption,
-    info_pool: SqlitePool,
-    historian: Historian,
     modifies_script: bool,
 }
 

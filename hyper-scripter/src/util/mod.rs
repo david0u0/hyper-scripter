@@ -219,7 +219,10 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-fn get_or_create_tamplate(ty: &ScriptType) -> Result<String> {
+pub fn get_or_create_tamplate(ty: &ScriptType, force: bool) -> Result<String> {
+    if !force {
+        Config::get().get_script_conf(&ty)?; // 確認類型存在與否
+    }
     let tmpl_path = get_template_path(ty)?;
     if tmpl_path.exists() {
         return read_file(&tmpl_path);
@@ -303,7 +306,8 @@ pub fn prepare_script<T: AsRef<str>>(
                 "name": script.name.key().to_owned(),
                 "content": content,
             });
-            let template = get_or_create_tamplate(&script.ty)?;
+            // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
+            let template = get_or_create_tamplate(&script.ty, true)?;
             handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
             for line in content {

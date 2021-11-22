@@ -65,7 +65,7 @@ pub async fn handle_completion(comp: Completion) -> Result {
         Completion::LS { name, args } => {
             let mut new_root = match Root::from_iter_safe(args) {
                 Ok(Root {
-                    subcmd: Some(Subs::Tags(_)),
+                    subcmd: Some(Subs::Tags(_) | Subs::Types(_)),
                     ..
                 }) => {
                     // TODO: 在補全腳本中處理，而不要在這邊

@@ -19,6 +19,8 @@ mod completion;
 pub use completion::*;
 mod tags;
 pub use tags::*;
+mod types;
+pub use types::*;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
@@ -239,8 +241,8 @@ pub enum Subs {
     },
     #[structopt(about = "List hyper scripts")]
     LS(List),
-    #[structopt(about = "List all existing types")]
-    Types,
+    #[structopt(about = "Manage script types")]
+    Types(Types),
     #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(long, short)]
@@ -412,6 +414,9 @@ impl Root {
             }
             Some(Subs::Tags(tags)) => {
                 tags.sanitize();
+            }
+            Some(Subs::Types(types)) => {
+                types.sanitize();
             }
             None => {
                 log::info!("無參數模式");

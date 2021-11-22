@@ -174,6 +174,7 @@ complete -c hs -n "__hs_use_subcommand" -f -a "rm" -d 'Remove the script'
 complete -c hs -n "__hs_use_subcommand" -f -a "ls" -d 'List hyper scripts'
 complete -c hs -n "__hs_use_subcommand" -f -a "cp" -d 'Copy the script to another one'
 complete -c hs -n "__hs_use_subcommand" -f -a "mv" -d 'Move the script to another one'
+complete -c hs -n "__hs_use_subcommand" -f -a "types" -d 'Manage script types'
 complete -c hs -n "__hs_use_subcommand" -f -a "tags" -d 'Manage script tags. If a tag filter is given, store it to config, otherwise show tag information.'
 complete -c hs -n "__hs_use_subcommand" -f -a "history" -d 'Manage script history'
 
@@ -235,6 +236,9 @@ complete -c hs -n "__fish_seen_subcommand_from rm" -s V -l version -d 'Prints ve
 complete -c hs -n "__fish_seen_subcommand_from rm" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from rm" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from rm" -l timeless -d 'Show scripts of all time.'
+
+complete -c hs -n "__fish_prev_arg_in types" -f -a "template"
+complete -c hs -n "__fish_seen_subcommand_from template" -f -a "(__hs_list_types)"
 
 complete -c hs -n "__fish_seen_subcommand_from ls" -l grouping -d 'Grouping style.' -r -f -a "tag tree none"
 complete -k -c hs -n "__fish_seen_subcommand_from ls" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"

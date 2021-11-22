@@ -1,5 +1,5 @@
 use fxhash::FxHashMap as HashMap;
-use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs};
+use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -262,8 +262,16 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 println!("{}", msg);
             }
         }
-        Subs::Types => {
+        Subs::Types(Types {
+            subcmd: Some(TypesSubs::LS),
+        }) => {
             print_iter(conf.types.keys(), " ");
+        }
+        Subs::Types(Types {
+            subcmd: Some(TypesSubs::Template { ty }),
+        }) => {
+            let template = util::get_or_create_tamplate(&ty, false)?;
+            println!("{}", template);
         }
         Subs::LS(List {
             long,

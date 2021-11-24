@@ -167,7 +167,7 @@ complete -c hs -n "__hs_use_subcommand" -f -a "(__hs_list_alias)"
 complete -c hs -n "__hs_use_subcommand" -f -a "help" -d 'Prints this message, the help of the given subcommand(s), or a script\'s help message.'
 complete -c hs -n "__hs_use_subcommand" -f -a "edit" -d 'Edit hyper script'
 complete -c hs -n "__hs_use_subcommand" -f -a "alias" -d 'Manage alias'
-complete -c hs -n "__hs_use_subcommand" -f -a "run" -d 'Run the script'
+# complete -c hs -n "__hs_use_subcommand" -f -a "run" -d 'Run the script' # very rarely needed
 complete -c hs -n "__hs_use_subcommand" -f -a "which" -d 'Execute the script query and get the exact file'
 complete -c hs -n "__hs_use_subcommand" -f -a "cat" -d 'Print the script to standard output'
 complete -c hs -n "__hs_use_subcommand" -f -a "rm" -d 'Remove the script'

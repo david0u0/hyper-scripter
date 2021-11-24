@@ -164,6 +164,10 @@ pub async fn run_n_times(
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
+    let ctrl_c_res = ctrlc::set_handler(|| {});
+    if ctrl_c_res.is_err() {
+        log::warn!("設置 ctrl-c 回調失敗 {:?}", ctrl_c_res);
+    }
 
     if use_previous_args {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;

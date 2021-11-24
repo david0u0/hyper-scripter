@@ -157,8 +157,8 @@ pub async fn do_script_query_strict<'b>(
     Err(Error::ScriptNotFound(script_query.to_string()))
 }
 
-static CTRLC_HANDLE: Once = Once::new();
 fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
+    static CTRLC_HANDLE: Once = Once::new();
     use colored::{Color, Colorize};
     use console::{Key, Term};
 
@@ -180,7 +180,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
             std::process::exit(1);
         });
         if term_hook_res.is_err() {
-            log::warn!("設置 ctrl-c 回調失敗");
+            log::warn!("設置 ctrl-c 回調失敗 {:?}", term_hook_res);
         }
     });
 

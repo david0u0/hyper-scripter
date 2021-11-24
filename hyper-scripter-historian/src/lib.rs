@@ -385,12 +385,9 @@ impl Historian {
             ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args.args);
         }
 
-        if offset == ZERO {
-            log::info!("ignore last args");
-            let ret = self.make_ignore_result(script_id).await?;
-            return Ok(Some(ret));
-        }
-        Ok(None)
+        log::info!("ignore last args");
+        let ret = self.make_ignore_result(script_id).await?;
+        Ok(Some(ret))
     }
     pub async fn ignore_args(
         &self,
@@ -408,12 +405,9 @@ impl Historian {
 
         ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
 
-        if offset == ZERO {
-            log::info!("ignore last args");
-            let ret = self.make_ignore_result(script_id).await?;
-            return Ok(Some(ret));
-        }
-        Ok(None)
+        log::info!("ignore last args");
+        let ret = self.make_ignore_result(script_id).await?;
+        Ok(Some(ret))
     }
 
     pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {

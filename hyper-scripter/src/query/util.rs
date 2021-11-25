@@ -4,10 +4,9 @@ use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::ScriptInfo;
 use crate::script_repo::{RepoEntry, ScriptRepo};
-use crate::util::get_display_type;
+use crate::util::{get_display_type, hijack_ctrlc_once};
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
-use std::sync::Once;
 
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
@@ -158,7 +157,6 @@ pub async fn do_script_query_strict<'b>(
 }
 
 fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
-    static CTRLC_HANDLE: Once = Once::new();
     use colored::{Color, Colorize};
     use console::{Key, Term};
 
@@ -173,16 +171,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
     );
 
     term.hide_cursor()?;
-    CTRLC_HANDLE.call_once(|| {
-        let term = term.clone();
-        let term_hook_res = ctrlc::set_handler(move || {
-            let _ = term.show_cursor();
-            std::process::exit(1);
-        });
-        if term_hook_res.is_err() {
-            log::warn!("設置 ctrl-c 回調失敗 {:?}", term_hook_res);
-        }
-    });
+    hijack_ctrlc_once();
 
     let ok = loop {
         term.write_str(&msg)?;

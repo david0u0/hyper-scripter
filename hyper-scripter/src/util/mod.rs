@@ -401,3 +401,15 @@ pub fn option_map_res<T, F: FnOnce(T) -> Result<T>>(opt: Option<T>, f: F) -> Res
         None => None,
     })
 }
+
+pub fn hijack_ctrlc_once() {
+    use std::sync::Once;
+    static CTRLC_HANDLE: Once = Once::new();
+    log::debug!("劫持 ctrl-c 回調");
+    CTRLC_HANDLE.call_once(|| {
+        let res = ctrlc::set_handler(|| {});
+        if res.is_err() {
+            log::warn!("設置 ctrl-c 回調失敗 {:?}", res);
+        }
+    });
+}

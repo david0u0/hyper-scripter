@@ -80,7 +80,7 @@ color = 'bright red' # colors shown in `hs ls` and other places.
 # tmplate is powred by handlebars
 template = [
     '# Hello, scripter!',
-    '''Dir.chdir("#{ENV['HOME']}/{{birthplace}}")''',
+    '''Dir.chdir("#{ENV['HOME']}/{{birthplace_rel}}")''',
     "NAME = '{{name}}'",
     '',
     'def {{name}}',

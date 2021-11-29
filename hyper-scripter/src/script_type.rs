@@ -11,10 +11,10 @@ const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
 
 set -e
-{{#if birthplace_in_home}}
-cd ~/{{birthplace}}
+{{#if birthplace_rel_in_home}}
+cd ~/{{birthplace_rel}}
 {{else}}
-cd {{birthplace_abs}}
+cd {{birthplace}}
 {{/if}}
 {{#each content}}{{{this}}}
 {{/each}}";
@@ -23,11 +23,11 @@ const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 // [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
 
 process.chdir(require('os').homedir());
-{{#if birthplace_in_home}}
+{{#if birthplace_rel_in_home}}
 process.chdir(process.env.HOME);
-process.chdir('{{birthplace}}');
+process.chdir('{{birthplace_rel}}');
 {{else}}
-process.chdir('{{birthplace_abs}}');
+process.chdir('{{birthplace}}');
 {{/if}}
 let spawn = require('child_process').spawnSync;
 spawn('test', [], { stdio: 'inherit' });
@@ -50,10 +50,10 @@ if [ $? = 0 ]; then
 fi
 
 set -e
-{{#if birthplace_in_home}}
-cd ~/{{birthplace}}
+{{#if birthplace_rel_in_home}}
+cd ~/{{birthplace_rel}}
 {{else}}
-cd {{birthplace_abs}}
+cd {{birthplace}}
 {{/if}}
 tmux new-session -s $NAME -d \"{{{content.0}}}; $SHELL\" || exit 1
 tmux split-window -h \"{{{content.1}}}; $SHELL\"
@@ -63,10 +63,10 @@ tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR - Help message for env var `VAR` goes here
-{{#if birthplace_in_home}}
-Dir.chdir(\"#{ENV['HOME']}/{{birthplace}}\")
+{{#if birthplace_rel_in_home}}
+Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
 {{else}}
-Dir.chdir(\"{{birthplace_abs}}\")
+Dir.chdir(\"{{birthplace}}\")
 {{/if}}
 {{#each content}}{{{this}}}
 {{/each}} ";

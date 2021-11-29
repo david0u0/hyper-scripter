@@ -300,8 +300,8 @@ pub fn prepare_script<T: AsRef<str>>(
     let has_content = !content.is_empty();
     let is_new = !path.exists();
     if is_new {
-        let birthplace_abs = normalize_path(".")?;
-        let birthplace = relative_to_home(&birthplace_abs);
+        let birthplace = normalize_path(".")?;
+        let birthplace_rel = relative_to_home(&birthplace);
 
         // NOTE: 創建資料夾和檔案
         if let Some(parent) = path.parent() {
@@ -313,9 +313,9 @@ pub fn prepare_script<T: AsRef<str>>(
         if !no_template {
             let content: Vec<_> = content.collect();
             let info = json!({
-                "birthplace_in_home": birthplace.is_some(),
+                "birthplace_in_home": birthplace_rel.is_some(),
+                "birthplace_rel": birthplace_rel,
                 "birthplace": birthplace,
-                "birthplace_abs": birthplace_abs,
                 "name": script.name.key().to_owned(),
                 "content": content,
             });

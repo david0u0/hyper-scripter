@@ -67,12 +67,12 @@ pub fn run(
     let info: serde_json::Value;
     info = json!({
         "path": script_path,
-        "hs_home": hs_home,
-        "hs_run_id": run_id,
-        "hs_tags": hs_tags,
-        "hs_cmd": hs_cmd,
-        "hs_exe": hs_exe,
-        "hs_env_help": hs_env_help,
+        "home": hs_home,
+        "run_id": run_id,
+        "tags": hs_tags,
+        "cmd": hs_cmd,
+        "exe": hs_exe,
+        "env_help": hs_env_help,
         "name": name,
         "content": content,
     });

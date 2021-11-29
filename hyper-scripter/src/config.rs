@@ -152,19 +152,19 @@ impl Default for Config {
             .collect(),
             env: std::array::IntoIter::new([
                 ("NAME", "{{name}}"),
-                ("HS_HOME", "{{hs_home}}"),
-                ("HS_CMD", "{{hs_cmd}}"),
-                ("HS_RUN_ID", "{{hs_run_id}}"),
+                ("HS_HOME", "{{home}}"),
+                ("HS_CMD", "{{cmd}}"),
+                ("HS_RUN_ID", "{{run_id}}"),
                 (
                     "HS_TAGS",
-                    "{{#each hs_tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
+                    "{{#each tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
                 ),
                 (
                     "HS_ENV_HELP",
-                    "{{#each hs_env_help}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
+                    "{{#each env_help}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
                 ),
-                ("HS_EXE", "{{hs_exe}}"),
-                ("HS_SOURCE", "{{hs_home}}/.hs_source"),
+                ("HS_EXE", "{{exe}}"),
+                ("HS_SOURCE", "{{home}}/.hs_source"),
             ])
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),

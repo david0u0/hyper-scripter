@@ -181,7 +181,7 @@ create_default_types! {
         args: vec!["{{path}}".to_owned()],
         env: vec![(
             "NODE_PATH".to_owned(),
-            "{{{hs_home}}}/node_modules".to_owned(),
+            "{{{home}}}/node_modules".to_owned(),
         )],
     }),
     ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
@@ -191,7 +191,7 @@ create_default_types! {
         args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
         env: vec![(
             "NODE_PATH".to_owned(),
-            "{{{hs_home}}}/node_modules".to_owned(),
+            "{{{home}}}/node_modules".to_owned(),
         )],
     }),
     ("rb", RB_WELCOME_MSG, ScriptTypeConfig {

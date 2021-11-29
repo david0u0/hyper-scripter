@@ -366,7 +366,7 @@ fn test_custom_env() {
 
     let mut conf = load_conf();
     conf.env
-        .insert("HOME_N_NAME".to_owned(), "{{hs_home}}::{{name}}".to_owned());
+        .insert("HOME_N_NAME".to_owned(), "{{home}}::{{name}}".to_owned());
     conf.store().unwrap();
 
     run!("e myname | echo $HOME_N_NAME").unwrap();

@@ -98,3 +98,12 @@ fn test_fuzzy_6() {
     let v = vec![SCRIPT, HYPER_SCRIPTER];
     assert_eq!(unwrap_fuzz(SCRIPT, &v), vec![SCRIPT]);
 }
+
+const BUILD_HS: Str = "hs/build";
+const UTIL_HISTORIAN: Str = "util/historian";
+const UILH: Str = "uilh";
+#[test]
+fn test_fuzzy_7() {
+    let v = vec![BUILD_HS, UTIL_HISTORIAN];
+    assert_eq!(unwrap_fuzz(UILH, &v), vec![BUILD_HS]);
+}

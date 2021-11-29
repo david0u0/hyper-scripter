@@ -81,7 +81,7 @@ pub fn run(
 
     if let Some(pre_run_script) = find_pre_run() {
         let args = std::iter::once(pre_run_script.as_ref()).chain(remaining_iter!());
-        let mut cmd = create_cmd("sh", args);
+        let mut cmd = create_cmd("bash", args);
         cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
         cmd.envs(env.iter().map(|(a, b)| (a, b)));
 

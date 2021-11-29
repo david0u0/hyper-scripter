@@ -238,7 +238,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm" -s a -l all -d 'Shorthand for
 complete -c hs -n "__fish_seen_subcommand_from rm" -l timeless -d 'Show scripts of all time.'
 
 complete -c hs -n "__fish_prev_arg_in types" -f -a "template"
-complete -c hs -n "__fish_seen_subcommand_from template" -f -a "(__hs_list_types)"
+complete -c hs -n "__fish_seen_subcommand_from types" -f -a "(__hs_list_types)"
 complete -c hs -n "__fish_seen_subcommand_from template" -s e -l edit
 
 complete -c hs -n "__fish_seen_subcommand_from ls" -l grouping -d 'Grouping style.' -r -f -a "tag tree none"

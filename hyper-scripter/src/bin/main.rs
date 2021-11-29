@@ -205,11 +205,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
             let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
             if !fast {
-                let cmd = util::create_concat_cmd(&conf.editor, &[&path]);
-                let stat = util::run_cmd(cmd)?;
-                if !stat.success() {
-                    let code = stat.code().unwrap_or_default();
-                    ret.errs.push(Error::EditorError(code, conf.editor.clone()));
+                let res = util::open_editor(&path);
+                if let Err(err) = res {
+                    ret.errs.push(err);
                 }
             }
             let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
@@ -290,10 +288,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             print_iter(conf.types.keys(), " ");
         }
         Subs::Types(Types {
-            subcmd: Some(TypesSubs::Template { ty }),
+            subcmd: Some(TypesSubs::Template { ty, edit }),
         }) => {
-            let template = util::get_or_create_tamplate(&ty, false)?;
-            println!("{}", template);
+            if edit {
+                let tmpl_path = util::get_template_path(&ty, false)?;
+                util::open_editor(&tmpl_path)?;
+            } else {
+                let template = util::get_or_create_tamplate(&ty, false)?;
+                println!("{}", template);
+            }
         }
         Subs::LS(List {
             long,

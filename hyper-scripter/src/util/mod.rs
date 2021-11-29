@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::extract_msg::extract_env_from_content;
-use crate::path::{get_home, get_template_path, normalize_path};
+use crate::path::{self, get_home, normalize_path};
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
@@ -150,6 +150,17 @@ where
     cmd
 }
 
+pub fn open_editor(path: &Path) -> Result {
+    let conf = Config::get();
+    let cmd = create_concat_cmd(&conf.editor, &[&path]);
+    let stat = run_cmd(cmd)?;
+    if !stat.success() {
+        let code = stat.code().unwrap_or_default();
+        return Err(Error::EditorError(code, conf.editor.clone()));
+    }
+    Ok(())
+}
+
 pub fn create_concat_cmd<'a, 'b, I1, S1, I2, S2>(arg1: I1, arg2: I2) -> Command
 where
     I1: IntoIterator<Item = &'a S1>,
@@ -219,11 +230,14 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn get_or_create_tamplate(ty: &ScriptType, force: bool) -> Result<String> {
+pub fn get_template_path(ty: &ScriptType, force: bool) -> Result<PathBuf> {
     if !force {
         Config::get().get_script_conf(&ty)?; // 確認類型存在與否
     }
-    let tmpl_path = get_template_path(ty)?;
+    path::get_template_path(ty)
+}
+pub fn get_or_create_tamplate(ty: &ScriptType, force: bool) -> Result<String> {
+    let tmpl_path = get_template_path(ty, force)?;
     if tmpl_path.exists() {
         return read_file(&tmpl_path);
     }
@@ -262,7 +276,6 @@ fn relative_to_home(p: &Path) -> Option<&Path> {
 }
 
 fn find_pre_run() -> Option<PathBuf> {
-    use crate::path;
     let p = path::get_home().join(path::HS_PRE_RUN);
     if p.exists() {
         log::info!("找到預執行腳本 {:?}", p);

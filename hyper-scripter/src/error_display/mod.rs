@@ -55,7 +55,7 @@ impl Display for Error {
                 write!(f, " '{}'", s)?;
             }
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
-            PreRunError(code) => write!(f, "Pre-dun script exited unexpectedly with {}", code)?,
+            PreRunError(code) => write!(f, "Pre-run script exited unexpectedly with {}", code)?,
             EditorError(code, cmd) => {
                 let cmd = cmd.join(" ");
                 write!(f, "Editor `{}` exited unexpectedly with {}", cmd, code)?

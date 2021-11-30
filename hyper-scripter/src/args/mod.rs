@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
-    DisableHelpSubcommand, DisableVersion, TrailingVarArg,
+    DisableHelpSubcommand, DisableVersion, Hidden, TrailingVarArg,
 };
 use structopt::StructOpt;
 
@@ -160,12 +160,12 @@ pub enum Subs {
         setting = AllowLeadingHyphen
     )]
     Help { args: Vec<String> },
-    #[structopt(about = "Print the help message of env variables")]
+    #[structopt(setting = Hidden, about = "Print the help message of env variables")]
     EnvHelp {
         #[structopt(default_value = "-", parse(try_from_str))]
         script_query: ScriptQuery,
     },
-    #[structopt(setting = AppSettings::Hidden)]
+    #[structopt(setting = Hidden)]
     LoadUtils,
     #[structopt(about = "Migrate the database")]
     Migrate,

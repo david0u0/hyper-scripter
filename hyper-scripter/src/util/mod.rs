@@ -1,7 +1,6 @@
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
-use crate::extract_msg::extract_env_from_content;
-use crate::path::{self, get_home, normalize_path};
+use crate::path;
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptType};
 use chrono::{DateTime, Utc};
@@ -30,90 +29,6 @@ pub fn illegal_name(s: &str) -> bool {
         || s.is_empty()
 }
 
-// XXX: main util?
-pub fn run(
-    script_path: &Path,
-    info: &ScriptInfo,
-    remaining: &[String],
-    content: &str,
-    run_id: i64,
-) -> Result<()> {
-    let conf = Config::get();
-    let ty = &info.ty;
-    let name = &info.name.key();
-    let hs_home = get_home();
-    let hs_tags: Vec<_> = info.tags.iter().map(|t| t.as_ref()).collect();
-
-    let hs_exe = std::env::current_exe()?;
-    let hs_exe = hs_exe.to_string_lossy();
-
-    let hs_cmd = std::env::args().next().unwrap_or_default();
-
-    let hs_env_help: Vec<_> = extract_env_from_content(content).collect();
-
-    let script_conf = conf.get_script_conf(ty)?;
-    let cmd_str = if let Some(cmd) = &script_conf.cmd {
-        cmd
-    } else {
-        return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
-    };
-
-    macro_rules! remaining_iter {
-        () => {
-            remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s))
-        };
-    }
-
-    let info: serde_json::Value;
-    info = json!({
-        "path": script_path,
-        "home": hs_home,
-        "run_id": run_id,
-        "tags": hs_tags,
-        "cmd": hs_cmd,
-        "exe": hs_exe,
-        "env_help": hs_env_help,
-        "name": name,
-        "content": content,
-    });
-    let env = conf.gen_env(&info)?;
-    let ty_env = script_conf.gen_env(&info)?;
-
-    if let Some(pre_run_script) = find_pre_run() {
-        let args = std::iter::once(pre_run_script.as_ref()).chain(remaining_iter!());
-        let mut cmd = create_cmd("bash", args);
-        cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
-        cmd.envs(env.iter().map(|(a, b)| (a, b)));
-
-        let stat = run_cmd(cmd)?;
-        log::info!("預腳本執行結果：{:?}", stat);
-        if !stat.success() {
-            // TODO: 根據返回值做不同表現
-            let code = stat.code().unwrap_or_default();
-            return Err(Error::PreRunError(code));
-        }
-    }
-
-    let args = script_conf.args(&info)?;
-    let full_args: Vec<&OsStr> = args
-        .iter()
-        .map(|s| s.as_ref())
-        .chain(remaining_iter!())
-        .collect();
-
-    let mut cmd = create_cmd(&cmd_str, &full_args);
-    cmd.envs(ty_env);
-    cmd.envs(env);
-
-    let stat = run_cmd(cmd)?;
-    log::info!("程式執行結果：{:?}", stat);
-    if !stat.success() {
-        let code = stat.code().unwrap_or_default();
-        Err(Error::ScriptError(code))
-    } else {
-        Ok(())
-    }
-}
 pub fn run_cmd(mut cmd: Command) -> Result<ExitStatus> {
     let res = cmd.spawn();
     let program = cmd.get_program();
@@ -275,16 +190,6 @@ fn relative_to_home(p: &Path) -> Option<&Path> {
     p.strip_prefix(&home).ok()
 }
 
-fn find_pre_run() -> Option<PathBuf> {
-    let p = path::get_home().join(path::HS_PRE_RUN);
-    if p.exists() {
-        log::info!("找到預執行腳本 {:?}", p);
-        Some(p)
-    } else {
-        None
-    }
-}
-
 #[derive(Debug)]
 pub enum PrepareRespond {
     HasContent,
@@ -300,7 +205,7 @@ pub fn prepare_script<T: AsRef<str>>(
     let has_content = !content.is_empty();
     let is_new = !path.exists();
     if is_new {
-        let birthplace = normalize_path(".")?;
+        let birthplace = path::normalize_path(".")?;
         let birthplace_rel = relative_to_home(&birthplace);
 
         // NOTE: 創建資料夾和檔案

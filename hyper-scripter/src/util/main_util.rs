@@ -1,11 +1,14 @@
 use crate::args::Subs;
+use crate::config::Config;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
+use crate::extract_msg::extract_env_from_content;
 use crate::path;
 use crate::query::{self, EditQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
@@ -154,6 +157,88 @@ pub async fn edit_or_create(
     Ok((script_path, entry))
 }
 
+fn run(
+    script_path: &Path,
+    info: &ScriptInfo,
+    remaining: &[String],
+    content: &str,
+    run_id: i64,
+) -> Result<()> {
+    let conf = Config::get();
+    let ty = &info.ty;
+    let name = &info.name.key();
+    let hs_home = path::get_home();
+    let hs_tags: Vec<_> = info.tags.iter().map(|t| t.as_ref()).collect();
+
+    let hs_exe = std::env::current_exe()?;
+    let hs_exe = hs_exe.to_string_lossy();
+
+    let hs_cmd = std::env::args().next().unwrap_or_default();
+
+    let hs_env_help: Vec<_> = extract_env_from_content(content).collect();
+
+    let script_conf = conf.get_script_conf(ty)?;
+    let cmd_str = if let Some(cmd) = &script_conf.cmd {
+        cmd
+    } else {
+        return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
+    };
+
+    macro_rules! remaining_iter {
+        () => {
+            remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s))
+        };
+    }
+
+    let info: serde_json::Value;
+    info = json!({
+        "path": script_path,
+        "home": hs_home,
+        "run_id": run_id,
+        "tags": hs_tags,
+        "cmd": hs_cmd,
+        "exe": hs_exe,
+        "env_help": hs_env_help,
+        "name": name,
+        "content": content,
+    });
+    let env = conf.gen_env(&info)?;
+    let ty_env = script_conf.gen_env(&info)?;
+
+    let pre_run_script = prepare_pre_run()?;
+    let args = std::iter::once(pre_run_script.as_ref()).chain(remaining_iter!());
+    let mut cmd = super::create_cmd("bash", args);
+    cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
+    cmd.envs(env.iter().map(|(a, b)| (a, b)));
+
+    let stat = super::run_cmd(cmd)?;
+    log::info!("預腳本執行結果：{:?}", stat);
+    if !stat.success() {
+        // TODO: 根據返回值做不同表現
+        let code = stat.code().unwrap_or_default();
+        return Err(Error::PreRunError(code));
+    }
+
+    let args = script_conf.args(&info)?;
+    let full_args: Vec<&OsStr> = args
+        .iter()
+        .map(|s| s.as_ref())
+        .chain(remaining_iter!())
+        .collect();
+
+    let mut cmd = super::create_cmd(&cmd_str, &full_args);
+    cmd.envs(ty_env);
+    cmd.envs(env);
+
+    let stat = super::run_cmd(cmd)?;
+    log::info!("程式執行結果：{:?}", stat);
+    if !stat.success() {
+        let code = stat.code().unwrap_or_default();
+        Err(Error::ScriptError(code))
+    } else {
+        Ok(())
+    }
+}
 pub async fn run_n_times(
     repeat: u64,
     dummy: bool,
@@ -192,7 +277,7 @@ pub async fn run_n_times(
     }
 
     for _ in 0..repeat {
-        let run_res = super::run(
+        let run_res = run(
             &script_path,
             &*entry,
             &args,
@@ -241,13 +326,13 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
     Ok(())
 }
 
-pub fn prepare_pre_run() -> Result {
+pub fn prepare_pre_run() -> Result<PathBuf> {
     let p = path::get_home().join(path::HS_PRE_RUN);
     if !p.exists() {
         log::info!("寫入預執行腳本 {:?}", p);
-        super::write_file(&p, ">&2 echo running $NAME $@")?;
+        super::write_file(&p, include_str!("hs_prerun.sh"))?;
     }
-    Ok(())
+    Ok(p)
 }
 
 pub fn load_templates() -> Result {

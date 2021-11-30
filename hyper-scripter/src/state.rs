@@ -37,7 +37,9 @@ impl<T: Sized> State<T> {
     }
 
     #[cfg(test)]
-    pub fn set(&self, _data: T) {}
+    pub fn set(&self, _data: T) {
+        log::info!("測試中，不設定狀態");
+    }
     #[cfg(test)]
     pub fn set_test(&self, data: T) {
         self.set_inner(data)

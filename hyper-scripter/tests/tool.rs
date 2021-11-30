@@ -13,10 +13,14 @@ lazy_static::lazy_static! {
     static ref HOME: PathBuf = normalize_path(HOME_RELATIVE).unwrap();
 }
 
-#[cfg(not(debug_assertions))]
-const EXE: &'static str = "../target/release/hs";
-#[cfg(debug_assertions)]
-const EXE: &str = "../target/debug/hs";
+fn get_exe() -> String {
+    #[cfg(not(debug_assertions))]
+    let mode = "release";
+    #[cfg(debug_assertions)]
+    let mode = "debug";
+
+    format!("{}/../target/{}/hs", env!("CARGO_MANIFEST_DIR"), mode)
+}
 
 #[derive(Debug, Default)]
 pub struct RunEnv {
@@ -144,7 +148,7 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     full_args.extend(&args_vec);
 
     log::info!("開始執行 {:?}", args_vec);
-    let mut cmd = Command::new(normalize_path(EXE).unwrap());
+    let mut cmd = Command::new(normalize_path(get_exe()).unwrap());
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
         cmd.current_dir(&dir);

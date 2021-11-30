@@ -37,7 +37,6 @@ fn get_default_home() -> Result<PathBuf> {
     Ok(home.into())
 }
 
-#[cfg(not(test))]
 fn get_sys_home() -> Result<PathBuf> {
     let p = match std::env::var(hs_home_env!()) {
         Ok(p) => {
@@ -48,10 +47,6 @@ fn get_sys_home() -> Result<PathBuf> {
         Err(e) => return Err(e.into()),
     };
     Ok(p)
-}
-#[cfg(test)]
-fn get_sys_home() -> Result<PathBuf> {
-    Ok(".test_hyper_scripter".into())
 }
 
 fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
@@ -130,8 +125,14 @@ pub fn get_home() -> &'static Path {
     PATH.get().as_ref()
 }
 #[cfg(test)]
+pub fn get_test_home() -> PathBuf {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dir.join(".test_hyper_scripter")
+}
+
+#[cfg(test)]
 pub fn get_home() -> &'static Path {
-    crate::set_once!(PATH, || { join_here_abs(".test_hyper_scripter").unwrap() });
+    crate::set_once!(PATH, || { get_test_home() });
     PATH.get().as_ref()
 }
 
@@ -215,15 +216,9 @@ mod test {
     fn test_open_anonymous() {
         let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
         assert_eq!(name, ScriptName::Anonymous(6));
-        assert_eq!(
-            p,
-            join_here_abs("./.test_hyper_scripter/.anonymous/6.sh").unwrap()
-        );
+        assert_eq!(p, get_test_home().join(".anonymous/6.sh"));
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
-        assert_eq!(
-            p,
-            join_here_abs("./.test_hyper_scripter/.anonymous/5.js").unwrap()
-        );
+        assert_eq!(p, get_test_home().join(".anonymous/5.js"));
     }
     #[test]
     fn test_open() {
@@ -239,10 +234,7 @@ mod test {
             None,
         )
         .unwrap();
-        assert_eq!(
-            p,
-            join_here_abs("./.test_hyper_scripter/.anonymous/1.sh").unwrap()
-        );
+        assert_eq!(p, get_test_home().join(".anonymous/1.sh"));
 
         match open_script(&not_exist, &"sh".into(), Some(true)).unwrap_err() {
             Error::PathNotFound(name) => assert_eq!(name[0], get_home().join("not-exist.sh")),

@@ -14,8 +14,9 @@ fn test_import() {
 
     run!("e copy/test -t +innate | echo 我要留下來").unwrap();
     run!(
-        "e my/innate -t +innate | rm {} -rf && cp tests/to_be_import {} -r",
+        "e my/innate -t +innate | rm {} -rf && cp {}/tests/to_be_import {} -r",
         dir,
+        env!("CARGO_MANIFEST_DIR"),
         dir,
     )
     .unwrap();

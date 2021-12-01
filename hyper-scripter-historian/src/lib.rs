@@ -240,12 +240,20 @@ impl Historian {
                     exec_ty,
                     main_event_id
                 )
-                .fetch_one(&*self.pool.read().unwrap())
+                .fetch_optional(&*self.pool.read().unwrap())
                 .await?;
-                if main_event.ignored || main_event.humble {
+                let main_event = match main_event {
+                    Some(e) => e,
+                    None => {
+                        log::warn!("找不到主要事件，可能被 tidy 掉了");
+                        return Ok(ZERO);
+                    }
+                };
+                if main_event.ignored {
                     return Ok(ZERO);
                 } else if main_event.humble {
-                    db_event.humble();
+                    log::debug!("謙卑地執行完畢了");
+                    db_event = db_event.humble();
                 }
 
                 let code = code.to_string();
@@ -253,9 +261,9 @@ impl Historian {
                     .raw_record(db_event.content(&code).main_event_id(*main_event_id))
                     .await?;
 
-                if main_event.humble {
+                if db_event.humble {
                     // XXX: 用很怪異的方式告訴外面的人不要記錄最新時間，醜死
-                    0
+                    ZERO
                 } else {
                     id
                 }

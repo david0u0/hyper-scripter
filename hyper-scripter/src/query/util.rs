@@ -64,13 +64,14 @@ pub async fn do_list_query<'a>(
 pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
-    force_all: bool,
+    finding_filtered: bool,
     forbid_prompt: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
-    let all = script_query.bang || force_all;
+    let all = script_query.bang;
     match &script_query.inner {
         ScriptQueryInner::Prev(prev) => {
+            assert!(!finding_filtered); // XXX 很難看的作法，應設法靜態檢查
             let latest = script_repo.latest_mut(*prev, all);
             log::trace!("找最新腳本");
             return if latest.is_some() {
@@ -79,14 +80,25 @@ pub async fn do_script_query<'b>(
                 Err(Error::Empty)
             };
         }
-        ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, all)),
+        ScriptQueryInner::Exact(name) => {
+            if finding_filtered {
+                Ok(script_repo.get_hidden_mut(name))
+            } else {
+                Ok(script_repo.get_mut(name, all))
+            }
+        }
         ScriptQueryInner::Fuzz(name) => {
             let level = if forbid_prompt {
                 PromptLevel::Never
             } else {
                 Config::get_prompt_level()
             };
-            let fuzz_res = fuzzy::fuzz(name, script_repo.iter_mut(all), SEP).await?;
+            let iter = if finding_filtered {
+                script_repo.iter_hidden_mut()
+            } else {
+                script_repo.iter_mut(all)
+            };
+            let fuzz_res = fuzzy::fuzz(name, iter, SEP).await?;
             let mut is_low = false;
             let mut is_multi_fuzz = false;
             let entry = match fuzz_res {

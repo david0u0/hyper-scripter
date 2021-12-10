@@ -121,7 +121,7 @@ macro_rules! last_arg_by_id {
         last_arg_by_id!($select, $script_id, $offset, $limit, "",)
     }};
     ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
-        last_arg!($select, $offset, $limit, "AND id = ? " + $where, $script_id $(,$var)*)
+        last_arg!($select, $offset, $limit, "AND script_id = ? " + $where, $script_id $(,$var)*)
     }};
 }
 

@@ -292,8 +292,8 @@ pub enum History {
     #[structopt(about = "Humble an event by it's id")]
     Humble { event_id: u64 },
     Show {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script: ScriptQuery,
+        #[structopt(parse(try_from_str))]
+        queries: Vec<ListQuery>,
         #[structopt(short, long, default_value = "10")]
         limit: u32,
         #[structopt(long)]

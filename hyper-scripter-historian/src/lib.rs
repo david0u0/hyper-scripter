@@ -92,32 +92,36 @@ impl<'a> DBEvent<'a> {
     }
 }
 
-macro_rules! select_last_arg {
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
-        select_last_arg!($select, $script_id, $offset, $limit, "", )
-    }};
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
-        const EXEC_TY: i8= EventType::Exec.get_code();
+macro_rules! last_arg {
+    ($select:literal, $offset:expr, $limit:expr, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
+        const EXEC_TY: i8 = EventType::Exec.get_code();
         sqlx::query!(
             "
             WITH args AS (
-                SELECT args, max(time) as time FROM events
-                WHERE type = ? AND script_id = ? AND NOT ignored "
+                SELECT args, script_id, max(time) as time FROM events
+                WHERE type = ? AND NOT ignored "
                 +
                 $where
+                $(+ $more_where)*
                 +
-                " GROUP BY args
-                ORDER BY time DESC LIMIT ? OFFSET ?
+                " GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
                 + " FROM args
             ",
             EXEC_TY,
-            $script_id,
             $($var, )*
             $limit,
             $offset,
         )
+    }};
+}
+macro_rules! last_arg_by_id {
+    ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
+        last_arg_by_id!($select, $script_id, $offset, $limit, "",)
+    }};
+    ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
+        last_arg!($select, $offset, $limit, "AND id = ? " + $where, $script_id $(,$var)*)
     }};
 }
 
@@ -300,20 +304,33 @@ impl Historian {
 
     pub async fn previous_args_list(
         &self,
-        id: i64,
+        ids: &[i64],
         limit: u32,
         offset: u32,
         dir: Option<&Path>,
-    ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
+    ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
+        let ids = join_id_str(ids);
+        log::info!("查詢歷史 {}", ids);
         let limit = limit as i64;
         let offset = offset as i64;
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
         let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
-        let res = select_last_arg!("args", id, offset, limit, "AND (? OR dir = ?)", no_dir, dir)
-            .fetch_all(&*self.pool.read().unwrap())
-            .await?;
-        Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        let res = last_arg!(
+            "args, script_id",
+            offset,
+            limit,
+            "AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)",
+            ids,
+            no_dir,
+            dir
+        )
+        .fetch_all(&*self.pool.read().unwrap())
+        .await?;
+        Ok(res
+            .into_iter()
+            .map(|res| (res.script_id, res.args.unwrap_or_default())))
     }
 
     async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
@@ -384,7 +401,7 @@ impl Historian {
         };
 
         let pool = self.pool.read().unwrap();
-        let args_vec = select_last_arg!("args", script_id, offset, limit)
+        let args_vec = last_arg_by_id!("args", script_id, offset, limit)
             .fetch_all(&*pool)
             .await?;
 
@@ -406,7 +423,7 @@ impl Historian {
         let offset = number as i64 - 1;
         let pool = self.pool.read().unwrap();
 
-        let args = select_last_arg!("args", script_id, offset, 1)
+        let args = last_arg_by_id!("args", script_id, offset, 1)
             .fetch_one(&*pool)
             .await?
             .args;
@@ -497,4 +514,13 @@ impl Historian {
 
         Ok(())
     }
+}
+
+fn join_id_str(ids: &[i64]) -> String {
+    use std::fmt::Write;
+    let mut ret = String::new();
+    for id in ids {
+        write!(ret, "[{}]", id).unwrap();
+    }
+    ret
 }

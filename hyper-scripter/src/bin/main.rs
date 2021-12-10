@@ -563,7 +563,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd:
                 History::Show {
-                    script,
+                    queries,
                     limit,
                     with_name,
                     offset,
@@ -573,14 +573,22 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let mut repo = repo.init().await?;
             let historian = repo.historian().clone();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let entry = query::do_script_query_strict(&script, &mut repo).await?;
+            let scripts = query::do_list_query(&mut repo, &queries).await?;
+            let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
+            // let id = if let Some(script) = script {
+            //     let entry = query::do_script_query_strict(&script, &mut repo).await?;
+            //     Some(entry.id)
+            // } else {
+            //     None
+            // };
             let args_list = historian
-                .previous_args_list(entry.id, limit, offset, dir.as_deref())
+                .previous_args_list(&ids, limit, offset, dir.as_deref())
                 .await?;
-            for args in args_list {
-                log::debug!("嘗試打印參數 {}", args);
+            for (script_id, args) in args_list {
+                log::debug!("嘗試打印參數 {} {}", script_id, args);
                 let args: Vec<String> = serde_json::from_str(&args)?;
                 if with_name {
+                    let entry = get_mut_by_id(&mut repo, script_id)?;
                     print!("{}", entry.name.key());
                     if !args.is_empty() {
                         print!(" ");
@@ -633,10 +641,7 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
         historian.ignore_args_by_id(event_id).await?
     };
     if let Some(res) = res {
-        let mut entry = repo.get_mut_by_id(res.script_id).ok_or_else(|| {
-            log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
-            Error::ScriptNotFound(res.script_id.to_string())
-        })?;
+        let mut entry = get_mut_by_id(&mut repo, res.script_id)?;
         entry
             .update(|info| {
                 info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
@@ -645,4 +650,11 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
             .await?;
     }
     Ok(())
+}
+
+fn get_mut_by_id(repo: &mut ScriptRepo, id: i64) -> Result<RepoEntry<'_>> {
+    repo.get_mut_by_id(id).ok_or_else(|| {
+        log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
+        Error::ScriptNotFound(id.to_string())
+    })
 }

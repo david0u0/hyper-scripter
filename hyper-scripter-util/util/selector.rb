@@ -1,8 +1,10 @@
 require 'io/console'
 
 RED = "\033[0;31m".freeze
-YELLOW_BG = "\033[0;43m".freeze
-YELLOW_BG_RED = "\033[31;43m".freeze
+YELLOW = "\033[0;33m".freeze
+BLUE_BG = "\033[0;44m".freeze
+BLUE_BG_RED = "\033[31;44m".freeze
+BLUE_BG_YELLOW = "\033[33;44m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
 
@@ -30,8 +32,8 @@ class Selector
   end
 
   # Initiate the selector
-  def initialize(options, offset: 1)
-    load(options)
+  def initialize(offset: 1)
+    @options = []
     @display_offset = offset
     @search_string = ''
     @number = nil
@@ -43,6 +45,10 @@ class Selector
 
   def can_virtual?
     @virtual_callbacks.length > 0
+  end
+
+  def is_virtual_selected(pos)
+    @virtual_state.nil? ? false : @virtual_state.in_range?(pos)
   end
 
   def run(sequence: '')
@@ -58,14 +64,13 @@ class Selector
 
       if sequence.length == 0
         @options.each_with_index do |option, i|
-          is_virtual_selected = @virtual_state.nil? ? false : @virtual_state.in_range?(i)
           leading = pos == i ? '>' : ' '
           gen_line = ->(option) { "#{leading} #{i + @display_offset}. #{option}" }
           line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
-          option = self.class.color_line(option, @search_string, is_virtual_selected)
+          option = color_line(i)
           option = gen_line.call(option)
 
-          option = "#{YELLOW_BG}#{option}#{NC}" if is_virtual_selected
+          option = "#{BLUE_BG}#{option}#{NC}" if is_virtual_selected(i)
           $stderr.print("#{option}\n")
         end
       end
@@ -200,12 +205,15 @@ class Selector
     ret.new(cb, content, recur)
   end
 
-  def self.color_line(option, search_string, is_virtual_selected)
-    option = option.to_s
-    if is_virtual_selected
-      return option.gsub(search_string, "#{YELLOW_BG_RED}#{search_string}#{YELLOW_BG}") if search_string.length > 0
-    elsif search_string.length > 0
-      return option.gsub(search_string, "#{RED}#{search_string}#{NC}")
+  def color_line(pos)
+    option = @options[pos].to_s
+    if is_virtual_selected(pos)
+      if @search_string.length > 0
+        return option.gsub(@search_string,
+                           "#{BLUE_BG_RED}#{@search_string}#{BLUE_BG}")
+      end
+    elsif @search_string.length > 0
+      return option.gsub(@search_string, "#{RED}#{@search_string}#{NC}")
     end
     option
   end
@@ -220,7 +228,8 @@ class Selector
           else
             (i + pos) % len
           end
-      return i if @options[i].to_s.include?(@search_string)
+      s = @options[i].to_s
+      return i if s.include?(@search_string)
     end
     nil
   end

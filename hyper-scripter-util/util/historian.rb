@@ -7,28 +7,36 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
-# Try to parse script query and get the script name
-# If the script is full name (starts with `=`), we can save an `hs ls` command
-def process_script_query(query)
-  return query[1..-1].chomp('!') if query.start_with?('=')
-
-  nil
-end
-
 class Option
-  def initialize(content, number)
+  def initialize(name, content, number, single)
     @content = content
     @number = number
+    @name = name
+    @single = single
   end
 
   def to_s
-    @content
+    if @single
+      @content
+    else
+      "(#{@name}) #{@content}"
+    end
   end
-  attr_reader :number, :content
+
+  attr_reader :number, :content, :name
 end
 
 class Historian < Selector
   attr_reader :script_name
+
+  def history_show
+    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
+    queries_str = @script_query.join(' ')
+    HS_ENV.do_hs(
+      "history show #{@root_args_str} --limit #{@limit} --offset #{@offset} \
+      --with-name #{dir_str} #{queries_str}", false
+    )
+  end
 
   def initialize(args)
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{args}", false)
@@ -38,37 +46,33 @@ class Historian < Selector
     @offset = show_obj['offset']
     @limit = show_obj['limit']
     @dir = show_obj['dir']
-    script_query = show_obj['script']
-    @script_name = process_script_query(script_query)
-    if @script_name.nil?
-      root_args = arg_obj['root_args']
-      filters = root_args['filter']
-      timeless = root_args['timeless']
-      recent = root_args['recent']
-      # TODO: toggle
+    @script_query = show_obj['queries']
+    @single = @script_query.length == 1 && !@script_query[0].include?('*')
 
-      # ask the actual script by ls command
-      filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
-      time_str = if recent.nil?
-                   timeless ? '--timeless' : ''
-                 else
-                   "--recent #{recent}"
-                 end
-      @script_name = HS_ENV.do_hs(
-        "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
-        false
-      ).strip
-    end
+    root_args = arg_obj['root_args']
+    filters = root_args['filter']
+    timeless = root_args['timeless']
+    recent = root_args['recent']
+    # TODO: toggle
 
-    warn "historian for #{@script_name}"
+    filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
+    time_str = if recent.nil?
+                 timeless ? '--timeless' : ''
+               else
+                 "--recent #{recent}"
+               end
+    @root_args_str = "#{time_str} #{filter_str}"
 
-    super(get_options, offset: @offset + 1)
+    super(offset: @offset + 1)
 
+    load_history
     register_all
   end
 
-  def process_option(content, number)
-    Option.new(content, number)
+  def process_history(name, content, number)
+    return nil if content == ''
+
+    Option.new(name, content, number, @single)
   end
 
   def run(sequence: '')
@@ -92,13 +96,17 @@ class Historian < Selector
     }, msg: 'set next command')
 
     register_keys(%w[r R], lambda { |_, obj|
+      raise 'delete for list query not supported' unless @single
+
       sourcing = true
-      HS_ENV.do_hs("history rm =#{@script_name}! #{obj.number}", false)
+      HS_ENV.do_hs("history rm =#{obj.name}! #{obj.number}", false)
     }, msg: 'replce the argument')
 
-    args = run(sequence: sequence).content.content
+    option = run(sequence: sequence).content
+    name = option.name
+    args = option.content
 
-    cmd = "=#{@script_name}! -- #{args}" # known issue: \n \t \" will not be handled properly
+    cmd = "=#{name}! -- #{args}" # known issue: \n \t \" will not be handled properly
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
         case ENV['SHELL'].split('/').last
@@ -117,31 +125,35 @@ class Historian < Selector
     end
   end
 
-  def get_options
-    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    history = HS_ENV.do_hs("history show =#{@script_name}! #{dir_str} --limit #{@limit} --offset #{@offset}", false)
+  def get_history
+    history = history_show
     opts = history.lines.each_with_index.map do |s, i|
       s = s.strip
-      if s == '' # ignore empty args
-        nil
-      else
-        process_option(s, i + @offset + 1)
-      end
+      name, _, content = s.partition(' ')
+      process_history(name, content, i + @offset + 1)
     end
     opts.reject { |opt| opt.nil? }
   end
 
-  def load_options
-    load(get_options)
+  def load_history
+    load(get_history)
+    @max_name_len = 0
+    @options.each do |opt|
+      @max_name_len = [@max_name_len, opt.name.length].max if defined?(opt.name)
+    end
   end
 
   def register_all
     register_keys(%w[d D], lambda { |_, obj|
-      HS_ENV.do_hs("history rm =#{@script_name}! #{obj.number}", false)
-      load_options
+      raise 'delete for list query not supported' unless @single
+
+      HS_ENV.do_hs("history rm =#{obj.name}! #{obj.number}", false)
+      load_history
     }, msg: 'delete the history', recur: true)
 
     register_keys_virtual(%w[d D], lambda { |min, max, options|
+      raise 'delete for list query not supported' unless @single
+
       last_num = nil
       options.each do |opt|
         # TODO: test this and try to make it work
@@ -151,8 +163,8 @@ class Historian < Selector
       end
 
       # FIXME: obj.number?
-      HS_ENV.do_hs("history rm =#{@script_name}! #{min + @offset + 1}..#{max + @offset + 1}", false)
-      load_options
+      HS_ENV.do_hs("history rm =#{options[0].name}! #{min + @offset + 1}..#{max + @offset + 1}", false)
+      load_history
       exit_virtual
     }, msg: 'delete the history', recur: true)
   end
@@ -165,10 +177,6 @@ class Historian < Selector
 
   def self.rm_run_id
     HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
-  end
-
-  def read_script
-    HS_ENV.do_hs("cat =#{@script_name}!", false)
   end
 end
 
@@ -185,6 +193,5 @@ if __FILE__ == $0
   sequence, args = split_args(ARGV)
 
   historian = Historian.new(args)
-  historian.read_script
   historian.run_as_main(sequence: sequence)
 end

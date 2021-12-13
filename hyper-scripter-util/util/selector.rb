@@ -65,9 +65,10 @@ class Selector
       if sequence.length == 0
         @options.each_with_index do |option, i|
           leading = pos == i ? '>' : ' '
-          gen_line = ->(option) { "#{leading} #{i + @display_offset}. #{option}" }
-          line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
-          option = color_line(i)
+          option = format_option(option)
+          gen_line = ->(s) { "#{leading} #{i + @display_offset}. #{s}" }
+          line_count += compute_lines(gen_line.call(option), win_width) # calculate line height without color, since colr will mess up char count
+          option = color_line(i, option)
           option = gen_line.call(option)
 
           option = "#{BLUE_BG}#{option}#{NC}" if is_virtual_selected(i)
@@ -205,17 +206,20 @@ class Selector
     ret.new(cb, content, recur)
   end
 
-  def color_line(pos)
-    option = @options[pos].to_s
+  def format_option(opt)
+    opt.to_s
+  end
+
+  def color_line(pos, option_str)
     if is_virtual_selected(pos)
       if @search_string.length > 0
-        return option.gsub(@search_string,
-                           "#{BLUE_BG_RED}#{@search_string}#{BLUE_BG}")
+        return option_str.gsub(@search_string,
+                               "#{BLUE_BG_RED}#{@search_string}#{BLUE_BG}")
       end
     elsif @search_string.length > 0
-      return option.gsub(@search_string, "#{RED}#{@search_string}#{NC}")
+      return option_str.gsub(@search_string, "#{RED}#{@search_string}#{NC}")
     end
-    option
+    option_str
   end
 
   private
@@ -228,13 +232,14 @@ class Selector
           else
             (i + pos) % len
           end
-      s = @options[i].to_s
+      s = format_option(@options[i])
       return i if s.include?(@search_string)
     end
     nil
   end
 
-  def compute_lines(len, win_width)
+  def compute_lines(s, win_width)
+    len = s.length
     lines = 1 + len / win_width
     lines -= 1 if len % win_width == 0
     lines

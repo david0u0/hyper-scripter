@@ -8,19 +8,10 @@ require_relative './common'
 require_relative './selector'
 
 class Option
-  def initialize(name, content, number, single)
+  def initialize(name, content, number)
     @content = content
     @number = number
     @name = name
-    @single = single
-  end
-
-  def to_s
-    if @single
-      @content
-    else
-      "(#{@name}) #{@content}"
-    end
   end
 
   attr_reader :number, :content, :name
@@ -54,6 +45,7 @@ class Historian < Selector
     timeless = root_args['timeless']
     recent = root_args['recent']
     # TODO: toggle
+    # TODO: arch
 
     filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
     time_str = if recent.nil?
@@ -72,7 +64,7 @@ class Historian < Selector
   def process_history(name, content, number)
     return nil if content == ''
 
-    Option.new(name, content, number, @single)
+    Option.new(name, content, number)
   end
 
   def run(sequence: '')
@@ -82,6 +74,13 @@ class Historian < Selector
     exit
   rescue Selector::Quit
     exit
+  end
+
+  def format_option(opt)
+    return opt.content if @single
+
+    name = "(#{opt.name})".ljust(@max_name_len + 2)
+    "#{name} #{opt.content}"
   end
 
   def run_as_main(sequence: '')
@@ -137,10 +136,7 @@ class Historian < Selector
 
   def load_history
     load(get_history)
-    @max_name_len = 0
-    @options.each do |opt|
-      @max_name_len = [@max_name_len, opt.name.length].max if defined?(opt.name)
-    end
+    @max_name_len = @options.map { |opt| opt.name.length }.max
   end
 
   def register_all

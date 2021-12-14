@@ -37,14 +37,6 @@ impl FromStr for EditQuery {
     }
 }
 
-fn serialize_to_string<S: serde::Serializer, U, T: ToString>(
-    _u: U,
-    t: T,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&t.to_string())
-}
-
 #[derive(Debug)]
 pub enum ListQuery {
     Pattern(Regex, String),

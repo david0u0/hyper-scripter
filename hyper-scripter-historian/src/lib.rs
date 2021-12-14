@@ -116,20 +116,7 @@ macro_rules! last_arg {
         )
     }};
 }
-macro_rules! last_arg_by_id {
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
-        last_arg_by_id!($select, $script_id, $offset, $limit, "",)
-    }};
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
-        last_arg!($select, $offset, $limit, "AND script_id = ? " + $where, $script_id $(,$var)*)
-    }};
-}
 
-macro_rules! ignore_arg {
-    ($pool:expr, $cond:literal, $($var:expr),+) => {
-        ignore_or_humble_arg!("ignored", $pool, $cond, $($var),*)
-    }
-}
 macro_rules! ignore_or_humble_arg {
     ($ignore_or_humble:literal, $pool:expr, $cond:literal, $($var:expr),+) => {
         let exec_ty = EventType::Exec.get_code();
@@ -375,7 +362,7 @@ impl Historian {
         if is_humble {
             ignore_or_humble_arg!("humble", pool, "id = ?", event_id);
         } else {
-            ignore_arg!(pool, "id = ?", event_id);
+            ignore_or_humble_arg!("ignored", pool, "id = ?", event_id);
         }
 
         if latest_record.id == event_id {
@@ -392,7 +379,7 @@ impl Historian {
         script_id: i64,
         min: NonZeroU64,
         max: Option<NonZeroU64>,
-    ) -> Result<Option<IgnoreResult>, DBError> {
+    ) -> Result<IgnoreResult, DBError> {
         let offset = min.get() as i64 - 1;
         let limit = if let Some(max) = max {
             (max.get() - min.get()) as i64
@@ -401,38 +388,26 @@ impl Historian {
         };
 
         let pool = self.pool.read().unwrap();
-        let args_vec = last_arg_by_id!("args", script_id, offset, limit)
-            .fetch_all(&*pool)
-            .await?;
-
-        for args in args_vec {
-            // TODO: 有沒有更有效的方法？
-            ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args.args);
-        }
-
-        log::info!("ignore last args");
-        let ret = self.make_ignore_result(script_id).await?;
-        Ok(Some(ret))
-    }
-    pub async fn ignore_args(
-        &self,
-        script_id: i64,
-        number: NonZeroU64,
-    ) -> Result<Option<IgnoreResult>, DBError> {
-        let number = number.get();
-        let offset = number as i64 - 1;
-        let pool = self.pool.read().unwrap();
-
-        let args = last_arg_by_id!("args", script_id, offset, 1)
-            .fetch_one(&*pool)
-            .await?
-            .args;
-
-        ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
+        const EXEC_TY: i8 = EventType::Exec.get_code();
+        ignore_or_humble_arg!(
+            "ignored",
+            pool,
+            "script_id = ? AND args IN (
+                WITH args AS (
+                    SELECT args, max(time) as time FROM events
+                    WHERE script_id = ? AND type = ? AND NOT ignored
+                    GROUP BY args ORDER BY time DESC LIMIT ? OFFSET ?
+                ) SELECT args FROM args
+            )",
+            script_id,
+            script_id,
+            EXEC_TY,
+            limit,
+            offset
+        );
 
         log::info!("ignore last args");
-        let ret = self.make_ignore_result(script_id).await?;
-        Ok(Some(ret))
+        self.make_ignore_result(script_id).await
     }
 
     pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {

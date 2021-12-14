@@ -124,18 +124,6 @@ macro_rules! ignore_or_humble_arg {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
-            WHERE type = ? AND
-            "
-                + $cond,
-            exec_ty,
-            $($var),*
-        )
-        .execute(&*$pool)
-        .await?;
-
-        sqlx::query!(
-            "
-            UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
                 SELECT id FROM events WHERE type = ? AND "
                 + $cond
@@ -146,7 +134,18 @@ macro_rules! ignore_or_humble_arg {
             exec_ty,
             $($var),*
         )
-        .execute(&*$pool).await?
+        .execute(&*$pool).await?;
+        sqlx::query!(
+            "
+            UPDATE events SET " + $ignore_or_humble + " = true
+            WHERE type = ? AND
+            "
+                + $cond,
+            exec_ty,
+            $($var),*
+        )
+        .execute(&*$pool)
+        .await?;
     };
 }
 

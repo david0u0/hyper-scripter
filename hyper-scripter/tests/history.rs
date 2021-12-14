@@ -311,21 +311,22 @@ fn test_event_path() {
     run!(dir: &dir_c, "- c").unwrap();
     run!(dir: &dir_a, "- c").unwrap();
 
+    const SHOW: &str = "history show -";
     let do_test = move || {
-        let recorded = run!("history show").unwrap();
+        let recorded = run!("{}", SHOW).unwrap();
         assert_list(&recorded, &["c", "b", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_a).unwrap();
+        let recorded = run!("{} --dir {}", SHOW, dir_a).unwrap();
         assert_list(&recorded, &["c", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_c).unwrap();
+        let recorded = run!("{} --dir {}", SHOW, dir_c).unwrap();
         assert_list(&recorded, &["c"]);
 
-        let recorded = run!("history show --dir {}/test/../../{}", dir_b, rel_b).unwrap();
+        let recorded = run!("{} --dir {}/test/../../{}", SHOW, dir_b, rel_b).unwrap();
         assert_list(&recorded, &["b"]);
 
-        let recorded = run!(dir: &tmp_dir, "history show --dir gg/../bb/../{}", rel_a)
-            .expect("相對路徑就壞了？");
+        let recorded =
+            run!(dir: &tmp_dir, "{} --dir gg/../bb/../{}", SHOW, rel_a).expect("相對路徑就壞了？");
         assert_list(&recorded, &["c", "a"]);
 
         // NOTE: 沒有 --no-trace 的話，下一次執行的順序會跑掉
@@ -333,7 +334,7 @@ fn test_event_path() {
             run!(dir: &tmp_dir, "--no-trace run -p --dir {}", dir_b).expect("執行前一次參數壞了？");
         assert_eq!(output, "b");
 
-        let recorded = run!("history show --dir a/b/c/d").expect("路徑不存在就壞了？");
+        let recorded = run!("{} --dir a/b/c/d", SHOW).expect("路徑不存在就壞了？");
         assert_list(&recorded, &[]);
     };
 

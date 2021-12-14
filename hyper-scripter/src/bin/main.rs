@@ -514,7 +514,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 .ignore_args_range(entry.id, range.get_min(), range.get_max())
                 .await?;
             if check_time_changed(&entry, &res) {
-                log::debug!("刪除後時間不同，應修改 {:?} v.s. {:?}", *entry, res);
+                log::debug!(
+                    "刪除後時間不同 {:?} {:?} v.s. {:?}",
+                    entry.exec_time,
+                    entry.exec_done_time,
+                    res
+                );
                 entry
                     .update(|info| {
                         info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));

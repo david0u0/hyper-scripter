@@ -1,6 +1,6 @@
 set -e
 
->&2 echo running $NAME $@
+>&2 echo running $NAME "$@"
 
 YELLOW='\033[1;33m'
 RED='\033[1;31m'

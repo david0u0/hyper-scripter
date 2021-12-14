@@ -1,9 +1,9 @@
 require 'io/console'
 
-RED = "\033[0;31m".freeze
+RED = "\033[1;31m".freeze
 YELLOW = "\033[0;33m".freeze
 BLUE_BG = "\033[0;44m".freeze
-BLUE_BG_RED = "\033[31;44m".freeze
+BLUE_BG_RED = "\033[31;44m\033[1m".freeze
 BLUE_BG_YELLOW = "\033[33;44m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
@@ -125,7 +125,11 @@ class Selector
       else
         case resp
         when 'q', 'Q'
-          raise Quit
+          if @virtual_state.nil?
+            raise Quit
+          else
+            @virtual_state = nil
+          end
         when 'j', 'J'
           pos = (pos + 1) % option_count
         when 'k', 'K'

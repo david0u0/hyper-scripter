@@ -4,6 +4,7 @@
 # [HS_HELP]:     hs historian -f hs hs/test --limit 20
 
 require 'json'
+require 'shellwords'
 require_relative './common'
 require_relative './selector'
 
@@ -22,14 +23,19 @@ class Historian < Selector
 
   def history_show
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    queries_str = @script_query.join(' ')
+    queries_str = @script_query.map { |q| Shellwords.escape(q) }.join(' ')
     HS_ENV.do_hs(
       "history show #{@root_args_str} --limit #{@limit} --offset #{@offset} \
       --with-name #{dir_str} #{queries_str}", false
     )
   end
 
+  def raise_err
+    @raise_err = true
+  end
+
   def initialize(args)
+    @raise_err = false
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{args}", false)
     arg_obj = JSON.parse(arg_obj_str)
 
@@ -62,18 +68,9 @@ class Historian < Selector
   end
 
   def process_history(name, content, number)
-    return nil if content == ''
+    return nil if (content == '') && @single
 
     Option.new(name, content, number)
-  end
-
-  def run(sequence: '')
-    super(sequence: sequence)
-  rescue Selector::Empty
-    puts 'History is empty'
-    exit
-  rescue Selector::Quit
-    exit
   end
 
   def format_option(opt)
@@ -81,6 +78,21 @@ class Historian < Selector
 
     name = "(#{opt.name})".ljust(@max_name_len + 2)
     "#{name} #{opt.content}"
+  end
+
+  def run(sequence: '')
+    if @raise_err
+      super(sequence: sequence)
+    else
+      begin
+        super(sequence: sequence)
+      rescue Selector::Empty
+        puts 'History is empty'
+        exit
+      rescue Selector::Quit
+        exit
+      end
+    end
   end
 
   def run_as_main(sequence: '')

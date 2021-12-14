@@ -4,7 +4,6 @@
 # [HS_HELP]:     hs historian -f hs hs/test --limit 20
 
 require 'json'
-require 'shellwords'
 require_relative './common'
 require_relative './selector'
 
@@ -18,12 +17,16 @@ class Option
   attr_reader :number, :content, :name
 end
 
+def escape_wildcard(s)
+  s.gsub('*', '\*')
+end
+
 class Historian < Selector
   attr_reader :script_name
 
   def history_show
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    queries_str = @script_query.map { |q| Shellwords.escape(q) }.join(' ')
+    queries_str = @script_query.map { |q| escape_wildcard(q) }.join(' ')
     HS_ENV.do_hs(
       "history show #{@root_args_str} --limit #{@limit} --offset #{@offset} \
       --with-name #{dir_str} #{queries_str}", false
@@ -36,7 +39,7 @@ class Historian < Selector
 
   def initialize(args)
     @raise_err = false
-    arg_obj_str = HS_ENV.do_hs("--dump-args history show #{args}", false)
+    arg_obj_str = HS_ENV.do_hs("--dump-args history show #{escape_wildcard(args)}", false)
     arg_obj = JSON.parse(arg_obj_str)
 
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
@@ -64,6 +67,7 @@ class Historian < Selector
     super(offset: @offset + 1)
 
     load_history
+    puts "historian for #{@options[0].name}" if @single && @options.length > 1
     register_all
   end
 

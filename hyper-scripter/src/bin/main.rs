@@ -505,27 +505,32 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::History {
-            subcmd: History::RM { script, range },
+            subcmd: History::RM { queries, range },
         } => {
             let mut repo = repo.init().await?;
             let historian = repo.historian().clone();
-            let mut entry = query::do_script_query_strict(&script, &mut repo).await?;
-            let res = historian
-                .ignore_args_range(entry.id, range.get_min(), range.get_max())
+            let mut scripts = query::do_list_query(&mut repo, &queries).await?;
+            let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
+            let res_vec = historian
+                .ignore_args_range(&ids, range.get_min(), range.get_max())
                 .await?;
-            if check_time_changed(&entry, &res) {
-                log::debug!(
-                    "刪除後時間不同 {:?} {:?} v.s. {:?}",
-                    entry.exec_time,
-                    entry.exec_done_time,
-                    res
-                );
-                entry
-                    .update(|info| {
-                        info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
-                        info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
-                    })
-                    .await?;
+            // TODO: 測試多個腳本的狀況
+            for (entry, res) in scripts.iter_mut().zip(res_vec) {
+                // TODO: 平行？
+                if check_time_changed(&entry, &res) {
+                    log::debug!(
+                        "刪除後時間不同 {:?} {:?} v.s. {:?}",
+                        entry.exec_time,
+                        entry.exec_done_time,
+                        res
+                    );
+                    entry
+                        .update(|info| {
+                            info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
+                            info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                        })
+                        .await?;
+                }
             }
         }
         Subs::History {
@@ -578,12 +583,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let scripts = query::do_list_query(&mut repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
-            // let id = if let Some(script) = script {
-            //     let entry = query::do_script_query_strict(&script, &mut repo).await?;
-            //     Some(entry.id)
-            // } else {
-            //     None
-            // };
             let args_list = historian
                 .previous_args_list(&ids, limit, offset, dir.as_deref())
                 .await?;

@@ -125,7 +125,7 @@ macro_rules! ignore_or_humble_arg {
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
-                SELECT id FROM events WHERE type = ? AND "
+                SELECT id FROM events WHERE type = ? AND NOT ignored AND "
                 + $cond
                 + "
             )
@@ -138,7 +138,7 @@ macro_rules! ignore_or_humble_arg {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
-            WHERE type = ? AND
+            WHERE type = ? AND NOT ignored AND
             "
                 + $cond,
             exec_ty,
@@ -375,38 +375,50 @@ impl Historian {
     }
     pub async fn ignore_args_range(
         &self,
-        script_id: i64,
+        ids: &[i64],
         min: NonZeroU64,
         max: Option<NonZeroU64>,
-    ) -> Result<IgnoreResult, DBError> {
+    ) -> Result<Vec<IgnoreResult>, DBError> {
+        let ids_str = join_id_str(ids);
+
         let offset = min.get() as i64 - 1;
         let limit = if let Some(max) = max {
             (max.get() - min.get()) as i64
         } else {
             -1
         };
+        log::info!("忽略歷史 {} {} {}", offset, limit, ids_str);
 
         let pool = self.pool.read().unwrap();
         const EXEC_TY: i8 = EventType::Exec.get_code();
+        // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
         ignore_or_humble_arg!(
             "ignored",
             pool,
-            "script_id = ? AND args IN (
+            "
+            (script_id || args) IN (
                 WITH args AS (
-                    SELECT args, max(time) as time FROM events
-                    WHERE script_id = ? AND type = ? AND NOT ignored
+                    SELECT args, max(time) as time, script_id FROM events
+                    WHERE instr(?, '[' || script_id || ']') > 0
+                    AND type = ? AND NOT ignored
                     GROUP BY args ORDER BY time DESC LIMIT ? OFFSET ?
-                ) SELECT args FROM args
-            )",
-            script_id,
-            script_id,
+                ) SELECT script_id || args as t FROM args
+            )
+            ",
+            ids_str,
             EXEC_TY,
             limit,
             offset
         );
 
         log::info!("ignore last args");
-        self.make_ignore_result(script_id).await
+        let mut ret = vec![];
+        for &id in ids {
+            // TODO: 平行？
+            ret.push(self.make_ignore_result(id).await?);
+        }
+        Ok(ret)
     }
 
     pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {

@@ -45,7 +45,7 @@ class Historian < Selector
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
-    @dir = show_obj['dir']
+    @dir = show_obj['dir'] # TODO: forbid delete?
     @script_query = show_obj['queries']
     @single = @script_query.length == 1 && !@script_query[0].include?('*')
 

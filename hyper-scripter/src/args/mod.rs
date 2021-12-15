@@ -279,8 +279,8 @@ pub enum Subs {
 #[derive(StructOpt, Debug, Serialize)]
 pub enum History {
     RM {
-        #[structopt(parse(try_from_str))]
-        script: ScriptQuery,
+        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        queries: Vec<ListQuery>,
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...

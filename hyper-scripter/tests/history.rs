@@ -4,6 +4,8 @@ mod tool;
 
 use tool::*;
 
+use rand::Rng;
+
 fn assert_list(actual: &str, expected: &[&str]) {
     let actual_v: Vec<_> = actual
         .split('\n')
@@ -185,7 +187,6 @@ fn test_history_args_rm_last() {
     // 來點趣味性=_=
     let mut rng = rand::thread_rng();
     let mut maybe_dummy = move |script: &str, arg: &str| {
-        use rand::Rng;
         let dummy = rng.gen::<u32>() % 3 == 0;
         let dummy_str = if dummy { "--dummy" } else { "" };
         let res = run!("run {} {} {} ", dummy_str, script, arg).unwrap();
@@ -293,6 +294,7 @@ fn test_neglect_archaeology() {
 
 #[test]
 fn test_event_path() {
+    // TODO: 帶目錄的刪除？
     // TODO: soft link
     let _g = setup();
     let tmp_dir = std::env::temp_dir();
@@ -311,21 +313,22 @@ fn test_event_path() {
     run!(dir: &dir_c, "- c").unwrap();
     run!(dir: &dir_a, "- c").unwrap();
 
+    const SHOW: &str = "history show -";
     let do_test = move || {
-        let recorded = run!("history show").unwrap();
+        let recorded = run!("{}", SHOW).unwrap();
         assert_list(&recorded, &["c", "b", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_a).unwrap();
+        let recorded = run!("{} --dir {}", SHOW, dir_a).unwrap();
         assert_list(&recorded, &["c", "a"]);
 
-        let recorded = run!("history show --dir {}", dir_c).unwrap();
+        let recorded = run!("{} --dir {}", SHOW, dir_c).unwrap();
         assert_list(&recorded, &["c"]);
 
-        let recorded = run!("history show --dir {}/test/../../{}", dir_b, rel_b).unwrap();
+        let recorded = run!("{} --dir {}/test/../../{}", SHOW, dir_b, rel_b).unwrap();
         assert_list(&recorded, &["b"]);
 
-        let recorded = run!(dir: &tmp_dir, "history show --dir gg/../bb/../{}", rel_a)
-            .expect("相對路徑就壞了？");
+        let recorded =
+            run!(dir: &tmp_dir, "{} --dir gg/../bb/../{}", SHOW, rel_a).expect("相對路徑就壞了？");
         assert_list(&recorded, &["c", "a"]);
 
         // NOTE: 沒有 --no-trace 的話，下一次執行的順序會跑掉
@@ -333,11 +336,141 @@ fn test_event_path() {
             run!(dir: &tmp_dir, "--no-trace run -p --dir {}", dir_b).expect("執行前一次參數壞了？");
         assert_eq!(output, "b");
 
-        let recorded = run!("history show --dir a/b/c/d").expect("路徑不存在就壞了？");
+        let recorded = run!("{} --dir a/b/c/d", SHOW).expect("路徑不存在就壞了？");
         assert_list(&recorded, &[]);
     };
 
     do_test();
     run!("history tidy -").unwrap();
     do_test();
+}
+
+#[test]
+fn test_multi_history() {
+    let _g = setup();
+
+    use std::collections::{HashMap, HashSet};
+    struct Historian {
+        counter: u32,
+        m: HashMap<(String, u32), u32>,
+    }
+    impl Historian {
+        fn new() -> Self {
+            Historian {
+                counter: 0,
+                m: Default::default(),
+            }
+        }
+        fn get_show_list(&self) -> Vec<(String, u32)> {
+            let mut v: Vec<_> = self.m.iter().collect();
+            v.sort_by_key(|(_, &v)| -(v as i32));
+            v.into_iter()
+                .map(|((name, arg), _)| (name.to_owned(), *arg))
+                .collect()
+        }
+        fn get_order(&self) -> Vec<String> {
+            let mut s: HashSet<_> = HashSet::new();
+            let mut ret = vec![];
+            let args = self.get_show_list();
+            for (name, _) in args.iter() {
+                let absent = s.insert(name);
+                if absent {
+                    ret.push(name.to_owned());
+                }
+            }
+            ret
+        }
+        fn len(&self) -> usize {
+            self.m.len()
+        }
+        fn run(&mut self, script: &ScriptTest, arg: u32) {
+            let name = script.get_name().to_owned();
+            run!("run --dummy {}! {}", name, arg).unwrap();
+
+            self.counter += 1;
+            self.m.insert((name, arg), self.counter);
+        }
+        fn rm(&mut self, n1: usize, n2: usize) {
+            let max = std::cmp::max(n1, n2);
+            let min = std::cmp::min(n1, n2);
+            run!("history rm * {}..{}", min + 1, max + 1).unwrap();
+
+            let list = self.get_show_list();
+            for line in &list[min..max] {
+                self.m.remove(line);
+            }
+        }
+        fn show(&self) {
+            let expected: Vec<_> = self
+                .get_show_list()
+                .iter()
+                .map(|(name, arg)| format!("{} {}", name, arg))
+                .collect();
+            let actual: Vec<_> = run!("history show --with-name")
+                .unwrap()
+                .lines()
+                .map(|s| s.to_owned())
+                .collect();
+            assert_eq!(expected, actual);
+        }
+        fn ls(&self) {
+            let expected = self.get_order();
+            let actual: Vec<_> = run!("ls --grouping none --name --plain")
+                .unwrap()
+                .split_whitespace()
+                .map(|s| s.to_owned())
+                .collect();
+            assert_eq!(expected, actual);
+        }
+    }
+
+    let mut h = Historian::new();
+    fn new_script(name: &str) -> ScriptTest {
+        let s = ScriptTest::new(name, None, None);
+        run!("history neglect {}", name).unwrap();
+        s
+    }
+    let a = new_script("a");
+    let b = new_script("b");
+    let c = new_script("c");
+    let d = new_script("d");
+    let repo = [a, b, c, d];
+    let mut rng = rand::thread_rng();
+
+    for _ in 0..150 {
+        macro_rules! run_script {
+            () => {
+                let script_idx: usize = rng.gen_range(0..4);
+                let arg = rng.gen_range(0..5);
+                h.run(&repo[script_idx], arg);
+            };
+        }
+
+        let len = h.len();
+        if len == 0 {
+            run_script!();
+        }
+
+        let action: u32 = rng.gen_range(0..3);
+        match action {
+            1 => {
+                // rm
+                loop {
+                    let t1 = rng.gen_range(0..len + 1);
+                    let t2 = rng.gen_range(0..len + 1);
+                    if t1 == t2 {
+                        continue;
+                    }
+                    h.rm(t1, t2);
+                    break;
+                }
+            }
+            _ => {
+                // run
+                run_script!();
+            }
+        }
+        h.show();
+        h.ls();
+    }
 }

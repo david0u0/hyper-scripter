@@ -37,17 +37,8 @@ impl FromStr for EditQuery {
     }
 }
 
-fn serialize_to_string<S: serde::Serializer, U, T: ToString>(
-    _u: U,
-    t: T,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&t.to_string())
-}
-
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub enum ListQuery {
-    #[serde(serialize_with = "serialize_to_string")]
     Pattern(Regex, String),
     Query(ScriptQuery),
 }
@@ -71,6 +62,17 @@ impl FromStr for ListQuery {
         }
     }
 }
+impl std::fmt::Display for ListQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            ListQuery::Query(q) => write!(f, "{}", q),
+            ListQuery::Pattern(_, s) => write!(f, "{}", s),
+        }?;
+        Ok(())
+    }
+}
+impl_ser_by_to_string!(ListQuery);
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScriptQuery {
     inner: ScriptQueryInner,

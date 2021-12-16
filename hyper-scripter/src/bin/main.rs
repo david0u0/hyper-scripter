@@ -7,7 +7,7 @@ use hyper_scripter::error::{Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
-use hyper_scripter::query::{self, RangeQuery, ScriptQuery};
+use hyper_scripter::query::{self, ScriptQuery};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
@@ -18,7 +18,7 @@ use hyper_scripter::util::{
 };
 use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
-use hyper_scripter_historian::Historian;
+use hyper_scripter_historian::{Historian, IgnoreResult};
 
 #[tokio::main]
 async fn main() {
@@ -505,24 +505,32 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
         }
         Subs::History {
-            subcmd: History::RM { script, range },
+            subcmd: History::RM { queries, range },
         } => {
             let mut repo = repo.init().await?;
             let historian = repo.historian().clone();
-            let mut entry = query::do_script_query_strict(&script, &mut repo).await?;
-            let res = match range {
-                RangeQuery::Single(n) => historian.ignore_args(entry.id, n).await?,
-                RangeQuery::Range { min, max } => {
-                    historian.ignore_args_range(entry.id, min, max).await?
+            let mut scripts = query::do_list_query(&mut repo, &queries).await?;
+            let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
+            let res_vec = historian
+                .ignore_args_range(&ids, range.get_min(), range.get_max())
+                .await?;
+            // TODO: 測試多個腳本的狀況
+            for (entry, res) in scripts.iter_mut().zip(res_vec) {
+                // TODO: 平行？
+                if check_time_changed(&entry, &res) {
+                    log::debug!(
+                        "刪除後時間不同 {:?} {:?} v.s. {:?}",
+                        entry.exec_time,
+                        entry.exec_done_time,
+                        res
+                    );
+                    entry
+                        .update(|info| {
+                            info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
+                            info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                        })
+                        .await?;
                 }
-            };
-            if let Some(res) = res {
-                entry
-                    .update(|info| {
-                        info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
-                        info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
-                    })
-                    .await?;
             }
         }
         Subs::History {
@@ -563,7 +571,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd:
                 History::Show {
-                    script,
+                    queries,
                     limit,
                     with_name,
                     offset,
@@ -573,14 +581,16 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let mut repo = repo.init().await?;
             let historian = repo.historian().clone();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let entry = query::do_script_query_strict(&script, &mut repo).await?;
+            let scripts = query::do_list_query(&mut repo, &queries).await?;
+            let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let args_list = historian
-                .previous_args_list(entry.id, limit, offset, dir.as_deref())
+                .previous_args_list(&ids, limit, offset, dir.as_deref())
                 .await?;
-            for args in args_list {
-                log::debug!("嘗試打印參數 {}", args);
+            for (script_id, args) in args_list {
+                log::debug!("嘗試打印參數 {} {}", script_id, args);
                 let args: Vec<String> = serde_json::from_str(&args)?;
                 if with_name {
+                    let entry = get_mut_by_id(&mut repo, script_id)?;
                     print!("{}", entry.name.key());
                     if !args.is_empty() {
                         print!(" ");
@@ -633,10 +643,7 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
         historian.ignore_args_by_id(event_id).await?
     };
     if let Some(res) = res {
-        let mut entry = repo.get_mut_by_id(res.script_id).ok_or_else(|| {
-            log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
-            Error::ScriptNotFound(res.script_id.to_string())
-        })?;
+        let mut entry = get_mut_by_id(&mut repo, res.script_id)?;
         entry
             .update(|info| {
                 info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
@@ -645,4 +652,17 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
             .await?;
     }
     Ok(())
+}
+
+fn get_mut_by_id(repo: &mut ScriptRepo, id: i64) -> Result<RepoEntry<'_>> {
+    repo.get_mut_by_id(id).ok_or_else(|| {
+        log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
+        Error::ScriptNotFound(id.to_string())
+    })
+}
+
+fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &IgnoreResult) -> bool {
+    let s_exec_time = entry.exec_time.as_ref().map(|t| **t);
+    let s_exec_done_time = entry.exec_done_time.as_ref().map(|t| **t);
+    (s_exec_time, s_exec_done_time) != (ignrore_res.exec_time, ignrore_res.exec_done_time)
 }

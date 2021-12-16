@@ -16,7 +16,8 @@ opts = %w[a b c d e f g]
 opts = opts.map.with_index { |opt, i| Option.new(opt, i) }
 
 mode = :normal
-selector = Selector.new(opts.clone, offset: 2)
+selector = Selector.new(offset: 2)
+selector.load(opts.clone)
 
 selector.register_keys(%w[A], ->(_, obj) { puts obj }, recur: true)
 selector.register_keys(%w[p], ->(_, obj) { puts obj.content }, recur: true)

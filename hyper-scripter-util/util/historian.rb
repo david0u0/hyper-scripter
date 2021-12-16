@@ -7,77 +7,106 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
-# Try to parse script query and get the script name
-# If the script is full name (starts with `=`), we can save an `hs ls` command
-def process_script_query(query)
-  return query[1..-1].chomp('!') if query.start_with?('=')
-
-  nil
-end
-
 class Option
-  def initialize(content, number)
+  def initialize(name, content, number)
     @content = content
     @number = number
+    @name = name
   end
 
-  def to_s
-    @content
-  end
-  attr_reader :number, :content
+  attr_reader :number, :content, :name
+end
+
+def escape_wildcard(s)
+  s.gsub('*', '\*')
 end
 
 class Historian < Selector
   attr_reader :script_name
 
+  def scripts_str
+    @scripts.map { |s| "=#{s}!" }.join(' ')
+  end
+
+  def history_show
+    return '' if @scripts.length == 0
+
+    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
+    HS_ENV.do_hs(
+      "history show --limit #{@limit} --offset #{@offset} \
+      --with-name #{dir_str} #{scripts_str}", false
+    )
+  end
+
+  def raise_err
+    @raise_err = true
+  end
+
+  def load_scripts(query, root_args)
+    filters = root_args['filter']
+    timeless = root_args['timeless']
+    recent = root_args['recent']
+    # TODO: toggle
+    # TODO: arch
+
+    filter_str = filters.map { |s| "--filter #{s}" }.join(' ')
+    time_str = if recent.nil?
+                 timeless ? '--timeless' : ''
+               else
+                 "--recent #{recent}"
+               end
+    query_str = query.map { |s| escape_wildcard(s) }.join(' ')
+    @scripts = HS_ENV.do_hs("#{time_str} #{filter_str} \
+                 ls --grouping none --plain --name #{query_str}", false).split
+  end
+
   def initialize(args)
-    arg_obj_str = HS_ENV.do_hs("--dump-args history show #{args}", false)
+    @raise_err = false
+    arg_obj_str = HS_ENV.do_hs("--dump-args history show #{escape_wildcard(args)}", false)
     arg_obj = JSON.parse(arg_obj_str)
 
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
-    @dir = show_obj['dir']
-    script_query = show_obj['script']
-    @script_name = process_script_query(script_query)
-    if @script_name.nil?
-      root_args = arg_obj['root_args']
-      filters = root_args['filter']
-      timeless = root_args['timeless']
-      recent = root_args['recent']
-      # TODO: toggle
+    @dir = show_obj['dir'] # TODO: forbid delete?
+    query = show_obj['queries']
+    @single = query.length == 1 && !query[0].include?('*')
 
-      # ask the actual script by ls command
-      filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
-      time_str = if recent.nil?
-                   timeless ? '--timeless' : ''
-                 else
-                   "--recent #{recent}"
-                 end
-      @script_name = HS_ENV.do_hs(
-        "#{time_str} #{filter_str} ls #{script_query} --grouping none --plain --name",
-        false
-      ).strip
-    end
+    load_scripts(query, arg_obj['root_args'])
 
-    warn "historian for #{@script_name}"
+    super(offset: @offset + 1)
 
-    super(get_options, offset: @offset + 1)
-
+    load_history
+    warn "historian for #{@options[0]&.name}" if @single
     register_all
   end
 
-  def process_option(content, number)
-    Option.new(content, number)
+  def process_history(name, content, number)
+    return nil if (content == '') && @single
+
+    Option.new(name, content, number)
+  end
+
+  def format_option(opt)
+    return opt.content if @single
+
+    name = "(#{opt.name})".ljust(@max_name_len + 2)
+    "#{name} #{opt.content}"
   end
 
   def run(sequence: '')
-    super(sequence: sequence)
-  rescue Selector::Empty
-    puts 'History is empty'
-    exit
-  rescue Selector::Quit
-    exit
+    if @raise_err
+      super(sequence: sequence)
+    else
+      begin
+        super(sequence: sequence)
+      rescue Selector::Empty
+        warn 'History is empty'
+        exit
+      rescue Selector::Quit
+        exit
+      end
+    end
   end
 
   def run_as_main(sequence: '')
@@ -93,12 +122,14 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("history rm =#{@script_name}! #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
     }, msg: 'replce the argument')
 
-    args = run(sequence: sequence).content.content
+    option = run(sequence: sequence).content
+    name = option.name
+    args = option.content
 
-    cmd = "=#{@script_name}! -- #{args}" # known issue: \n \t \" will not be handled properly
+    cmd = "=#{name}! -- #{args}" # known issue: \n \t \" will not be handled properly
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
         case ENV['SHELL'].split('/').last
@@ -117,31 +148,28 @@ class Historian < Selector
     end
   end
 
-  def get_options
-    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    history = HS_ENV.do_hs("history show =#{@script_name}! #{dir_str} --limit #{@limit} --offset #{@offset}", false)
+  def get_history
+    history = history_show
     opts = history.lines.each_with_index.map do |s, i|
       s = s.strip
-      if s == '' # ignore empty args
-        nil
-      else
-        process_option(s, i + @offset + 1)
-      end
+      name, _, content = s.partition(' ')
+      process_history(name, content, i + @offset + 1)
     end
     opts.reject { |opt| opt.nil? }
   end
 
-  def load_options
-    load(get_options)
+  def load_history
+    load(get_history)
+    @max_name_len = @options.map { |opt| opt.name.length }.max
   end
 
   def register_all
     register_keys(%w[d D], lambda { |_, obj|
-      HS_ENV.do_hs("history rm =#{@script_name}! #{obj.number}", false)
-      load_options
+      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
+      load_history
     }, msg: 'delete the history', recur: true)
 
-    register_keys_virtual(%w[d D], lambda { |min, max, options|
+    register_keys_virtual(%w[d D], lambda { |_, _, options|
       last_num = nil
       options.each do |opt|
         # TODO: test this and try to make it work
@@ -150,9 +178,10 @@ class Historian < Selector
         last_num = opt.number
       end
 
-      # FIXME: obj.number?
-      HS_ENV.do_hs("history rm =#{@script_name}! #{min + @offset + 1}..#{max + @offset + 1}", false)
-      load_options
+      min = options[0].number
+      max = options[-1].number + 1
+      HS_ENV.do_hs("history rm #{scripts_str} #{min}..#{max}", false)
+      load_history
       exit_virtual
     }, msg: 'delete the history', recur: true)
   end
@@ -165,10 +194,6 @@ class Historian < Selector
 
   def self.rm_run_id
     HS_ENV.do_hs("history rm-id #{HS_ENV.env_var(:run_id)}", false)
-  end
-
-  def read_script
-    HS_ENV.do_hs("cat =#{@script_name}!", false)
   end
 end
 
@@ -185,6 +210,5 @@ if __FILE__ == $0
   sequence, args = split_args(ARGV)
 
   historian = Historian.new(args)
-  historian.read_script
   historian.run_as_main(sequence: sequence)
 end

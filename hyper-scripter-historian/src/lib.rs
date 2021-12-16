@@ -92,28 +92,24 @@ impl<'a> DBEvent<'a> {
     }
 }
 
-macro_rules! select_last_arg {
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr) => {{
-        select_last_arg!($select, $script_id, $offset, $limit, "", )
-    }};
-    ($select:literal, $script_id:expr, $offset:expr, $limit:expr, $where:literal, $($var:expr),*) => {{
-        const EXEC_TY: i8= EventType::Exec.get_code();
+macro_rules! last_arg {
+    ($select:literal, $offset:expr, $limit:expr, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
+        const EXEC_TY: i8 = EventType::Exec.get_code();
         sqlx::query!(
             "
             WITH args AS (
-                SELECT args, max(time) as time FROM events
-                WHERE type = ? AND script_id = ? AND NOT ignored "
+                SELECT args, script_id, max(time) as time FROM events
+                WHERE type = ? AND NOT ignored "
                 +
                 $where
+                $(+ $more_where)*
                 +
-                " GROUP BY args
-                ORDER BY time DESC LIMIT ? OFFSET ?
+                " GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
                 + " FROM args
             ",
             EXEC_TY,
-            $script_id,
             $($var, )*
             $limit,
             $offset,
@@ -121,11 +117,6 @@ macro_rules! select_last_arg {
     }};
 }
 
-macro_rules! ignore_arg {
-    ($pool:expr, $cond:literal, $($var:expr),+) => {
-        ignore_or_humble_arg!("ignored", $pool, $cond, $($var),*)
-    }
-}
 macro_rules! ignore_or_humble_arg {
     ($ignore_or_humble:literal, $pool:expr, $cond:literal, $($var:expr),+) => {
         let exec_ty = EventType::Exec.get_code();
@@ -133,20 +124,8 @@ macro_rules! ignore_or_humble_arg {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
-            WHERE type = ? AND
-            "
-                + $cond,
-            exec_ty,
-            $($var),*
-        )
-        .execute(&*$pool)
-        .await?;
-
-        sqlx::query!(
-            "
-            UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
-                SELECT id FROM events WHERE type = ? AND "
+                SELECT id FROM events WHERE type = ? AND NOT ignored AND "
                 + $cond
                 + "
             )
@@ -155,7 +134,18 @@ macro_rules! ignore_or_humble_arg {
             exec_ty,
             $($var),*
         )
-        .execute(&*$pool).await?
+        .execute(&*$pool).await?;
+        sqlx::query!(
+            "
+            UPDATE events SET " + $ignore_or_humble + " = true
+            WHERE type = ? AND NOT ignored AND
+            "
+                + $cond,
+            exec_ty,
+            $($var),*
+        )
+        .execute(&*$pool)
+        .await?;
     };
 }
 
@@ -300,20 +290,33 @@ impl Historian {
 
     pub async fn previous_args_list(
         &self,
-        id: i64,
+        ids: &[i64],
         limit: u32,
         offset: u32,
         dir: Option<&Path>,
-    ) -> Result<impl ExactSizeIterator<Item = String>, DBError> {
+    ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
+        let ids = join_id_str(ids);
+        log::info!("查詢歷史 {}", ids);
         let limit = limit as i64;
         let offset = offset as i64;
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
         let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
-        let res = select_last_arg!("args", id, offset, limit, "AND (? OR dir = ?)", no_dir, dir)
-            .fetch_all(&*self.pool.read().unwrap())
-            .await?;
-        Ok(res.into_iter().map(|res| res.args.unwrap_or_default()))
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        let res = last_arg!(
+            "args, script_id",
+            offset,
+            limit,
+            "AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)",
+            ids,
+            no_dir,
+            dir
+        )
+        .fetch_all(&*self.pool.read().unwrap())
+        .await?;
+        Ok(res
+            .into_iter()
+            .map(|res| (res.script_id, res.args.unwrap_or_default())))
     }
 
     async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
@@ -358,7 +361,7 @@ impl Historian {
         if is_humble {
             ignore_or_humble_arg!("humble", pool, "id = ?", event_id);
         } else {
-            ignore_arg!(pool, "id = ?", event_id);
+            ignore_or_humble_arg!("ignored", pool, "id = ?", event_id);
         }
 
         if latest_record.id == event_id {
@@ -372,50 +375,50 @@ impl Historian {
     }
     pub async fn ignore_args_range(
         &self,
-        script_id: i64,
+        ids: &[i64],
         min: NonZeroU64,
         max: Option<NonZeroU64>,
-    ) -> Result<Option<IgnoreResult>, DBError> {
+    ) -> Result<Vec<IgnoreResult>, DBError> {
+        let ids_str = join_id_str(ids);
+
         let offset = min.get() as i64 - 1;
         let limit = if let Some(max) = max {
             (max.get() - min.get()) as i64
         } else {
             -1
         };
+        log::info!("忽略歷史 {} {} {}", offset, limit, ids_str);
 
         let pool = self.pool.read().unwrap();
-        let args_vec = select_last_arg!("args", script_id, offset, limit)
-            .fetch_all(&*pool)
-            .await?;
+        const EXEC_TY: i8 = EventType::Exec.get_code();
+        // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        ignore_or_humble_arg!(
+            "ignored",
+            pool,
+            "
+            (script_id || args) IN (
+                WITH args AS (
+                    SELECT args, max(time) as time, script_id FROM events
+                    WHERE instr(?, '[' || script_id || ']') > 0
+                    AND type = ? AND NOT ignored
+                    GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
+                ) SELECT script_id || args as t FROM args
+            )
+            ",
+            ids_str,
+            EXEC_TY,
+            limit,
+            offset
+        );
 
-        for args in args_vec {
-            // TODO: 有沒有更有效的方法？
-            ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args.args);
+        log::info!("ignore last args");
+        let mut ret = vec![];
+        for &id in ids {
+            // TODO: 平行？
+            ret.push(self.make_ignore_result(id).await?);
         }
-
-        log::info!("ignore last args");
-        let ret = self.make_ignore_result(script_id).await?;
-        Ok(Some(ret))
-    }
-    pub async fn ignore_args(
-        &self,
-        script_id: i64,
-        number: NonZeroU64,
-    ) -> Result<Option<IgnoreResult>, DBError> {
-        let number = number.get();
-        let offset = number as i64 - 1;
-        let pool = self.pool.read().unwrap();
-
-        let args = select_last_arg!("args", script_id, offset, 1)
-            .fetch_one(&*pool)
-            .await?
-            .args;
-
-        ignore_arg!(pool, "script_id = ? AND args = ?", script_id, args);
-
-        log::info!("ignore last args");
-        let ret = self.make_ignore_result(script_id).await?;
-        Ok(Some(ret))
+        Ok(ret)
     }
 
     pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {
@@ -497,4 +500,13 @@ impl Historian {
 
         Ok(())
     }
+}
+
+fn join_id_str(ids: &[i64]) -> String {
+    use std::fmt::Write;
+    let mut ret = String::new();
+    for id in ids {
+        write!(ret, "[{}]", id).unwrap();
+    }
+    ret
 }

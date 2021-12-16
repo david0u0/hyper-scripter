@@ -279,8 +279,8 @@ pub enum Subs {
 #[derive(StructOpt, Debug, Serialize)]
 pub enum History {
     RM {
-        #[structopt(parse(try_from_str))]
-        script: ScriptQuery,
+        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        queries: Vec<ListQuery>,
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...
@@ -292,8 +292,8 @@ pub enum History {
     #[structopt(about = "Humble an event by it's id")]
     Humble { event_id: u64 },
     Show {
-        #[structopt(default_value = "-", parse(try_from_str))]
-        script: ScriptQuery,
+        #[structopt(parse(try_from_str))]
+        queries: Vec<ListQuery>,
         #[structopt(short, long, default_value = "10")]
         limit: u32,
         #[structopt(long)]

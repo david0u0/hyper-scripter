@@ -4,12 +4,9 @@ use std::num::NonZeroU64;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
-pub enum RangeQuery {
-    Range {
-        min: NonZeroU64,
-        max: Option<NonZeroU64>,
-    },
-    Single(NonZeroU64),
+pub struct RangeQuery {
+    min: NonZeroU64,
+    max: Option<NonZeroU64>,
 }
 
 const SEP: &str = "..";
@@ -19,6 +16,15 @@ fn parse_int(s: &str) -> Result<NonZeroU64> {
         Error::Format(RangeQueryCode, s.to_owned()).context(format!("解析整數錯誤 {}", e))
     })?;
     Ok(num)
+}
+
+impl RangeQuery {
+    pub fn get_max(&self) -> Option<NonZeroU64> {
+        self.max
+    }
+    pub fn get_min(&self) -> NonZeroU64 {
+        self.min
+    }
 }
 
 impl FromStr for RangeQuery {
@@ -44,26 +50,29 @@ impl FromStr for RangeQuery {
                 }
                 Some(max)
             };
-            Ok(RangeQuery::Range { min, max })
+            Ok(RangeQuery { min, max })
         } else {
             let num = parse_int(s)?;
-            Ok(RangeQuery::Single(num))
+            Ok(RangeQuery {
+                min: num,
+                max: Some(NonZeroU64::new(num.get() + 1).unwrap()),
+            })
         }
     }
 }
 
 impl std::fmt::Display for RangeQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RangeQuery::Single(n) => write!(f, "{}", n),
-            RangeQuery::Range { min, max } => {
-                write!(f, "{}..", min)?;
-                if let Some(max) = max {
-                    write!(f, "{}", max)?;
-                }
-                Ok(())
+        let RangeQuery { min, max } = *self;
+        if Some(min) == max {
+            write!(f, "{}", min)?;
+        } else {
+            write!(f, "{}{}", min, SEP)?;
+            if let Some(max) = max {
+                write!(f, "{}", max)?;
             }
         }
+        Ok(())
     }
 }
 

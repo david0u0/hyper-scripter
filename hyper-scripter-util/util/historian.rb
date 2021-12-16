@@ -7,8 +7,6 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
-NEVER_PROMPT = '--prompt-level never'
-
 class Option
   def initialize(name, content, number)
     @content = content
@@ -26,22 +24,17 @@ end
 class Historian < Selector
   attr_reader :script_name
 
-  def queries_str
-    if @script_query.length == 0
-      '\*'
-    else
-      @script_query.map { |q| escape_wildcard(q) }.join(' ')
-    end
+  def scripts_str
+    @scripts.map { |s| "=#{s}!" }.join(' ')
   end
 
   def history_show
-    prompt_str = @first_load ? '' : NEVER_PROMPT
-    @first_load = false
+    return '' if @scripts.length == 0
+
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
     HS_ENV.do_hs(
-      "#{prompt_str} history show #{@root_args_str} \
-      --limit #{@limit} --offset #{@offset} \
-      --with-name #{dir_str} #{queries_str}", false
+      "history show --limit #{@limit} --offset #{@offset} \
+      --with-name #{dir_str} #{scripts_str}", false
     )
   end
 
@@ -49,9 +42,26 @@ class Historian < Selector
     @raise_err = true
   end
 
+  def load_scripts(query, root_args)
+    filters = root_args['filter']
+    timeless = root_args['timeless']
+    recent = root_args['recent']
+    # TODO: toggle
+    # TODO: arch
+
+    filter_str = filters.map { |s| "--filter #{s}" }.join(' ')
+    time_str = if recent.nil?
+                 timeless ? '--timeless' : ''
+               else
+                 "--recent #{recent}"
+               end
+    query_str = query.map { |s| escape_wildcard(s) }.join(' ')
+    @scripts = HS_ENV.do_hs("#{time_str} #{filter_str} \
+                 ls --grouping none --plain --name #{query_str}", false).split
+  end
+
   def initialize(args)
     @raise_err = false
-    @first_load = true
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{escape_wildcard(args)}", false)
     arg_obj = JSON.parse(arg_obj_str)
 
@@ -59,28 +69,15 @@ class Historian < Selector
     @offset = show_obj['offset']
     @limit = show_obj['limit']
     @dir = show_obj['dir'] # TODO: forbid delete?
-    @script_query = show_obj['queries']
-    @single = @script_query.length == 1 && !@script_query[0].include?('*')
+    query = show_obj['queries']
+    @single = query.length == 1 && !query[0].include?('*')
 
-    root_args = arg_obj['root_args']
-    filters = root_args['filter']
-    timeless = root_args['timeless']
-    recent = root_args['recent']
-    # TODO: toggle
-    # TODO: arch
-
-    filter_str = (filters.map { |s| "--filter #{s}" }).join(' ')
-    time_str = if recent.nil?
-                 timeless ? '--timeless' : ''
-               else
-                 "--recent #{recent}"
-               end
-    @root_args_str = "#{time_str} #{filter_str}"
+    load_scripts(query, arg_obj['root_args'])
 
     super(offset: @offset + 1)
 
     load_history
-    warn "historian for #{@options[0].name}" if @single && @options.length > 1
+    warn "historian for #{@options[0]&.name}" if @single
     register_all
   end
 
@@ -125,7 +122,7 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
     }, msg: 'replce the argument')
 
     option = run(sequence: sequence).content
@@ -168,7 +165,7 @@ class Historian < Selector
 
   def register_all
     register_keys(%w[d D], lambda { |_, obj|
-      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
       load_history
     }, msg: 'delete the history', recur: true)
 
@@ -183,7 +180,7 @@ class Historian < Selector
 
       min = options[0].number
       max = options[-1].number + 1
-      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{min}..#{max}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} #{min}..#{max}", false)
       load_history
       exit_virtual
     }, msg: 'delete the history', recur: true)

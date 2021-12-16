@@ -402,7 +402,7 @@ impl Historian {
                     SELECT args, max(time) as time, script_id FROM events
                     WHERE instr(?, '[' || script_id || ']') > 0
                     AND type = ? AND NOT ignored
-                    GROUP BY args ORDER BY time DESC LIMIT ? OFFSET ?
+                    GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
                 ) SELECT script_id || args as t FROM args
             )
             ",

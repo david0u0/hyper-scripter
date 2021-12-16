@@ -7,6 +7,8 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
+NEVER_PROMPT = '--prompt-level never'
+
 class Option
   def initialize(name, content, number)
     @content = content
@@ -24,11 +26,21 @@ end
 class Historian < Selector
   attr_reader :script_name
 
+  def queries_str
+    if @script_query.length == 0
+      '\*'
+    else
+      @script_query.map { |q| escape_wildcard(q) }.join(' ')
+    end
+  end
+
   def history_show
+    prompt_str = @first_load ? '' : NEVER_PROMPT
+    @first_load = false
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    queries_str = @script_query.map { |q| escape_wildcard(q) }.join(' ')
     HS_ENV.do_hs(
-      "history show #{@root_args_str} --limit #{@limit} --offset #{@offset} \
+      "#{prompt_str} history show #{@root_args_str} \
+      --limit #{@limit} --offset #{@offset} \
       --with-name #{dir_str} #{queries_str}", false
     )
   end
@@ -39,6 +51,7 @@ class Historian < Selector
 
   def initialize(args)
     @raise_err = false
+    @first_load = true
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{escape_wildcard(args)}", false)
     arg_obj = JSON.parse(arg_obj_str)
 
@@ -67,7 +80,7 @@ class Historian < Selector
     super(offset: @offset + 1)
 
     load_history
-    puts "historian for #{@options[0].name}" if @single && @options.length > 1
+    warn "historian for #{@options[0].name}" if @single && @options.length > 1
     register_all
   end
 
@@ -91,7 +104,7 @@ class Historian < Selector
       begin
         super(sequence: sequence)
       rescue Selector::Empty
-        puts 'History is empty'
+        warn 'History is empty'
         exit
       rescue Selector::Quit
         exit
@@ -111,10 +124,8 @@ class Historian < Selector
     }, msg: 'set next command')
 
     register_keys(%w[r R], lambda { |_, obj|
-      raise 'delete for list query not supported' unless @single
-
       sourcing = true
-      HS_ENV.do_hs("history rm =#{obj.name}! #{obj.number}", false)
+      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{obj.number}", false)
     }, msg: 'replce the argument')
 
     option = run(sequence: sequence).content
@@ -157,15 +168,11 @@ class Historian < Selector
 
   def register_all
     register_keys(%w[d D], lambda { |_, obj|
-      raise 'delete for list query not supported' unless @single
-
-      HS_ENV.do_hs("history rm =#{obj.name}! #{obj.number}", false)
+      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{obj.number}", false)
       load_history
     }, msg: 'delete the history', recur: true)
 
-    register_keys_virtual(%w[d D], lambda { |min, max, options|
-      raise 'delete for list query not supported' unless @single
-
+    register_keys_virtual(%w[d D], lambda { |_, _, options|
       last_num = nil
       options.each do |opt|
         # TODO: test this and try to make it work
@@ -174,8 +181,9 @@ class Historian < Selector
         last_num = opt.number
       end
 
-      # FIXME: obj.number?
-      HS_ENV.do_hs("history rm =#{options[0].name}! #{min + @offset + 1}..#{max + @offset + 1}", false)
+      min = options[0].number
+      max = options[-1].number + 1
+      HS_ENV.do_hs("#{NEVER_PROMPT} history rm #{queries_str} #{min}..#{max}", false)
       load_history
       exit_virtual
     }, msg: 'delete the history', recur: true)

@@ -63,9 +63,9 @@ class Selector
       @virtual_state&.set_point(pos)
 
       if sequence.length == 0
-        @options.each_with_index do |option, i|
+        @options.each_with_index do |_, i|
           leading = pos == i ? '>' : ' '
-          option = format_option(option)
+          option = format_option(i)
           gen_line = ->(s) { "#{leading} #{i + @display_offset}. #{s}" }
           line_count += compute_lines(gen_line.call(option), win_width) # calculate line height without color, since colr will mess up char count
           option = color_line(i, option)
@@ -210,8 +210,8 @@ class Selector
     ret.new(cb, content, recur)
   end
 
-  def format_option(opt)
-    opt.to_s
+  def format_option(pos)
+    @options[pos].to_s
   end
 
   def color_line(pos, option_str)
@@ -236,7 +236,7 @@ class Selector
           else
             (i + pos) % len
           end
-      s = format_option(@options[i])
+      s = format_option(i)
       return i if s.include?(@search_string)
     end
     nil

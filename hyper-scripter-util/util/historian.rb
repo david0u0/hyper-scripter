@@ -87,10 +87,18 @@ class Historian < Selector
     Option.new(name, content, number)
   end
 
-  def format_option(opt)
+  def pos_len(pos)
+    Math.log(pos + @offset + 1, 10).floor
+  end
+
+  def format_option(pos)
+    opt = @options[pos]
     return opt.content if @single
 
-    name = "(#{opt.name})".ljust(@max_name_len + 2)
+    max_cnt = @options.length + @offset
+    just = @max_name_len - pos_len(pos)
+
+    name = "(#{opt.name})".rjust(just + 2)
     "#{name} #{opt.content}"
   end
 
@@ -160,7 +168,9 @@ class Historian < Selector
 
   def load_history
     load(get_history)
-    @max_name_len = @options.map { |opt| opt.name.length }.max
+    @max_name_len = @options.each_with_index.map do |opt, i|
+      opt.name.length + pos_len(i)
+    end.max
   end
 
   def register_all

@@ -73,8 +73,24 @@ impl DBEnv {
     }
 
     async fn update_last_time(&self, info: &ScriptInfo) -> Result {
-        if !matches!(self.trace_opt, TraceOption::Normal) {
-            return Ok(());
+        match self.trace_opt {
+            TraceOption::NoTrace => return Ok(()),
+            TraceOption::Normal => (),
+            TraceOption::Humble => {
+                let humble_time = Utc::now().naive_utc();
+                sqlx::query!(
+                    "
+                    INSERT OR REPLACE INTO last_events
+                    (script_id, humble)
+                    VALUES(?, ?)
+                    ",
+                    info.id,
+                    humble_time
+                )
+                .execute(&self.info_pool)
+                .await?;
+                return Ok(());
+            }
         }
 
         let last_time = info.last_time();
@@ -86,8 +102,8 @@ impl DBEnv {
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
-            (script_id, last_time, read, write, miss, exec, exec_done, neglect, exec_count)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (script_id, last_time, read, write, miss, exec, exec_done, neglect, humble, exec_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ",
             info.id,
             last_time,
@@ -97,6 +113,7 @@ impl DBEnv {
             exec_time,
             exec_done_time,
             neglect_time,
+            info.humble_time,
             exec_count
         )
         .execute(&self.info_pool)
@@ -327,6 +344,9 @@ impl ScriptRepo {
             }
             if let Some(time) = record.neglect {
                 builder.neglect_time(time);
+            }
+            if let Some(time) = record.humble {
+                builder.humble_time(time);
             }
 
             let script = builder.build();

@@ -9,7 +9,7 @@ use fxhash::FxHashSet as HashSet;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -179,7 +179,7 @@ impl DerefMut for ScriptInfo {
     }
 }
 
-fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
+fn map<T: Deref<Target = NaiveDateTime>>(time: &Option<T>) -> NaiveDateTime {
     match time {
         Some(time) => **time,
         _ => NaiveDateTime::from_timestamp(1, 0),
@@ -198,6 +198,7 @@ impl ScriptInfo {
     pub fn last_major_time(&self) -> NaiveDateTime {
         max!(
             *self.write_time,
+            map(&self.humble_time.as_ref()),
             map(&self.exec_time),
             map(&self.exec_done_time)
         )

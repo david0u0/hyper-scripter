@@ -77,15 +77,11 @@ impl DBEnv {
             TraceOption::NoTrace => return Ok(()),
             TraceOption::Normal => (),
             TraceOption::Humble => {
-                let humble_time = Utc::now().naive_utc();
+                let humble_time = info.last_time();
                 sqlx::query!(
-                    "
-                    INSERT OR REPLACE INTO last_events
-                    (script_id, humble)
-                    VALUES(?, ?)
-                    ",
+                    "UPDATE last_events set humble = ? WHERE script_id = ?",
+                    humble_time,
                     info.id,
-                    humble_time
                 )
                 .execute(&self.info_pool)
                 .await?;

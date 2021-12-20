@@ -154,6 +154,7 @@ pub struct IgnoreResult {
     pub script_id: i64,
     pub exec_time: Option<NaiveDateTime>,
     pub exec_done_time: Option<NaiveDateTime>,
+    pub humble_time: Option<NaiveDateTime>,
 }
 
 impl Historian {
@@ -320,10 +321,21 @@ impl Historian {
     }
 
     async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
+        let humble_time = sqlx::query!(
+            "
+            SELECT time FROM events
+            WHERE script_id = ? AND NOT ignored AND humble
+            ORDER BY time DESC LIMIT 1
+            ",
+            script_id
+        )
+        .fetch_optional(&*self.pool.read().unwrap())
+        .await?;
         Ok(IgnoreResult {
             script_id,
             exec_time: self.last_time_of(script_id, EventType::Exec).await?,
             exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
+            humble_time: humble_time.map(|t| t.time),
         })
     }
     pub async fn ignore_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {

@@ -26,6 +26,7 @@ fn get_exe() -> String {
 pub struct RunEnv {
     pub home: Option<PathBuf>,
     pub dir: Option<PathBuf>,
+    pub silent: Option<bool>,
 }
 
 #[macro_export]
@@ -163,11 +164,14 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let stdout = child.stdout.as_mut().unwrap();
     let mut out_str = vec![];
     let reader = BufReader::new(stdout);
+    let silent = env.silent;
     reader
         .lines()
         .filter_map(|line| line.ok())
         .for_each(|line| {
-            println!("{}", line);
+            if silent != Some(true) {
+                println!("{}", line);
+            }
             out_str.push(line);
         });
 

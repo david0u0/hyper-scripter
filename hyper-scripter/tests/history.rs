@@ -346,13 +346,47 @@ fn test_event_path() {
 }
 
 #[test]
+fn test_humble_and_time_filter() {
+    let _g = setup();
+    const CONTENT: &str = r#"
+    $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
+    "#;
+    let test = ScriptTest::new("test", None, Some(CONTENT));
+    run!("history neglect {}", test.get_name()).unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("-a --dummy").run("a").unwrap(); // normal
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("-a").run("b").unwrap(); // humble by id
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("--humble -a").run("c").unwrap(); // humble by flag
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+}
+
+#[test]
 fn test_multi_history() {
+    println!("多腳本歷史測試");
     let _g = setup();
 
     use std::collections::{HashMap, HashSet};
     struct Historian {
         counter: u32,
         m: HashMap<(String, u32), u32>,
+    }
+    macro_rules! run_n_print {
+        ($($arg:tt)*) => ({
+            let cmd = format!($($arg)*);
+            println!("{}", cmd);
+            run!(silent: true, "{}", cmd).unwrap()
+        });
     }
     impl Historian {
         fn new() -> Self {
@@ -385,15 +419,13 @@ fn test_multi_history() {
         }
         fn run(&mut self, script: &ScriptTest, arg: u32) {
             let name = script.get_name().to_owned();
-            run!("run --dummy {}! {}", name, arg).unwrap();
+            run_n_print!("run --dummy {}! {}", name, arg);
 
             self.counter += 1;
             self.m.insert((name, arg), self.counter);
         }
-        fn rm(&mut self, n1: usize, n2: usize) {
-            let max = std::cmp::max(n1, n2);
-            let min = std::cmp::min(n1, n2);
-            run!("history rm * {}..{}", min + 1, max + 1).unwrap();
+        fn rm(&mut self, min: usize, max: usize) {
+            run_n_print!("history rm * {}..{}", min + 1, max + 1);
 
             let list = self.get_show_list();
             for line in &list[min..max] {
@@ -406,8 +438,7 @@ fn test_multi_history() {
                 .iter()
                 .map(|(name, arg)| format!("{} {}", name, arg))
                 .collect();
-            let actual: Vec<_> = run!("history show --with-name")
-                .unwrap()
+            let actual: Vec<_> = run_n_print!("-a history show * --limit 999 --with-name")
                 .lines()
                 .map(|s| s.to_owned())
                 .collect();
@@ -415,8 +446,7 @@ fn test_multi_history() {
         }
         fn ls(&self) {
             let expected = self.get_order();
-            let actual: Vec<_> = run!("ls --grouping none --name --plain")
-                .unwrap()
+            let actual: Vec<_> = run_n_print!("ls --grouping none --name --plain")
                 .split_whitespace()
                 .map(|s| s.to_owned())
                 .collect();
@@ -449,6 +479,7 @@ fn test_multi_history() {
         let len = h.len();
         if len == 0 {
             run_script!();
+            continue;
         }
 
         let action: u32 = rng.gen_range(0..3);
@@ -456,11 +487,8 @@ fn test_multi_history() {
             1 => {
                 // rm
                 loop {
-                    let t1 = rng.gen_range(0..len + 1);
-                    let t2 = rng.gen_range(0..len + 1);
-                    if t1 == t2 {
-                        continue;
-                    }
+                    let t1 = rng.gen_range(0..len);
+                    let t2 = rng.gen_range(t1 + 1..len + 1);
                     h.rm(t1, t2);
                     break;
                 }

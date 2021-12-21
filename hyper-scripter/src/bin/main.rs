@@ -519,15 +519,17 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 // TODO: 平行？
                 if check_time_changed(&entry, &res) {
                     log::debug!(
-                        "刪除後時間不同 {:?} {:?} v.s. {:?}",
+                        "刪除後時間不同 {:?} {:?} {:?} v.s. {:?}",
                         entry.exec_time,
                         entry.exec_done_time,
+                        entry.humble_time,
                         res
                     );
                     entry
                         .update(|info| {
                             info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
                             info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                            info.humble_time = res.humble_time;
                         })
                         .await?;
                 }
@@ -648,6 +650,7 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
             .update(|info| {
                 info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
                 info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
+                info.humble_time = res.humble_time;
             })
             .await?;
     }
@@ -664,5 +667,10 @@ fn get_mut_by_id(repo: &mut ScriptRepo, id: i64) -> Result<RepoEntry<'_>> {
 fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &IgnoreResult) -> bool {
     let s_exec_time = entry.exec_time.as_ref().map(|t| **t);
     let s_exec_done_time = entry.exec_done_time.as_ref().map(|t| **t);
-    (s_exec_time, s_exec_done_time) != (ignrore_res.exec_time, ignrore_res.exec_done_time)
+    (s_exec_time, s_exec_done_time, entry.humble_time)
+        != (
+            ignrore_res.exec_time,
+            ignrore_res.exec_done_time,
+            ignrore_res.humble_time,
+        )
 }

@@ -9,7 +9,7 @@ use fxhash::FxHashSet as HashSet;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -158,6 +158,7 @@ pub struct TimelessScriptInfo {
 }
 #[derive(Debug, Deref, Clone)]
 pub struct ScriptInfo {
+    pub humble_time: Option<NaiveDateTime>,
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
     pub miss_time: Option<ScriptTime>,
@@ -178,7 +179,7 @@ impl DerefMut for ScriptInfo {
     }
 }
 
-fn map<T>(time: &Option<ScriptTime<T>>) -> NaiveDateTime {
+fn map<T: Deref<Target = NaiveDateTime>>(time: &Option<T>) -> NaiveDateTime {
     match time {
         Some(time) => **time,
         _ => NaiveDateTime::from_timestamp(1, 0),
@@ -193,14 +194,16 @@ impl ScriptInfo {
         let builder = ScriptInfo::builder(0, new_name, self.ty.clone(), self.tags.iter().cloned());
         builder.build()
     }
-    /// `major time` 即不包含 `read` 和 `miss` 事件的時鼎
+    /// `major time` 即不包含 `read` 和 `miss` 事件的時間，但包含 `humble`
     pub fn last_major_time(&self) -> NaiveDateTime {
         max!(
             *self.write_time,
+            map(&self.humble_time.as_ref()),
             map(&self.exec_time),
             map(&self.exec_done_time)
         )
     }
+    /// 不包含 `humble`
     pub fn last_time(&self) -> NaiveDateTime {
         max!(
             *self.read_time,
@@ -256,6 +259,7 @@ impl ScriptInfo {
             write_time: None,
             exec_done_time: None,
             neglect_time: None,
+            humble_time: None,
             exec_count: 0,
         }
     }
@@ -295,6 +299,7 @@ pub struct ScriptBuilder {
     write_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
     neglect_time: Option<NaiveDateTime>,
+    humble_time: Option<NaiveDateTime>,
     exec_done_time: Option<NaiveDateTime>,
     exec_count: u64,
     id: i64,
@@ -331,6 +336,10 @@ impl ScriptBuilder {
         self.neglect_time = Some(time);
         self
     }
+    pub fn humble_time(&mut self, time: NaiveDateTime) -> &mut Self {
+        self.humble_time = Some(time);
+        self
+    }
     pub fn created_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.created_time = Some(time);
         self
@@ -344,6 +353,7 @@ impl ScriptBuilder {
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
             neglect_time: self.neglect_time.map(ScriptTime::new),
+            humble_time: self.humble_time,
             exec_count: self.exec_count,
             timeless_info: TimelessScriptInfo {
                 changed: false,

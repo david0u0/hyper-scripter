@@ -346,6 +346,32 @@ fn test_event_path() {
 }
 
 #[test]
+fn test_humble_and_time_filter() {
+    let _g = setup();
+    const CONTENT: &str = r#"
+    $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
+    "#;
+    let test = ScriptTest::new("test", None, Some(CONTENT));
+    run!("history neglect {}", test.get_name()).unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("-a --dummy").run("a").unwrap(); // normal
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("-a").run("b").unwrap(); // humble by id
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+
+    test.filter("--humble -a").run("c").unwrap(); // humble by flag
+    test.can_find_by_name().unwrap();
+    run!("history rm - 1").unwrap();
+    test.can_find_by_name().unwrap_err();
+}
+
+#[test]
 fn test_multi_history() {
     println!("多腳本歷史測試");
     let _g = setup();

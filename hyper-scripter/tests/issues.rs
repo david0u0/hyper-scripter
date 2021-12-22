@@ -169,13 +169,30 @@ fn test_edit_without_change() {
     println!("沒有動到檔案就不要記錄寫入事件");
     let _g = setup();
 
-    run!("e test1 | echo $NAME").unwrap();
-    run!("e test2 | echo $NAME").unwrap();
-    assert_eq!("test2", run!("-").unwrap());
-    run!("e test1").unwrap(); // nothing changed! FIXME: 其實應該記錄一筆讀取事件…但是很難測…
-    assert_eq!("test2", run!("-").unwrap());
-    run!("e test1 | echo $NAME").unwrap();
-    assert_eq!("test1\ntest1", run!("-").unwrap());
+    let t = ScriptTest::new("target", None, None);
+    let base = ScriptTest::new("baseline", None, None);
+    base.can_find("!").unwrap();
+    run!("history neglect {}", t.get_name()).unwrap();
+    t.can_find_by_name().expect_err("被忽略還找得到？");
+    run!("e {}!", t.get_name()).unwrap(); // nothing changed!
+    t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
+
+    base.can_find("-").unwrap();
+    t.can_find("!").unwrap();
+
+    run!("e {}! | echo $NAME", t.get_name()).unwrap(); // changed!
+    t.can_find_by_name().unwrap();
+    assert_eq!(
+        format!("{}\n{}", t.get_name(), t.get_name()),
+        run!("-").unwrap(),
+        "帶內容編輯應打破時間篩選"
+    );
+
+    let orphan = ScriptTest::new("orphan", None, Some(""));
+    orphan
+        .filter("-a")
+        .can_find_by_name()
+        .expect_err("空編輯新腳本應該要被砍掉");
 }
 
 #[test]

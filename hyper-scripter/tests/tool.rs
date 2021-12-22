@@ -141,7 +141,10 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let args_vec: Vec<&str> = if args.find('|').is_some() {
         let (first, second) = args.split_once("|").unwrap();
         let mut v: Vec<_> = first.split(' ').filter(|s| !s.is_empty()).collect();
-        v.push(second.trim());
+        let second = second.trim();
+        if second.len() > 0 {
+            v.push(second);
+        }
         v
     } else {
         args.split_whitespace().collect()

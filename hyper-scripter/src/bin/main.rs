@@ -204,6 +204,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let (path, mut entry) =
                 main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
             let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
+            entry.update(|info| info.read()).await?;
             if !fast {
                 let res = util::open_editor(&path);
                 if let Err(err) = res {
@@ -212,6 +213,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             }
             let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
             if !should_keep {
+                util::remove(&path)?;
                 let id = entry.id;
                 repo.remove(id).await?
             }

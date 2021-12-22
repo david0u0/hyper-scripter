@@ -373,6 +373,7 @@ pub async fn after_script(
     path: &Path,
     prepare_resp: &PrepareRespond,
 ) -> Result<bool> {
+    let mut record_write = true;
     match prepare_resp {
         PrepareRespond::HasContent => {
             log::debug!("帶內容腳本，不執行後處理");
@@ -380,18 +381,18 @@ pub async fn after_script(
         PrepareRespond::NoContent { is_new, time } => {
             let modified = super::file_modify_time(path)?;
             if time >= &modified {
-                return Ok(if *is_new {
+                if *is_new {
                     log::info!("新腳本未變動，應刪除之");
-                    super::remove(path)?;
-                    false
+                    return Ok(false);
                 } else {
-                    log::info!("舊本未變動，不記錄事件");
-                    // FIXME: 其實應該記錄一筆讀取事件…
-                    true
-                });
+                    log::info!("舊腳本未變動，不記錄寫事件（只記讀事件）");
+                    record_write = false;
+                }
             }
         }
     }
-    entry.update(|info| info.write()).await?;
+    if record_write {
+        entry.update(|info| info.write()).await?;
+    }
     Ok(true)
 }

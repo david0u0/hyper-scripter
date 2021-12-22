@@ -77,7 +77,7 @@ impl DBEnv {
             TraceOption::NoTrace => return Ok(()),
             TraceOption::Normal => (),
             TraceOption::Humble => {
-                let humble_time = info.last_time();
+                let humble_time = info.last_major_time();
                 sqlx::query!(
                     "UPDATE last_events set humble = ? WHERE script_id = ?",
                     humble_time,

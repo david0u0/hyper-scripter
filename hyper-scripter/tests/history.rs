@@ -369,6 +369,10 @@ fn test_humble_and_time_filter() {
     test.can_find_by_name().unwrap();
     run!("history rm - 1").unwrap();
     test.can_find_by_name().unwrap_err();
+
+    run!("--humble cat ={}!", test.get_name()).unwrap();
+    test.can_find_by_name()
+        .expect_err("謙卑讀取事件不應影響時間篩選");
 }
 
 #[test]

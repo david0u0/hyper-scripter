@@ -228,11 +228,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let content = util::read_file(&script_path)?;
 
             let helps = extract_help_from_content(&content);
-            print_iter(helps, "\n");
-            println!("");
+            let has_help = print_iter(helps, "\n");
 
-            let envs = extract_env_from_content(&content);
-            print_iter(envs, "\n");
+            let mut envs = extract_env_from_content(&content).peekable();
+            if envs.peek().is_some() {
+                if has_help {
+                    println!("\n");
+                }
+                print_iter(envs, "\n");
+            }
         }
         Subs::Run {
             script_query,
@@ -280,9 +284,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             let envs = extract_env_from_content(&content);
-            for msg in envs {
-                println!("{}", msg);
-            }
+            print_iter(envs, "\n");
         }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS),

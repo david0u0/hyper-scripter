@@ -302,7 +302,7 @@ pub fn get_display_type(ty: &ScriptType) -> DisplayType {
     }
 }
 
-pub fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>, sep: &str) {
+pub fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>, sep: &str) -> bool {
     let mut first = true;
     for t in iter {
         if !first {
@@ -311,6 +311,7 @@ pub fn print_iter<T: std::fmt::Display>(iter: impl Iterator<Item = T>, sep: &str
         first = false;
         print!("{}", t);
     }
+    !first
 }
 
 pub fn option_map_res<T, F: FnOnce(T) -> Result<T>>(opt: Option<T>, f: F) -> Result<Option<T>> {

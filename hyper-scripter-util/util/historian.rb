@@ -209,16 +209,16 @@ end
 
 if __FILE__ == $0
   Historian.humble_run_id
-  def split_args(args)
-    index = args.index('--')
-    if index.nil?
-      ['', args.join(' ')]
+
+  def split_args
+    if ARGV[0] == '--sequence'
+      [ARGV[1], ARGV[2..-1].join(' ')]
     else
-      [args[0..index].join(' '), args[index + 1..-1].join(' ')]
+      ['', ARGV.join(' ')]
     end
   end
-  sequence, args = split_args(ARGV)
 
+  sequence, args = split_args
   historian = Historian.new(args)
   historian.run_as_main(sequence: sequence)
 end

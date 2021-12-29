@@ -4,7 +4,7 @@
 # [HS_HELP]: USAGE:
 # [HS_HELP]:     hs import [--namespace namespace] [dirname | git repo address]
 
-require 'getoptlong'
+require 'optparse'
 require 'fileutils'
 require 'shellwords'
 require_relative './common'
@@ -104,16 +104,14 @@ def import(arg, namespace)
   end
 end
 
-opts = GetoptLong.new(['--namespace', '-n', GetoptLong::REQUIRED_ARGUMENT])
-
 namespace = nil
-opts.each do |opt, arg|
-  case opt
-  when '--namespace'
+opt = OptionParser.new do |opts|
+  opts.on('-n', '--namespace NAMESPACE', 'namespace') do |arg|
     namespace = arg
-    puts "import with namespace #{namespace}"
+    warn "import with namespace #{namespace}"
   end
 end
+opt.parse!
 
 if ARGV.length == 0
   puts 'At least one argument is required!'

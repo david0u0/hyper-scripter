@@ -140,13 +140,14 @@ impl Default for Config {
             alias: std::array::IntoIter::new([
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
-                gen_alias("l", &["ls", "--grouping", "none"]),
+                gen_alias("l", &["ls", "--grouping", "none", "--recent", "1"]),
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "removed", "*"]),
-                gen_alias("tree", &["ls", "--grouping", "tree"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous-args"]),
-                gen_alias("pc", &["=util/historian!", "c", "--"]),
+                gen_alias("pc", &["=util/historian!", "--sequence", "c"]),
+                gen_alias("pr", &["=util/historian!", "--sequence", "r"]),
+                gen_alias("purge", &["rm", "--purge"]),
                 gen_alias("h", &["=util/historian!"]),
             ])
             .collect(),
@@ -165,6 +166,7 @@ impl Default for Config {
                 ),
                 ("HS_EXE", "{{exe}}"),
                 ("HS_SOURCE", "{{home}}/.hs_source"),
+                ("TMP_DIR", "/tmp"),
             ])
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),

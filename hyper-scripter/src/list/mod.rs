@@ -80,9 +80,9 @@ impl FromStr for Grouping {
 }
 
 #[derive(Debug)]
-pub struct ListOptions<'a, T = (), U = ()> {
+pub struct ListOptions<T = (), U = ()> {
     pub grouping: Grouping,
-    pub queries: &'a [ListQuery],
+    pub queries: Vec<ListQuery>,
     pub plain: bool,
     pub display_style: DisplayStyle<T, U>,
 }

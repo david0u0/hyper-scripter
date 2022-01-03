@@ -196,7 +196,7 @@ fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
     )
     .unwrap();
     ls_res
-        .split(' ')
+        .split_whitespace()
         .filter_map(|s| {
             if !s.is_empty() {
                 Some(s.to_owned())

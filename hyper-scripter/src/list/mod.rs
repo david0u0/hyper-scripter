@@ -1,6 +1,9 @@
 mod list_impl;
 pub use list_impl::*;
 
+mod grid;
+pub use grid::Grid;
+
 mod tree;
 mod tree_lib;
 

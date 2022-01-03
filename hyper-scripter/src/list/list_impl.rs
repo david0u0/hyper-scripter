@@ -1,5 +1,5 @@
 use super::{
-    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grouping,
+    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping,
     ListOptions,
 };
 use crate::error::Result;
@@ -12,9 +12,9 @@ use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
 use std::cmp::Reverse;
+use std::fmt::Write as FmtWrite;
 use std::hash::Hash;
 use std::io::Write;
-use term_grid::{Cell as GridCell, Direction, Filling, Grid, GridOptions};
 
 type ListOptionWithOutput = ListOptions<Table, Grid>;
 
@@ -60,12 +60,6 @@ impl TagsKey {
     }
 }
 
-fn new_grid() -> Grid {
-    Grid::new(GridOptions {
-        direction: Direction::TopToBottom,
-        filling: Filling::Spaces(2),
-    })
-}
 fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
     ListOptions {
         display_style: match opt.display_style {
@@ -119,7 +113,7 @@ pub fn fmt_meta(
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, grid) => {
-            let mut display_str = Vec::<u8>::new();
+            let mut display_str = String::new();
             let mut width = 0;
             if is_latest && !opt.plain {
                 width += 1;
@@ -136,12 +130,7 @@ pub fn fmt_meta(
             });
             width += ident.chars().count();
             write!(display_str, "{}", ident)?;
-            let display_str = std::str::from_utf8(&display_str)?;
-            let cell = GridCell {
-                contents: display_str.to_string(),
-                width,
-            };
-            grid.add(cell);
+            grid.add(display_str, width);
         }
     }
     Ok(())
@@ -158,11 +147,12 @@ pub async fn fmt_list<W: Write>(
         .await?
         .into_iter()
         .map(|e| &*e.into_inner());
+    let len = scripts_iter.len();
 
     let final_table: Option<Table>;
     match opt.grouping {
         Grouping::None => {
-            let mut opt = convert_opt(opt, new_grid());
+            let mut opt = convert_opt(opt, Grid::new(len));
             let scripts: Vec<_> = scripts_iter.collect();
             fmt_group(w, scripts, latest_script_id, &mut opt)?;
             final_table = extract_table(opt);
@@ -174,7 +164,7 @@ pub async fn fmt_list<W: Write>(
             final_table = extract_table(opt);
         }
         Grouping::Tag => {
-            let mut opt = convert_opt(opt, new_grid());
+            let mut opt = convert_opt(opt, Grid::new(len));
             let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
             for script in scripts_iter {
                 let key = TagsKey::new(script.tags.iter().cloned());
@@ -224,12 +214,10 @@ fn fmt_group<W: Write>(
     match &mut opt.display_style {
         DisplayStyle::Short(_, grid) => {
             let width = console::Term::stdout().size().1 as usize;
-            if let Some(grid_display) = grid.fit_into_width(width) {
-                write!(w, "{}", grid_display)?;
-            } else {
-                // TODO
-            }
-            *grid = new_grid();
+            let grid_display = grid.fit_into_width(width);
+            write!(w, "{}", grid_display)?;
+            drop(grid_display);
+            grid.clear();
         }
         _ => (),
     }

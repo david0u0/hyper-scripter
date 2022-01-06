@@ -136,7 +136,7 @@ impl AliasRoot {
             let base_len = args.len() - remaining_args.len();
             let base_args = args.iter().take(base_len).map(AsRef::as_ref);
             let after_args = alias.after.iter().map(AsRef::as_ref);
-            let remaining_args = remaining_args.iter().map(AsRef::as_ref).skip(1);
+            let remaining_args = remaining_args[1..].iter().map(AsRef::as_ref);
             let new_args = base_args.chain(after_args).chain(remaining_args);
 
             // log::trace!("新的參數為 {:?}", new_args);

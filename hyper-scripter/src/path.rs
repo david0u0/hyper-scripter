@@ -8,7 +8,7 @@ use std::fs::{create_dir, read_dir};
 use std::path::{Component, Path, PathBuf};
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
-pub const HS_PRE_RUN: &str = ".hs_prerun.sh";
+pub const HS_PRE_RUN: &str = ".hs_prerun";
 const TEMPLATE: &str = ".hs_templates";
 
 macro_rules! hs_home_env {

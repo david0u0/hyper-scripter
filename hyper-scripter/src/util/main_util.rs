@@ -205,9 +205,8 @@ fn run(
     let env = conf.gen_env(&info)?;
     let ty_env = script_conf.gen_env(&info)?;
 
-    let pre_run_script = prepare_pre_run()?;
-    let args = std::iter::once(pre_run_script.as_ref()).chain(remaining_iter!());
-    let mut cmd = super::create_cmd("bash", args);
+    let pre_run_script = prepare_pre_run(None)?;
+    let mut cmd = super::create_cmd(pre_run_script, remaining_iter!());
     cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
 
@@ -326,11 +325,17 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
     Ok(())
 }
 
-pub fn prepare_pre_run() -> Result<PathBuf> {
+pub fn prepare_pre_run(content: Option<&str>) -> Result<PathBuf> {
     let p = path::get_home().join(path::HS_PRE_RUN);
-    if !p.exists() {
-        log::info!("寫入預執行腳本 {:?}", p);
-        super::write_file(&p, include_str!("hs_prerun.sh"))?;
+    if content.is_some() || !p.exists() {
+        let content = content.unwrap_or_else(|| include_str!("hs_prerun"));
+        log::info!("寫入預執行腳本 {:?} {}", p, content);
+        super::write_file(&p, content)?;
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o774))?;
+        }
     }
     Ok(p)
 }

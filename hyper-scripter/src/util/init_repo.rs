@@ -45,7 +45,7 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
     if init {
         log::info!("初次使用，載入好用工具和預執行腳本");
         main_util::load_utils(&mut repo).await?;
-        main_util::prepare_pre_run()?;
+        main_util::prepare_pre_run(None)?;
         main_util::load_templates()?;
     }
 

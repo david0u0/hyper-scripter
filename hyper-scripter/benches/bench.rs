@@ -3,7 +3,7 @@
 
 use criterion::{black_box, Bencher, Criterion};
 use criterion_macro::criterion;
-use hyper_scripter::{fuzzy::*, path::HS_PRE_RUN};
+use hyper_scripter::{fuzzy::*, util::main_util::prepare_pre_run};
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
 
 #[allow(dead_code)]
@@ -195,7 +195,7 @@ impl<'a, 'b, S: FnMut(&mut StdRng, &str) -> String> MyBencherWithSetup<'a, 'b, S
         b.b.iter_with_setup(
             || {
                 let _ = setup();
-                std::fs::write(get_home().join(HS_PRE_RUN), "").unwrap();
+                prepare_pre_run(Some("#!/usr/bin/bash")).unwrap();
                 for (name, tag_arr) in data.data.iter() {
                     let tag_str = gen_tag_string(tag_arr);
                     run!(

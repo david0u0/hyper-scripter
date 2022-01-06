@@ -1,5 +1,5 @@
 use super::{
-    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grouping,
+    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping,
     ListOptions,
 };
 use crate::error::Result;
@@ -12,8 +12,11 @@ use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
 use prettytable::{cell, format, row, Cell, Row, Table};
 use std::cmp::Reverse;
+use std::fmt::Write as FmtWrite;
 use std::hash::Hash;
 use std::io::Write;
+
+type ListOptionWithOutput = ListOptions<Table, Grid>;
 
 fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> String {
     match style {
@@ -57,24 +60,34 @@ impl TagsKey {
     }
 }
 
-fn convert_opt<'a, W: Write>(
-    w: &'a mut W,
-    opt: &ListOptions<'a>,
-) -> ListOptions<'a, Table, &'a mut W> {
+fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
     ListOptions {
         display_style: match opt.display_style {
-            DisplayStyle::Short(t, _) => DisplayStyle::Short(t, w),
-            DisplayStyle::Long(_) => DisplayStyle::Long(Table::new()),
+            DisplayStyle::Short(style, _) => DisplayStyle::Short(style, t),
+            DisplayStyle::Long(_) => {
+                let mut table = Table::new();
+                if opt.grouping != Grouping::Tree {
+                    table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
+                }
+                table.set_format(*format::consts::FORMAT_CLEAN);
+                DisplayStyle::Long(table)
+            }
         },
         grouping: opt.grouping,
         queries: opt.queries,
         plain: opt.plain,
     }
 }
-pub fn fmt_meta<W: Write>(
+fn extract_table<U>(opt: ListOptions<Table, U>) -> Option<Table> {
+    match opt.display_style {
+        DisplayStyle::Short(..) => None,
+        DisplayStyle::Long(table) => Some(table),
+    }
+}
+pub fn fmt_meta(
     script: &ScriptInfo,
     is_latest: bool,
-    opt: &mut ListOptions<Table, &mut W>,
+    opt: &mut ListOptionWithOutput,
 ) -> Result<()> {
     let ty = get_display_type(&script.ty);
     let color = ty.color();
@@ -99,9 +112,12 @@ pub fn fmt_meta<W: Write>(
                 row![name_txt, c->ty_txt, c->script.write_time, c->exec_time_str(script), help_msg];
             table.add_row(row);
         }
-        DisplayStyle::Short(ident_style, w) => {
+        DisplayStyle::Short(ident_style, grid) => {
+            let mut display_str = String::new();
+            let mut width = 0;
             if is_latest && !opt.plain {
-                write!(w, "{}", "*".color(Color::Yellow).bold())?;
+                width += 1;
+                write!(display_str, "{}", "*".color(Color::Yellow).bold())?;
             }
             let ident = ident_string(ident_style, &*ty.display(), script);
             let ident = style(opt.plain, ident, |s| {
@@ -112,7 +128,9 @@ pub fn fmt_meta<W: Write>(
                     s
                 }
             });
-            write!(w, "{}", ident)?;
+            width += ident.chars().count();
+            write!(display_str, "{}", ident)?;
+            grid.add(display_str, width);
         }
     }
     Ok(())
@@ -120,35 +138,33 @@ pub fn fmt_meta<W: Write>(
 const TITLE: &[&str] = &["name", "type", "write", "execute", "help message"];
 pub async fn fmt_list<W: Write>(
     w: &mut W,
-    script_repo: &'_ mut ScriptRepo,
-    opt: &ListOptions<'_>,
+    script_repo: &mut ScriptRepo,
+    opt: ListOptions,
 ) -> Result<()> {
-    let mut opt = convert_opt(w, opt);
-
     let latest_script_id = script_repo.latest_mut(1, false).map_or(-1, |s| s.id);
-
-    if let DisplayStyle::Long(table) = &mut opt.display_style {
-        if opt.grouping != Grouping::Tree {
-            table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
-        }
-        table.set_format(*format::consts::FORMAT_CLEAN);
-    }
 
     let scripts_iter = do_list_query(script_repo, &opt.queries)
         .await?
         .into_iter()
         .map(|e| &*e.into_inner());
+    let len = scripts_iter.len();
 
+    let final_table: Option<Table>;
     match opt.grouping {
         Grouping::None => {
+            let mut opt = convert_opt(opt, Grid::new(len));
             let scripts: Vec<_> = scripts_iter.collect();
-            fmt_group(scripts, latest_script_id, &mut opt)?;
+            fmt_group(w, scripts, latest_script_id, &mut opt)?;
+            final_table = extract_table(opt);
         }
         Grouping::Tree => {
+            let mut opt = convert_opt(opt, &mut *w);
             let scripts: Vec<_> = scripts_iter.collect();
             tree::fmt(scripts, latest_script_id, &mut opt)?;
+            final_table = extract_table(opt);
         }
         Grouping::Tag => {
+            let mut opt = convert_opt(opt, Grid::new(len));
             let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
             for script in scripts_iter {
                 let key = TagsKey::new(script.tags.iter().cloned());
@@ -168,41 +184,42 @@ pub async fn fmt_list<W: Write>(
                         DisplayStyle::Long(table) => {
                             table.add_row(Row::new(vec![Cell::new(&tags_txt.to_string())]));
                         }
-                        DisplayStyle::Short(_, w) => {
+                        DisplayStyle::Short(_, _) => {
                             writeln!(w, "{}", tags_txt)?;
                         }
                     }
                 }
-                fmt_group(scripts, latest_script_id, &mut opt)?;
+                fmt_group(w, scripts, latest_script_id, &mut opt)?;
             }
+            final_table = extract_table(opt);
         }
     }
-    if let DisplayStyle::Long(table) = &mut opt.display_style {
+    if let Some(table) = final_table {
         table.print(w)?;
     }
     Ok(())
 }
 
 fn fmt_group<W: Write>(
+    w: &mut W,
     mut scripts: Vec<&ScriptInfo>,
     latest_script_id: i64,
-    opt: &mut ListOptions<Table, &mut W>,
+    opt: &mut ListOptionWithOutput,
 ) -> Result<()> {
     scripts.sort_by_key(|s| Reverse(s.last_time()));
-    let mut scripts = scripts.iter();
-    if let Some(script) = scripts.next() {
+    for script in scripts.into_iter() {
         let is_latest = script.id == latest_script_id;
         fmt_meta(script, is_latest, opt)?;
     }
-    for script in scripts {
-        if let DisplayStyle::Short(_, w) = &mut opt.display_style {
-            write!(w, "  ")?;
+    match &mut opt.display_style {
+        DisplayStyle::Short(_, grid) => {
+            let width = console::Term::stdout().size().1 as usize;
+            let grid_display = grid.fit_into_width(width);
+            write!(w, "{}", grid_display)?;
+            drop(grid_display);
+            grid.clear();
         }
-        let is_latest = script.id == latest_script_id;
-        fmt_meta(script, is_latest, opt)?;
-    }
-    if let DisplayStyle::Short(_, w) = &mut opt.display_style {
-        writeln!(w)?;
+        _ => (),
     }
     Ok(())
 }

@@ -861,6 +861,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "structopt",
+ "term_grid",
  "tokio",
  "toml",
 ]
@@ -1990,6 +1991,15 @@ dependencies = [
  "byteorder",
  "dirs 1.0.5",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "term_grid"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "230d3e804faaed5a39b08319efb797783df2fd9671b39b7596490cb486d702cf"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]

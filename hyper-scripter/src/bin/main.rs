@@ -321,11 +321,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let opt = ListOptions {
                 grouping: grouping.into(),
                 plain,
-                queries: &queries,
+                queries,
                 display_style,
             };
             let stdout = std::io::stdout();
-            fmt_list(&mut stdout.lock(), &mut repo.init().await?, &opt).await?;
+            fmt_list(&mut stdout.lock(), &mut repo.init().await?, opt).await?;
         }
         Subs::RM { queries, purge } => {
             let mut repo = repo.init().await?;

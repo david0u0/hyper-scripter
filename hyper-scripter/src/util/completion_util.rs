@@ -79,7 +79,7 @@ pub async fn handle_completion(comp: Completion) -> Result {
                 }
             };
             log::info!("補完模式，參數為 {:?}", new_root);
-            new_root.set_home_unless_from_alias()?;
+            new_root.set_home_unless_from_alias(false)?;
             new_root.sanitize_flags();
             let mut repo = init_repo(new_root.root_args, false).await?;
 
@@ -103,7 +103,7 @@ pub async fn handle_completion(comp: Completion) -> Result {
         }
         Completion::Alias { args } => {
             let root = parse_alias_root(&args)?;
-            let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref())?;
+            let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             let conf = Config::load(&home)?;
             if let Some(new_args) = root.expand_alias(&args, &conf) {
                 print_iter(new_args, " ");

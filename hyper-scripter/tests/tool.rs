@@ -99,7 +99,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
 
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        hyper_scripter::path::set_home(Some(&home)).unwrap();
+        hyper_scripter::path::set_home(Some(&home), true).unwrap();
         Config::init().unwrap();
         Config::set_prompt_level(Some(PromptLevel::Never));
     });

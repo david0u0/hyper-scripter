@@ -2,6 +2,10 @@ function __hs_extract_home_and_run
     set cmd (commandline -j)
     set hs_home (eval "hs completion home $cmd" 2>/dev/null)
     if [ $status -eq 0 ]
+        if [ ! -d $hs_home ]
+            # Stop completion cause we don't want to create directory
+            return 1
+        end
         set home_args "-H $hs_home"
     end
     eval "hs --no-alias $home_args $argv" 2>/dev/null
@@ -149,8 +153,8 @@ function __hs_use_subcommand
     eval "command hs completion no-subcommand $cmd" 2>/dev/null
 end
 
-complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -F
-complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -r -F
+complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)" # TODO: this doesn't repect `-H`
 complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.' -r -f -a ""
 complete -c hs -n "__hs_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
 complete -c hs -n "__hs_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"

@@ -58,7 +58,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
         return Ok(vec![]);
     }
 
-    root.set_home_unless_from_alias()?;
+    root.set_home_unless_from_alias(true)?;
 
     if matches!(root.subcmd, Some(Subs::Migrate)) {
         migration::do_migrate(db::get_file()).await?;

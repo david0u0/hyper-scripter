@@ -88,34 +88,38 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     Ok(ret)
 }
 
-fn compute_home_path<T: AsRef<Path>>(p: T) -> Result<PathBuf> {
+fn compute_home_path<T: AsRef<Path>>(p: T, create_on_missing: bool) -> Result<PathBuf> {
     let path = join_here_abs(p)?;
     log::debug!("計算路徑：{:?}", path);
     if !path.exists() {
-        log::info!("路徑 {:?} 不存在，嘗試創建之", path);
-        handle_fs_res(&[&path], create_dir(&path))?;
+        if create_on_missing {
+            log::info!("路徑 {:?} 不存在，嘗試創建之", path);
+            handle_fs_res(&[&path], create_dir(&path))?;
+        } else {
+            return Err(Error::PathNotFound(vec![path]));
+        }
     } else {
         let redirect = path.join(HS_REDIRECT);
         if redirect.is_file() {
             let redirect = read_file(&redirect)?;
             let redirect = path.join(redirect.trim());
             log::info!("重導向至 {:?}", redirect);
-            return compute_home_path(redirect);
+            return compute_home_path(redirect, create_on_missing);
         }
     }
     Ok(path)
 }
-pub fn compute_home_path_optional<T: AsRef<Path>>(p: Option<T>) -> Result<PathBuf> {
+pub fn compute_home_path_optional<T: AsRef<Path>>(
+    p: Option<T>,
+    create_on_missing: bool,
+) -> Result<PathBuf> {
     match p {
-        Some(p) => compute_home_path(p),
-        None => compute_home_path(get_sys_home()?),
+        Some(p) => compute_home_path(p, create_on_missing),
+        None => compute_home_path(get_sys_home()?, create_on_missing),
     }
 }
-pub fn set_home_from_sys() -> Result {
-    set_home(Option::<&'static str>::None)
-}
-pub fn set_home<T: AsRef<Path>>(p: Option<T>) -> Result {
-    let path = compute_home_path_optional(p)?;
+pub fn set_home<T: AsRef<Path>>(p: Option<T>, create_on_missing: bool) -> Result {
+    let path = compute_home_path_optional(p, create_on_missing)?;
     PATH.set(path);
     Ok(())
 }

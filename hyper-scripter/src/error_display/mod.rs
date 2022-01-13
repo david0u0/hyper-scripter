@@ -24,6 +24,7 @@ impl Display for Error {
         match self {
             DontFuzz => return Ok(()),
             Empty => write!(f, "No existing script!")?,
+            NoPreviousArgs => write!(f, "No previous argument!")?,
             SysPathNotFound(SysPath::Config) => write!(
                 f,
                 "Can not find you're config path. Usually it should be `$HOME/.config`",

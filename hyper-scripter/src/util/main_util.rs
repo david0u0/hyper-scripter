@@ -245,6 +245,7 @@ pub async fn run_n_times(
     mut args: Vec<String>,
     res: &mut Vec<Error>,
     use_previous_args: bool,
+    error_no_previous: bool,
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
@@ -254,6 +255,9 @@ pub async fn run_n_times(
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
+            None if error_no_previous => {
+                return Err(Error::NoPreviousArgs);
+            }
             None => log::warn!("無前一次參數，當作空的"),
             Some(arg_str) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);

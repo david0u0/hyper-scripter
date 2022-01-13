@@ -46,6 +46,7 @@ pub enum Error {
     RedundantOpt(RedundantOpt),
     TagFilterNotFound(String),
     DontFuzz,
+    NoPreviousArgs,
     Empty,
 
     Completion,

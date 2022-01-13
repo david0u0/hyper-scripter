@@ -243,6 +243,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             dummy,
             args,
             previous_args,
+            error_no_previous,
             repeat,
             dir,
         } => {
@@ -255,6 +256,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 args,
                 &mut ret.errs,
                 previous_args,
+                error_no_previous,
                 dir,
             )
             .await?;

@@ -212,6 +212,13 @@ pub enum Subs {
         repeat: Option<u64>,
         #[structopt(long, short, help = "Use arguments from last run")]
         previous_args: bool,
+        #[structopt(
+            long,
+            short = "E",
+            requires = "previous-args",
+            help = "Raise an error if --previous-args is given but there is no previous argument"
+        )]
+        error_no_previous: bool,
         #[structopt(long, short, requires = "previous-args")]
         dir: Option<PathBuf>,
         #[structopt(default_value = "-", parse(try_from_str))]
@@ -527,6 +534,7 @@ mod test {
             Some(Subs::Run {
                 dummy: true,
                 previous_args: false,
+                error_no_previous: false,
                 repeat: Some(42),
                 dir: None,
                 script_query,

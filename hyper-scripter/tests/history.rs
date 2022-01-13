@@ -212,32 +212,34 @@ fn test_history_args_rm_last() {
 
     run!("history rm A 2").unwrap(); // Ax
 
-    assert_eq!(run!("run -p -").unwrap(), "Bzz");
+    assert_eq!(run!("run -pE -").unwrap(), "Bzz");
     run!("history rm - 1").unwrap(); // Bzz
     run!("history rm - 1").unwrap(); // Bz
-    assert_eq!(run!("run -p").unwrap(), "Az");
+    assert_eq!(run!("run -pE").unwrap(), "Az");
     run!("history rm - 1").unwrap(); // Az
-    assert_eq!(run!("run -p -").unwrap(), "By");
+    assert_eq!(run!("run -pE -").unwrap(), "By");
 
     // Make some noise HAHA
     {
         maybe_dummy("B", "w");
         maybe_dummy("A", "w");
 
-        assert_eq!(run!("run -p -").unwrap(), "Aw");
+        assert_eq!(run!("run -pE -").unwrap(), "Aw");
         run!("history rm B 1").unwrap(); // Bw
-        assert_eq!(run!("run -p -").unwrap(), "Aw");
+        assert_eq!(run!("run -pE -").unwrap(), "Aw");
         run!("history rm A 1").unwrap(); // Aw
     }
 
-    assert_eq!(run!("run -p -").unwrap(), "By"); // Ax already removed
+    assert_eq!(run!("run -pE -").unwrap(), "By"); // Ax already removed
     run!("history rm - 1").unwrap(); // By
-    assert_eq!(run!("run -p -").unwrap(), "Ay");
+    assert_eq!(run!("run -pE -").unwrap(), "Ay");
     run!("history rm - 1").unwrap(); // Ay
+    run!("run -pE A").expect_err("沒有先前參數");
     assert_eq!(run!("--no-trace -p A").expect("空的"), "A"); // no-trace, won't effect order
 
-    assert_eq!(run!("run -p B").unwrap(), "Bx");
+    assert_eq!(run!("run -pE B").unwrap(), "Bx");
     run!("history rm - 1").unwrap(); // Bx
+    run!("run -pE B").expect_err("沒有先前參數");
     assert_eq!(run!("--no-trace -p B").expect("空的"), "B"); // no-trace, won't effect order
 
     assert_eq!(run!("run -").unwrap(), "A"); // read time

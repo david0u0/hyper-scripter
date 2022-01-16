@@ -14,7 +14,7 @@ const MSG_JS: &str = "你好，爪哇腳本人！";
 #[test]
 fn test_tags() {
     let _g = setup();
-    run!("e . | echo \"{}\"", MSG).unwrap();
+    run!("e ? | echo \"{}\"", MSG).unwrap();
     assert_eq!(MSG, run!("-").unwrap());
 
     run!(
@@ -39,7 +39,7 @@ fn test_tags() {
 fn test_mv_cp() {
     let _g = setup();
 
-    run!("e -t test . -T js --no-template | echo $HS_TAGS").unwrap();
+    run!("e -t test ? -T js --no-template | echo $HS_TAGS").unwrap();
     run!("-").expect_err("用 nodejs 執行 echo ……？");
 
     run!("mv 1 -T sh -t test2").unwrap();
@@ -185,7 +185,7 @@ fn test_rm() {
 
     run!("e test/ya -t test-tag | echo \"{}\"", MSG).unwrap();
     assert_eq!(MSG, run!("test/ya").unwrap());
-    run!("e . | echo \"你匿\"").unwrap();
+    run!("e ? | echo \"你匿\"").unwrap();
     assert_eq!("你匿", run!(".1").unwrap());
 
     run!("rm - test*").unwrap();

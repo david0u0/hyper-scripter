@@ -29,7 +29,7 @@ impl Default for EditQuery {
 impl FromStr for EditQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
-        Ok(if s == "." {
+        Ok(if s == "?" {
             EditQuery::NewAnonimous
         } else {
             EditQuery::Query(s.parse()?)
@@ -153,7 +153,7 @@ impl FromStr for ScriptQuery {
         } else if s.starts_with('^') {
             ScriptQueryInner::Prev(parse_prev(s)?)
         } else {
-            ScriptName::valid(s, true).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
+            ScriptName::valid(s, true, true).context("模糊搜尋仍需符合腳本名格式！")?; // NOTE: 單純檢查用
             ScriptQueryInner::Fuzz(s.to_owned())
         };
         Ok(ScriptQuery { inner, bang })

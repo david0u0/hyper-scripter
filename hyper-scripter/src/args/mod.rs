@@ -184,7 +184,7 @@ pub enum Subs {
         tags: Option<TagFilter>,
         #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
-        #[structopt(parse(try_from_str), default_value = ".")]
+        #[structopt(parse(try_from_str), default_value = "?")]
         edit_query: EditQuery,
         content: Vec<String>,
     },

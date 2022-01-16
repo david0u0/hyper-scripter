@@ -305,7 +305,7 @@ impl ScriptRepo {
         for record in scripts.into_iter() {
             let name = record.name;
             log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
-            let script_name = name.clone().into_script_name()?;
+            let script_name = name.clone().into_script_name_unchecked()?; // NOTE: 從資料庫撈出來就別檢查了吧
 
             let mut builder = ScriptInfo::builder(
                 record.id,

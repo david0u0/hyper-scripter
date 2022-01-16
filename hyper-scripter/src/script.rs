@@ -37,7 +37,7 @@ impl FromStr for ScriptName {
     }
 }
 impl ScriptName {
-    pub fn valid(mut s: &str, fuzzing: bool) -> Result<Option<u32>> {
+    pub fn valid(mut s: &str, fuzzing: bool, check_legal_name: bool) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
         let reg = regex::Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(s);
@@ -50,15 +50,19 @@ impl ScriptName {
         } else {
             if fuzzing {
                 if s == "." {
+                    log::info!("特殊規則：模糊搜時允許單一個`.`");
                     return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
                 } else if s.ends_with('/') {
+                    log::info!("特殊規則：模糊搜時允許以`/`結尾");
                     s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
                 }
             }
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
-            for s in s.split('/') {
-                if illegal_name(s) {
-                    return Err(Error::Format(ScriptNameCode, s.to_owned()));
+            if check_legal_name {
+                for s in s.split('/') {
+                    if illegal_name(s) {
+                        return Err(Error::Format(ScriptNameCode, s.to_owned()));
+                    }
                 }
             }
             Ok(None)
@@ -267,6 +271,12 @@ impl ScriptInfo {
 
 pub trait IntoScriptName {
     fn into_script_name(self) -> Result<ScriptName>;
+    fn into_script_name_unchecked(self) -> Result<ScriptName>
+    where
+        Self: Sized,
+    {
+        self.into_script_name()
+    }
 }
 
 impl IntoScriptName for u32 {
@@ -274,14 +284,20 @@ impl IntoScriptName for u32 {
         Ok(ScriptName::Anonymous(self))
     }
 }
+fn string_into_script_name(s: String, check_legal_name: bool) -> Result<ScriptName> {
+    log::debug!("解析腳本名：{} {}", s, check_legal_name);
+    if let Some(id) = ScriptName::valid(&s, false, check_legal_name)? {
+        id.into_script_name()
+    } else {
+        Ok(ScriptName::Named(s))
+    }
+}
 impl IntoScriptName for String {
     fn into_script_name(self) -> Result<ScriptName> {
-        log::debug!("解析腳本名：{}", self);
-        if let Some(id) = ScriptName::valid(&self, false)? {
-            id.into_script_name()
-        } else {
-            Ok(ScriptName::Named(self))
-        }
+        string_into_script_name(self, true)
+    }
+    fn into_script_name_unchecked(self) -> Result<ScriptName> {
+        string_into_script_name(self, false)
     }
 }
 impl IntoScriptName for ScriptName {

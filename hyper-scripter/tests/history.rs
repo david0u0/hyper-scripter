@@ -309,7 +309,7 @@ fn test_event_path() {
     let (dir_b, rel_b) = init_dir("b");
     let (dir_c, _) = init_dir("c");
 
-    run!("e . | echo $1").unwrap();
+    run!("e ? | echo $1").unwrap();
     run!(dir: &dir_a, "- a").unwrap();
     run!(dir: &dir_b, "- b").unwrap();
     run!(dir: &dir_c, "- c").unwrap();

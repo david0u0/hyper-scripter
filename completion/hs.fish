@@ -52,17 +52,25 @@ function __hs_list_scripts
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
 
-    if echo $cmd_arr[-1] | string match -q -r ".*!\$"
-        set bang 1
-        set cmd "hs -f all --timeless"
-        set name_arg "--name (string replace ! '' $cmd_arr[-1])"
-    else
-        if [ -n "$cmd_arr[-1]" ]
-            set name_arg "--name $cmd_arr[-1]"
-        else
-            set trailing "trailing"
+    set name $cmd_arr[-1]
+    if [ -n $name ]
+        if echo $name | string match -q -r ".*!\$"
+            set bang "!"
+            set cmd "hs -f all --timeless"
+            set name (string replace ! '' $name)
         end
-        set cmd "$orig_cmd $trailing"
+        if echo $name | string match -q -r "=.*\$"
+            set exact "="
+            set name (string replace = '' $name)
+        end
+        if [ -n $name ]
+            set name_arg "--name $name"
+        end
+        if not set -q cmd
+            set cmd "$cmd_arr[1..-2] trailing"
+        end
+    else
+        set cmd "$orig_cmd trailing"
     end
 
     set list (eval "command hs completion ls $name_arg $cmd" 2>/dev/null)
@@ -70,12 +78,9 @@ function __hs_list_scripts
         return
     end
     for script in (string split ' ' $list)
+        set res "$exact$script$bang"
         # NOTE: duplicate the script name to mimic the "reorder fuzzy search"
-        if set -q bang
-            echo $script!\t$script!
-        else
-            echo $script\t$script
-        end
+        echo $res\t$res
     end
 end
 

@@ -37,6 +37,7 @@ impl FromStr for ScriptName {
     }
 }
 impl ScriptName {
+    #[inline]
     pub fn valid(mut s: &str, fuzzing: bool, check_legal_name: bool) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
         let reg = regex::Regex::new(r"^\.(\d+)$")?;
@@ -284,6 +285,7 @@ impl IntoScriptName for u32 {
         Ok(ScriptName::Anonymous(self))
     }
 }
+#[inline]
 fn string_into_script_name(s: String, check_legal_name: bool) -> Result<ScriptName> {
     log::debug!("解析腳本名：{} {}", s, check_legal_name);
     if let Some(id) = ScriptName::valid(&s, false, check_legal_name)? {

@@ -10,6 +10,7 @@ use std::cmp::{Ordering, PartialOrd};
 use tokio::task::spawn_blocking;
 
 const MID_SCORE: i64 = 800; // TODO: 好好決定這個魔法數字
+const EXACXT_SCORE: i64 = std::i64::MAX / 1000; // 代表「完全相符」時的分數
 
 fn is_multifuzz(score: i64, best_score: i64) -> bool {
     best_score - score < 2 // 吃掉「正常排序就命中」的差異
@@ -228,6 +229,9 @@ pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
 }
 
 fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
+    if choice == pattern {
+        return Some(EXACXT_SCORE);
+    }
     let mut ans_opt = None;
     let mut first = true;
     foreach_reorder(choice, sep, &mut |choice_reordered| {

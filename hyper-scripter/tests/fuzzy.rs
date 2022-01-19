@@ -107,3 +107,13 @@ fn test_fuzzy_7() {
     let v = vec![BUILD_HS, UTIL_HISTORIAN];
     assert_eq!(unwrap_fuzz(UILH, &v), vec![BUILD_HS]);
 }
+
+const AB: Str = "ab";
+const ABC: Str = "abc";
+const A: Str = "a";
+#[test]
+fn test_fuzzy_exact() {
+    let v = vec![AB, ABC];
+    assert_eq!(unwrap_fuzz(A, &v), vec![ABC, AB]);
+    assert_eq!(unwrap_fuzz(AB, &v), vec![AB]);
+}

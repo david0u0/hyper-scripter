@@ -125,6 +125,7 @@ struct MyBencher<'a, 'b> {
     epoch: usize,
     with_alias: bool,
     check_res: bool,
+    script_content: Option<String>,
 }
 struct MyBencherWithSetup<'a, 'b, S> {
     b: MyBencher<'a, 'b>,
@@ -139,10 +140,14 @@ impl<'a, 'b> MyBencher<'a, 'b> {
             epoch,
             with_alias,
             check_res: false,
+            script_content: None,
         }
     }
     fn check_res(&mut self) {
-        self.check_res = true
+        self.check_res = true;
+    }
+    fn script_content(&mut self, content: &str) {
+        self.script_content = Some(content.to_owned());
     }
     fn with_setup<S: FnMut(&mut StdRng, &str) -> String>(
         self,
@@ -191,7 +196,9 @@ impl<'a, 'b, S: FnMut(&mut StdRng, &str) -> String> MyBencherWithSetup<'a, 'b, S
             })
             .collect();
 
-        let (script_count, check_res) = (b.script_count, b.check_res);
+        let (script_count, check_res, script_content) =
+            (b.script_count, b.check_res, b.script_content);
+        let script_content = script_content.as_deref().unwrap_or("echo $NAME");
         b.b.iter_with_setup(
             || {
                 let _ = setup();
@@ -199,9 +206,10 @@ impl<'a, 'b, S: FnMut(&mut StdRng, &str) -> String> MyBencherWithSetup<'a, 'b, S
                 for (name, tag_arr) in data.data.iter() {
                     let tag_str = gen_tag_string(tag_arr);
                     run!(
-                        "--no-alias edit --fast --no-template -t {} {} | echo $NAME",
+                        "--no-alias edit --fast --no-template -t {} {} | {}",
                         tag_str,
-                        name
+                        name,
+                        script_content
                     )
                     .unwrap();
                 }
@@ -269,6 +277,13 @@ fn run_criterion(c: &mut Criterion, name: &str, script_count: usize, epoch: usiz
             });
             b.run(|_, name, _| format!("history show ={}! --with-name", name));
         });
+    } else if name.contains("rmid") {
+        c.bench_function(name, |b| {
+            let mut b = MyBencher::new(b, script_count, epoch, with_alias);
+            b.script_content("$HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID");
+            b.check_res();
+            b.run(|_, name, _| format!("={}!", name));
+        });
     } else {
         panic!("看不懂 benchmark 的名字 {}", name);
     }
@@ -297,6 +312,10 @@ fn bench_massive_history(c: &mut Criterion) {
     // run random history show with exact name and bang!
     run_criterion(c, "massive_history", 200, 400);
 }
+#[criterion]
+fn bench_massive_rmid(c: &mut Criterion) {
+    run_criterion(c, "massive_rmid", 200, 400);
+}
 
 #[criterion]
 fn bench_small_fuzzy(c: &mut Criterion) {
@@ -320,6 +339,10 @@ fn bench_small_ls(c: &mut Criterion) {
 fn bench_small_history(c: &mut Criterion) {
     // run random history show with exact name and bang!
     run_criterion(c, "small_history", 40, 80);
+}
+#[criterion]
+fn bench_small_rmid(c: &mut Criterion) {
+    run_criterion(c, "small_rmid", 40, 80);
 }
 
 #[criterion]

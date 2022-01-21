@@ -150,7 +150,7 @@ macro_rules! ignore_or_humble_arg {
 }
 
 #[derive(Debug)]
-pub struct IgnoreResult {
+pub struct LastTimeChanged {
     pub script_id: i64,
     pub exec_time: Option<NaiveDateTime>,
     pub exec_done_time: Option<NaiveDateTime>,
@@ -320,7 +320,7 @@ impl Historian {
             .map(|res| (res.script_id, res.args.unwrap_or_default())))
     }
 
-    async fn make_ignore_result(&self, script_id: i64) -> Result<IgnoreResult, DBError> {
+    async fn make_ignore_result(&self, script_id: i64) -> Result<LastTimeChanged, DBError> {
         let humble_time = sqlx::query!(
             "
             SELECT time FROM events
@@ -331,17 +331,23 @@ impl Historian {
         )
         .fetch_optional(&*self.pool.read().unwrap())
         .await?;
-        Ok(IgnoreResult {
+        Ok(LastTimeChanged {
             script_id,
             exec_time: self.last_time_of(script_id, EventType::Exec).await?,
             exec_done_time: self.last_time_of(script_id, EventType::ExecDone).await?,
             humble_time: humble_time.map(|t| t.time),
         })
     }
-    pub async fn ignore_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+    pub async fn ignore_args_by_id(
+        &self,
+        event_id: i64,
+    ) -> Result<Option<LastTimeChanged>, DBError> {
         self.process_args_by_id(false, event_id).await
     }
-    pub async fn humble_args_by_id(&self, event_id: i64) -> Result<Option<IgnoreResult>, DBError> {
+    pub async fn humble_args_by_id(
+        &self,
+        event_id: i64,
+    ) -> Result<Option<LastTimeChanged>, DBError> {
         self.process_args_by_id(true, event_id).await
     }
     /// humble or ignore
@@ -349,7 +355,7 @@ impl Historian {
         &self,
         is_humble: bool,
         event_id: i64,
-    ) -> Result<Option<IgnoreResult>, DBError> {
+    ) -> Result<Option<LastTimeChanged>, DBError> {
         if event_id == ZERO {
             log::info!("試圖處理零事件，什麼都不做");
             return Ok(None);
@@ -390,7 +396,7 @@ impl Historian {
         ids: &[i64],
         min: NonZeroU64,
         max: Option<NonZeroU64>,
-    ) -> Result<Vec<IgnoreResult>, DBError> {
+    ) -> Result<Vec<LastTimeChanged>, DBError> {
         let ids_str = join_id_str(ids);
 
         let offset = min.get() as i64 - 1;

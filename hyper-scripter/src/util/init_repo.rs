@@ -3,12 +3,19 @@ use crate::args::RootArgs;
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::path;
-use crate::script_repo::{RecentFilter, ScriptRepo};
+use crate::script_repo::{DBEnv, RecentFilter, ScriptRepo};
 use fxhash::FxHashSet as HashSet;
 use hyper_scripter_historian::Historian;
 
 /// 即使 `need_journal=false` 也可能使用 journal，具體條件同 `crate::db::get_pool`
-pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptRepo> {
+pub async fn init_env(mut need_journal: bool) -> Result<(DBEnv, bool)> {
+    let (pool, init) = crate::db::get_pool(&mut need_journal).await?;
+    let historian = Historian::new(path::get_home().to_owned()).await?;
+    Ok((DBEnv::new(pool, historian, need_journal), init))
+}
+
+/// 即使 `need_journal=false` 也可能使用 journal，具體條件同 `crate::db::get_pool`
+pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo> {
     let RootArgs {
         no_trace,
         humble,
@@ -21,7 +28,6 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
     } = args;
 
     let conf = Config::get();
-    let (pool, init) = crate::db::get_pool(&mut need_journal).await?;
 
     let recent = if timeless {
         None
@@ -32,8 +38,8 @@ pub async fn init_repo(args: RootArgs, mut need_journal: bool) -> Result<ScriptR
         })
     };
 
-    let historian = Historian::new(path::get_home().to_owned()).await?;
-    let mut repo = ScriptRepo::new(pool, recent, historian, need_journal)
+    let (env, init) = init_env(need_journal).await?;
+    let mut repo = ScriptRepo::new(recent, env)
         .await
         .context("載入腳本倉庫失敗")?;
     if no_trace {

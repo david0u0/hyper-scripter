@@ -8,7 +8,7 @@ use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_co
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
 use hyper_scripter::query::{self, ScriptQuery};
-use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
+use hyper_scripter::script_repo::{DBEnv, RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
 use hyper_scripter::util::{
@@ -18,7 +18,7 @@ use hyper_scripter::util::{
 };
 use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
-use hyper_scripter_historian::{Historian, IgnoreResult};
+use hyper_scripter_historian::{Historian, LastTimeChanged};
 
 #[tokio::main]
 async fn main() {
@@ -93,6 +93,14 @@ impl RepoHolder {
     async fn historian(self) -> Result<Historian> {
         let historian = Historian::new(path::get_home().to_owned()).await?;
         Ok(historian)
+    }
+    async fn env(self) -> Result<DBEnv> {
+        let (env, init) = util::init_env(self.need_journal).await?;
+        if init {
+            log::error!("還沒初始化就想做進階操作 ==");
+            std::process::exit(0);
+        }
+        Ok(env)
     }
 }
 
@@ -598,7 +606,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 log::debug!("嘗試打印參數 {} {}", script_id, args);
                 let args: Vec<String> = serde_json::from_str(&args)?;
                 if with_name {
-                    let entry = get_mut_by_id(&mut repo, script_id)?;
+                    let entry = repo.get_mut_by_id(script_id).ok_or_else(|| {
+                        log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
+                        Error::ScriptNotFound(script_id.to_string())
+                    })?;
                     print!("{}", entry.name.key());
                     if !args.is_empty() {
                         print!(" ");
@@ -642,35 +653,20 @@ fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag
 }
 
 async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -> Result {
-    let mut repo = repo.init().await?;
-    let historian = repo.historian();
+    let env = repo.env().await?;
     let event_id = event_id as i64;
     let res = if is_humble {
-        historian.humble_args_by_id(event_id).await?
+        env.historian.humble_args_by_id(event_id).await?
     } else {
-        historian.ignore_args_by_id(event_id).await?
+        env.historian.ignore_args_by_id(event_id).await?
     };
     if let Some(res) = res {
-        let mut entry = get_mut_by_id(&mut repo, res.script_id)?;
-        entry
-            .update(|info| {
-                info.exec_time = res.exec_time.map(|t| ScriptTime::new(t));
-                info.exec_done_time = res.exec_done_time.map(|t| ScriptTime::new(t));
-                info.humble_time = res.humble_time;
-            })
-            .await?;
+        env.update_last_time_directly(res).await?;
     }
     Ok(())
 }
 
-fn get_mut_by_id(repo: &mut ScriptRepo, id: i64) -> Result<RepoEntry<'_>> {
-    repo.get_mut_by_id(id).ok_or_else(|| {
-        log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
-        Error::ScriptNotFound(id.to_string())
-    })
-}
-
-fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &IgnoreResult) -> bool {
+fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &LastTimeChanged) -> bool {
     let s_exec_time = entry.exec_time.as_ref().map(|t| **t);
     let s_exec_done_time = entry.exec_done_time.as_ref().map(|t| **t);
     (s_exec_time, s_exec_done_time, entry.humble_time)

@@ -4,7 +4,7 @@ use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
 use fxhash::FxHashMap as HashMap;
-use hyper_scripter_historian::{Event, EventData, Historian, LastTimeChanged};
+use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
 
@@ -80,8 +80,8 @@ impl DBEnv {
         Ok(())
     }
 
-    pub async fn update_last_time_directly(&self, last_time: LastTimeChanged) -> Result {
-        let LastTimeChanged {
+    pub async fn update_last_time_directly(&self, last_time: LastTimeRecord) -> Result {
+        let LastTimeRecord {
             script_id,
             exec_time,
             exec_done_time,

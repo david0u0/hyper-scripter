@@ -18,7 +18,7 @@ use hyper_scripter::util::{
 };
 use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
-use hyper_scripter_historian::{Historian, LastTimeChanged};
+use hyper_scripter_historian::{Historian, LastTimeRecord};
 
 #[tokio::main]
 async fn main() {
@@ -666,7 +666,7 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
     Ok(())
 }
 
-fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &LastTimeChanged) -> bool {
+fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &LastTimeRecord) -> bool {
     let s_exec_time = entry.exec_time.as_ref().map(|t| **t);
     let s_exec_done_time = entry.exec_done_time.as_ref().map(|t| **t);
     (s_exec_time, s_exec_done_time, entry.humble_time)

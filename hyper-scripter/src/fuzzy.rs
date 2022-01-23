@@ -342,7 +342,7 @@ mod test {
     async fn do_fuzz<'a>(name: &'a str, v: &'a Vec<&'a str>) -> Option<FuzzResult<&'a str>> {
         fuzz(name, v.iter().map(|s| *s), ":").await.unwrap()
     }
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_fuzz() {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1";
@@ -365,7 +365,7 @@ mod test {
         assert_eq!(v, vec!["測試腳本1", "測試腳本2"]);
         assert_eq!(ans, "測試腳本1"); // 真的同分，只好以順序決定了
     }
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_fuzz_with_len() {
         let _ = env_logger::try_init();
         let t1 = "測試腳本1";
@@ -376,7 +376,7 @@ mod test {
         assert_eq!(ans, "測試腳本1");
         assert_eq!(v, vec);
     }
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_reorder_fuzz() {
         let _ = env_logger::try_init();
         let t1 = "a:c";

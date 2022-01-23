@@ -164,22 +164,19 @@ impl DBEnv {
         let name = name_cow.as_ref();
         let ty = info.ty.as_ref();
         let tags = join_tags(info.tags.iter());
-        sqlx::query!(
+        let res = sqlx::query!(
             "
             INSERT INTO script_infos (name, ty, tags)
             VALUES(?, ?, ?)
+            RETURNING id
             ",
             name,
             ty,
             tags,
         )
-        .execute(&self.info_pool)
+        .fetch_one(&self.info_pool)
         .await?;
-        let id = sqlx::query!("SELECT last_insert_rowid() as id")
-            .fetch_one(&self.info_pool)
-            .await?
-            .id;
-        Ok(id as i64)
+        Ok(res.id)
     }
 
     async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
@@ -319,8 +316,9 @@ impl ScriptRepo {
             (time, r.archaeology)
         });
 
+        // FIXME: should use left join, but it breaks sqlx ^0.5
         let scripts = sqlx::query!(
-            "SELECT * FROM script_infos si LEFT JOIN last_events le ON si.id = le.script_id"
+            "SELECT * FROM script_infos si JOIN last_events le ON si.id = le.script_id"
         )
         .fetch_all(&db_env.info_pool)
         .await?;

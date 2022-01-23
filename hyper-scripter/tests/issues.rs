@@ -105,7 +105,7 @@ fn test_edit_existing_bang() {
     run!("e test -t hide | echo 躲貓貓").unwrap();
 
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         use hyper_scripter::error::{Error, RedundantOpt};
         use hyper_scripter::script_repo::ScriptRepo;
@@ -207,7 +207,7 @@ fn test_multifuzz() {
     let t2 = ScriptTest::new("multifuzz/t2", None, None);
 
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     let res = rt.block_on(async {
         fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), SEP)
             .await

@@ -23,11 +23,12 @@ pub struct Historian {
 }
 
 async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64, DBError> {
-    sqlx::query!(
+    let res = sqlx::query!(
         "
         INSERT INTO events
         (script_id, type, cmd, args, content, time, main_event_id, dir, humble)
         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
         ",
         event.script_id,
         event.ty,
@@ -39,12 +40,9 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.dir,
         event.humble
     )
-    .execute(pool)
+    .fetch_one(pool)
     .await?;
-    let res = sqlx::query!("SELECT last_insert_rowid() AS id")
-        .fetch_one(pool)
-        .await?;
-    Ok(res.id as i64)
+    Ok(res.id)
 }
 
 #[derive(Clone, Copy)]

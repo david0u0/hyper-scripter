@@ -4,7 +4,7 @@ use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
 use fxhash::FxHashMap as HashMap;
-use hyper_scripter_historian::{Event, EventData, Historian};
+use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
 
@@ -29,7 +29,7 @@ enum TraceOption {
 
 #[derive(Debug)]
 pub struct DBEnv {
-    pub info_pool: SqlitePool,
+    info_pool: SqlitePool,
     pub historian: Historian,
     trace_opt: TraceOption,
     modifies_script: bool,
@@ -60,6 +60,14 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
+    pub fn new(info_pool: SqlitePool, historian: Historian, modifies_script: bool) -> Self {
+        Self {
+            info_pool,
+            historian,
+            modifies_script,
+            trace_opt: TraceOption::Normal,
+        }
+    }
     pub async fn handle_neglect(&self, id: i64) -> Result {
         let time = Utc::now().naive_utc();
         sqlx::query!(
@@ -72,15 +80,36 @@ impl DBEnv {
         Ok(())
     }
 
+    pub async fn update_last_time_directly(&self, last_time: LastTimeRecord) -> Result {
+        let LastTimeRecord {
+            script_id,
+            exec_time,
+            exec_done_time,
+            humble_time,
+        } = last_time;
+        sqlx::query!(
+            "UPDATE last_events set humble = ?, exec = ?, exec_done = ? WHERE script_id = ?",
+            humble_time,
+            exec_time,
+            exec_done_time,
+            script_id
+        )
+        .execute(&self.info_pool)
+        .await?;
+        Ok(())
+    }
     async fn update_last_time(&self, info: &ScriptInfo) -> Result {
+        let exec_count = info.exec_count as i32;
         match self.trace_opt {
             TraceOption::NoTrace => return Ok(()),
             TraceOption::Normal => (),
             TraceOption::Humble => {
+                // FIXME: what if a script is created with humble?
                 let humble_time = info.last_major_time();
                 sqlx::query!(
-                    "UPDATE last_events set humble = ? WHERE script_id = ?",
+                    "UPDATE last_events set humble = ?, exec_count = ? WHERE script_id = ?",
                     humble_time,
+                    exec_count,
                     info.id,
                 )
                 .execute(&self.info_pool)
@@ -94,7 +123,6 @@ impl DBEnv {
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
         let neglect_time = info.neglect_time.as_ref().map(|t| **t);
         let miss_time = info.miss_time.as_ref().map(|t| **t);
-        let exec_count = info.exec_count as i32;
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
@@ -283,12 +311,7 @@ impl ScriptRepo {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
-    pub async fn new(
-        pool: SqlitePool,
-        recent: Option<RecentFilter>,
-        historian: Historian,
-        modifies_script: bool,
-    ) -> Result<ScriptRepo> {
+    pub async fn new(recent: Option<RecentFilter>, db_env: DBEnv) -> Result<ScriptRepo> {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let time_bound = recent.map(|r| {
             let mut time = Utc::now().naive_utc();
@@ -299,7 +322,7 @@ impl ScriptRepo {
         let scripts = sqlx::query!(
             "SELECT * FROM script_infos si LEFT JOIN last_events le ON si.id = le.script_id"
         )
-        .fetch_all(&pool)
+        .fetch_all(&db_env.info_pool)
         .await?;
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         for record in scripts.into_iter() {
@@ -367,12 +390,7 @@ impl ScriptRepo {
             map,
             hidden_map,
             latest_name: None,
-            db_env: DBEnv {
-                trace_opt: TraceOption::Normal,
-                info_pool: pool,
-                historian,
-                modifies_script,
-            },
+            db_env,
         })
     }
     pub fn no_trace(&mut self) {

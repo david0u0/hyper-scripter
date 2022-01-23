@@ -17,7 +17,7 @@ pub mod main_util;
 pub mod serde;
 
 pub mod init_repo;
-pub use init_repo::init_repo;
+pub use init_repo::*;
 
 pub fn illegal_name(s: &str) -> bool {
     s.starts_with('-')

@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 pub mod completion_util;
+pub mod holder;
 pub mod main_util;
 pub mod serde;
 

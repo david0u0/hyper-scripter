@@ -156,10 +156,16 @@ pub struct LastTimeRecord {
 }
 
 impl Historian {
+    pub async fn close(self) {
+        if let Ok(pool) = self.pool.read() {
+            pool.close().await;
+        }
+    }
     async fn raw_record(&self, event: DBEvent<'_>) -> Result<i64, DBError> {
         let pool = &mut *self.pool.write().unwrap();
         let res = raw_record_event(pool, event).await;
         if res.is_err() {
+            pool.close().await;
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
             *pool = db::get_pool(&self.dir_path).await?;
             return raw_record_event(pool, event).await;

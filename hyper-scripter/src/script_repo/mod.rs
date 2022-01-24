@@ -3,6 +3,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
+use futures::join;
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
@@ -60,6 +61,9 @@ impl<'b> RepoEntryOptional<'b> {
 }
 
 impl DBEnv {
+    pub async fn close(self) {
+        join!(self.historian.close(), self.info_pool.close());
+    }
     pub fn new(info_pool: SqlitePool, historian: Historian, modifies_script: bool) -> Self {
         Self {
             info_pool,
@@ -284,6 +288,9 @@ pub struct ScriptRepo {
 }
 
 impl ScriptRepo {
+    pub async fn close(self) {
+        self.db_env.close().await;
+    }
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }

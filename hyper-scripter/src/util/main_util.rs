@@ -77,8 +77,9 @@ pub async fn edit_or_create(
     let mut new_namespaces: Vec<Tag> = vec![];
 
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        macro_rules! new_named {
-            () => {{
+        match query::do_script_query(&query, script_repo, false, false).await {
+            // TODO: 手動測試文件？
+            Err(Error::DontFuzz) | Ok(None) => {
                 if tags.explicit_filter {
                     return Err(RedundantOpt::Filter.into());
                 }
@@ -100,15 +101,14 @@ pub async fn edit_or_create(
                 let p = path::open_script(&name, &final_ty, None)
                     .context(format!("打開新命名腳本失敗：{:?}", name))?;
                 if p.exists() {
+                    if p.is_dir() {
+                        return Err(Error::PathExist(p).context("與目錄撞路徑"));
+                    }
+                    check_path_collision(&p, script_repo)?;
                     log::warn!("編輯野生腳本！");
                 }
                 (name, p)
-            }};
-        }
-
-        match query::do_script_query(&query, script_repo, false, false).await {
-            Err(Error::DontFuzz) => new_named!(), // TODO: 手動測試文件？
-            Ok(None) => new_named!(),
+            }
             Ok(Some(entry)) => {
                 if ty.is_some() {
                     return Err(RedundantOpt::Type.into());
@@ -404,4 +404,14 @@ pub async fn after_script(
         entry.update(|info| info.write()).await?;
     }
     Ok(true)
+}
+
+fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {
+    for script in script_repo.iter_mut(true) {
+        let script_p = path::open_script(&script.name, &script.ty, None)?;
+        if &script_p == p {
+            return Err(Error::PathExist(script_p).context("與既存腳本撞路徑"));
+        }
+    }
+    Ok(())
 }

@@ -284,3 +284,16 @@ fn test_fuzz_end_with_slash() {
     run!("e illegal/").expect_err("不應創建以`/`結尾的腳本");
     run!("mv - illegal/").expect_err("不應創建以`/`結尾的腳本");
 }
+
+#[test]
+fn test_existing_path() {
+    println!("測試路徑衝突的邊角案例");
+    let _g = setup();
+
+    let _ = ScriptTest::new("dir/file", None, None);
+    run!("e =dir -T txt | echo 1").expect_err("與目錄撞路徑");
+    run!("e =dir/file.sh -T txt | echo 1").expect_err("與既存腳本撞路徑");
+    run!("e =dir/file.sh/file | echo 1").unwrap_err();
+
+    assert_ls_len(1, Some("all"), None);
+}

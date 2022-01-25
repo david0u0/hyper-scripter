@@ -14,19 +14,11 @@ mod range_query;
 pub use range_query::*;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-pub enum EditQuery {
+pub enum EditQuery<Q> {
     NewAnonimous,
-    Query(ScriptQuery),
+    Query(Q),
 }
-impl Default for EditQuery {
-    fn default() -> Self {
-        EditQuery::Query(ScriptQuery {
-            inner: ScriptQueryInner::Prev(1),
-            bang: false,
-        })
-    }
-}
-impl FromStr for EditQuery {
+impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         Ok(if s == "?" {
@@ -77,6 +69,14 @@ impl_ser_by_to_string!(ListQuery);
 pub struct ScriptQuery {
     inner: ScriptQueryInner,
     bang: bool,
+}
+impl Default for ScriptQuery {
+    fn default() -> Self {
+        ScriptQuery {
+            inner: ScriptQueryInner::Prev(1),
+            bang: false,
+        }
+    }
 }
 impl std::fmt::Display for ScriptQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

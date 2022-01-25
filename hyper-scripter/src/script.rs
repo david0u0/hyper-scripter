@@ -3,6 +3,7 @@ use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode,
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::Tag;
+use crate::tag::TagFilter;
 use crate::util::illegal_name;
 use chrono::NaiveDateTime;
 use fxhash::FxHashSet as HashSet;
@@ -194,6 +195,15 @@ impl ScriptInfo {
     pub fn set_id(&mut self, id: i64) {
         assert_eq!(self.id, 0, "只有 id=0（代表新腳本）時可以設定 id");
         self.timeless_info.id = id;
+    }
+    pub fn append_tags(&mut self, tags: TagFilter) {
+        if tags.append {
+            log::debug!("附加上標籤：{:?}", tags);
+            tags.fill_allowed_map(&mut self.tags);
+        } else {
+            log::debug!("設定標籤：{:?}", tags);
+            self.tags = tags.into_allowed_iter().collect();
+        }
     }
     pub fn cp(&self, new_name: ScriptName) -> Self {
         let builder = ScriptInfo::builder(0, new_name, self.ty.clone(), self.tags.iter().cloned());

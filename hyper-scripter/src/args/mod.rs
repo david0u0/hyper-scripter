@@ -185,7 +185,7 @@ pub enum Subs {
         #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
         #[structopt(parse(try_from_str), default_value = "?")]
-        edit_query: EditQuery,
+        edit_query: EditQuery<ScriptQuery>,
         content: Vec<String>,
     },
     #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
@@ -255,7 +255,7 @@ pub enum Subs {
         #[structopt(long, short)]
         tags: Option<TagFilter>,
         origin: ScriptQuery,
-        new: ScriptName,
+        new: EditQuery<ScriptName>,
     },
     #[structopt(about = "Move the script to another one")]
     MV {
@@ -428,7 +428,7 @@ impl Root {
             None => {
                 log::info!("無參數模式");
                 self.subcmd = Some(Subs::Edit {
-                    edit_query: EditQuery::default(),
+                    edit_query: EditQuery::Query(Default::default()),
                     ty: None,
                     content: vec![],
                     tags: None,

@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content;
 use crate::path;
-use crate::query::{self, EditQuery};
+use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo};
 use crate::script_type::{iter_default_templates, ScriptType};
@@ -52,14 +52,7 @@ pub async fn mv(
                 info.name = name;
             }
             if let Some(tags) = tags {
-                // TODO: delete tag
-                if tags.append {
-                    log::debug!("附加上標籤：{:?}", tags);
-                    tags.fill_allowed_map(&mut info.tags);
-                } else {
-                    log::debug!("設定標籤：{:?}", tags);
-                    info.tags = tags.into_allowed_iter().collect();
-                }
+                info.append_tags(tags);
             }
             info.write();
         })
@@ -68,7 +61,7 @@ pub async fn mv(
 }
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
 pub async fn edit_or_create(
-    edit_query: EditQuery,
+    edit_query: EditQuery<ScriptQuery>,
     script_repo: &'_ mut ScriptRepo,
     ty: Option<ScriptType>,
     tags: EditTagArgs,

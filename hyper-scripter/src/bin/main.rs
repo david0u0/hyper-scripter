@@ -5,7 +5,7 @@ use hyper_scripter::error::{Error, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
-use hyper_scripter::query::{self, ScriptQuery};
+use hyper_scripter::query::{self, EditQuery, ScriptQuery};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
@@ -194,7 +194,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let (path, mut entry) =
                 main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
             let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
-            entry.update(|info| info.read()).await?;
+            create_read_event(&mut entry).await?;
             if !fast {
                 let res = util::open_editor(&path);
                 if let Err(err) = res {
@@ -360,27 +360,29 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::CP { origin, new, tags } => {
             let (mut repo, closer) = repo.init().await?;
-            if repo.get_mut(&new, true).is_some() {
-                return Err(Error::ScriptExist(new.to_string()));
+            if let EditQuery::Query(new) = &new {
+                if repo.get_mut(new, true).is_some() {
+                    return Err(Error::ScriptExist(new.to_string()));
+                }
             }
             let entry = query::do_script_query_strict(&origin, &mut repo).await?;
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let new_script = path::open_script(&new, &entry.ty, Some(false))?;
-            util::cp(&og_script, &new_script)?;
-            let mut new_info = entry.cp(new.clone());
+            let (new_name, new_path) = match new {
+                EditQuery::NewAnonimous => path::open_new_anonymous(&entry.ty)?,
+                EditQuery::Query(new) => {
+                    let new_path = path::open_script(&new, &entry.ty, Some(false))?;
+                    (new, new_path)
+                }
+            };
+            util::cp(&og_script, &new_path)?;
+            let mut new_info = entry.cp(new_name);
 
             if let Some(tags) = tags {
-                // TODO: delete tag
-                if tags.append {
-                    log::debug!("附加上標籤：{:?}", tags);
-                    new_info.tags.extend(tags.into_allowed_iter());
-                } else {
-                    log::debug!("設定標籤：{:?}", tags);
-                    new_info.tags = tags.into_allowed_iter().collect();
-                }
+                new_info.append_tags(tags);
             }
 
-            repo.entry(&new).or_insert(new_info).await?;
+            let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
+            create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
             closer.close(repo).await;
         }
         Subs::MV {
@@ -409,7 +411,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     .into());
                 }
                 //  只有一個，放心移動
-                main_util::mv(&mut scripts[0], new_name, ty.clone(), tags.clone()).await?;
+                main_util::mv(&mut scripts[0], new_name, ty.clone(), tags).await?;
             } else {
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;

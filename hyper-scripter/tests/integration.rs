@@ -55,7 +55,7 @@ fn test_mv_cp() {
     run!("-").expect_err("用 mv 修改標籤失敗？");
 
     run!("cp -f hide 1 -t +cp .2").unwrap();
-    let mut res: Vec<_> = run!("!")
+    let mut res: Vec<_> = run!(".2!")
         .unwrap()
         .split(' ')
         .map(|s| s.to_string())

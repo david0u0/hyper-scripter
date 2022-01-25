@@ -170,7 +170,7 @@ impl TagFilter {
                 set.insert(control.tag);
             } else {
                 if control.tag.match_all() {
-                    set.clear();
+                    set.clear(); // XXX: is this the right thing to do?
                     continue;
                 }
                 set.remove(&control.tag);

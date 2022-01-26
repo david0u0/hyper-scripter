@@ -393,12 +393,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         } => {
             let (mut repo, closer) = repo.init().await?;
             let new_name = match new {
-                Some(name) => {
+                Some(EditQuery::Query(name)) => {
                     if repo.get_mut(&name, true).is_some() {
                         return Err(Error::ScriptExist(name.to_string()));
                     }
                     Some(name)
                 }
+                Some(EditQuery::NewAnonimous) => Some(path::new_anonymous_name()?),
                 None => None,
             };
             let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;

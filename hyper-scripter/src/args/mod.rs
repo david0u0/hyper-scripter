@@ -270,7 +270,7 @@ pub enum Subs {
         tags: Option<TagFilter>,
         #[structopt(parse(try_from_str))]
         origin: ListQuery,
-        new: Option<ScriptName>,
+        new: Option<EditQuery<ScriptName>>,
     },
     #[structopt(
         about = "Manage script tags. If a tag filter is given, store it to config, otherwise show tag information."

@@ -163,10 +163,13 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
 
     Ok(ids)
 }
-pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
+pub fn new_anonymous_name() -> Result<ScriptName> {
     let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
     let id = ids.into_iter().max().unwrap_or_default() + 1;
-    let name = id.into_script_name().unwrap();
+    id.into_script_name()
+}
+pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
+    let name = new_anonymous_name()?;
     let path = open_script(&name, ty, None)?; // NOTE: max + 1 的邏輯已足以確保不會產生衝突的腳本，不檢查了！
     Ok((name, path))
 }

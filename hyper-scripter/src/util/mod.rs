@@ -231,8 +231,13 @@ pub fn prepare_script<T: AsRef<str>>(
             let template = get_or_create_tamplate(&script.ty, true)?;
             handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
+            let mut first = true;
             for line in content {
-                writeln!(file, "{}", line)?;
+                if !first {
+                    writeln!(file, "")?;
+                }
+                first = false;
+                write!(file, "{}", line)?;
             }
         }
     } else {

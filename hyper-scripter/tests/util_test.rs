@@ -2,6 +2,7 @@
 #[path = "tool.rs"]
 mod tool;
 
+use hyper_scripter::util::read_file;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use tool::*;
@@ -32,8 +33,8 @@ fn test_import() {
     run!("-f util import {}", dir).unwrap();
     run!("-f innate which myinnate").unwrap();
 
-    assert_eq!(run!("-f my test").unwrap(), "安安，紅寶石");
-    assert_eq!(run!("-f tag mytest").unwrap(), "安安，紅寶石");
+    assert_eq!(run!("-f my test").unwrap(), "安安！紅寶石");
+    assert_eq!(run!("-f tag mytest").unwrap(), "安安！紅寶石");
     assert_eq!(run!("-f tag youtest").unwrap(), "殼已破碎");
     assert_eq!(run!("-f nameless -").unwrap(), "安安，匿名殼");
     assert_eq!(
@@ -51,9 +52,18 @@ fn test_import() {
 
     run!("-f util import --namespace imported {}", dir).unwrap();
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
-    assert_eq!(run!("-a imported/my/tes").unwrap(), "安安，紅寶石");
+    assert_eq!(run!("-a imported/my/tes").unwrap(), "安安！紅寶石");
     run!("-f imported which").expect_err("命名空間汙染了標籤！");
     assert_ls_len(22, Some("all"), None);
+
+    // check content of file
+    let file_path = run!("which -a imported/my/tes").unwrap();
+    let tmp_file_path = run!(home: &dir_path, "--no-alias which my/tes!").unwrap();
+    assert_eq!(
+        read_file(file_path.as_ref()).unwrap(),
+        read_file(tmp_file_path.as_ref()).unwrap(),
+        "匯入前後檔案內容不同"
+    );
 }
 
 fn test_collect() {

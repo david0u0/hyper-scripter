@@ -4,6 +4,7 @@ use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::ScriptType;
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
+use fxhash::FxHashSet as HashSet;
 use std::fs::{create_dir, read_dir};
 use std::path::{Component, Path, PathBuf};
 
@@ -141,6 +142,7 @@ pub fn get_home() -> &'static Path {
 }
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {
+    // TODO: iterator
     let mut ids = vec![];
     let dir = get_home().join(ANONYMOUS);
     if !dir.exists() {
@@ -153,7 +155,7 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
             .to_str()
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?
             .to_string();
-        let re = regex::Regex::new(r"\.\w+$").unwrap();
+        let re = regex::Regex::new(r"\..+$").unwrap();
         let name = re.replace(&name, "");
         match name.parse::<u32>() {
             Ok(id) => ids.push(id),
@@ -164,13 +166,21 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
     Ok(ids)
 }
 pub fn new_anonymous_name() -> Result<ScriptName> {
-    let ids = get_anonymous_ids().context("無法取得匿名腳本編號")?;
-    let id = ids.into_iter().max().unwrap_or_default() + 1;
-    id.into_script_name()
+    let ids: HashSet<_> = get_anonymous_ids()
+        .context("無法取得匿名腳本編號")?
+        .into_iter()
+        .collect();
+    let mut i = 1;
+    loop {
+        if !ids.contains(&i) {
+            return i.into_script_name();
+        }
+        i += 1;
+    }
 }
 pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
     let name = new_anonymous_name()?;
-    let path = open_script(&name, ty, None)?; // NOTE: max + 1 的邏輯已足以確保不會產生衝突的腳本，不檢查了！
+    let path = open_script(&name, ty, None)?; // NOTE: new_anonymous_name 的邏輯已足以確保不會產生衝突的檔案，不檢查了！
     Ok((name, path))
 }
 
@@ -222,8 +232,8 @@ mod test {
     #[test]
     fn test_open_anonymous() {
         let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
-        assert_eq!(name, ScriptName::Anonymous(6));
-        assert_eq!(p, get_test_home().join(".anonymous/6.sh"));
+        assert_eq!(name, ScriptName::Anonymous(3));
+        assert_eq!(p, get_test_home().join(".anonymous/3.sh"));
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(p, get_test_home().join(".anonymous/5.js"));
     }

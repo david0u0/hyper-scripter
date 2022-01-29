@@ -107,7 +107,8 @@ pub struct ScriptTypeConfig {
     pub color: String,
     pub cmd: Option<String>,
     args: Vec<String>,
-    env: Vec<(String, String)>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    env: HashMap<String, String>,
 }
 
 impl ScriptTypeConfig {
@@ -159,53 +160,59 @@ macro_rules! create_default_types {
     };
 }
 
+fn gen_map(arr: &[(&str, &str)]) -> HashMap<String, String> {
+    arr.iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
 create_default_types! {
     ("sh", SHELL_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("sh".to_owned()),
         color: "bright magenta".to_owned(),
         cmd: Some("bash".to_owned()),
         args: vec!["{{path}}".to_owned()],
-        env: vec![],
+        env: Default::default()
     }),
     ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("sh".to_owned()),
         color: "white".to_owned(),
         cmd: Some("bash".to_owned()),
         args: vec!["{{path}}".to_owned()],
-        env: vec![],
+        env: Default::default(),
     }),
     ("js", JS_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
         cmd: Some("node".to_owned()),
         args: vec!["{{path}}".to_owned()],
-        env: vec![(
-            "NODE_PATH".to_owned(),
-            "{{{home}}}/node_modules".to_owned(),
-        )],
+        env: gen_map(&[(
+            "NODE_PATH",
+            "{{{home}}}/node_modules",
+        )]),
     }),
     ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
         cmd: Some("node".to_owned()),
         args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
-        env: vec![(
-            "NODE_PATH".to_owned(),
-            "{{{home}}}/node_modules".to_owned(),
-        )],
+        env: gen_map(&[(
+            "NODE_PATH",
+            "{{{home}}}/node_modules",
+        )]),
     }),
     ("rb", RB_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("rb".to_owned()),
         color: "bright red".to_owned(),
         cmd: Some("ruby".to_owned()),
         args: vec!["{{path}}".to_owned()],
-        env: vec![],
+        env: Default::default(),
     }),
     ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
         ext: None,
         color: "bright black".to_owned(),
         cmd: Some("cat".to_owned()),
         args: vec!["{{path}}".to_owned()],
-        env: vec![],
+        env: Default::default(),
     })
 }

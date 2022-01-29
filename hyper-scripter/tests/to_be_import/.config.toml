@@ -28,10 +28,8 @@ args = [
     '-e',
     '{{{content}}}',
 ]
-env = [[
-    'NODE_PATH',
-    '{{{script_dir}}}/node_modules',
-]]
+[types.js-i.env]
+NODE_PATH = '{{{script_dir}}}/node_modules'
 
 # NOTE: 亂搞別名，測試 --no-alias 選項
 [alias.ls]
@@ -47,40 +45,37 @@ after = [
 ext = 'md'
 color = 'bright black'
 args = []
-env = []
 
 [types.sh]
 ext = 'sh'
 color = 'bright magenta'
 cmd = 'bash'
 args = ['{{path}}']
-env = []
 
 [types.rb]
 ext = 'rb'
 color = 'bright red'
 cmd = 'ruby'
 args = ['{{path}}']
-env = []
 
 [types.vorpal]
 ext = 'js'
 color = 'bright cyan'
 cmd = 'node'
 args = ['{{path}}']
-env = [[
-    'NODE_PATH',
-    '{{{script_dir}}}/node_modules',
-]]
+
+[types.vorpal.env]
+NODE_PATH = '{{{script_dir}}}/node_modules'
 
 [types.tmux]
 ext = 'sh'
 color = 'white'
 cmd = 'sh'
 args = ['{{path}}']
-env = []
 
 [types.txt]
 color = 'bright black'
 args = []
-env = []
+
+[env]
+HS_HOME = '/usr' # 亂搞一些環境變數

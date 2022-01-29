@@ -88,17 +88,14 @@ impl_de_by_from_str!(PromptLevel);
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recent: Option<u32>,
     pub main_tag_filter: TagFilter,
     prompt_level: PromptLevel,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
     pub tag_filters: Vec<NamedTagFilter>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub alias: HashMap<String, Alias>,
     pub types: HashMap<ScriptType, ScriptTypeConfig>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
     #[serde(skip)]
     last_modified: Option<SystemTime>,

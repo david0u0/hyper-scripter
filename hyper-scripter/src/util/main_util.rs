@@ -23,15 +23,15 @@ pub struct EditTagArgs {
 
 pub async fn mv(
     entry: &mut RepoEntry<'_>,
-    new_name: Option<ScriptName>,
+    new_name: Option<&ScriptName>,
     ty: Option<ScriptType>,
     tags: Option<TagFilter>,
 ) -> Result {
     let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {
-        let new_name = new_name.as_ref().unwrap_or(&entry.name);
+        let new_name = new_name.unwrap_or(&entry.name);
         let new_ty = ty.as_ref().unwrap_or(&entry.ty);
-        let new_path = path::open_script(new_name, new_ty, None)?;
+        let new_path = path::open_script(new_name, new_ty, None)?; // NOTE: 不判斷存在性，因為接下來要對新舊腳本同路徑的狀況做特殊處理
         if new_path != og_path {
             log::debug!("改動腳本檔案：{:?} -> {:?}", og_path, new_path);
             if new_path.exists() {
@@ -49,7 +49,7 @@ pub async fn mv(
                 info.ty = ty;
             }
             if let Some(name) = new_name {
-                info.name = name;
+                info.name = name.clone();
             }
             if let Some(tags) = tags {
                 info.append_tags(tags);

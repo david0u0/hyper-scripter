@@ -3,7 +3,7 @@ use crate::error::{
     Result,
 };
 use crate::impl_ser_by_to_string;
-use crate::script::{IntoScriptName, ScriptName};
+use crate::script::{ConcreteScriptName, IntoScriptName, ScriptName};
 use regex::Regex;
 use serde::Serialize;
 use std::str::FromStr;
@@ -29,9 +29,31 @@ impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display)]
+pub enum ScriptOrDirQuery {
+    #[display(fmt = "{}", _0)]
+    Script(ScriptName),
+    #[display(fmt = "{}", _0)]
+    Dir(ConcreteScriptName),
+}
+impl FromStr for ScriptOrDirQuery {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(if s.ends_with('/') {
+            let s = &s[0..s.len() - 1];
+            ScriptOrDirQuery::Dir(ConcreteScriptName::new(s.into())?)
+        } else {
+            ScriptOrDirQuery::Script(s.parse()?)
+        })
+    }
+}
+impl_ser_by_to_string!(ScriptOrDirQuery);
+
+#[derive(Debug, Display)]
 pub enum ListQuery {
+    #[display(fmt = "{}", _1)]
     Pattern(Regex, String),
+    #[display(fmt = "{}", _0)]
     Query(ScriptQuery),
 }
 impl FromStr for ListQuery {
@@ -52,15 +74,6 @@ impl FromStr for ListQuery {
         } else {
             Ok(ListQuery::Query(s.parse()?))
         }
-    }
-}
-impl std::fmt::Display for ListQuery {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            ListQuery::Query(q) => write!(f, "{}", q),
-            ListQuery::Pattern(_, s) => write!(f, "{}", s),
-        }?;
-        Ok(())
     }
 }
 impl_ser_by_to_string!(ListQuery);

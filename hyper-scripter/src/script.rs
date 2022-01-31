@@ -7,7 +7,7 @@ use crate::tag::TagFilter;
 use crate::util::illegal_name;
 use chrono::NaiveDateTime;
 use fxhash::FxHashSet as HashSet;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
@@ -26,10 +26,54 @@ macro_rules! max {
     };
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// XXX: use impl_ser_by_to_string
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deref, Display)]
+#[display(fmt = "{}", inner)]
+pub struct ConcreteScriptName {
+    #[deref]
+    inner: String,
+}
+impl ConcreteScriptName {
+    fn valid(s: &str) -> Result {
+        // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
+        for s in s.split('/') {
+            if illegal_name(s) {
+                return Err(Error::Format(ScriptNameCode, s.to_owned()));
+            }
+        }
+        Ok(())
+    }
+    pub fn new(s: String) -> Result<Self> {
+        Self::valid(&s)?;
+        Ok(ConcreteScriptName { inner: s })
+    }
+    fn new_unchecked(s: String) -> Self {
+        ConcreteScriptName { inner: s }
+    }
+    pub fn join(&mut self, other: &ScriptName) -> Result {
+        match other {
+            ScriptName::Named(n) => {
+                let stem = if let Some((_, stem)) = n.inner.rsplit_once('/') {
+                    stem
+                } else {
+                    n
+                };
+                self.inner += "/";
+                self.inner += stem;
+                Ok(())
+            }
+            ScriptName::Anonymous(_) => Err(Error::Format(
+                ScriptNameCode,
+                format!("{}/{}", self.inner, other),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ScriptName {
     Anonymous(u32),
-    Named(String),
+    Named(ConcreteScriptName),
 }
 impl FromStr for ScriptName {
     type Err = Error;
@@ -66,12 +110,7 @@ impl ScriptName {
                     s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
                 }
             }
-            // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
-            for s in s.split('/') {
-                if illegal_name(s) {
-                    return Err(Error::Format(ScriptNameCode, s.to_owned()));
-                }
-            }
+            ConcreteScriptName::valid(&s)?;
             Ok(None)
         } else {
             Ok(None)
@@ -142,7 +181,7 @@ impl ScriptName {
 impl PartialOrd for ScriptName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (ScriptName::Named(n1), ScriptName::Named(n2)) => n1.partial_cmp(n2),
+            (ScriptName::Named(n1), ScriptName::Named(n2)) => n1.inner.partial_cmp(&n2.inner),
             (ScriptName::Anonymous(i1), ScriptName::Anonymous(i2)) => i1.partial_cmp(i2),
             (ScriptName::Named(_), ScriptName::Anonymous(_)) => Some(Ordering::Less),
             (ScriptName::Anonymous(_), ScriptName::Named(_)) => Some(Ordering::Greater),
@@ -302,13 +341,18 @@ impl IntoScriptName for u32 {
         Ok(ScriptName::Anonymous(self))
     }
 }
+impl IntoScriptName for ConcreteScriptName {
+    fn into_script_name(self) -> Result<ScriptName> {
+        Ok(ScriptName::Named(self))
+    }
+}
 #[inline]
 fn string_into_script_name(s: String, check: bool) -> Result<ScriptName> {
     log::debug!("解析腳本名：{} {}", s, check);
     if let Some(id) = ScriptName::valid(&s, false, false, check)? {
         id.into_script_name()
     } else {
-        Ok(ScriptName::Named(s))
+        Ok(ScriptName::Named(ConcreteScriptName::new_unchecked(s))) // NOTE: already checked by `ScriptName::valid`
     }
 }
 impl IntoScriptName for String {

@@ -50,23 +50,19 @@ impl ConcreteScriptName {
     fn new_unchecked(s: String) -> Self {
         ConcreteScriptName { inner: s }
     }
-    pub fn join(&mut self, other: &ScriptName) -> Result {
-        match other {
-            ScriptName::Named(n) => {
-                let stem = if let Some((_, stem)) = n.inner.rsplit_once('/') {
-                    stem
-                } else {
-                    n
-                };
-                self.inner += "/";
-                self.inner += stem;
-                Ok(())
-            }
-            ScriptName::Anonymous(_) => Err(Error::Format(
-                ScriptNameCode,
-                format!("{}/{}", self.inner, other),
-            )),
+    fn stem_inner(&self) -> &str {
+        if let Some((_, stem)) = self.inner.rsplit_once('/') {
+            stem
+        } else {
+            &self.inner
         }
+    }
+    pub fn stem(&self) -> ConcreteScriptName {
+        Self::new_unchecked(self.stem_inner().to_owned())
+    }
+    pub fn join(&mut self, other: &ConcreteScriptName) {
+        self.inner += "/";
+        self.inner += other.stem_inner();
     }
 }
 

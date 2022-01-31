@@ -19,7 +19,6 @@ use hyper_scripter::util::{
 use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
 use hyper_scripter_historian::{Historian, LastTimeRecord};
-use std::borrow::Cow;
 
 #[tokio::main]
 async fn main() {
@@ -366,16 +365,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let (new_name, new_path) = match new {
                 EditQuery::NewAnonimous => path::open_new_anonymous(&entry.ty)?,
-                EditQuery::Query(ScriptOrDirQuery::Script(new)) => {
-                    let new_path = path::open_script(&new, &entry.ty, Some(false))?;
-                    (new, new_path)
-                }
-                EditQuery::Query(ScriptOrDirQuery::Dir(mut new)) => {
-                    // TODO: 支援 wildcard?
-                    new.join(&entry.name)?;
-                    let new = new.into_script_name()?;
-                    let new_path = path::open_script(&new, &entry.ty, Some(false))?;
-                    (new, new_path)
+                EditQuery::Query(query) => {
+                    let new_name = match query {
+                        ScriptOrDirQuery::Script(new) => new,
+                        ScriptOrDirQuery::Dir(new) => new.join(&entry.name)?.into_script_name()?,
+                    };
+                    let new_path = path::open_script(&new_name, &entry.ty, Some(false))?;
+                    (new_name, new_path)
                 }
             };
             // FIXME
@@ -412,12 +408,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 for mut script in scripts {
                     let new_name = match &new {
-                        EditQuery::NewAnonimous => Cow::Owned(path::new_anonymous_name()?),
-                        EditQuery::Query(ScriptOrDirQuery::Script(new)) => Cow::Borrowed(new),
+                        EditQuery::NewAnonimous => path::new_anonymous_name()?,
+                        EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
                         EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
-                            let mut new = new.clone();
-                            new.join(&script.name)?;
-                            Cow::Owned(new.into_script_name()?)
+                            let new = new.clone();
+                            new.join(&script.name)?.into_script_name()?
                         }
                     };
                     // FIXME
@@ -425,7 +420,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     //     return Err(Error::ScriptExist(new_name.to_string()));
                     // }
 
-                    main_util::mv(&mut script, Some(&new_name), ty.clone(), tags.clone()).await?;
+                    main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
                 for entry in scripts.iter_mut() {

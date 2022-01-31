@@ -1,5 +1,8 @@
 use crate::error::{
-    Contextable, Error, FormatCode::Regex as RegexCode, FormatCode::ScriptQuery as ScriptQueryCode,
+    Contextable, Error,
+    FormatCode::{
+        Regex as RegexCode, ScriptName as ScriptNameCode, ScriptQuery as ScriptQueryCode,
+    },
     Result,
 };
 use crate::impl_ser_by_to_string;
@@ -29,19 +32,45 @@ impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
     }
 }
 
+#[derive(Debug, Display, Clone)]
+pub enum DirQuery {
+    #[display(fmt = "/")]
+    Root,
+    #[display(fmt = "{}", _0)]
+    NonRoot(ConcreteScriptName),
+}
+impl DirQuery {
+    pub fn join(self, other: &ScriptName) -> Result<ConcreteScriptName> {
+        match other {
+            ScriptName::Anonymous(_) => {
+                Err(Error::Format(ScriptNameCode, format!("{}/{}", self, other)))
+            }
+            ScriptName::Named(n) => Ok(match self {
+                Self::Root => n.stem(),
+                Self::NonRoot(mut dir) => {
+                    dir.join(n);
+                    dir
+                }
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Display)]
 pub enum ScriptOrDirQuery {
     #[display(fmt = "{}", _0)]
     Script(ScriptName),
     #[display(fmt = "{}", _0)]
-    Dir(ConcreteScriptName),
+    Dir(DirQuery),
 }
 impl FromStr for ScriptOrDirQuery {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
-        Ok(if s.ends_with('/') {
+        Ok(if s == "/" {
+            ScriptOrDirQuery::Dir(DirQuery::Root)
+        } else if s.ends_with('/') {
             let s = &s[0..s.len() - 1];
-            ScriptOrDirQuery::Dir(ConcreteScriptName::new(s.into())?)
+            ScriptOrDirQuery::Dir(DirQuery::NonRoot(ConcreteScriptName::new(s.into())?))
         } else {
             ScriptOrDirQuery::Script(s.parse()?)
         })

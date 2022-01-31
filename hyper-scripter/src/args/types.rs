@@ -1,3 +1,4 @@
+use super::help_str::*;
 use crate::script_type::ScriptType;
 use serde::Serialize;
 use structopt::clap::AppSettings::AllowLeadingHyphen;
@@ -18,6 +19,7 @@ pub enum TypesSubs {
     Template {
         #[structopt(long, short)]
         edit: bool,
+        #[structopt(help = TYPE_HELP)]
         ty: ScriptType,
     },
 }

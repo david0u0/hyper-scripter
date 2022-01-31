@@ -39,7 +39,12 @@ impl FromStr for ScriptName {
 }
 impl ScriptName {
     #[inline]
-    pub fn valid(mut s: &str, fuzzing: bool, check_legal_name: bool) -> Result<Option<u32>> {
+    pub fn valid(
+        mut s: &str,
+        allow_endwith_slash: bool,
+        allow_dot: bool,
+        check: bool,
+    ) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
         let reg = regex::Regex::new(r"^\.(\d+)$")?;
         let m = reg.captures(s);
@@ -49,24 +54,26 @@ impl ScriptName {
                 Ok(id) => Ok(Some(id)),
                 Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
             }
-        } else {
-            if fuzzing {
-                if s == "." {
-                    log::info!("特殊規則：模糊搜時允許單一個`.`");
+        } else if check {
+            if s == "." {
+                if allow_dot {
+                    log::info!("特殊規則：允許單一個`.`");
                     return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
-                } else if s.ends_with('/') {
-                    log::info!("特殊規則：模糊搜時允許以`/`結尾");
+                }
+            } else if s.ends_with('/') {
+                if allow_endwith_slash {
+                    log::info!("特殊規則：允許以`/`結尾");
                     s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
                 }
             }
             // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
-            if check_legal_name {
-                for s in s.split('/') {
-                    if illegal_name(s) {
-                        return Err(Error::Format(ScriptNameCode, s.to_owned()));
-                    }
+            for s in s.split('/') {
+                if illegal_name(s) {
+                    return Err(Error::Format(ScriptNameCode, s.to_owned()));
                 }
             }
+            Ok(None)
+        } else {
             Ok(None)
         }
     }
@@ -296,9 +303,9 @@ impl IntoScriptName for u32 {
     }
 }
 #[inline]
-fn string_into_script_name(s: String, check_legal_name: bool) -> Result<ScriptName> {
-    log::debug!("解析腳本名：{} {}", s, check_legal_name);
-    if let Some(id) = ScriptName::valid(&s, false, check_legal_name)? {
+fn string_into_script_name(s: String, check: bool) -> Result<ScriptName> {
+    log::debug!("解析腳本名：{} {}", s, check);
+    if let Some(id) = ScriptName::valid(&s, false, false, check)? {
         id.into_script_name()
     } else {
         Ok(ScriptName::Named(s))

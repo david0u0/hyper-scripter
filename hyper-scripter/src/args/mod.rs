@@ -19,7 +19,9 @@ mod completion;
 pub use completion::*;
 mod tags;
 pub use tags::*;
+mod help_str;
 mod types;
+use help_str::*;
 pub use types::*;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
@@ -37,12 +39,12 @@ pub struct RootArgs {
     pub hs_home: Option<String>,
     #[structopt(long, hidden = true)]
     pub dump_args: bool,
-    #[structopt(long, help = "Do not record history")]
+    #[structopt(long, help = "Don't record history")]
     pub no_trace: bool,
     #[structopt(
         long,
         conflicts_with = "no-trace",
-        help = "Do not affect script time (but will still record history)"
+        help = "Don't affect script time order (but still record history and affect time filter)"
     )]
     pub humble: bool,
     #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
@@ -53,10 +55,9 @@ pub struct RootArgs {
         short,
         long,
         global = true,
-        parse(try_from_str),
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Filter by tags, e.g. `all,^mytag`"
+        help = "Filter by tags, e.g. `all,^removed`"
     )]
     pub filter: Vec<TagFilter>,
     #[structopt(
@@ -162,7 +163,7 @@ pub enum Subs {
     Help { args: Vec<String> },
     #[structopt(setting = Hidden, about = "Print the help message of env variables")]
     EnvHelp {
-        #[structopt(default_value = "-", parse(try_from_str))]
+        #[structopt(default_value = "-")]
         script_query: ScriptQuery,
     },
     #[structopt(setting = Hidden)]
@@ -171,20 +172,15 @@ pub enum Subs {
     Migrate,
     #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
     Edit {
-        #[structopt(
-            long,
-            short = "T",
-            parse(try_from_str),
-            help = "Type of the script, e.g. `sh`"
-        )]
+        #[structopt(long, short = "T", help = TYPE_HELP)]
         ty: Option<ScriptType>,
         #[structopt(long, short)]
         no_template: bool,
-        #[structopt(long, short)]
+        #[structopt(long, short, help = TAGS_HELP)]
         tags: Option<TagFilter>,
         #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
-        #[structopt(parse(try_from_str), default_value = "?")]
+        #[structopt(default_value = "?", help = NEW_ANONYMOUS_HELP)]
         edit_query: EditQuery<ScriptQuery>,
         content: Vec<String>,
     },
@@ -219,26 +215,26 @@ pub enum Subs {
             help = "Raise an error if --previous-args is given but there is no previous argument"
         )]
         error_no_previous: bool,
-        #[structopt(long, short, requires = "previous-args")]
+        #[structopt(long, short, requires = "previous-args", help = "")]
         dir: Option<PathBuf>,
-        #[structopt(default_value = "-", parse(try_from_str))]
+        #[structopt(default_value = "-")]
         script_query: ScriptQuery,
         #[structopt(help = "Command line args to pass to the script")]
         args: Vec<String>,
     },
     #[structopt(about = "Execute the script query and get the exact file")]
     Which {
-        #[structopt(default_value = "-", parse(try_from_str))]
+        #[structopt(default_value = "-")]
         script_query: ScriptQuery,
     },
     #[structopt(about = "Print the script to standard output")]
     Cat {
-        #[structopt(default_value = "-", parse(try_from_str))]
+        #[structopt(default_value = "-")]
         script_query: ScriptQuery,
     },
     #[structopt(about = "Remove the script")]
     RM {
-        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        #[structopt(required = true, min_values = 1)]
         queries: Vec<ListQuery>,
         #[structopt(
             long,
@@ -252,29 +248,23 @@ pub enum Subs {
     Types(Types),
     #[structopt(about = "Copy the script to another one")]
     CP {
-        #[structopt(long, short)]
+        #[structopt(long, short, help = TAGS_HELP)]
         tags: Option<TagFilter>,
         origin: ScriptQuery,
+        #[structopt(help = NEW_ANONYMOUS_HELP)]
         new: EditQuery<ScriptName>,
     },
     #[structopt(about = "Move the script to another one")]
     MV {
-        #[structopt(
-            long,
-            short = "T",
-            parse(try_from_str),
-            help = "Type of the script, e.g. `sh`"
-        )]
+        #[structopt(long, short = "T", help = TYPE_HELP)]
         ty: Option<ScriptType>,
-        #[structopt(short, long)]
+        #[structopt(long, short, help = TAGS_HELP)]
         tags: Option<TagFilter>,
-        #[structopt(parse(try_from_str))]
         origin: ListQuery,
+        #[structopt(help = NEW_ANONYMOUS_HELP)]
         new: Option<EditQuery<ScriptName>>,
     },
-    #[structopt(
-        about = "Manage script tags. If a tag filter is given, store it to config, otherwise show tag information."
-    )]
+    #[structopt(about = "Manage script tags")]
     Tags(Tags),
     #[structopt(about = "Manage script history")]
     History {
@@ -286,7 +276,8 @@ pub enum Subs {
 #[derive(StructOpt, Debug, Serialize)]
 pub enum History {
     RM {
-        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        // TODO: dir
+        #[structopt(required = true, min_values = 1)]
         queries: Vec<ListQuery>,
         range: RangeQuery,
     },
@@ -299,7 +290,7 @@ pub enum History {
     #[structopt(about = "Humble an event by it's id")]
     Humble { event_id: u64 },
     Show {
-        #[structopt(default_value = "-", parse(try_from_str))]
+        #[structopt(default_value = "-")]
         queries: Vec<ListQuery>,
         #[structopt(short, long, default_value = "10")]
         limit: u32,
@@ -311,7 +302,7 @@ pub enum History {
         dir: Option<PathBuf>,
     },
     Neglect {
-        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        #[structopt(required = true, min_values = 1)]
         queries: Vec<ListQuery>,
     },
     #[structopt( settings = NO_FLAG_SETTINGS)]
@@ -321,7 +312,7 @@ pub enum History {
         args: Vec<String>,
     },
     Tidy {
-        #[structopt(parse(try_from_str), required = true, min_values = 1)]
+        #[structopt(required = true, min_values = 1)]
         queries: Vec<ListQuery>,
     },
 }
@@ -340,7 +331,6 @@ pub struct List {
     pub file: bool,
     #[structopt(long, help = "Show name of the script.", conflicts_with = "long")]
     pub name: bool,
-    #[structopt(parse(try_from_str))]
     pub queries: Vec<ListQuery>,
 }
 

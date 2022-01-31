@@ -269,8 +269,8 @@ fn test_history_rm_range() {
 }
 
 #[test]
-fn test_fuzz_end_with_slash() {
-    println!("測試以`/`結尾的腳本名");
+fn test_fuzz_dot_or_endwith_slash() {
+    println!("測試以`/`結尾的腳本名，以及`.`腳本名");
     let _g = setup();
 
     let t = ScriptTest::new("test/slash", None, None);
@@ -283,6 +283,18 @@ fn test_fuzz_end_with_slash() {
 
     run!("e illegal/").expect_err("不應創建以`/`結尾的腳本");
     run!("mv - illegal/").expect_err("不應創建以`/`結尾的腳本");
+
+    run!("e .").expect_err("不應創建`.`為名的腳本");
+    let t = ScriptTest::new(".1", None, None);
+    t.can_find("1").unwrap();
+    t.can_find(".1").unwrap();
+    t.can_find(".").unwrap();
+
+    t.can_find("..").expect_err("兩個`.`仍不可行");
+    t.can_find(".a").unwrap_err();
+
+    run!("e .").expect("應查詢到剛才建出的腳本");
+    run!("mv - .").expect_err("不應創建以`/`結尾的腳本");
 }
 
 #[test]

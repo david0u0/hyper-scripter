@@ -29,7 +29,7 @@ async fn fuzz_arr<'a>(
     iter: impl Iterator<Item = RepoEntry<'a>>,
 ) -> Result<Vec<RepoEntry<'a>>> {
     // TODO: 測試這個複雜的函式，包括前綴和次級結果
-    let res = fuzz_with_multifuzz_ratio(name, iter, SEP, 0.6).await?;
+    let res = fuzz_with_multifuzz_ratio(name, iter, SEP, Some(60)).await?;
     Ok(match res {
         None => vec![],
         Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],

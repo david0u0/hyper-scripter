@@ -121,18 +121,20 @@ pub async fn fuzz<'a, T: FuzzKey + Send + 'a>(
     iter: impl Iterator<Item = T>,
     sep: &str,
 ) -> Result<Option<FuzzResult<T>>> {
-    fuzz_with_multifuzz_ratio(name, iter, sep, 1.0).await
+    fuzz_with_multifuzz_ratio(name, iter, sep, None).await
 }
 
+/// multifuzz_ratio 為百分比的數字部份
 pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     name: &str,
     iter: impl Iterator<Item = T>,
     sep: &str,
-    multifuzz_ratio: f64,
+    multifuzz_ratio: Option<i64>,
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
     let mut data_vec: Vec<_> = iter.map(|t| (FuzzScore::default(), t)).collect();
     let sep = MyRaw::new(sep);
+    let has_ratio = multifuzz_ratio.is_some();
 
     crate::set_once!(MATCHER, || {
         let mut conf = SkimScoreConfig::default();
@@ -146,7 +148,12 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
         spawn_blocking(move || {
             // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
             let key = unsafe { key.get() };
-            let score = my_fuzz(key, unsafe { raw_name.get() }, unsafe { sep.get() });
+            let score = my_fuzz(
+                key,
+                unsafe { raw_name.get() },
+                unsafe { sep.get() },
+                !has_ratio,
+            );
 
             if let Some(score) = score {
                 let len = key.chars().count();
@@ -172,7 +179,8 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
         return Ok(None);
     }
 
-    let best_score_normalized = (best_score.score as f64 * multifuzz_ratio) as i64;
+    let best_score_normalized =
+        multifuzz_ratio.map_or(best_score.score, |r| best_score.score * r / 100);
 
     let mut ans = None;
     let mut multifuzz_vec = vec![];
@@ -228,8 +236,8 @@ pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
     found
 }
 
-fn my_fuzz(choice: &str, pattern: &str, sep: &str) -> Option<i64> {
-    if choice == pattern {
+fn my_fuzz(choice: &str, pattern: &str, sep: &str, boost_exact: bool) -> Option<i64> {
+    if boost_exact && choice == pattern {
         return Some(EXACXT_SCORE);
     }
     let mut ans_opt = None;

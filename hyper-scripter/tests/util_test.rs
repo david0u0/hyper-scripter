@@ -25,7 +25,8 @@ fn test_import() {
     run!("-f my -").unwrap();
     assert_eq!(run!("-f copy -").unwrap(), "我要留下來");
 
-    run!(home: &dir_path, "--no-alias ls -la").expect_err("還沒升級就成功？");
+    run!(allow_other_error: true, home: &dir_path, "--no-alias ls -la")
+        .expect_err("還沒升級就成功？");
     run!(home: &dir_path, "migrate").unwrap(); // NOTE: 順便測試 migrate 功能
     run!(home: &dir_path, "--no-alias ls -la").expect("升級了還失敗？");
 

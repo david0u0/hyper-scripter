@@ -1,6 +1,20 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub struct ExitCode(i32);
+impl ExitCode {
+    pub fn cmp_and_replace(&mut self, code: ExitCode) {
+        self.0 = std::cmp::max(self.0, code.0);
+    }
+    pub fn code(&self) -> i32 {
+        self.0
+    }
+}
+pub const EXIT_OK: ExitCode = ExitCode(0);
+pub const EXIT_KNOWN_ERR: ExitCode = ExitCode(1);
+pub const EXIT_OTHER_ERR: ExitCode = ExitCode(2);
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SysPath {
     Config,
@@ -67,6 +81,14 @@ impl Error {
             msg.push(s.to_string());
         }
         self
+    }
+    pub fn code(&self) -> ExitCode {
+        use Error::*;
+        match self {
+            Others(..) | GeneralFS(..) => EXIT_OTHER_ERR,
+            ScriptError(c) | PreRunError(c) | EditorError(c, _) => ExitCode(*c),
+            _ => EXIT_KNOWN_ERR,
+        }
     }
 }
 

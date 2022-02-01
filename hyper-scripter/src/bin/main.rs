@@ -1,7 +1,7 @@
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
-use hyper_scripter::error::{Error, RedundantOpt, Result};
+use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
@@ -27,20 +27,12 @@ async fn main() {
         Err(e) => vec![e],
         Ok(v) => v,
     };
-    let mut exit_code = 0;
+    let mut exit_code = ExitCode::default();
     for err in errs.iter() {
-        use Error::*;
-        match err {
-            ScriptError(c) | PreRunError(c) | EditorError(c, _) => exit_code = *c,
-            _ => {
-                if exit_code == 0 {
-                    exit_code = 1;
-                }
-            }
-        }
+        exit_code.cmp_and_replace(err.code());
         eprint!("{}", err);
     }
-    std::process::exit(exit_code);
+    std::process::exit(exit_code.code());
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();

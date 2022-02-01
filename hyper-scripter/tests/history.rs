@@ -391,7 +391,7 @@ fn test_multi_history() {
         ($($arg:tt)*) => ({
             let cmd = format!($($arg)*);
             println!("{}", cmd);
-            run!(silent: true, "{}", cmd).unwrap()
+            run!(silent: true, "{}", cmd).unwrap() // NOTE: 不打印標準輸出，太吵了==
         });
     }
     impl Historian {

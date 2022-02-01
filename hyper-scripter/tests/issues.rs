@@ -10,48 +10,48 @@ fn test_mv_same_name() {
     println!("移動腳本時，若前後腳本的路徑相同（腳本分類所致），應順利改動");
     let _g = setup();
 
-    run!("e test | echo 1").unwrap();
+    run!("e test1 | echo 1").unwrap();
     run!("e test2 | echo 2").unwrap();
 
-    run!("mv test -T tmux").unwrap();
-    assert_eq!(run!("test").unwrap(), "1");
+    run!("mv test1 -T tmux").unwrap();
+    assert_eq!(run!("test1").unwrap(), "1");
 
-    run!("mv test test2").expect_err("移動成撞名的腳本應報錯");
-    assert_eq!(run!("test").unwrap(), "1");
-    run!("mv test test2 -T rb").expect_err("移動成撞名的腳本，即使分類不同，也應報錯");
-    assert_eq!(run!("test").unwrap(), "1");
+    run!("mv test1 test2").expect_err("移動成撞名的腳本應報錯");
+    assert_eq!(run!("test1").unwrap(), "1");
+    run!("mv test1 test2 -T rb").expect_err("移動成撞名的腳本，即使路徑不同，也應報錯");
+    assert_eq!(run!("test1").unwrap(), "1");
 }
 #[test]
 fn test_cp_same_name() {
     println!("複製腳本時，若和既存的腳本撞名，應報錯");
     let _g = setup();
 
-    run!("e test -T rb | puts 1").unwrap();
+    run!("e test1 -T rb | puts 1").unwrap();
     run!("e test2 | echo 2").unwrap();
     run!("e test3 -T rb | puts 3").unwrap();
 
-    run!("cp test test2").expect_err("改成撞名的腳本，即使路徑不同，也應報錯");
-    assert_eq!(run!("test2").unwrap(), "2");
-
-    run!("cp test test3").expect_err("改成撞名的腳本應報錯");
+    run!("cp test1 test3").expect_err("複製成撞名的腳本應報錯");
     assert_eq!(run!("test3").unwrap(), "3");
 
-    assert_eq!(run!("test").unwrap(), "1");
+    run!("cp test1 test2").expect_err("複製成撞名的腳本，即使路徑不同，也應報錯");
+    assert_eq!(run!("test2").unwrap(), "2");
+
+    assert_eq!(run!("test1").unwrap(), "1");
 }
 #[test]
 fn test_rm_non_exist() {
     println!("若欲刪除的腳本不存在，應直接消滅之。");
     let _g = setup();
 
-    run!("e test | echo '刪我啊'").unwrap();
+    run!("e test1 | echo '刪我啊'").unwrap();
     run!("e test2 | echo '別刪我QQ'").unwrap();
-    assert_eq!(run!("test").unwrap(), "刪我啊");
-    let file = get_home().join("test.sh");
+    assert_eq!(run!("test1").unwrap(), "刪我啊");
+    let file = get_home().join("test1.sh");
     remove_file(&file).unwrap();
     assert_ls_len(2, None, None);
-    assert_eq!(run!("which test").unwrap(), file.to_string_lossy()); // TODO: 應該允許 which 嗎？
+    assert_eq!(run!("which test1").unwrap(), file.to_string_lossy()); // TODO: 應該允許 which 嗎？
 
-    run!("test").expect_err("刪掉的腳本還能執行！？");
+    run!("test1").expect_err("刪掉的腳本還能執行！？");
     run!("rm *").expect("rm 應該要消滅掉不存在的腳本");
 
     assert_ls_len(1, Some("all"), None);
@@ -282,7 +282,6 @@ fn test_fuzz_dot_or_endwith_slash() {
     t.can_find("/sla").unwrap_err();
 
     run!("e illegal/").expect_err("不應創建以`/`結尾的腳本");
-    run!("mv - illegal/").expect_err("不應創建以`/`結尾的腳本");
 
     run!("e .").expect_err("不應創建`.`為名的腳本");
     let t = ScriptTest::new(".1", None, None);

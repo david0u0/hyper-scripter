@@ -152,10 +152,11 @@ pub async fn do_script_query_strict<'b>(
 ) -> Result<RepoEntry<'b>> {
     // FIXME: 一旦 NLL 進化就修掉這段 unsafe
     let ptr = script_repo as *mut ScriptRepo;
-    if let Some(info) = do_script_query(script_query, unsafe { &mut *ptr }, false, false).await? {
+    if let Some(info) = do_script_query(script_query, script_repo, false, false).await? {
         return Ok(info);
     }
 
+    let script_repo = unsafe { &mut *ptr };
     #[cfg(not(feature = "benching"))]
     if !script_query.bang {
         let filtered = do_script_query(script_query, script_repo, true, true).await?;

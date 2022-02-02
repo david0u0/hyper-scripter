@@ -366,14 +366,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     (new_name, new_path)
                 }
             };
-            // FIXME
-            // if repo.get_mut(&new_name, true).is_some() {
-            //     return Err(Error::ScriptExist(new_name.to_string()));
-            // }
+            let mut new_info = entry.cp(new_name);
+            if repo.get_mut(&new_info.name, true).is_some() {
+                return Err(Error::ScriptExist(new_info.name.to_string()));
+            }
 
             util::cp(&og_script, &new_path)?;
 
-            let mut new_info = entry.cp(new_name);
             if let Some(tags) = tags {
                 new_info.append_tags(tags);
             }
@@ -398,20 +397,26 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     )
                     .into());
                 }
-                for mut script in scripts {
-                    let new_name = match &new {
-                        EditQuery::NewAnonimous => path::new_anonymous_name()?,
-                        EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
-                        EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
-                            let new = new.clone();
-                            new.join(&script.name)?.into_script_name()?
-                        }
-                    };
-                    // FIXME
-                    // if repo.get_mut(&new_name, true).is_some() {
-                    //     return Err(Error::ScriptExist(new_name.to_string()));
-                    // }
-
+                let mv_pairs: Result<Vec<_>> = scripts
+                    .into_iter()
+                    .map(|script| -> Result<_> {
+                        let new_name = match &new {
+                            EditQuery::NewAnonimous => path::new_anonymous_name()?,
+                            EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
+                            EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
+                                let new = new.clone();
+                                new.join(&script.name)?.into_script_name()?
+                            }
+                        };
+                        Ok((script.name.clone(), new_name))
+                    })
+                    .collect();
+                for (og_name, new_name) in mv_pairs?.into_iter() {
+                    if repo.get_mut(&new_name, true).is_some() {
+                        return Err(Error::ScriptExist(new_name.to_string()));
+                    }
+                    // TODO: 用 id 之類的加速？
+                    let mut script = repo.get_mut(&og_name, true).unwrap();
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {

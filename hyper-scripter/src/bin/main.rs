@@ -1,4 +1,4 @@
-use fxhash::FxHashMap as HashMap;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
 use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
@@ -397,7 +397,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     )
                     .into());
                 }
-                let mv_pairs: Result<Vec<_>> = scripts
+                let mv_pairs_res: Result<Vec<_>> = scripts
                     .into_iter()
                     .map(|script| -> Result<_> {
                         let new_name = match &new {
@@ -411,10 +411,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                         Ok((script.name.clone(), new_name))
                     })
                     .collect();
-                for (og_name, new_name) in mv_pairs?.into_iter() {
-                    if repo.get_mut(&new_name, true).is_some() {
+                let mv_pairs = mv_pairs_res?;
+                let mut dup_set = HashSet::default();
+                for (_, new_name) in mv_pairs.iter() {
+                    if dup_set.contains(new_name) || repo.get_mut(new_name, true).is_some() {
                         return Err(Error::ScriptExist(new_name.to_string()));
                     }
+                    dup_set.insert(new_name);
+                }
+                for (og_name, new_name) in mv_pairs.into_iter() {
                     // TODO: 用 id 之類的加速？
                     let mut script = repo.get_mut(&og_name, true).unwrap();
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;

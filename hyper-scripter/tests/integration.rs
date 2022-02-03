@@ -8,9 +8,10 @@ use hyper_scripter::{
 };
 use std::fs::write;
 use tool::*;
-const MSG: &str = "你好，腳本人！";
 
+const MSG: &str = "你好，腳本人！";
 const MSG_JS: &str = "你好，爪哇腳本人！";
+
 #[test]
 fn test_tags() {
     let _g = setup();

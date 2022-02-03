@@ -27,7 +27,7 @@ macro_rules! max {
 }
 
 // XXX: use impl_ser_by_to_string
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deref, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deref, Display, Hash)]
 #[display(fmt = "{}", inner)]
 pub struct ConcreteScriptName {
     #[deref]
@@ -66,7 +66,7 @@ impl ConcreteScriptName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Hash)]
 pub enum ScriptName {
     Anonymous(u32),
     Named(ConcreteScriptName),

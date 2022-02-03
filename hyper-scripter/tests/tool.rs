@@ -1,5 +1,6 @@
 use hyper_scripter::{
     config::{Config, PromptLevel},
+    error::EXIT_KNOWN_ERR,
     path::normalize_path,
 };
 use std::io::{BufRead, BufReader};
@@ -27,6 +28,7 @@ pub struct RunEnv {
     pub home: Option<PathBuf>,
     pub dir: Option<PathBuf>,
     pub silent: Option<bool>,
+    pub allow_other_error: Option<bool>,
 }
 
 #[macro_export]
@@ -181,8 +183,10 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let status = child.wait().unwrap();
     let res = if status.success() {
         Ok(out_str.join("\n"))
-    } else {
+    } else if env.allow_other_error == Some(true) || status.code() == Some(EXIT_KNOWN_ERR.code()) {
         Err(Error::exit_status(status).context(format!("執行 {:?} 失敗", args_vec)))
+    } else {
+        panic!("執行 {:?} 遭未知的錯誤！", args_vec);
     };
     log::info!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
     res

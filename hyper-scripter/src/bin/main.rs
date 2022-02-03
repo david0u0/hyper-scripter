@@ -1,11 +1,12 @@
-use fxhash::FxHashMap as HashMap;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagFilter};
-use hyper_scripter::error::{Error, RedundantOpt, Result};
+use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
-use hyper_scripter::query::{self, EditQuery, ScriptQuery};
+use hyper_scripter::query::{self, EditQuery, ScriptOrDirQuery, ScriptQuery};
+use hyper_scripter::script::IntoScriptName;
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
@@ -26,20 +27,12 @@ async fn main() {
         Err(e) => vec![e],
         Ok(v) => v,
     };
-    let mut exit_code = 0;
+    let mut exit_code = ExitCode::default();
     for err in errs.iter() {
-        use Error::*;
-        match err {
-            ScriptError(c) | PreRunError(c) | EditorError(c, _) => exit_code = *c,
-            _ => {
-                if exit_code == 0 {
-                    exit_code = 1;
-                }
-            }
-        }
+        exit_code.cmp_and_replace(err.code());
         eprint!("{}", err);
     }
-    std::process::exit(exit_code);
+    std::process::exit(exit_code.code());
 }
 async fn main_err_handle() -> Result<Vec<Error>> {
     let args: Vec<_> = std::env::args().collect();
@@ -360,27 +353,29 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::CP { origin, new, tags } => {
             let (mut repo, closer) = repo.init().await?;
-            if let EditQuery::Query(new) = &new {
-                if repo.get_mut(new, true).is_some() {
-                    return Err(Error::ScriptExist(new.to_string()));
-                }
-            }
             let entry = query::do_script_query_strict(&origin, &mut repo).await?;
             let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let (new_name, new_path) = match new {
                 EditQuery::NewAnonimous => path::open_new_anonymous(&entry.ty)?,
-                EditQuery::Query(new) => {
-                    let new_path = path::open_script(&new, &entry.ty, Some(false))?;
-                    (new, new_path)
+                EditQuery::Query(query) => {
+                    let new_name = match query {
+                        ScriptOrDirQuery::Script(new) => new,
+                        ScriptOrDirQuery::Dir(new) => new.join(&entry.name)?.into_script_name()?,
+                    };
+                    let new_path = path::open_script(&new_name, &entry.ty, Some(false))?;
+                    (new_name, new_path)
                 }
             };
-            util::cp(&og_script, &new_path)?;
             let mut new_info = entry.cp(new_name);
+            if repo.get_mut(&new_info.name, true).is_some() {
+                return Err(Error::ScriptExist(new_info.name.to_string()));
+            }
+
+            util::cp(&og_script, &new_path)?;
 
             if let Some(tags) = tags {
                 new_info.append_tags(tags);
             }
-
             let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
             create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
             closer.close(repo).await;
@@ -392,27 +387,43 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             ty,
         } => {
             let (mut repo, closer) = repo.init().await?;
-            let new_name = match new {
-                Some(EditQuery::Query(name)) => {
-                    if repo.get_mut(&name, true).is_some() {
-                        return Err(Error::ScriptExist(name.to_string()));
-                    }
-                    Some(name)
-                }
-                Some(EditQuery::NewAnonimous) => Some(path::new_anonymous_name()?),
-                None => None,
-            };
             let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;
-            if new_name.is_some() {
-                if scripts.len() > 1 {
+            if let Some(new) = new {
+                let is_dir = matches!(new, EditQuery::Query(ScriptOrDirQuery::Dir(_)));
+                if scripts.len() > 1 && !is_dir {
                     log::warn!("試圖把多個腳本移動成同一個");
                     return Err(RedundantOpt::Scripts(
                         scripts.iter().map(|s| s.name.key().to_string()).collect(),
                     )
                     .into());
                 }
-                //  只有一個，放心移動
-                main_util::mv(&mut scripts[0], new_name, ty.clone(), tags).await?;
+                let mv_pairs_res: Result<Vec<_>> = scripts
+                    .into_iter()
+                    .map(|script| -> Result<_> {
+                        let new_name = match &new {
+                            EditQuery::NewAnonimous => path::new_anonymous_name()?,
+                            EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
+                            EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
+                                let new = new.clone();
+                                new.join(&script.name)?.into_script_name()?
+                            }
+                        };
+                        Ok((script.name.clone(), new_name))
+                    })
+                    .collect();
+                let mv_pairs = mv_pairs_res?;
+                let mut dup_set = HashSet::default();
+                for (_, new_name) in mv_pairs.iter() {
+                    if dup_set.contains(new_name) || repo.get_mut(new_name, true).is_some() {
+                        return Err(Error::ScriptExist(new_name.to_string()));
+                    }
+                    dup_set.insert(new_name);
+                }
+                for (og_name, new_name) in mv_pairs.into_iter() {
+                    // TODO: 用 id 之類的加速？
+                    let mut script = repo.get_mut(&og_name, true).unwrap();
+                    main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
+                }
             } else {
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;

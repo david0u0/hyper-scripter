@@ -2,8 +2,7 @@ use crate::config::{Alias, Config, PromptLevel};
 use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
-use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptQuery};
-use crate::script::ScriptName;
+use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
 use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
 use crate::Either;
@@ -252,7 +251,7 @@ pub enum Subs {
         tags: Option<TagFilter>,
         origin: ScriptQuery,
         #[structopt(help = NEW_ANONYMOUS_HELP)]
-        new: EditQuery<ScriptName>,
+        new: EditQuery<ScriptOrDirQuery>,
     },
     #[structopt(about = "Move the script to another one")]
     MV {
@@ -262,7 +261,7 @@ pub enum Subs {
         tags: Option<TagFilter>,
         origin: ListQuery,
         #[structopt(help = NEW_ANONYMOUS_HELP)]
-        new: Option<EditQuery<ScriptName>>,
+        new: Option<EditQuery<ScriptOrDirQuery>>,
     },
     #[structopt(about = "Manage script tags")]
     Tags(Tags),

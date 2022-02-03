@@ -34,6 +34,10 @@ name = "history"
 path = "tests/history.rs"
 
 [[test]]
+name = "advanced"
+path = "tests/advanced.rs"
+
+[[test]]
 name = "fuzzy"
 path = "tests/fuzzy.rs"
 

@@ -6,6 +6,7 @@ use fuzzy_matcher::{
     FuzzyMatcher,
 };
 use std::borrow::Cow;
+use std::cell::UnsafeCell;
 use std::cmp::{Ordering, PartialOrd};
 use tokio::task::spawn_blocking;
 
@@ -132,7 +133,9 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     multifuzz_ratio: Option<i64>,
 ) -> Result<Option<FuzzResult<T>>> {
     let raw_name = MyRaw::new(name);
-    let mut data_vec: Vec<_> = iter.map(|t| (FuzzScore::default(), t)).collect();
+    let mut data_vec: Vec<_> = iter
+        .map(|t| (UnsafeCell::new(FuzzScore::default()), t))
+        .collect();
     let sep = MyRaw::new(sep);
     let has_ratio = multifuzz_ratio.is_some();
 
@@ -144,7 +147,7 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
 
     let score_fut = data_vec.iter_mut().map(|(score, data)| {
         let key = MyCow::new(data.fuzz_key());
-        let score_ptr = MyRaw(score as *mut _);
+        let score_ptr = MyRaw(score.get());
         spawn_blocking(move || {
             // SAFTY: 等等就會 join，故這個函式 await 完之前都不可能釋放這些字串
             let key = unsafe { key.get() };
@@ -169,8 +172,8 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     join_all(score_fut).await;
     // NOTE: 算分數就別平行做了，不然要搞原子性，可能得不償失
     let best_score = data_vec
-        .iter()
-        .map(|(score, _)| *score)
+        .iter_mut()
+        .map(|(score, _)| *score.get_mut())
         .max()
         .unwrap_or_default();
 
@@ -185,7 +188,8 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     let mut ans = None;
     let mut multifuzz_vec = vec![];
     let mut secondary_multifuzz_vec = vec![];
-    for (score, data) in data_vec.into_iter() {
+    for (mut score, data) in data_vec.into_iter() {
+        let score = *score.get_mut();
         if score == best_score && ans.is_none() {
             ans = Some(data);
         } else if is_multifuzz(score.score, best_score.score) {

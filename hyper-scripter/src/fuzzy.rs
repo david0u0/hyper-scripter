@@ -188,8 +188,8 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     let mut ans = None;
     let mut multifuzz_vec = vec![];
     let mut secondary_multifuzz_vec = vec![];
-    for (mut score, data) in data_vec.into_iter() {
-        let score = *score.get_mut();
+    for (score, data) in data_vec.into_iter() {
+        let score = score.into_inner();
         if score == best_score && ans.is_none() {
             ans = Some(data);
         } else if is_multifuzz(score.score, best_score.score) {

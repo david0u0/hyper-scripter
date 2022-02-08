@@ -7,9 +7,9 @@ use crate::tag::TagFilter;
 use crate::util::illegal_name;
 use chrono::NaiveDateTime;
 use fxhash::FxHashSet as HashSet;
-use serde::Serialize;
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::fmt::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -26,8 +26,7 @@ macro_rules! max {
     };
 }
 
-// XXX: use impl_ser_by_to_string
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deref, Display, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Display, Hash)]
 #[display(fmt = "{}", inner)]
 pub struct ConcreteScriptName {
     #[deref]
@@ -47,6 +46,11 @@ impl ConcreteScriptName {
         Self::valid(&s)?;
         Ok(ConcreteScriptName { inner: s })
     }
+    pub fn new_id(id: u32) -> Self {
+        ConcreteScriptName {
+            inner: id.to_string(),
+        }
+    }
     fn new_unchecked(s: String) -> Self {
         ConcreteScriptName { inner: s }
     }
@@ -61,12 +65,14 @@ impl ConcreteScriptName {
         Self::new_unchecked(self.stem_inner().to_owned())
     }
     pub fn join(&mut self, other: &ConcreteScriptName) {
-        self.inner += "/";
-        self.inner += other.stem_inner();
+        write!(&mut self.inner, "/{}", other.stem()).unwrap();
+    }
+    pub fn join_id(&mut self, other: u32) {
+        write!(&mut self.inner, "/{}", other).unwrap();
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ScriptName {
     Anonymous(u32),
     Named(ConcreteScriptName),
@@ -155,7 +161,7 @@ impl ScriptName {
                 Ok(c) => c.ext.as_ref().map(|s| s.as_ref()),
             };
             if let Some(ext) = ext {
-                *name = format!("{}.{}", name, ext);
+                write!(name, ".{}", ext).unwrap();
             }
             Ok(())
         }

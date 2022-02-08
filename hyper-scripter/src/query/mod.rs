@@ -1,14 +1,11 @@
 use crate::error::{
     Contextable, Error,
-    FormatCode::{
-        Regex as RegexCode, ScriptName as ScriptNameCode, ScriptQuery as ScriptQueryCode,
-    },
+    FormatCode::{Regex as RegexCode, ScriptQuery as ScriptQueryCode},
     Result,
 };
 use crate::impl_ser_by_to_string;
 use crate::script::{ConcreteScriptName, IntoScriptName, ScriptName};
 use regex::Regex;
-use serde::Serialize;
 use std::str::FromStr;
 
 mod util;
@@ -16,9 +13,11 @@ pub use util::*;
 mod range_query;
 pub use range_query::*;
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Eq, PartialEq, Display)]
 pub enum EditQuery<Q> {
+    #[display(fmt = "?")]
     NewAnonimous,
+    #[display(fmt = "{}", _0)]
     Query(Q),
 }
 impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
@@ -31,27 +30,49 @@ impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
         })
     }
 }
+impl_ser_by_to_string!(EditQuery<ScriptOrDirQuery>);
+impl_ser_by_to_string!(EditQuery<ScriptQuery>);
 
 #[derive(Debug, Display, Clone)]
 pub enum DirQuery {
     #[display(fmt = "/")]
     Root,
-    #[display(fmt = "{}", _0)]
+    #[display(fmt = "{}/", _0)]
     NonRoot(ConcreteScriptName),
 }
 impl DirQuery {
-    pub fn join(self, other: &ScriptName) -> Result<ConcreteScriptName> {
-        match other {
-            ScriptName::Anonymous(_) => {
-                Err(Error::Format(ScriptNameCode, format!("{}/{}", self, other)))
+    /// 接上另一個 `ScriptName`
+    ///
+    /// ```
+    /// use hyper_scripter::query::*;
+    /// use hyper_scripter::script::*;
+    ///
+    /// let root = DirQuery::Root;
+    /// let joined = root.clone().join(&".42".to_owned().into_script_name().unwrap());
+    /// assert_eq!(joined.to_string(), "42");
+    ///
+    /// let joined = root.join(&"a/b/c".to_owned().into_script_name().unwrap());
+    /// assert_eq!(joined.to_string(), "c");
+    ///
+    /// let dir = DirQuery::NonRoot(ConcreteScriptName::new("dir".into()).unwrap());
+    /// let joined = dir.clone().join(&".42".to_owned().into_script_name().unwrap());
+    /// assert_eq!(joined.to_string(), "dir/42");
+    ///
+    /// let joined = dir.join(&"a/b/c".to_owned().into_script_name().unwrap());
+    /// assert_eq!(joined.to_string(), "dir/c");
+    /// ```
+    pub fn join(self, other: &ScriptName) -> ConcreteScriptName {
+        match (self, other) {
+            (Self::Root, ScriptName::Anonymous(id)) => ConcreteScriptName::new_id(*id),
+            (Self::Root, ScriptName::Named(n)) => n.stem(),
+            (Self::NonRoot(mut dir), ScriptName::Anonymous(id)) => {
+                dir.join_id(*id);
+                dir
             }
-            ScriptName::Named(n) => Ok(match self {
-                Self::Root => n.stem(),
-                Self::NonRoot(mut dir) => {
-                    dir.join(n);
-                    dir
-                }
-            }),
+            (Self::NonRoot(mut dir), ScriptName::Named(n)) => {
+                dir.join(n);
+                dir
+            }
         }
     }
 }

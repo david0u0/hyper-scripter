@@ -360,7 +360,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 EditQuery::Query(query) => {
                     let new_name = match query {
                         ScriptOrDirQuery::Script(new) => new,
-                        ScriptOrDirQuery::Dir(new) => new.join(&entry.name)?.into_script_name()?,
+                        ScriptOrDirQuery::Dir(new) => new.join(&entry.name).into_script_name()?,
                     };
                     let new_path = path::open_script(&new_name, &entry.ty, Some(false))?;
                     (new_name, new_path)
@@ -405,7 +405,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                             EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
                             EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
                                 let new = new.clone();
-                                new.join(&script.name)?.into_script_name()?
+                                new.join(&script.name).into_script_name()?
                             }
                         };
                         Ok((script.name.clone(), new_name))

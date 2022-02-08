@@ -3,7 +3,20 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct ExitCode(i32);
+pub const EXIT_OK: ExitCode = ExitCode(0);
+pub const EXIT_KNOWN_ERR: ExitCode = ExitCode(1);
+pub const EXIT_OTHER_ERR: ExitCode = ExitCode(2);
 impl ExitCode {
+    /// 將另一個 `ExitCode` 和自身比較，若對方較嚴重，則將自身的值變成對方
+    ///
+    /// ```
+    /// use hyper_scripter::error::*;
+    /// let mut code = EXIT_KNOWN_ERR;
+    /// code.cmp_and_replace(EXIT_OK);
+    /// assert_eq!(code, EXIT_KNOWN_ERR);
+    /// code.cmp_and_replace(EXIT_OTHER_ERR);
+    /// assert_eq!(code, EXIT_OTHER_ERR);
+    /// ```
     pub fn cmp_and_replace(&mut self, code: ExitCode) {
         self.0 = std::cmp::max(self.0, code.0);
     }
@@ -11,9 +24,6 @@ impl ExitCode {
         self.0
     }
 }
-pub const EXIT_OK: ExitCode = ExitCode(0);
-pub const EXIT_KNOWN_ERR: ExitCode = ExitCode(1);
-pub const EXIT_OTHER_ERR: ExitCode = ExitCode(2);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SysPath {

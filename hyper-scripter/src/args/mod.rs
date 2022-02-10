@@ -9,8 +9,8 @@ use crate::Either;
 use serde::Serialize;
 use std::path::PathBuf;
 use structopt::clap::AppSettings::{
-    self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags,
-    DisableHelpSubcommand, DisableVersion, Hidden, TrailingVarArg,
+    self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, ColoredHelp,
+    DisableHelpFlags, DisableHelpSubcommand, DisableVersion, Hidden, TrailingVarArg,
 };
 use structopt::StructOpt;
 
@@ -24,6 +24,7 @@ use help_str::*;
 pub use types::*;
 
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
+    ColoredHelp,
     AllowLeadingHyphen,
     DisableHelpFlags,
     TrailingVarArg,
@@ -88,7 +89,7 @@ pub struct RootArgs {
 }
 
 #[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
+#[structopt(global_setting = ColoredHelp, settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
 pub struct Root {
     #[structopt(skip = false)]
     #[serde(skip)]
@@ -148,7 +149,7 @@ impl AliasRoot {
 }
 
 #[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllArgsOverrideSelf])]
+#[structopt(settings = &[AllArgsOverrideSelf, ColoredHelp])]
 pub enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
@@ -355,7 +356,8 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
             return Ok(());
         }
     }
-    clap.clone().print_help()?;
+    let mut clap = clap.clone().setting(ColoredHelp);
+    clap.print_help()?;
     println!();
     std::process::exit(0);
 }

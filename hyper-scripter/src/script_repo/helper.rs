@@ -5,9 +5,12 @@ use std::collections::hash_map::IterMut as HashMapIter;
 
 use super::DBEnv;
 
+pub(super) struct IterWithoutEnv<'b> {
+    pub iter: HashMapIter<'b, String, ScriptInfo>,
+    pub iter2: Option<HashMapIter<'b, String, ScriptInfo>>,
+}
 pub struct Iter<'b> {
-    pub(super) iter: HashMapIter<'b, String, ScriptInfo>,
-    pub(super) iter2: Option<HashMapIter<'b, String, ScriptInfo>>,
+    pub(super) iter: IterWithoutEnv<'b>,
     pub(super) env: &'b DBEnv,
 }
 #[derive(Deref, Debug)]
@@ -34,17 +37,23 @@ impl<'b> RepoEntry<'b> {
         self.env
     }
 }
-impl<'b> Iterator for Iter<'b> {
-    type Item = RepoEntry<'b>;
+impl<'b> Iterator for IterWithoutEnv<'b> {
+    type Item = &'b mut ScriptInfo;
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: 似乎有優化空間？參考標準庫 Chain
         if let Some((_, info)) = self.iter.next() {
-            Some(RepoEntry::new(info, self.env))
+            Some(info)
         } else if let Some(iter) = self.iter2.as_mut() {
-            iter.next().map(|(_, info)| RepoEntry::new(info, self.env))
+            iter.next().map(|(_, info)| info)
         } else {
             None
         }
+    }
+}
+impl<'b> Iterator for Iter<'b> {
+    type Item = RepoEntry<'b>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|info| RepoEntry::new(info, self.env))
     }
 }
 

@@ -5,7 +5,7 @@ use crate::extract_msg::extract_env_from_content;
 use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
-use crate::script_repo::{RepoEntry, ScriptRepo};
+use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptType};
 use crate::tag::{Tag, TagFilter};
 use std::ffi::OsStr;
@@ -78,7 +78,7 @@ pub async fn edit_or_create(
                 }
                 final_ty = ty.unwrap_or_default();
                 let name = query.into_script_name()?;
-                if script_repo.get_hidden_mut(&name).is_some() {
+                if script_repo.get_mut(&name, Visibility::All).is_some() {
                     log::error!("與被篩掉的腳本撞名");
                     return Err(Error::ScriptIsFiltered(name.to_string()));
                 }
@@ -116,7 +116,7 @@ pub async fn edit_or_create(
                 // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
                 // return Ok((p, entry));
                 let n = entry.name.clone();
-                return Ok((p, script_repo.get_mut(&n, true).unwrap()));
+                return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap()));
             }
             Err(e) => return Err(e),
         }
@@ -301,7 +301,7 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
     for u in utils.into_iter() {
         log::info!("載入小工具 {}", u.name);
         let name = u.name.to_owned().into_script_name()?;
-        if script_repo.get_mut(&name, true).is_some() {
+        if script_repo.get_mut(&name, Visibility::All).is_some() {
             log::warn!("已存在的小工具 {:?}，跳過", name);
             continue;
         }
@@ -400,7 +400,7 @@ pub async fn after_script(
 }
 
 fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {
-    for script in script_repo.iter_mut(true) {
+    for script in script_repo.iter_mut(Visibility::All) {
         let script_p = path::open_script(&script.name, &script.ty, None)?;
         if &script_p == p {
             return Err(Error::PathExist(script_p).context("與既存腳本撞路徑"));

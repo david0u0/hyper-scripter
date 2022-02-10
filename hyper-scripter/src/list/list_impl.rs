@@ -5,7 +5,7 @@ use super::{
 use crate::error::Result;
 use crate::query::do_list_query;
 use crate::script::ScriptInfo;
-use crate::script_repo::ScriptRepo;
+use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::get_display_type;
 use colored::{Color, Colorize};
@@ -141,7 +141,9 @@ pub async fn fmt_list<W: Write>(
     script_repo: &mut ScriptRepo,
     opt: ListOptions,
 ) -> Result<()> {
-    let latest_script_id = script_repo.latest_mut(1, false).map_or(-1, |s| s.id);
+    let latest_script_id = script_repo
+        .latest_mut(1, Visibility::Normal)
+        .map_or(-1, |s| s.id);
 
     let scripts_iter = do_list_query(script_repo, &opt.queries)
         .await?

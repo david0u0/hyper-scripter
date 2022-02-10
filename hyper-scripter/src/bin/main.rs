@@ -7,7 +7,7 @@ use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOption
 use hyper_scripter::path;
 use hyper_scripter::query::{self, EditQuery, ScriptOrDirQuery, ScriptQuery};
 use hyper_scripter::script::IntoScriptName;
-use hyper_scripter::script_repo::{RepoEntry, ScriptRepo};
+use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
 use hyper_scripter::util::{
@@ -367,7 +367,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
             };
             let mut new_info = entry.cp(new_name);
-            if repo.get_mut(&new_info.name, true).is_some() {
+            if repo.get_mut(&new_info.name, Visibility::All).is_some() {
                 return Err(Error::ScriptExist(new_info.name.to_string()));
             }
 
@@ -414,14 +414,16 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 let mv_pairs = mv_pairs_res?;
                 let mut dup_set = HashSet::default();
                 for (_, new_name) in mv_pairs.iter() {
-                    if dup_set.contains(new_name) || repo.get_mut(new_name, true).is_some() {
+                    if dup_set.contains(new_name)
+                        || repo.get_mut(new_name, Visibility::All).is_some()
+                    {
                         return Err(Error::ScriptExist(new_name.to_string()));
                     }
                     dup_set.insert(new_name);
                 }
                 for (og_name, new_name) in mv_pairs.into_iter() {
                     // TODO: 用 id 之類的加速？
-                    let mut script = repo.get_mut(&og_name, true).unwrap();
+                    let mut script = repo.get_mut(&og_name, Visibility::All).unwrap();
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
@@ -645,7 +647,7 @@ fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag
     use std::collections::hash_map::Entry::*;
 
     let mut map: HashMap<&Tag, _> = Default::default();
-    for script in repo.iter_mut(true) {
+    for script in repo.iter_mut(Visibility::All) {
         let script = script.into_inner();
         let date = script.last_major_time();
         for tag in script.tags.iter() {

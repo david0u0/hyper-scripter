@@ -3,7 +3,7 @@ use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script::ScriptInfo;
-use crate::script_repo::{RepoEntry, ScriptRepo};
+use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::util::{get_display_type, hijack_ctrlc_once};
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
@@ -13,7 +13,7 @@ pub async fn do_list_query<'a>(
     queries: &[ListQuery],
 ) -> Result<Vec<RepoEntry<'a>>> {
     if queries.is_empty() {
-        return Ok(repo.iter_mut(false).collect());
+        return Ok(repo.iter_mut(Visibility::Normal).collect());
     }
     let mut mem = HashSet::<i64>::default();
     let mut ret = vec![];
@@ -33,7 +33,7 @@ pub async fn do_list_query<'a>(
         match query {
             ListQuery::Pattern(re, og) => {
                 let mut is_empty = true;
-                for script in repo.iter_mut(false) {
+                for script in repo.iter_mut(Visibility::Normal) {
                     if re.is_match(&script.name.key()) {
                         is_empty = false;
                         insert!(script);
@@ -68,11 +68,18 @@ pub async fn do_script_query<'b>(
     forbid_prompt: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
-    let all = script_query.bang;
+    let mut visibility = if script_query.bang {
+        Visibility::All
+    } else {
+        Visibility::Normal
+    };
+    if finding_filtered {
+        visibility = visibility.invert();
+    }
     match &script_query.inner {
         ScriptQueryInner::Prev(prev) => {
             assert!(!finding_filtered); // XXX 很難看的作法，應設法靜態檢查
-            let latest = script_repo.latest_mut(*prev, all);
+            let latest = script_repo.latest_mut(*prev, visibility);
             log::trace!("找最新腳本");
             return if latest.is_some() {
                 Ok(latest)
@@ -80,24 +87,15 @@ pub async fn do_script_query<'b>(
                 Err(Error::Empty)
             };
         }
-        ScriptQueryInner::Exact(name) => {
-            if finding_filtered {
-                Ok(script_repo.get_hidden_mut(name))
-            } else {
-                Ok(script_repo.get_mut(name, all))
-            }
-        }
+        ScriptQueryInner::Exact(name) => Ok(script_repo.get_mut(name, visibility)),
         ScriptQueryInner::Fuzz(name) => {
             let level = if forbid_prompt {
                 PromptLevel::Never
             } else {
                 Config::get_prompt_level()
             };
-            let iter = if finding_filtered {
-                script_repo.iter_hidden_mut()
-            } else {
-                script_repo.iter_mut(all)
-            };
+
+            let iter = script_repo.iter_mut(visibility);
             let fuzz_res = fuzzy::fuzz(name, iter, SEP).await?;
             let mut is_low = false;
             let mut is_multi_fuzz = false;
@@ -164,7 +162,7 @@ pub async fn do_script_query_strict<'b>(
             filtered.update(|script| script.miss()).await?;
             return Err(Error::ScriptIsFiltered(filtered.name.key().to_string()));
         }
-    }
+    };
 
     Err(Error::ScriptNotFound(script_query.to_string()))
 }

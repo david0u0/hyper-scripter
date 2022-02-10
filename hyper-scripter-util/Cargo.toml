@@ -2,6 +2,6 @@
 name = "hyper-scripter-util"
 version = "0.5.15"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Tools for hyper-scripter. Not indetended to be used directly."

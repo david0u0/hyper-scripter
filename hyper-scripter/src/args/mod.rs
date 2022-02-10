@@ -405,8 +405,9 @@ impl Root {
     pub fn sanitize(&mut self) -> Result {
         match &mut self.subcmd {
             Some(Subs::Other(args)) => {
-                let args =
-                    std::array::IntoIter::new(["hs", "run"]).chain(args.iter().map(|s| s.as_str()));
+                let args = ["hs", "run"]
+                    .into_iter()
+                    .chain(args.iter().map(|s| s.as_str()));
                 self.subcmd = Some(Subs::from_iter(args));
                 log::info!("執行模式 {:?}", self.subcmd);
             }

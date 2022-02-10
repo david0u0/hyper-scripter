@@ -134,7 +134,7 @@ impl Default for Config {
             ],
             main_tag_filter: "+all".parse().unwrap(),
             types: ScriptTypeConfig::default_script_types(),
-            alias: std::array::IntoIter::new([
+            alias: [
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls", "--grouping", "none", "--recent", "1"]),
@@ -146,9 +146,10 @@ impl Default for Config {
                 gen_alias("pr", &["=util/historian!", "--sequence", "r"]),
                 gen_alias("purge", &["rm", "--purge"]),
                 gen_alias("h", &["=util/historian!"]),
-            ])
+            ]
+            .into_iter()
             .collect(),
-            env: std::array::IntoIter::new([
+            env: [
                 ("NAME", "{{name}}"),
                 ("HS_HOME", "{{home}}"),
                 ("HS_CMD", "{{cmd}}"),
@@ -164,7 +165,8 @@ impl Default for Config {
                 ("HS_EXE", "{{exe}}"),
                 ("HS_SOURCE", "{{home}}/.hs_source"),
                 ("TMP_DIR", "/tmp"),
-            ])
+            ]
+            .into_iter()
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect(),
         }

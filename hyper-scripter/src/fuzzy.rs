@@ -70,8 +70,13 @@ impl MyRaw<*const str> {
     fn new(s: &str) -> MyRaw<*const str> {
         MyRaw(s as *const str)
     }
-    unsafe fn get(&self) -> &str {
+    unsafe fn as_str(&self) -> &str {
         &*self.0
+    }
+}
+impl<T: Copy> MyRaw<T> {
+    fn get(&self) -> T {
+        self.0
     }
 }
 
@@ -88,7 +93,7 @@ impl MyCow {
     }
     unsafe fn get(&self) -> &str {
         match self {
-            MyCow::Borrowed(s) => s.get(),
+            MyCow::Borrowed(s) => s.as_str(),
             MyCow::Owned(s) => &*s,
         }
     }
@@ -153,8 +158,8 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
             let key = unsafe { key.get() };
             let score = my_fuzz(
                 key,
-                unsafe { raw_name.get() },
-                unsafe { sep.get() },
+                unsafe { raw_name.as_str() },
+                unsafe { sep.as_str() },
                 !has_ratio,
             );
 
@@ -163,7 +168,7 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
                 // SAFETY: 怎麼可能有多個人持有同個元素的分數
                 assert_ne!(len, 0);
                 unsafe {
-                    *score_ptr.0 = FuzzScore { score, len };
+                    *score_ptr.get() = FuzzScore { score, len };
                 }
             }
         })

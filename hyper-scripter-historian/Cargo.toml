@@ -2,7 +2,7 @@
 name = "hyper-scripter-historian"
 version = "0.5.15"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Database tool for hyper-scripter. Not indetended to be used directly."
 

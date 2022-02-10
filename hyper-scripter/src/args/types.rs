@@ -29,7 +29,8 @@ impl Types {
         match self.subcmd.as_ref() {
             None => self.subcmd = Some(TypesSubs::LS),
             Some(TypesSubs::Other(args)) => {
-                let args = std::array::IntoIter::new(["types", "template"])
+                let args = ["types", "template"]
+                    .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
                 self.subcmd = Some(TypesSubs::from_iter(args));
             }

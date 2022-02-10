@@ -151,11 +151,11 @@ macro_rules! create_default_types {
         }
         pub fn iter_default_templates() -> impl ExactSizeIterator<Item = (ScriptType, &'static str)> {
             let arr = [$( (ScriptType($name.to_owned()), $tmpl), )*];
-            std::array::IntoIter::new(arr)
+            arr.into_iter()
         }
         fn iter_default_configs() -> impl ExactSizeIterator<Item = (ScriptType, ScriptTypeConfig)> {
             let arr = [$( (ScriptType($name.to_owned()), $conf), )*];
-            std::array::IntoIter::new(arr)
+            arr.into_iter()
         }
     };
 }

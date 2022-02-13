@@ -5,8 +5,8 @@ use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
-use hyper_scripter::query::{self, EditQuery, ScriptOrDirQuery, ScriptQuery};
-use hyper_scripter::script::IntoScriptName;
+use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, ScriptQuery};
+use hyper_scripter::script::{IntoScriptName, ScriptName};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagFilter};
@@ -350,31 +350,21 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::CP { origin, new, tags } => {
             let (mut repo, closer) = repo.init().await?;
-            let entry = query::do_script_query_strict(&origin, &mut repo).await?;
-            let og_script = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let (new_name, new_path) = match new {
-                EditQuery::NewAnonimous => path::open_new_anonymous(&entry.ty)?,
-                EditQuery::Query(query) => {
-                    let new_name = match query {
-                        ScriptOrDirQuery::Script(new) => new,
-                        ScriptOrDirQuery::Dir(new) => new.join(&entry.name).into_script_name()?,
-                    };
-                    let new_path = path::open_script(&new_name, &entry.ty, Some(false))?;
-                    (new_name, new_path)
+            let cp_pairs = create_dir_pair(&mut repo, origin, new).await?;
+            for (og_name, new_name) in cp_pairs.into_iter() {
+                // TODO: 用 id 之類的加速？
+                let entry = repo.get_mut(&og_name, Visibility::All).unwrap();
+                let mut new_info = entry.cp(new_name);
+                let og_path = path::open_script(&og_name, &entry.ty, Some(true))?;
+                let new_path = path::open_script(&new_info.name, &entry.ty, Some(false))?;
+                util::cp(&og_path, &new_path)?;
+
+                if let Some(tags) = &tags {
+                    new_info.append_tags(tags.clone());
                 }
-            };
-            let mut new_info = entry.cp(new_name);
-            if repo.get_mut(&new_info.name, Visibility::All).is_some() {
-                return Err(Error::ScriptExist(new_info.name.to_string()));
+                let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
+                create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
             }
-
-            util::cp(&og_script, &new_path)?;
-
-            if let Some(tags) = tags {
-                new_info.append_tags(tags);
-            }
-            let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
-            create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
             closer.close(repo).await;
         }
         Subs::MV {
@@ -384,46 +374,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             ty,
         } => {
             let (mut repo, closer) = repo.init().await?;
-            let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;
             if let Some(new) = new {
-                let is_dir = matches!(new, EditQuery::Query(ScriptOrDirQuery::Dir(_)));
-                if scripts.len() > 1 && !is_dir {
-                    log::warn!("試圖把多個腳本移動成同一個");
-                    return Err(RedundantOpt::Scripts(
-                        scripts.iter().map(|s| s.name.key().to_string()).collect(),
-                    )
-                    .into());
-                }
-                let mv_pairs_res: Result<Vec<_>> = scripts
-                    .into_iter()
-                    .map(|script| -> Result<_> {
-                        let new_name = match &new {
-                            EditQuery::NewAnonimous => path::new_anonymous_name()?,
-                            EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
-                            EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
-                                let new = new.clone();
-                                new.join(&script.name).into_script_name()?
-                            }
-                        };
-                        Ok((script.name.clone(), new_name))
-                    })
-                    .collect();
-                let mv_pairs = mv_pairs_res?;
-                let mut dup_set = HashSet::default();
-                for (_, new_name) in mv_pairs.iter() {
-                    if dup_set.contains(new_name)
-                        || repo.get_mut(new_name, Visibility::All).is_some()
-                    {
-                        return Err(Error::ScriptExist(new_name.to_string()));
-                    }
-                    dup_set.insert(new_name);
-                }
+                let mv_pairs = create_dir_pair(&mut repo, origin, new).await?;
                 for (og_name, new_name) in mv_pairs.into_iter() {
                     // TODO: 用 id 之類的加速？
                     let mut script = repo.get_mut(&og_name, Visibility::All).unwrap();
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
+                let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;
                 }
@@ -688,4 +647,44 @@ fn check_time_changed(entry: &RepoEntry<'_>, ignrore_res: &LastTimeRecord) -> bo
             ignrore_res.exec_done_time,
             ignrore_res.humble_time,
         )
+}
+
+async fn create_dir_pair(
+    repo: &mut ScriptRepo,
+    og: ListQuery,
+    new: EditQuery<ScriptOrDirQuery>,
+) -> Result<Vec<(ScriptName, ScriptName)>> {
+    let scripts = query::do_list_query(repo, &[og]).await?;
+    let is_dir = matches!(new, EditQuery::Query(ScriptOrDirQuery::Dir(_)));
+    if scripts.len() > 1 && !is_dir {
+        log::warn!("試圖把多個腳本移動成同一個");
+        return Err(RedundantOpt::Scripts(
+            scripts.iter().map(|s| s.name.key().to_string()).collect(),
+        )
+        .into());
+    }
+    let pairs_res: Result<Vec<_>> = scripts
+        .into_iter()
+        .map(|script| -> Result<_> {
+            let new_name = match &new {
+                EditQuery::NewAnonimous => path::new_anonymous_name()?,
+                EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
+                EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
+                    let new = new.clone();
+                    new.join(&script.name).into_script_name()?
+                }
+            };
+            Ok((script.name.clone(), new_name))
+        })
+        .collect();
+    if let Ok(pairs) = &pairs_res {
+        let mut dup_set = HashSet::default();
+        for (_, new_name) in pairs.iter() {
+            if dup_set.contains(new_name) || repo.get_mut(new_name, Visibility::All).is_some() {
+                return Err(Error::ScriptExist(new_name.to_string()));
+            }
+            dup_set.insert(new_name);
+        }
+    }
+    pairs_res
 }

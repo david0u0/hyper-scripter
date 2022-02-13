@@ -34,3 +34,5 @@ fn test_mv_dir() {
         None,
     );
 }
+
+// TODO: test cp

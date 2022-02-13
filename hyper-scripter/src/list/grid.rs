@@ -21,7 +21,8 @@ impl Grid {
     pub fn clear(&mut self) {
         *self = Grid::new(self.capacity);
     }
-    pub fn fit_into_width<'a>(&'a mut self, width: usize) -> impl std::fmt::Display + 'a {
+    pub fn fit_into_screen<'a>(&'a mut self) -> impl std::fmt::Display + 'a {
+        let width = console::Term::stdout().size().1 as usize;
         if let Some(grid_display) = self.grid.fit_into_width(width) {
             grid_display
         } else {

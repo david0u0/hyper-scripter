@@ -251,7 +251,7 @@ pub enum Subs {
         #[structopt(long, short, help = TAGS_HELP)]
         tags: Option<TagFilter>,
         #[structopt(help = SCRIPT_QUERY_HELP)]
-        origin: ScriptQuery,
+        origin: ListQuery,
         #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
         new: EditQuery<ScriptOrDirQuery>,
     },

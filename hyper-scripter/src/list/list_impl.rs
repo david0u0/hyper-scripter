@@ -215,8 +215,7 @@ fn fmt_group<W: Write>(
     }
     match &mut opt.display_style {
         DisplayStyle::Short(_, grid) => {
-            let width = console::Term::stdout().size().1 as usize;
-            let grid_display = grid.fit_into_width(width);
+            let grid_display = grid.fit_into_screen();
             write!(w, "{}", grid_display)?;
             drop(grid_display);
             grid.clear();

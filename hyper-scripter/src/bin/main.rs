@@ -167,19 +167,16 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 // TODO: 不要這麼愛 clone
                 let mut innate_tags = conf.main_tag_filter.clone();
                 if let Some(tags) = tags {
-                    let append_namespace = tags.append;
                     innate_tags.push(tags);
                     EditTagArgs {
                         explicit_filter,
                         explicit_tag: true,
                         content: innate_tags,
-                        append_namespace,
                     }
                 } else {
                     EditTagArgs {
                         explicit_filter,
                         explicit_tag: false,
-                        append_namespace: true,
                         content: innate_tags,
                     }
                 }

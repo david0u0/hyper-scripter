@@ -13,9 +13,9 @@ fn test_import() {
     let dir = dir_path.to_string_lossy();
     log::info!("把待匯入的腳本放進 {}", dir);
 
-    run!("e copy/test -t +innate | echo 我要留下來").unwrap();
+    run!("e copy/test -t +innate,copy | echo 我要留下來").unwrap();
     run!(
-        "e my/innate -t +innate | rm {} -rf && cp {}/tests/to_be_import {} -r",
+        "e my/innate -t +innate,my | rm {} -rf && cp {}/tests/to_be_import {} -r",
         dir,
         env!("CARGO_MANIFEST_DIR"),
         dir,
@@ -86,16 +86,14 @@ fn test_collect() {
 
     run!("e noughty-txt.sh -T txt | echo 別收集我").unwrap();
 
+    const COLLECT_TXT: &str = "這是一個收集測試";
     let named = create_all(
         "this/is/a/collect/t.est",
         Some("rb"),
-        "puts '這是一個收集測試'",
+        &format!("puts '{COLLECT_TXT}'"),
     );
-    let named_txt = create_all(
-        "this/is/a/txt/coll.ect/test.ggext",
-        None,
-        "這是一個文字檔收集測試",
-    );
+    const SCREWED_UP_TXT: &str = "因為副檔名爛掉所以被當作文字檔";
+    let named_txt = create_all("this/is/a/txt/coll.ect/test.ggext", None, SCREWED_UP_TXT);
     create_all(".anonymous/10", Some("sh"), "echo 這是一個匿名收集測試");
     create_all(".anonymous/100", None, "這是一個匿名文字檔收集測試");
 
@@ -120,9 +118,8 @@ fn test_collect() {
 
     run!("collect").unwrap();
 
-    assert_eq!(run!("-f this {}", named).unwrap(), "這是一個收集測試");
-    assert_eq!(run!("-f is {}", named).unwrap(), "這是一個收集測試");
-    assert_eq!(run!("{}", named_txt).unwrap(), "這是一個文字檔收集測試");
+    assert_eq!(run!("{}", named).unwrap(), COLLECT_TXT);
+    assert_eq!(run!("{}", named_txt).unwrap(), SCREWED_UP_TXT);
     assert_eq!(run!(".10").unwrap(), "這是一個匿名收集測試");
     assert_eq!(run!(".100").unwrap(), "這是一個匿名文字檔收集測試");
 

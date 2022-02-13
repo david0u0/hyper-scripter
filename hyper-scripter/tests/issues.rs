@@ -134,7 +134,6 @@ fn test_edit_existing_bang() {
                     $ty.map(|s: &str| s.parse().unwrap()),
                     EditTagArgs {
                         content: $tag.parse().unwrap(),
-                        append_namespace: true,
                         explicit_tag: false,
                         explicit_filter: false,
                     },

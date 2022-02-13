@@ -13,8 +13,6 @@ use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
     pub content: TagFilter,
-    /// 是否要把命名空間也做為標籤
-    pub append_namespace: bool,
     /// 命令行參數裡帶著 tag 選項，例如 hs edit --tag some-tag edit
     pub explicit_tag: bool,
     /// 命令行參數裡帶著 filter 選項，例如 hs --filter some-tag edit
@@ -67,7 +65,6 @@ pub async fn edit_or_create(
     tags: EditTagArgs,
 ) -> Result<(PathBuf, RepoEntry<'_>)> {
     let final_ty: ScriptType;
-    let mut new_namespaces: Vec<Tag> = vec![];
 
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         match query::do_script_query(&query, script_repo, false, false).await {
@@ -83,13 +80,6 @@ pub async fn edit_or_create(
                     return Err(Error::ScriptIsFiltered(name.to_string()));
                 }
                 log::debug!("打開新命名腳本：{:?}", name);
-                if tags.append_namespace {
-                    new_namespaces = name
-                        .namespaces()
-                        .iter()
-                        .map(|s| s.parse())
-                        .collect::<Result<Vec<Tag>>>()?;
-                }
 
                 let p = path::open_script(&name, &final_ty, None)
                     .context(format!("打開新命名腳本失敗：{:?}", name))?;
@@ -135,15 +125,7 @@ pub async fn edit_or_create(
     let entry = script_repo
         .entry(&script_name)
         .or_insert(
-            ScriptInfo::builder(
-                0,
-                script_name,
-                final_ty,
-                tags.content
-                    .into_allowed_iter()
-                    .chain(new_namespaces.into_iter()),
-            )
-            .build(),
+            ScriptInfo::builder(0, script_name, final_ty, tags.content.into_allowed_iter()).build(),
         )
         .await?;
 

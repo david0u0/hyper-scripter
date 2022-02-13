@@ -29,11 +29,17 @@ fn test_tags() {
     assert_eq!(MSG, run!(".1").expect("標籤篩選把舊的腳本搞爛了！"));
 
     run!("tesjs").expect_err("標籤沒有篩選掉不該出現的腳本！可能是上上個操作把設定檔寫爛了");
-    run!("tags all").unwrap();
     run!("tags --name no-hidden all").unwrap();
     run!("tesjs").expect("沒吃到設定檔的標籤？");
+
+    run!("tags --name no-hidden all,^hide!").unwrap();
+    run!("tesjs").expect_err("沒吃到設定檔的標籤？");
+
+    run!("tags all").unwrap();
+    run!("tesjs").expect("沒吃到設定檔的標籤？");
+
     run!("tags test").unwrap();
-    run!("tesjs").expect("命名空間沒賦與它標籤？");
+    run!("tesjs").expect_err("命名空間變成標籤了？");
 }
 
 #[test]
@@ -270,10 +276,10 @@ fn test_append_tags() {
     assert_tags(&no_append_test, ["no-append", "eventually-append"]);
     assert_tags(&append_test, ["global", "test", "append"]);
     // 測試 ^all 的功能（無視一切先前的標籤）
-    let t1 = ScriptTest::new("non-global/namespace-test", Some("+^all"), CONTENT);
-    let t2 = ScriptTest::new("non-global/no-namespace-test", Some("^all"), CONTENT);
-    assert_tags(&t1, ["non-global"]);
-    assert_tags(&t2, []);
+    let t1 = ScriptTest::new("no-tag", Some("+^all"), CONTENT);
+    let t2 = ScriptTest::new("so-normal", None, CONTENT);
+    assert_tags(&t1, []);
+    assert_tags(&t2, ["global", "test"]);
     // 測試 ^{some-tag} 的功能
     let t1 = ScriptTest::new("only-test", Some("+^global"), CONTENT);
     let t2 = ScriptTest::new("only-global", Some("+^test"), CONTENT);
@@ -334,11 +340,11 @@ fn test_redirect() {
 #[test]
 fn test_mandatory_filter() {
     let _g = setup();
-    let t1 = ScriptTest::new("prj1/t", None, None);
-    let t2 = ScriptTest::new("prj2/t", None, None);
-    let t3 = ScriptTest::new("prj1/src/t", None, None);
-    let t4 = ScriptTest::new("prj2/src/t", None, None);
-    let t5 = ScriptTest::new("hide/prj2/src/t", None, None);
+    let t1 = ScriptTest::new("prj1/t", Some("prj1"), None);
+    let t2 = ScriptTest::new("prj2/t", Some("prj2"), None);
+    let t3 = ScriptTest::new("prj1/src/t", Some("prj1,src"), None);
+    let t4 = ScriptTest::new("prj2/src/t", Some("prj2,src"), None);
+    let t5 = ScriptTest::new("hide/prj2/src/t", Some("hide,prj2,src"), None);
 
     fn assert_ls_names<'a, const N: usize>(
         arr: [&'a ScriptTest; N],

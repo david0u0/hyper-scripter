@@ -137,7 +137,7 @@ impl Default for Config {
             alias: [
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
-                gen_alias("l", &["ls", "--grouping", "none", "--recent", "1"]),
+                gen_alias("l", &["ls", "--grouping", "none", "--limit", "5"]),
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "removed", "*"]),
                 gen_alias("t", &["tags"]),

@@ -7,6 +7,7 @@ use crate::script_type::ScriptType;
 use crate::tag::TagFilter;
 use crate::Either;
 use serde::Serialize;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use structopt::clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, ColoredHelp,
@@ -327,6 +328,8 @@ pub struct List {
     pub long: bool,
     #[structopt(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
     pub grouping: Grouping,
+    #[structopt(long, help = "Limit the amount of scripts found.")]
+    pub limit: Option<NonZeroUsize>,
     #[structopt(long, help = "No color and other decoration.")]
     pub plain: bool,
     #[structopt(long, help = "Show file path to the script.", conflicts_with = "long")]

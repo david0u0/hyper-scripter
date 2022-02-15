@@ -293,6 +293,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::LS(List {
             long,
             grouping,
+            limit,
             queries,
             plain,
             name,
@@ -309,6 +310,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let opt = ListOptions {
                 grouping: grouping.into(),
                 plain,
+                limit,
                 queries,
                 display_style,
             };

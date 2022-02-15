@@ -38,7 +38,7 @@ function __hs_list_tags
         set no_append 1
     end
 
-    for tag in (string split ' ' (__hs_extract_home_and_run tags ls --known) all)
+    for tag in (string split ' ' (__hs_extract_home_and_run tags ls --known) removed all)
         if set -q append
             echo +$tag\t+$tag
         end
@@ -159,7 +159,7 @@ function __hs_use_subcommand
 end
 
 complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -r -F
-complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)" # TODO: this doesn't repect `-H`
+complete -k -c hs -n "__hs_use_subcommand" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
 complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.' -r -f -a ""
 complete -c hs -n "__hs_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
 complete -c hs -n "__hs_use_subcommand" -l toggle -d 'Toggle named filter temporarily' -r -f -a "(__hs_list_named_filters)"
@@ -255,6 +255,7 @@ complete -k -c hs -n "__fish_seen_subcommand_from ls" -s f -l filter -d 'Filter 
 complete -c hs -n "__fish_seen_subcommand_from ls" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -s l -l long -d 'Show verbose information.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l plain -d 'No color and other decoration.'
+complete -c hs -n "__fish_seen_subcommand_from ls" -l limit -d 'Limit the amount of scripts found.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l file -d 'Show file path to the script.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l name -d 'Show name of the script.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -s h -l help -d 'Prints help information'

@@ -76,6 +76,7 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
         grouping: opt.grouping,
         queries: opt.queries,
         plain: opt.plain,
+        limit: opt.limit,
     }
 }
 fn extract_table<U>(opt: ListOptions<Table, U>) -> Option<Table> {
@@ -149,7 +150,14 @@ pub async fn fmt_list<W: Write>(
         .await?
         .into_iter()
         .map(|e| &*e.into_inner());
-    let len = scripts_iter.len();
+    let len = {
+        let mut len = scripts_iter.len();
+        if let Some(limit) = opt.limit {
+            len = std::cmp::min(len, limit.get() as usize)
+        }
+        len
+    };
+    let scripts_iter = scripts_iter.take(len);
 
     let final_table: Option<Table>;
     match opt.grouping {

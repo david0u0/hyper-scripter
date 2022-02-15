@@ -15,6 +15,7 @@ use crate::{
 use colored::{ColoredString, Colorize};
 use serde::Serialize;
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 
 fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
@@ -85,8 +86,9 @@ impl FromStr for Grouping {
 #[derive(Debug)]
 pub struct ListOptions<T = (), U = ()> {
     pub grouping: Grouping,
-    pub queries: Vec<ListQuery>,
     pub plain: bool,
+    pub limit: Option<NonZeroUsize>,
+    pub queries: Vec<ListQuery>,
     pub display_style: DisplayStyle<T, U>,
 }
 

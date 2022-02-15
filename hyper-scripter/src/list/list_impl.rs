@@ -60,6 +60,10 @@ impl TagsKey {
     }
 }
 
+fn sort_scripts(v: &mut Vec<&ScriptInfo>) {
+    v.sort_by_key(|s| Reverse(s.last_time()));
+}
+
 fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
     ListOptions {
         display_style: match opt.display_style {
@@ -136,6 +140,53 @@ pub fn fmt_meta(
     }
     Ok(())
 }
+
+enum ScriptsEither<'a, I> {
+    Iter(I),
+    V(Vec<&'a ScriptInfo>),
+}
+impl<'a, I: ExactSizeIterator<Item = &'a ScriptInfo>> ScriptsEither<'a, I> {
+    fn new(iter: I, limit: Option<usize>) -> Self {
+        if let Some(limit) = limit {
+            let mut v: Vec<_> = iter.collect();
+            sort_scripts(&mut v);
+            v.truncate(limit);
+            Self::V(v)
+        } else {
+            Self::Iter(iter)
+        }
+    }
+    fn collect(self) -> Vec<&'a ScriptInfo> {
+        match self {
+            Self::Iter(iter) => iter.collect(),
+            Self::V(v) => v,
+        }
+    }
+    fn len(&self) -> usize {
+        match self {
+            Self::Iter(iter) => iter.len(),
+            Self::V(v) => v.len(),
+        }
+    }
+    fn sorted(&self) -> bool {
+        matches!(self, Self::V(..))
+    }
+    fn for_each<F: FnMut(&'a ScriptInfo)>(self, mut f: F) {
+        match self {
+            Self::Iter(iter) => {
+                for s in iter {
+                    f(s);
+                }
+            }
+            Self::V(v) => {
+                for s in v.into_iter() {
+                    f(s);
+                }
+            }
+        }
+    }
+}
+
 const TITLE: &[&str] = &["name", "type", "write", "execute", "help message"];
 pub async fn fmt_list<W: Write>(
     w: &mut W,
@@ -150,37 +201,31 @@ pub async fn fmt_list<W: Write>(
         .await?
         .into_iter()
         .map(|e| &*e.into_inner());
-    let len = {
-        let mut len = scripts_iter.len();
-        if let Some(limit) = opt.limit {
-            len = std::cmp::min(len, limit.get() as usize)
-        }
-        len
-    };
-    let scripts_iter = scripts_iter.take(len);
+    let scripts_either = ScriptsEither::new(scripts_iter, opt.limit.map(|l| l.get()));
+    let sorted = scripts_either.sorted();
 
     let final_table: Option<Table>;
     match opt.grouping {
         Grouping::None => {
-            let mut opt = convert_opt(opt, Grid::new(len));
-            let scripts: Vec<_> = scripts_iter.collect();
-            fmt_group(w, scripts, latest_script_id, &mut opt)?;
+            let mut opt = convert_opt(opt, Grid::new(scripts_either.len()));
+            let scripts = scripts_either.collect();
+            fmt_group(w, scripts, sorted, latest_script_id, &mut opt)?;
             final_table = extract_table(opt);
         }
         Grouping::Tree => {
             let mut opt = convert_opt(opt, &mut *w);
-            let scripts: Vec<_> = scripts_iter.collect();
+            let scripts = scripts_either.collect();
             tree::fmt(scripts, latest_script_id, &mut opt)?;
             final_table = extract_table(opt);
         }
         Grouping::Tag => {
-            let mut opt = convert_opt(opt, Grid::new(len));
+            let mut opt = convert_opt(opt, Grid::new(scripts_either.len()));
             let mut script_map: HashMap<TagsKey, Vec<&ScriptInfo>> = HashMap::default();
-            for script in scripts_iter {
+            scripts_either.for_each(|script| {
                 let key = TagsKey::new(script.tags.iter().cloned());
                 let v = script_map.entry(key).or_default();
                 v.push(script);
-            }
+            });
 
             let mut scripts: Vec<_> = script_map.into_iter().collect();
 
@@ -199,7 +244,7 @@ pub async fn fmt_list<W: Write>(
                         }
                     }
                 }
-                fmt_group(w, scripts, latest_script_id, &mut opt)?;
+                fmt_group(w, scripts, sorted, latest_script_id, &mut opt)?;
             }
             final_table = extract_table(opt);
         }
@@ -213,10 +258,13 @@ pub async fn fmt_list<W: Write>(
 fn fmt_group<W: Write>(
     w: &mut W,
     mut scripts: Vec<&ScriptInfo>,
+    sorted: bool,
     latest_script_id: i64,
     opt: &mut ListOptionWithOutput,
 ) -> Result<()> {
-    scripts.sort_by_key(|s| Reverse(s.last_time()));
+    if !sorted {
+        sort_scripts(&mut scripts);
+    }
     for script in scripts.into_iter() {
         let is_latest = script.id == latest_script_id;
         fmt_meta(script, is_latest, opt)?;

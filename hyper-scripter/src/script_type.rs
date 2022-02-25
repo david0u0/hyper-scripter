@@ -105,32 +105,79 @@ impl Default for ScriptType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ScriptFullType(pub ScriptType, pub Option<ScriptType>);
-impl Display for ScriptFullType {
-    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
-        if let Some(sub) = &self.1 {
-            write!(w, "{}/{}", self.0, sub)
-        } else {
-            write!(w, "{}", self.0)
-        }
-    }
+pub struct ScriptFullType {
+    pub ty: ScriptType,
+    pub sub: Option<ScriptType>,
 }
 impl FromStr for ScriptFullType {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((first, second)) = s.split_once("/") {
-            Ok(ScriptFullType(first.parse()?, Some(second.parse()?)))
+            Ok(ScriptFullType {
+                ty: first.parse()?,
+                sub: Some(second.parse()?),
+            })
         } else {
-            Ok(ScriptFullType(s.parse()?, None))
+            Ok(ScriptFullType {
+                ty: s.parse()?,
+                sub: None,
+            })
         }
     }
 }
-impl From<ScriptType> for ScriptFullType {
-    fn from(other: ScriptType) -> Self {
-        ScriptFullType(other, None)
+impl Default for ScriptFullType {
+    fn default() -> Self {
+        Self {
+            ty: ScriptType::default(),
+            sub: None,
+        }
     }
 }
 impl_ser_by_to_string!(ScriptFullType);
+
+pub trait AsScriptFullTypeRef {
+    fn get_ty(&self) -> &ScriptType;
+    fn get_sub(&self) -> Option<&ScriptType>;
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        if let Some(sub) = &self.get_sub() {
+            write!(w, "{}/{}", self.get_ty(), sub)
+        } else {
+            write!(w, "{}", self.get_ty())
+        }
+    }
+}
+impl Display for ScriptFullType {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        AsScriptFullTypeRef::fmt(self, w)
+    }
+}
+
+impl AsScriptFullTypeRef for ScriptType {
+    fn get_ty(&self) -> &ScriptType {
+        &self
+    }
+    fn get_sub(&self) -> Option<&ScriptType> {
+        None
+    }
+}
+
+impl AsScriptFullTypeRef for ScriptFullType {
+    fn get_ty(&self) -> &ScriptType {
+        &self.ty
+    }
+    fn get_sub(&self) -> Option<&ScriptType> {
+        self.sub.as_ref()
+    }
+}
+
+impl<'a> AsScriptFullTypeRef for (&'a ScriptType, Option<&'a ScriptType>) {
+    fn get_ty(&self) -> &ScriptType {
+        self.0
+    }
+    fn get_sub(&self) -> Option<&ScriptType> {
+        self.1
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ScriptTypeConfig {

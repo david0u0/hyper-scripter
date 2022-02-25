@@ -1,7 +1,7 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
-use crate::script_type::{ScriptFullType, ScriptType};
+use crate::script_type::{AsScriptFullTypeRef, ScriptType};
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use fxhash::FxHashSet as HashSet;
@@ -211,8 +211,18 @@ pub fn open_script(
     Ok(script_path)
 }
 
-pub fn get_template_path(ty: &ScriptFullType) -> Result<PathBuf> {
-    let p = get_home().join(TEMPLATE).join(format!("{}.hbs", ty));
+pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
+    use std::fmt::{Display, Formatter, Result as FmtResult};
+    struct DisplayTy<'a, U>(&'a U);
+    impl<'a, U: AsScriptFullTypeRef> Display for DisplayTy<'a, U> {
+        fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+            self.0.fmt(w)
+        }
+    }
+
+    let p = get_home()
+        .join(TEMPLATE)
+        .join(format!("{}.hbs", DisplayTy(ty)));
     if let Some(dir) = p.parent() {
         if !dir.exists() {
             log::info!("找不到模板資料夾，創建之");

@@ -181,9 +181,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     }
                 }
             };
-            let (path, mut entry) =
+            let (path, mut entry, sub_type) =
                 main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
-            let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
+            let prepare_resp =
+                util::prepare_script(&path, &*entry, sub_type.as_ref(), no_template, &content)?;
             create_read_event(&mut entry).await?;
             if !fast {
                 let res = util::open_editor(&path);

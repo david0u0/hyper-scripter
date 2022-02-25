@@ -6,7 +6,7 @@ use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
-use crate::script_type::{iter_default_templates, ScriptType};
+use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagFilter};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -61,10 +61,10 @@ pub async fn mv(
 pub async fn edit_or_create(
     edit_query: EditQuery<ScriptQuery>,
     script_repo: &'_ mut ScriptRepo,
-    ty: Option<ScriptType>,
+    ty: Option<ScriptFullType>,
     tags: EditTagArgs,
-) -> Result<(PathBuf, RepoEntry<'_>)> {
-    let final_ty: ScriptType;
+) -> Result<(PathBuf, RepoEntry<'_>, Option<ScriptType>)> {
+    let final_ty: ScriptFullType;
 
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
         match query::do_script_query(&query, script_repo, false, false).await {
@@ -81,7 +81,7 @@ pub async fn edit_or_create(
                 }
                 log::debug!("打開新命名腳本：{:?}", name);
 
-                let p = path::open_script(&name, &final_ty, None)
+                let p = path::open_script(&name, &final_ty.ty, None)
                     .context(format!("打開新命名腳本失敗：{:?}", name))?;
                 if p.exists() {
                     if p.is_dir() {
@@ -106,7 +106,7 @@ pub async fn edit_or_create(
                 // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
                 // return Ok((p, entry));
                 let n = entry.name.clone();
-                return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap()));
+                return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap(), None));
             }
             Err(e) => return Err(e),
         }
@@ -116,20 +116,21 @@ pub async fn edit_or_create(
         }
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");
-        path::open_new_anonymous(&final_ty).context("打開新匿名腳本失敗")?
+        path::open_new_anonymous(&final_ty.ty).context("打開新匿名腳本失敗")?
     };
 
     log::info!("編輯 {:?}", script_name);
 
+    let ScriptFullType { ty, sub } = final_ty;
     // 這裡的 or_insert 其實永遠會發生，所以無需用閉包來傳
     let entry = script_repo
         .entry(&script_name)
         .or_insert(
-            ScriptInfo::builder(0, script_name, final_ty, tags.content.into_allowed_iter()).build(),
+            ScriptInfo::builder(0, script_name, ty, tags.content.into_allowed_iter()).build(),
         )
         .await?;
 
-    Ok((script_path, entry))
+    Ok((script_path, entry, sub))
 }
 
 fn run(
@@ -298,7 +299,7 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             .entry(&name)
             .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
             .await?;
-        super::prepare_script(&p, &*entry, true, &[u.content])?;
+        super::prepare_script(&p, &*entry, None, true, &[u.content])?;
         entry.update(|info| info.write()).await?;
     }
     Ok(())
@@ -321,7 +322,7 @@ pub fn prepare_pre_run(content: Option<&str>) -> Result<PathBuf> {
 
 pub fn load_templates() -> Result {
     for (ty, tmpl) in iter_default_templates() {
-        let tmpl_path = path::get_template_path(&ty.into())?;
+        let tmpl_path = path::get_template_path(&ty)?;
         if tmpl_path.exists() {
             continue;
         }

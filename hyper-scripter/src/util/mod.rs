@@ -158,7 +158,7 @@ pub fn get_or_create_template_path<T: AsScriptFullTypeRef>(
     }
     let tmpl_path = path::get_template_path(ty)?;
     if !tmpl_path.exists() {
-        let default_tmpl = get_default_template(ty.get_ty()); // FIXME: consider sub tmpl here?
+        let default_tmpl = get_default_template(ty); // FIXME: consider sub tmpl here?
         return write_file(&tmpl_path, default_tmpl).map(|_| (tmpl_path, Some(default_tmpl)));
     }
     Ok((tmpl_path, None))

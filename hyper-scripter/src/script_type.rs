@@ -21,6 +21,18 @@ cd {{birthplace}}
 {{#each content}}{{{this}}}
 {{/each}}";
 
+const SHELL_CD_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+
+set -e
+{{#if birthplace_rel_in_home}}
+echo 'cd ~/{{birthplace_rel}}' > $HS_SOURCE
+{{else}}
+echo 'cd {{birthplace}}' > $HS_SOURCE
+{{/if}}
+{{#each content}}{{{this}}}
+{{/each}}";
+
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 // [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
@@ -71,7 +83,36 @@ Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
 Dir.chdir(\"{{birthplace}}\")
 {{/if}}
 {{#each content}}{{{this}}}
-{{/each}} ";
+{{/each}}";
+
+const RB_TRAVERSE_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+
+def directory_tree(path)
+  files = []
+  Dir.foreach(path) do |entry|
+    next if ['..', '.'].include?(entry)
+
+    full_path = File.join(path, entry)
+    if File.directory?(full_path)
+      directory_tree(full_path).each do |f|
+        files.push(f)
+      end
+    else
+      files.push(full_path)
+    end
+  end
+  files
+end
+{{#if birthplace_rel_in_home}}
+Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
+{{else}}
+Dir.chdir(\"{{birthplace}}\")
+{{/if}}
+directory_tree('.').each do |full_path|
+  {{#each content}}{{{this}}}
+  {{/each}}
+end";
 
 #[derive(Clone, Display, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
@@ -152,15 +193,6 @@ impl Display for ScriptFullType {
     }
 }
 
-impl AsScriptFullTypeRef for ScriptType {
-    fn get_ty(&self) -> &ScriptType {
-        &self
-    }
-    fn get_sub(&self) -> Option<&ScriptType> {
-        None
-    }
-}
-
 impl AsScriptFullTypeRef for ScriptFullType {
     fn get_ty(&self) -> &ScriptType {
         &self.ty
@@ -220,15 +252,25 @@ impl ScriptTypeConfig {
 }
 
 macro_rules! create_default_types {
-    ($(( $name:literal, $tmpl:ident, $conf:expr )),*) => {
-        pub fn get_default_template(ty: &ScriptType) -> &'static str {
-            match ty.0.as_ref() {
-                $($name => $tmpl,)*
+    ($(( $name:literal, $tmpl:ident, $conf:expr, [ $($sub:literal: $sub_tmpl:ident),* ] )),*) => {
+        pub fn get_default_template<T: AsScriptFullTypeRef>(ty: &T) -> &'static str {
+            match (ty.get_ty().as_ref(), ty.get_sub().map(|s| s.as_ref())) {
+                $(
+                    $(
+                        ($name, Some($sub)) => $sub_tmpl,
+                    )*
+                    ($name, _) => $tmpl,
+                )*
                 _ => DEFAULT_WELCOME_MSG
             }
         }
-        pub fn iter_default_templates() -> impl ExactSizeIterator<Item = (ScriptType, &'static str)> {
-            let arr = [$( (ScriptType($name.to_owned()), $tmpl), )*];
+        pub fn iter_default_templates() -> impl ExactSizeIterator<Item = (ScriptFullType, &'static str)> {
+            let arr = [$(
+                (ScriptFullType{ ty: ScriptType($name.to_owned()), sub: None }, $tmpl),
+                $(
+                    (ScriptFullType{ ty: ScriptType($name.to_owned()), sub: Some(ScriptType($sub.to_owned())) }, $sub_tmpl),
+                )*
+            )*];
             arr.into_iter()
         }
         fn iter_default_configs() -> impl ExactSizeIterator<Item = (ScriptType, ScriptTypeConfig)> {
@@ -251,14 +293,14 @@ create_default_types! {
         cmd: Some("bash".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default()
-    }),
+    }, ["cd": SHELL_CD_WELCOME_MSG]),
     ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("sh".to_owned()),
         color: "white".to_owned(),
         cmd: Some("bash".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default(),
-    }),
+    }, []),
     ("js", JS_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
@@ -268,7 +310,7 @@ create_default_types! {
             "NODE_PATH",
             "{{{home}}}/node_modules",
         )]),
-    }),
+    }, []),
     ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
@@ -278,19 +320,19 @@ create_default_types! {
             "NODE_PATH",
             "{{{home}}}/node_modules",
         )]),
-    }),
+    }, []),
     ("rb", RB_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("rb".to_owned()),
         color: "bright red".to_owned(),
         cmd: Some("ruby".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default(),
-    }),
+    }, ["traverse": RB_TRAVERSE_WELCOME_MSG]),
     ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
         ext: None,
         color: "bright black".to_owned(),
         cmd: Some("cat".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default(),
-    })
+    }, [])
 }

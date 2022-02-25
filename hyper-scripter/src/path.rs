@@ -1,11 +1,11 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
-use crate::script_type::ScriptType;
+use crate::script_type::{ScriptFullType, ScriptType};
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use fxhash::FxHashSet as HashSet;
-use std::fs::{create_dir, read_dir};
+use std::fs::{create_dir, create_dir_all, read_dir};
 use std::path::{Component, Path, PathBuf};
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
@@ -211,13 +211,15 @@ pub fn open_script(
     Ok(script_path)
 }
 
-pub fn get_template_path(ty: &ScriptType) -> Result<PathBuf> {
-    let dir = get_home().join(TEMPLATE);
-    if !dir.exists() {
-        log::info!("找不到模板資料夾，創建之");
-        handle_fs_res(&[&dir], create_dir(&dir))?;
+pub fn get_template_path(ty: &ScriptFullType) -> Result<PathBuf> {
+    let p = get_home().join(TEMPLATE).join(format!("{}.hbs", ty));
+    if let Some(dir) = p.parent() {
+        if !dir.exists() {
+            log::info!("找不到模板資料夾，創建之");
+            handle_fs_res(&[&dir], create_dir_all(&dir))?;
+        }
     }
-    Ok(dir.join(format!("{}.hbs", ty)))
+    Ok(p)
 }
 
 #[cfg(test)]

@@ -1,7 +1,9 @@
 use crate::error::Error;
+use crate::impl_ser_by_to_string;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
 
 const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
@@ -101,6 +103,35 @@ impl Default for ScriptType {
         "sh".into()
     }
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScriptFullType(pub ScriptType, pub Option<ScriptType>);
+impl Display for ScriptFullType {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        if let Some(sub) = &self.1 {
+            write!(w, "{}/{}", self.0, sub)
+        } else {
+            write!(w, "{}", self.0)
+        }
+    }
+}
+impl FromStr for ScriptFullType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((first, second)) = s.split_once("/") {
+            Ok(ScriptFullType(first.parse()?, Some(second.parse()?)))
+        } else {
+            Ok(ScriptFullType(s.parse()?, None))
+        }
+    }
+}
+impl From<ScriptType> for ScriptFullType {
+    fn from(other: ScriptType) -> Self {
+        ScriptFullType(other, None)
+    }
+}
+impl_ser_by_to_string!(ScriptFullType);
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ScriptTypeConfig {
     pub ext: Option<String>,

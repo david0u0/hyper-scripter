@@ -321,7 +321,7 @@ pub fn prepare_pre_run(content: Option<&str>) -> Result<PathBuf> {
 
 pub fn load_templates() -> Result {
     for (ty, tmpl) in iter_default_templates() {
-        let tmpl_path = path::get_template_path(&ty)?;
+        let tmpl_path = path::get_template_path(&ty.into())?;
         if tmpl_path.exists() {
             continue;
         }

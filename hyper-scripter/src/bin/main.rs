@@ -295,10 +295,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             subcmd: Some(TypesSubs::Template { ty, edit }),
         }) => {
             if edit {
-                let (tmpl_path, _) = util::get_or_create_template_path(&ty, false)?;
+                let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
                 util::open_editor(&tmpl_path)?;
             } else {
-                let template = util::get_or_create_template(&ty, false)?;
+                let template = util::get_or_create_template(&ty, false, false)?;
                 println!("{}", template);
             }
         }

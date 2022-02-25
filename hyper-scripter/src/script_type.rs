@@ -336,3 +336,11 @@ create_default_types! {
         env: Default::default(),
     }, [])
 }
+
+/// 因為沒辦法直接對 AsScriptFullTypeRef 實作 Display 不得不多包一層…
+pub struct DisplayTy<'a, U>(pub &'a U);
+impl<'a, U: AsScriptFullTypeRef> Display for DisplayTy<'a, U> {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        self.0.fmt(w)
+    }
+}

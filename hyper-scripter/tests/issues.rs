@@ -156,7 +156,7 @@ fn test_edit_existing_bang() {
         assert_eq!(p, get_home().join("tes.rb"));
         assert!(sub.is_some());
         assert_tags(&["gg"], e.tags.iter());
-        
+
         let (p, e, sub) = try_edit!("test2", None, "+gg").await.unwrap();
         assert_eq!(p, get_home().join("test2.sh"));
         assert!(sub.is_none());

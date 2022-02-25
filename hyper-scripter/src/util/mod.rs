@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script::ScriptInfo;
-use crate::script_type::{get_default_template, AsScriptFullTypeRef, ScriptType};
+use crate::script_type::{get_default_template, AsScriptFullTypeRef, DisplayTy, ScriptType};
 use chrono::{DateTime, Utc};
 use colored::Color;
 use std::borrow::Cow;
@@ -149,22 +149,31 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
+/// check_subtype 是為避免太容易生出子模版
 pub fn get_or_create_template_path<T: AsScriptFullTypeRef>(
     ty: &T,
     force: bool,
+    check_subtype: bool,
 ) -> Result<(PathBuf, Option<&'static str>)> {
     if !force {
         Config::get().get_script_conf(ty.get_ty())?; // 確認類型存在與否
     }
     let tmpl_path = path::get_template_path(ty)?;
     if !tmpl_path.exists() {
-        let default_tmpl = get_default_template(ty); // FIXME: consider sub tmpl here?
+        if check_subtype && ty.get_sub().is_some() {
+            return Err(Error::UnknownType(DisplayTy(ty).to_string()));
+        }
+        let default_tmpl = get_default_template(ty);
         return write_file(&tmpl_path, default_tmpl).map(|_| (tmpl_path, Some(default_tmpl)));
     }
     Ok((tmpl_path, None))
 }
-pub fn get_or_create_template<T: AsScriptFullTypeRef>(ty: &T, force: bool) -> Result<String> {
-    let (tmpl_path, default_tmpl) = get_or_create_template_path(ty, force)?;
+pub fn get_or_create_template<T: AsScriptFullTypeRef>(
+    ty: &T,
+    force: bool,
+    check_subtype: bool,
+) -> Result<String> {
+    let (tmpl_path, default_tmpl) = get_or_create_template_path(ty, force, check_subtype)?;
     if let Some(default_tmpl) = default_tmpl {
         return Ok(default_tmpl.to_owned());
     }
@@ -236,7 +245,7 @@ pub fn prepare_script<T: AsRef<str>>(
                 "content": content,
             });
             // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
-            let template = get_or_create_template(&(&script.ty, sub_type), true)?;
+            let template = get_or_create_template(&(&script.ty, sub_type), true, true)?;
             handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
             let mut first = true;

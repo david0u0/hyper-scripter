@@ -143,20 +143,20 @@ pub fn get_home() -> &'static Path {
 
 fn get_anonymous_ids() -> Result<Vec<u32>> {
     // TODO: iterator
-    let mut ids = vec![];
     let dir = get_home().join(ANONYMOUS);
     if !dir.exists() {
         log::info!("找不到匿名腳本資料夾，創建之");
         handle_fs_res(&[&dir], create_dir(&dir))?;
     }
+
+    let mut ids = vec![];
     for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
-        let name = entry?
-            .file_name()
+        let name = entry?.file_name();
+        let name = name
             .to_str()
-            .ok_or_else(|| Error::msg("檔案實體為空...?"))?
-            .to_string();
+            .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
         let re = regex::Regex::new(r"\..+$").unwrap();
-        let name = re.replace(&name, "");
+        let name = re.replace(name, "");
         match name.parse::<u32>() {
             Ok(id) => ids.push(id),
             _ => log::warn!("匿名腳本名無法轉為整數：{}", name),
@@ -220,6 +220,25 @@ pub fn get_template_path(ty: &ScriptFullType) -> Result<PathBuf> {
         }
     }
     Ok(p)
+}
+pub fn get_sub_types(ty: &ScriptType) -> Result<Vec<ScriptType>> {
+    let dir = get_home().join(TEMPLATE).join(ty.as_ref());
+    if !dir.exists() {
+        log::info!("找不到子類別資料夾，直接回傳");
+        return Ok(vec![]);
+    }
+
+    let mut subs = vec![];
+    for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
+        let name = entry?.file_name();
+        let name = name
+            .to_str()
+            .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
+        let re = regex::Regex::new(r"\.hbs$").unwrap();
+        let name = re.replace(&name, "");
+        subs.push(name.parse()?);
+    }
+    Ok(subs)
 }
 
 #[cfg(test)]

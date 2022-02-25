@@ -277,7 +277,18 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS),
         }) => {
-            print_iter(conf.types.keys(), " ");
+            let mut first = true;
+            for ty in conf.types.keys() {
+                if !first {
+                    print!(" ");
+                }
+                first = false;
+                print!("{}", ty);
+                let subs = path::get_sub_types(ty)?;
+                for sub in subs.into_iter() {
+                    print!(" {}/{}", ty, sub);
+                }
+            }
         }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::Template { ty, edit }),

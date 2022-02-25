@@ -276,7 +276,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             closer.close(repo).await;
         }
         Subs::Types(Types {
-            subcmd: Some(TypesSubs::LS),
+            subcmd: Some(TypesSubs::LS { show_sub }),
         }) => {
             let mut first = true;
             for ty in conf.types.keys() {
@@ -285,9 +285,11 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 first = false;
                 print!("{}", ty);
-                let subs = path::get_sub_types(ty)?;
-                for sub in subs.into_iter() {
-                    print!(" {}/{}", ty, sub);
+                if show_sub {
+                    let subs = path::get_sub_types(ty)?;
+                    for sub in subs.into_iter() {
+                        print!(" {}/{}", ty, sub);
+                    }
                 }
             }
         }

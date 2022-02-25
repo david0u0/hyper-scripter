@@ -15,7 +15,10 @@ pub struct Types {
 pub enum TypesSubs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),
-    LS,
+    LS {
+        #[structopt(long)]
+        show_sub: bool,
+    },
     Template {
         #[structopt(long, short)]
         edit: bool,
@@ -27,7 +30,7 @@ pub enum TypesSubs {
 impl Types {
     pub fn sanitize(&mut self) {
         match self.subcmd.as_ref() {
-            None => self.subcmd = Some(TypesSubs::LS),
+            None => self.subcmd = Some(TypesSubs::LS { show_sub: false }),
             Some(TypesSubs::Other(args)) => {
                 let args = ["types", "template"]
                     .into_iter()

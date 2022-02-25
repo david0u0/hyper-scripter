@@ -12,7 +12,7 @@ function __hs_extract_home_and_run
 end
 
 function __hs_list_types
-    string split ' ' (__hs_extract_home_and_run types)
+    string split ' ' (__hs_extract_home_and_run types ls $argv)
 end
 
 function __hs_expand_alias
@@ -195,7 +195,7 @@ complete -c hs -n "__fish_seen_subcommand_from help" -s A -l archaeology -d 'Sho
 complete -c hs -n "__fish_seen_subcommand_from help" -s a -l all -d 'Shorthand for `-f=all,^removed --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from help" -l timeless -d 'Show scripts of all time.'
 
-complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
+complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types --show-sub)"
 complete -k -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags -r -f -a "(__hs_list_tags both)"
 complete -k -c hs -n "__fish_seen_subcommand_from edit" -s f -l filter -d 'Filter by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -l recent -d 'Show scripts within recent days.'
@@ -247,7 +247,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm" -s a -l all -d 'Shorthand for
 complete -c hs -n "__fish_seen_subcommand_from rm" -l timeless -d 'Show scripts of all time.'
 
 complete -c hs -n "__fish_prev_arg_in types" -f -a "template"
-complete -c hs -n "__fish_seen_subcommand_from types" -f -a "(__hs_list_types)"
+complete -c hs -n "__fish_seen_subcommand_from types" -f -a "(__hs_list_types --show-sub)"
 complete -c hs -n "__fish_seen_subcommand_from template" -s e -l edit
 
 complete -c hs -n "__fish_seen_subcommand_from ls" -l grouping -d 'Grouping style.' -r -f -a "tag tree none"

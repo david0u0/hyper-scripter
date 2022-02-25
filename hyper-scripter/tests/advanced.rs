@@ -48,7 +48,7 @@ fn test_mv_dir() {
 fn test_sub_tmpl() {
     let _g = setup();
     fn get_types_vec() -> Vec<String> {
-        let mut v: Vec<_> = run!("types ls")
+        let mut v: Vec<_> = run!("types ls --show-sub")
             .unwrap()
             .split_ascii_whitespace()
             .map(|s| s.to_owned())

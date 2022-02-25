@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script::ScriptInfo;
-use crate::script_type::{get_default_template, ScriptType};
+use crate::script_type::{get_default_template, AsScriptFullTypeRef, DisplayTy, ScriptType};
 use chrono::{DateTime, Utc};
 use colored::Color;
 use std::borrow::Cow;
@@ -149,20 +149,35 @@ pub fn handle_fs_res<T, P: AsRef<Path>>(path: &[P], res: std::io::Result<T>) -> 
     }
 }
 
-pub fn get_template_path(ty: &ScriptType, force: bool) -> Result<PathBuf> {
+/// check_subtype 是為避免太容易生出子模版
+pub fn get_or_create_template_path<T: AsScriptFullTypeRef>(
+    ty: &T,
+    force: bool,
+    check_subtype: bool,
+) -> Result<(PathBuf, Option<&'static str>)> {
     if !force {
-        Config::get().get_script_conf(&ty)?; // 確認類型存在與否
+        Config::get().get_script_conf(ty.get_ty())?; // 確認類型存在與否
     }
-    path::get_template_path(ty)
+    let tmpl_path = path::get_template_path(ty)?;
+    if !tmpl_path.exists() {
+        if check_subtype && ty.get_sub().is_some() {
+            return Err(Error::UnknownType(DisplayTy(ty).to_string()));
+        }
+        let default_tmpl = get_default_template(ty);
+        return write_file(&tmpl_path, default_tmpl).map(|_| (tmpl_path, Some(default_tmpl)));
+    }
+    Ok((tmpl_path, None))
 }
-pub fn get_or_create_tamplate(ty: &ScriptType, force: bool) -> Result<String> {
-    let tmpl_path = get_template_path(ty, force)?;
-    if tmpl_path.exists() {
-        return read_file(&tmpl_path);
+pub fn get_or_create_template<T: AsScriptFullTypeRef>(
+    ty: &T,
+    force: bool,
+    check_subtype: bool,
+) -> Result<String> {
+    let (tmpl_path, default_tmpl) = get_or_create_template_path(ty, force, check_subtype)?;
+    if let Some(default_tmpl) = default_tmpl {
+        return Ok(default_tmpl.to_owned());
     }
-    let default_tmpl = get_default_template(ty);
-    write_file(&tmpl_path, default_tmpl)?;
-    Ok(default_tmpl.to_owned())
+    read_file(&tmpl_path)
 }
 
 // 如果有需要跳脫的字元就吐 json 格式，否則就照原字串
@@ -202,6 +217,7 @@ pub enum PrepareRespond {
 pub fn prepare_script<T: AsRef<str>>(
     path: &Path,
     script: &ScriptInfo,
+    sub_type: Option<&ScriptType>,
     no_template: bool,
     content: &[T],
 ) -> Result<PrepareRespond> {
@@ -229,7 +245,7 @@ pub fn prepare_script<T: AsRef<str>>(
                 "content": content,
             });
             // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
-            let template = get_or_create_tamplate(&script.ty, true)?;
+            let template = get_or_create_template(&(&script.ty, sub_type), true, true)?;
             handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
         } else {
             let mut first = true;

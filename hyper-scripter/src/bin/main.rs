@@ -181,9 +181,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     }
                 }
             };
-            let (path, mut entry) =
+            let (path, mut entry, sub_type) =
                 main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
-            let prepare_resp = util::prepare_script(&path, &*entry, no_template, &content)?;
+            let prepare_resp =
+                util::prepare_script(&path, &*entry, sub_type.as_ref(), no_template, &content)?;
             create_read_event(&mut entry).await?;
             if !fast {
                 let res = util::open_editor(&path);
@@ -277,16 +278,27 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS),
         }) => {
-            print_iter(conf.types.keys(), " ");
+            let mut first = true;
+            for ty in conf.types.keys() {
+                if !first {
+                    print!(" ");
+                }
+                first = false;
+                print!("{}", ty);
+                let subs = path::get_sub_types(ty)?;
+                for sub in subs.into_iter() {
+                    print!(" {}/{}", ty, sub);
+                }
+            }
         }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::Template { ty, edit }),
         }) => {
             if edit {
-                let tmpl_path = util::get_template_path(&ty, false)?;
+                let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
                 util::open_editor(&tmpl_path)?;
             } else {
-                let template = util::get_or_create_tamplate(&ty, false)?;
+                let template = util::get_or_create_template(&ty, false, false)?;
                 println!("{}", template);
             }
         }

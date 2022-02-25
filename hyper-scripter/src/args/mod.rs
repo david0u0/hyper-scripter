@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
-use crate::script_type::ScriptType;
+use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagFilter;
 use crate::Either;
 use serde::Serialize;
@@ -174,7 +174,7 @@ pub enum Subs {
     #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
     Edit {
         #[structopt(long, short = "T", help = TYPE_HELP)]
-        ty: Option<ScriptType>,
+        ty: Option<ScriptFullType>,
         #[structopt(long, short)]
         no_template: bool,
         #[structopt(long, short, help = TAGS_HELP)]

@@ -50,7 +50,7 @@ pub struct TagControl {
     allow: bool,
     tag: Tag,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct Tag(String);
 impl AsRef<str> for Tag {
     fn as_ref(&self) -> &str {
@@ -61,11 +61,6 @@ impl Tag {
     pub fn match_all(&self) -> bool {
         // TODO: loop invariant 優化
         &self.0 == "all"
-    }
-}
-impl Display for Tag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", self.0)
     }
 }
 impl FromStr for Tag {

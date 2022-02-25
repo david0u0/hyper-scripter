@@ -152,12 +152,19 @@ fn test_edit_existing_bang() {
         let err = try_edit!("test!", Some("rb"), "gg").await.unwrap_err();
         assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
-        let (p, e) = try_edit!("tes", Some("rb"), "+gg").await.unwrap();
+        let (p, e, sub) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
         assert_eq!(p, get_home().join("tes.rb"));
+        assert!(sub.is_some());
         assert_tags(&["gg"], e.tags.iter());
 
-        let (p, e) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
+        let (p, e, sub) = try_edit!("test2", None, "+gg").await.unwrap();
+        assert_eq!(p, get_home().join("test2.sh"));
+        assert!(sub.is_none());
+        assert_tags(&["gg"], e.tags.iter());
+
+        let (p, e, sub) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
         assert_eq!(p, get_home().join("test.sh"));
+        assert!(sub.is_none());
         assert_tags(&["hide"], e.tags.iter());
     });
 }

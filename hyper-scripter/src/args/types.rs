@@ -1,5 +1,5 @@
 use super::help_str::*;
-use crate::script_type::ScriptType;
+use crate::script_type::ScriptFullType;
 use serde::Serialize;
 use structopt::clap::AppSettings::AllowLeadingHyphen;
 use structopt::StructOpt;
@@ -20,7 +20,7 @@ pub enum TypesSubs {
         #[structopt(long, short)]
         edit: bool,
         #[structopt(help = TYPE_HELP)]
-        ty: ScriptType,
+        ty: ScriptFullType,
     },
 }
 

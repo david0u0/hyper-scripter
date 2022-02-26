@@ -66,8 +66,8 @@ fn test_sub_tmpl() {
     }
 
     const RB_TRAVERSE: &str = "rb/traverse";
-    const JS_SUPER_WIERD_NAME: &str = "js/suPeR-wiERd_NAme";
-    const WIERD_JS_STR: &str = "this is a super wierd JS string";
+    const JS_SUPER_WEIRD_NAME: &str = "js/suPeR-weIRd_NAme";
+    const WEIRD_JS_STR: &str = "this is a super weird JS string";
 
     run!("e traverse-test -T {} | puts 'test!'", RB_TRAVERSE).unwrap();
 
@@ -82,22 +82,22 @@ fn test_sub_tmpl() {
 
     assert_eq!(
         run!("types js").unwrap(),
-        run!("types {}", JS_SUPER_WIERD_NAME).unwrap(),
+        run!("types {}", JS_SUPER_WEIRD_NAME).unwrap(),
         "子模版的預設值應該和父類別相同（除非是寫死的那幾個，如 rb/traverse）"
     );
-    let p = get_tmpl_path(JS_SUPER_WIERD_NAME);
-    write_file(&p, &format!("console.log('{WIERD_JS_STR}')")).unwrap();
+    let p = get_tmpl_path(JS_SUPER_WEIRD_NAME);
+    write_file(&p, &format!("console.log('{WEIRD_JS_STR}')")).unwrap();
     assert_ne!(
         run!("types js").unwrap(),
-        run!("types {}", JS_SUPER_WIERD_NAME).unwrap(),
+        run!("types {}", JS_SUPER_WEIRD_NAME).unwrap(),
         "子模版檔案已被寫入，不該相同"
     );
 
     assert_ne!(get_types_vec(), types); // 怪名字還不在向量中
-    modify_types_vec(&mut types, &[JS_SUPER_WIERD_NAME], &[]);
+    modify_types_vec(&mut types, &[JS_SUPER_WEIRD_NAME], &[]);
     assert_eq!(get_types_vec(), types);
 
-    run!("e wierd-test -T {} | dummy", JS_SUPER_WIERD_NAME).unwrap();
-    assert_eq!(WIERD_JS_STR, run!("wierd-test").unwrap());
+    run!("e weird-test -T {} --fast", JS_SUPER_WEIRD_NAME).unwrap();
+    assert_eq!(WEIRD_JS_STR, run!("weird-test").unwrap());
     run!("traverse-test").expect("刪個子模版不應影響已存在的腳本！");
 }

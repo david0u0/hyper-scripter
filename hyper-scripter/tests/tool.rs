@@ -99,6 +99,8 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         }
     }
 
+    run!("ls").unwrap(); // create the home
+
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
         hyper_scripter::path::set_home(Some(&home), true).unwrap();
@@ -106,7 +108,10 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         Config::set_prompt_level(Some(PromptLevel::Never));
     });
 
-    run!("alias e edit --fast").unwrap();
+    // 避免編輯器堵住整個程式
+    let mut conf = load_conf();
+    conf.editor = vec!["echo".to_owned()];
+    conf.store().unwrap();
 
     guard
 }

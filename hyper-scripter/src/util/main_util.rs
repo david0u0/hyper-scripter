@@ -353,8 +353,8 @@ pub async fn after_script(
 ) -> Result<bool> {
     let mut record_write = true;
     match prepare_resp {
-        PrepareRespond::HasContent => {
-            log::debug!("帶內容腳本，不執行後處理");
+        PrepareRespond::NoAfterProcess => {
+            log::debug!("不執行後處理");
         }
         PrepareRespond::NoContent { is_new, time } => {
             let modified = super::file_modify_time(path)?;

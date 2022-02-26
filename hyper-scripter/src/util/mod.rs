@@ -212,7 +212,7 @@ fn relative_to_home(p: &Path) -> Option<&Path> {
 
 #[derive(Debug)]
 pub enum PrepareRespond {
-    HasContent,
+    NoAfterProcess,
     NoContent { is_new: bool, time: DateTime<Utc> },
 }
 pub fn prepare_script<T: AsRef<str>>(
@@ -275,7 +275,7 @@ pub fn prepare_script<T: AsRef<str>>(
     }
 
     Ok(if has_content {
-        PrepareRespond::HasContent
+        PrepareRespond::NoAfterProcess
     } else {
         PrepareRespond::NoContent {
             is_new,

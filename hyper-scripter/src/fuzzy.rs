@@ -111,10 +111,14 @@ impl FuzzScore {
 }
 impl PartialOrd for FuzzScore {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.score.cmp(&other.score) {
-            Ordering::Equal => Some(other.len.cmp(&self.len)),
-            res @ _ => Some(res),
-        }
+        Some(
+            if (self.score - other.score).abs() < 2 && self.len != other.len {
+                // 吃掉「正常排序就命中」的差異
+                other.len.cmp(&self.len)
+            } else {
+                self.score.cmp(&other.score)
+            },
+        )
     }
 }
 impl Ord for FuzzScore {
@@ -403,12 +407,12 @@ mod test {
 
         let res = do_fuzz("ab", &vec).await.unwrap();
         let (ans, v) = extract_multifuzz(res);
-        assert_eq!(ans, "a:b");
+        assert_eq!(ans, "a:b"); // 正常排序就命中
         assert_eq!(v, vec!["a:b", "b:a"]);
 
         let res = do_fuzz("ba", &vec).await.unwrap();
         let (ans, v) = extract_multifuzz(res);
-        assert_eq!(ans, "b:a");
+        assert_eq!(ans, "b:a"); // 正常排序就命中
         assert_eq!(v, vec!["a:b", "b:a"]);
 
         let res = do_fuzz("ca", &vec).await.unwrap();
@@ -418,6 +422,12 @@ mod test {
         let (ans, v) = extract_multifuzz(res);
         assert_eq!(ans, "a:c"); // 真的同分，只好以順序決定了
         assert_eq!(v, vec!["a:b", "a:c", "b:a"]);
+
+        let vec = vec!["a:b:c", "c:a"];
+        let res = do_fuzz("a", &vec).await.unwrap();
+        let (ans, v) = extract_multifuzz(res);
+        assert_eq!(ans, "c:a");
+        assert_eq!(v, vec!["a:b:c", "c:a"]);
     }
     #[test]
     fn test_reorder() {

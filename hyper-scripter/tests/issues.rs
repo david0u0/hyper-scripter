@@ -222,8 +222,8 @@ fn test_multifuzz() {
     });
     {
         let is_match =
-            matches!(res, Multi{ans, others, ..} if ans == pref.get_name() && others.len() == 2);
-        assert!(is_match, "並非預期中的 multifuzz 結果，應更新測資");
+            matches!(&res, Multi{ans, others, ..} if *ans == pref.get_name() && others.len() == 2);
+        assert!(is_match, "{:?} 並非預期中結果，應更新測資", res);
     }
 
     t2.can_find("multifuzz/t").unwrap();

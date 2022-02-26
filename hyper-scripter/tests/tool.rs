@@ -219,8 +219,9 @@ pub fn assert_ls_len(expect: usize, filter: Option<&str>, query: Option<&str>) {
     let res = get_ls(filter, query);
     assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", filter, res);
 }
-pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str>) {
-    expect.sort_unstable();
+pub fn assert_ls<T: ToString>(expect: Vec<T>, filter: Option<&str>, query: Option<&str>) {
+    let mut expect: Vec<_> = expect.into_iter().map(|s| s.to_string()).collect();
+    expect.sort();
     let mut res = get_ls(filter, query);
     res.sort();
     assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);
@@ -230,6 +231,11 @@ pub fn assert_ls(mut expect: Vec<&str>, filter: Option<&str>, query: Option<&str
 #[derive(Debug)]
 pub struct ScriptTest {
     name: String,
+}
+impl<'a> ToString for &'a ScriptTest {
+    fn to_string(&self) -> String {
+        self.name.clone()
+    }
 }
 impl ScriptTest {
     pub fn get_name(&self) -> &str {

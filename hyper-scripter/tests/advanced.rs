@@ -101,3 +101,18 @@ fn test_sub_tmpl() {
     assert_eq!(WEIRD_JS_STR, run!("weird-test").unwrap());
     run!("traverse-test").expect("刪個子模版不應影響已存在的腳本！");
 }
+
+#[test]
+fn test_bang_list_query() {
+    let _g = setup();
+    let a = ScriptTest::new("dir/a", Some("hide"), None);
+    let b = ScriptTest::new("dir/b", Some("hide"), None);
+    let c = ScriptTest::new("dir/c", Some("hide"), None);
+    let d = ScriptTest::new("dir/d", None, None);
+    let e = ScriptTest::new("e", None, None);
+
+    assert_ls(vec![&d], None, Some("dir/*"));
+    assert_ls(vec![&d, &e], None, Some("*"));
+    assert_ls(vec![&a, &b, &c, &d], None, Some("dir/*!"));
+    run!("ls dir2/*!").expect_err("不存在的列表查詢還是得報錯");
+}

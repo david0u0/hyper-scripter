@@ -102,7 +102,7 @@ impl_ser_by_to_string!(ScriptOrDirQuery);
 #[derive(Debug, Display)]
 pub enum ListQuery {
     #[display(fmt = "{}", _1)]
-    Pattern(Regex, String),
+    Pattern(Regex, String, bool),
     #[display(fmt = "{}", _0)]
     Query(ScriptQuery),
 }
@@ -114,8 +114,13 @@ impl FromStr for ListQuery {
             // TODO: 好好檢查
             let re = s.replace(".", r"\.");
             let re = re.replace("*", ".*");
-            match Regex::new(&format!("^{}$", re)) {
-                Ok(re) => Ok(ListQuery::Pattern(re, s)),
+            let (re, bang) = if re.ends_with('!') {
+                (&re[0..re.len() - 1], true)
+            } else {
+                (&re[..], false)
+            };
+            match Regex::new(&format!("^{re}$",)) {
+                Ok(re) => Ok(ListQuery::Pattern(re, s, bang)),
                 Err(e) => {
                     log::error!("正規表達式錯誤：{}", e);
                     Err(Error::Format(RegexCode, s))

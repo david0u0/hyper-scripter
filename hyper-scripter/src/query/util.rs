@@ -8,6 +8,14 @@ use crate::util::{get_display_type, hijack_ctrlc_once};
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
 
+fn compute_vis(bang: bool) -> Visibility {
+    if bang {
+        Visibility::All
+    } else {
+        Visibility::Normal
+    }
+}
+
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
     queries: &[ListQuery],
@@ -31,9 +39,9 @@ pub async fn do_list_query<'a>(
         // SAFETY: `mem` 已保證回傳的陣列不可能包含相同的資料
         let repo = unsafe { &mut *repo_ptr };
         match query {
-            ListQuery::Pattern(re, og) => {
+            ListQuery::Pattern(re, og, bang) => {
                 let mut is_empty = true;
-                for script in repo.iter_mut(Visibility::Normal) {
+                for script in repo.iter_mut(compute_vis(*bang)) {
                     if re.is_match(&script.name.key()) {
                         is_empty = false;
                         insert!(script);
@@ -68,11 +76,7 @@ pub async fn do_script_query<'b>(
     forbid_prompt: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
     log::debug!("開始尋找 `{:?}`", script_query);
-    let mut visibility = if script_query.bang {
-        Visibility::All
-    } else {
-        Visibility::Normal
-    };
+    let mut visibility = compute_vis(script_query.bang);
     if finding_filtered {
         visibility = visibility.invert();
     }

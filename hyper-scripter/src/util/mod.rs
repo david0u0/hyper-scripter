@@ -16,6 +16,7 @@ pub mod completion_util;
 pub mod holder;
 pub mod main_util;
 pub mod serde;
+pub mod shebang_handle;
 
 pub mod init_repo;
 pub use init_repo::*;

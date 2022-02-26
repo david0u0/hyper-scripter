@@ -5,9 +5,8 @@ pub use tool::*;
 
 use hyper_scripter::{
     script_type::ScriptFullType,
-    util::{read_file, remove, write_file},
+    util::{remove, write_file},
 };
-use std::fs::remove_file;
 use std::path::PathBuf;
 
 #[test]

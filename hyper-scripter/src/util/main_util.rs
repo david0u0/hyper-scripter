@@ -8,7 +8,6 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagFilter};
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
@@ -160,12 +159,6 @@ fn run(
         return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
     };
 
-    macro_rules! remaining_iter {
-        () => {
-            remaining.iter().map(|s| AsRef::<OsStr>::as_ref(s))
-        };
-    }
-
     let info: serde_json::Value;
     info = json!({
         "path": script_path,
@@ -182,7 +175,13 @@ fn run(
     let ty_env = script_conf.gen_env(&info)?;
 
     let pre_run_script = prepare_pre_run(None)?;
-    let mut cmd = super::create_cmd(pre_run_script, remaining_iter!());
+    let (cmd, shebang) = super::shebang_handle::handle(&pre_run_script)?;
+    let args = shebang
+        .iter()
+        .map(|s| s.as_ref())
+        .chain(std::iter::once(pre_run_script.as_os_str()))
+        .chain(remaining.iter().map(|s| s.as_ref()));
+    let mut cmd = super::create_cmd(cmd, args);
     cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
 
@@ -195,13 +194,12 @@ fn run(
     }
 
     let args = script_conf.args(&info)?;
-    let full_args: Vec<&OsStr> = args
+    let full_args = args
         .iter()
-        .map(|s| s.as_ref())
-        .chain(remaining_iter!())
-        .collect();
+        .map(|s| s.as_str())
+        .chain(remaining.iter().map(|s| s.as_str()));
 
-    let mut cmd = super::create_cmd(&cmd_str, &full_args);
+    let mut cmd = super::create_cmd(&cmd_str, full_args);
     cmd.envs(ty_env);
     cmd.envs(env);
 
@@ -311,11 +309,6 @@ pub fn prepare_pre_run(content: Option<&str>) -> Result<PathBuf> {
         let content = content.unwrap_or_else(|| include_str!("hs_prerun"));
         log::info!("寫入預執行腳本 {:?} {}", p, content);
         super::write_file(&p, content)?;
-        #[cfg(target_os = "linux")]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o774))?;
-        }
     }
     Ok(p)
 }

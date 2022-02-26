@@ -7,7 +7,7 @@ use std::fs::{create_dir_all, remove_dir_all, remove_file, File};
 use std::io::prelude::*;
 use tool::*;
 
-fn test_import() {
+fn test_import(og_util_cnt: usize) {
     let tmp_dir = std::env::temp_dir();
     let dir_path = tmp_dir.join("to_be_import");
     let dir = dir_path.to_string_lossy();
@@ -49,13 +49,13 @@ fn test_import() {
 
     assert!(check_exist(&[".gitignore"]));
 
-    assert_ls_len(16, Some("all"), None);
+    assert_ls_len(11 + og_util_cnt, Some("all"), None);
 
     run!("-f util import --namespace imported {}", dir).unwrap();
     // NOTE: 上面這行會噴一些找不到路徑的錯誤，不用緊張，是因為 `to_be_import` 裡面有些腳本被故意砍掉了
     assert_eq!(run!("-a imported/my/tes").unwrap(), "安安！紅寶石");
     run!("-f imported which").expect_err("命名空間汙染了標籤！");
-    assert_ls_len(22, Some("all"), None);
+    assert_ls_len(17 + og_util_cnt, Some("all"), None);
 
     // check content of file
     let file_path = run!("which -a imported/my/tes").unwrap();
@@ -67,7 +67,7 @@ fn test_import() {
     );
 }
 
-fn test_collect() {
+fn test_collect(og_util_cnt: usize) {
     pub fn create_all(name: &str, ext: Option<&str>, content: &str) -> String {
         let full_name = if let Some(ext) = ext {
             format!("{}.{}", name, ext)
@@ -131,12 +131,13 @@ fn test_collect() {
     assert_eq!(run!("-f tag youest").unwrap(), "殼已破碎");
     assert_eq!(run!("-f nameless -").unwrap(), "安安，匿名殼");
 
-    assert_ls_len(23, Some("all"), None);
+    assert_ls_len(18 + og_util_cnt, Some("all"), None);
 }
 
 #[test]
 fn test_utils() {
     let _g = setup_with_utils();
-    test_import();
-    test_collect();
+    let og_util_cnt = get_ls(Some("all"), None).len();
+    test_import(og_util_cnt);
+    test_collect(og_util_cnt);
 }

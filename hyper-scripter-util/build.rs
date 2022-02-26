@@ -21,8 +21,8 @@ fn read_all() -> std::io::Result<impl Iterator<Item = String>> {
     Ok(iter)
 }
 
-fn read_hidden() -> std::io::Result<Vec<String>> {
-    let hidden_list = join_file("hidden_list", None);
+fn read_list(s: &str) -> std::io::Result<Vec<String>> {
+    let hidden_list = join_file(s, None);
     let mut file = File::open(hidden_list)?;
     let mut content = String::new();
     file.read_to_string(&mut content)?;
@@ -32,16 +32,19 @@ fn read_hidden() -> std::io::Result<Vec<String>> {
 fn main() -> std::io::Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest = Path::new(&out_dir).join("get_all_utils.rs");
-    let hidden_list = read_hidden()?;
+    let hidden_list = read_list("hidden_list")?;
+    let last_list = read_list("last_list")?;
     let mut file = File::create(dest)?;
-    let inner = read_all()?
-        .map(|path| {
-            let mut splited = path.rsplitn(2, '.');
-            let ty = splited.next().unwrap();
-            let name = splited.next().unwrap();
-            let hidden = hidden_list.iter().any(|s| s == name);
-            format!(
-                "
+    let mut inner = vec![];
+    let mut last_inner = vec![];
+    for path in read_all()? {
+        let mut splited = path.rsplitn(2, '.');
+        let ty = splited.next().unwrap();
+        let name = splited.next().unwrap();
+        let hidden = hidden_list.iter().any(|s| s == name);
+        let is_last = last_list.iter().any(|s| s == name);
+        let s = format!(
+            "
                 RawUtil {{
                     name: \"util/{}\",
                     ty: \"{}\",
@@ -49,14 +52,17 @@ fn main() -> std::io::Result<()> {
                     is_hidden: {},
                 }}
                 ",
-                name,
-                ty,
-                join_util(&path),
-                hidden
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(",");
+            name,
+            ty,
+            join_util(&path),
+            hidden
+        );
+        if is_last {
+            last_inner.push(s);
+        } else {
+            inner.push(s);
+        }
+    }
     file.write_all(
         b"pub struct RawUtil {
             pub name: &'static str,
@@ -66,7 +72,7 @@ fn main() -> std::io::Result<()> {
         }",
     )?;
     file.write_all(b"pub fn get_all() -> &'static [RawUtil] {\n")?;
-    file.write_all(format!("    &[{}]", inner).as_bytes())?;
+    file.write_all(format!("    &[{}, {}]", inner.join(","), last_inner.join(",")).as_bytes())?;
     file.write_all(b"}\n")?;
     Ok(())
 }

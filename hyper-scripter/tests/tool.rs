@@ -197,7 +197,7 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     res
 }
 
-fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
+pub fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
     let ls_res = run!(
         "ls {} --grouping none --plain --name {}",
         filter.map(|f| format!("-f {}", f)).unwrap_or_default(),

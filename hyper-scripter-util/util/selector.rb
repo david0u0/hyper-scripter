@@ -8,6 +8,28 @@ BLUE_BG_YELLOW = "\033[33;44m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
 
+def read_char
+  STDIN.echo = false
+  STDIN.raw!
+  input = STDIN.getc.chr
+  if input == "\e"
+    begin
+      input << STDIN.read_nonblock(3)
+    rescue StandardError
+      nil
+    end
+    begin
+      input << STDIN.read_nonblock(2)
+    rescue StandardError
+      nil
+    end
+  end
+ensure
+  STDIN.echo = true
+  STDIN.cooked!
+  return input
+end
+
 class Selector
   class Empty < StandardError
   end
@@ -88,7 +110,7 @@ class Selector
                sequence = sequence[1..-1]
                ch
              else
-               STDIN.getch
+               read_char
              end
       exit if resp == "\u0003" # Ctrl-C
 
@@ -130,9 +152,9 @@ class Selector
           else
             @virtual_state = nil
           end
-        when 'j', 'J'
+        when 'j', 'J', "\e[B"
           pos = (pos + 1) % option_count
-        when 'k', 'K'
+        when 'k', 'K', "\e[A"
           pos = (pos - 1 + option_count) % option_count
         when 'n'
           new_pos = search_index(pos + 1)

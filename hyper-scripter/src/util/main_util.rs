@@ -350,7 +350,7 @@ pub async fn after_script(
     entry: &mut RepoEntry<'_>,
     path: &Path,
     prepare_resp: &PrepareRespond,
-) -> Result<bool> {
+) -> Result {
     let mut record_write = true;
     match prepare_resp {
         PrepareRespond::NoAfterProcess => {
@@ -361,7 +361,7 @@ pub async fn after_script(
             if time >= &modified {
                 if *is_new {
                     log::info!("新腳本未變動，應刪除之");
-                    return Ok(false);
+                    return Err(Error::EmptyCreate);
                 } else {
                     log::info!("舊腳本未變動，不記錄寫事件（只記讀事件）");
                     record_write = false;
@@ -372,7 +372,7 @@ pub async fn after_script(
     if record_write {
         entry.update(|info| info.write()).await?;
     }
-    Ok(true)
+    Ok(())
 }
 
 fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {

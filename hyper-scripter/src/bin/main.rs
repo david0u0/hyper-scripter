@@ -194,12 +194,19 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             } else {
                 prepare_resp = PrepareRespond::NoAfterProcess;
             }
-            let should_keep = main_util::after_script(&mut entry, &path, &prepare_resp).await?;
-            if !should_keep {
-                util::remove(&path)?;
-                let id = entry.id;
-                repo.remove(id).await?
+            let after_res = main_util::after_script(&mut entry, &path, &prepare_resp).await;
+            if let Err(err) = after_res {
+                match &err {
+                    Error::EmptyCreate => {
+                        util::remove(&path)?;
+                        let id = entry.id;
+                        repo.remove(id).await?
+                    }
+                    _ => (),
+                }
+                return Err(err);
             }
+
             closer.close(repo).await;
         }
         Subs::Help { args } => {

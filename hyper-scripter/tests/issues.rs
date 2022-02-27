@@ -195,7 +195,8 @@ fn test_edit_without_change() {
         "帶內容編輯應打破時間篩選"
     );
 
-    let orphan = ScriptTest::new("orphan", None, Some(""));
+    let (orphan, res) = ScriptTest::new_regardless("orphan", None, Some(""));
+    res.expect_err("空編輯應該是一個錯誤");
     orphan
         .filter("-a")
         .can_find_by_name()

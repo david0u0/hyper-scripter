@@ -29,6 +29,7 @@ impl Display for Error {
                 f,
                 "Can not find you're config path. Usually it should be `$HOME/.config`",
             )?,
+            EmptyCreate => write!(f, "Not creating new script due to file not changing.")?,
             SysPathNotFound(SysPath::Home) => write!(f, "Can not find you're home path.")?,
             PermissionDenied(v) => fmt_multi_path(f, "Permission denied", v)?,
             PathNotFound(v) => fmt_multi_path(f, "Path not found", v)?,

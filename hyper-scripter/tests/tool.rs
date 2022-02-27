@@ -99,7 +99,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         }
     }
 
-    run!("ls").unwrap(); // create the home
+    run!(silent: true, "ls").unwrap(); // create the home
 
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
@@ -241,13 +241,21 @@ impl ScriptTest {
     pub fn get_name(&self) -> &str {
         &self.name
     }
-    pub fn new(name: &str, tags: Option<&str>, content: Option<&str>) -> Self {
+    pub fn new_regardless(name: &str, tags: Option<&str>, content: Option<&str>) -> (Self, Result) {
         let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
         let content = content.unwrap_or("echo $NAME");
-        run!("e {} ={} | {}", tags_str, name, content).unwrap();
-        ScriptTest {
-            name: name.to_owned(),
-        }
+        let res = run!("e {} ={} | {}", tags_str, name, content).map(|_| ());
+        (
+            ScriptTest {
+                name: name.to_owned(),
+            },
+            res,
+        )
+    }
+    pub fn new(name: &str, tags: Option<&str>, content: Option<&str>) -> Self {
+        let (t, res) = Self::new_regardless(name, tags, content);
+        res.unwrap();
+        t
     }
     pub fn assert_not_exist(&self, args: Option<&str>, msg: Option<&str>) {
         let s = format!("cat {} ={}", args.unwrap_or_default(), self.name);

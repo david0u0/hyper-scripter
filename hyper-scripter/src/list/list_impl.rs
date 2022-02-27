@@ -35,7 +35,7 @@ fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> Str
 struct TagsKey(Vec<Tag>);
 impl std::fmt::Display for TagsKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0.is_empty() {
+        if self.is_empty() {
             write!(f, "(no tag)")?;
             return Ok(());
         }
@@ -57,6 +57,9 @@ impl TagsKey {
         let mut tags: Vec<_> = tags.collect();
         tags.sort();
         TagsKey(tags)
+    }
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -229,8 +232,14 @@ pub async fn fmt_list<W: Write>(
 
             let mut scripts: Vec<_> = script_map.into_iter().collect();
 
-            // NOTE: 以群組中執行次數的最大值排序
-            scripts.sort_by_key(|(_, v)| v.iter().map(|s| s.exec_count).max());
+            // NOTE: 以群組中執行次數的最大值排序, 無標籤永遠在上
+            scripts.sort_by_key(|(k, v)| {
+                if k.is_empty() {
+                    None
+                } else {
+                    v.iter().map(|s| s.exec_count).max()
+                }
+            });
 
             for (tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {

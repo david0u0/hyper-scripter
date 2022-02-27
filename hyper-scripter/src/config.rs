@@ -117,7 +117,7 @@ impl Default for Config {
             prompt_level: PromptLevel::Smart,
             tag_filters: vec![
                 NamedTagFilter {
-                    content: "+pin".parse().unwrap(),
+                    content: "+pin,util".parse().unwrap(),
                     name: "pin".to_owned(),
                     inactivated: false,
                 },

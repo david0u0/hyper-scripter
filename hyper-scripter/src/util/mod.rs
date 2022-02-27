@@ -245,6 +245,7 @@ pub fn prepare_script<T: AsRef<str>>(
                 "name": script.name.key().to_owned(),
                 "content": content,
             });
+            log::debug!("編輯模版資訊：{:?}", info);
             // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
             let template = get_or_create_template(&(&script.ty, sub_type), true, true)?;
             handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;

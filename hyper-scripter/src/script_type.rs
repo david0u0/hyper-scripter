@@ -13,7 +13,7 @@ const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
 set -e
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}
 cd {{birthplace}}
@@ -25,7 +25,7 @@ const SHELL_CD_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
 set -e
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 echo 'cd ~/{{birthplace_rel}}' > $HS_SOURCE
 {{else}}
 echo 'cd {{birthplace}}' > $HS_SOURCE
@@ -37,7 +37,7 @@ const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 // [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
 process.chdir(require('os').homedir());
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 process.chdir(process.env.HOME);
 process.chdir('{{birthplace_rel}}');
 {{else}}
@@ -64,7 +64,7 @@ if [ $? = 0 ]; then
 fi
 
 set -e
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}
 cd {{birthplace}}
@@ -77,7 +77,7 @@ tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
 {{else}}
 Dir.chdir(\"{{birthplace}}\")
@@ -104,14 +104,14 @@ def directory_tree(path)
   end
   files
 end
-{{#if birthplace_rel_in_home}}
+{{#if birthplace_in_home}}
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
 {{else}}
 Dir.chdir(\"{{birthplace}}\")
 {{/if}}
 directory_tree('.').each do |full_path|
   {{#each content}}{{{this}}}
-  {{/each}}
+  {{else}} # TODO{{/each}}
 end";
 
 #[derive(Clone, Display, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]

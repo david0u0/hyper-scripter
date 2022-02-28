@@ -1,12 +1,15 @@
 require 'io/console'
 
 RED = "\033[1;31m".freeze
-YELLOW = "\033[0;33m".freeze
+GREEN = "\033[1;32m".freeze
+YELLOW = "\033[1;33m".freeze
+BLUE = "\033[1;34m".freeze
 BLUE_BG = "\033[0;44m".freeze
 BLUE_BG_RED = "\033[31;44m\033[1m".freeze
 BLUE_BG_YELLOW = "\033[33;44m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
+HELP_MSG = "#{GREEN}press h/H for help#{NC}"
 
 def read_char
   STDIN.echo = false
@@ -27,7 +30,25 @@ def read_char
 ensure
   STDIN.echo = true
   STDIN.cooked!
+  exit 1 if input == "\u0003" # Ctrl-C
   return input
+end
+
+def erase_lines(line_count)
+  line_count.times do
+    $stderr.print "\e[A"
+  end
+  $stderr.print "\r\e[J"
+end
+
+def get_win_width
+  IO.console.winsize[1]
+end
+
+def compute_lines(len, win_width)
+  lines = 1 + len / win_width
+  lines -= 1 if len % win_width == 0
+  lines
 end
 
 class Selector
@@ -45,12 +66,14 @@ class Selector
   def register_keys(keys, callback, msg: '', recur: false)
     @enter_overriden = true if keys.include?(ENTER)
     keys = [keys] unless keys.is_a?(Array)
-    keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, msg, recur)) }
+    keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, recur)) }
+    @helps.push(self.class.make_help(keys, msg, :no, recur))
   end
 
   def register_keys_virtual(keys, callback, msg: '', recur: false)
     keys = [keys] unless keys.is_a?(Array)
-    keys.each { |k| @virtual_callbacks.store(k, self.class.make_callback(callback, msg, recur)) }
+    keys.each { |k| @virtual_callbacks.store(k, self.class.make_callback(callback, recur)) }
+    @helps.push(self.class.make_help(keys, msg, :yes, recur))
   end
 
   # Initiate the selector
@@ -61,6 +84,7 @@ class Selector
     @number = nil
     @callbacks = {}
     @virtual_callbacks = {}
+    @helps = []
     @enter_overriden = false
     @virtual_state = nil
   end
@@ -73,11 +97,24 @@ class Selector
     @virtual_state.nil? ? false : @virtual_state.in_range?(pos)
   end
 
+  def print_help
+    lines = 0
+    win_width = get_win_width
+    msgs = collect_help_str
+    msgs.each do |(msg, len)|
+      warn msg
+      lines += compute_lines(len, win_width)
+    end
+    warn '(press any key to continue)'
+    lines + 1
+  end
+
   def run(sequence: '')
     pos = 0
     mode = :normal
+    win_width = get_win_width
+    warn HELP_MSG.to_s
     loop do
-      win_width = IO.console.winsize[1]
       option_count = @options.length
       raise Empty if option_count == 0
 
@@ -89,7 +126,7 @@ class Selector
           leading = pos == i ? '>' : ' '
           option = format_option(i)
           gen_line = ->(s) { "#{leading} #{i + @display_offset}. #{s}" }
-          line_count += compute_lines(gen_line.call(option), win_width) # calculate line height without color, since colr will mess up char count
+          line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
           option = color_line(i, option)
           option = gen_line.call(option)
 
@@ -112,7 +149,6 @@ class Selector
              else
                read_char
              end
-      exit if resp == "\u0003" # Ctrl-C
 
       callback = nil
 
@@ -146,6 +182,10 @@ class Selector
         end
       else
         case resp
+        when 'h', 'H'
+          lines = print_help
+          read_char
+          erase_lines lines
         when 'q', 'Q'
           if @virtual_state.nil?
             raise Quit
@@ -187,12 +227,7 @@ class Selector
         end
       end
 
-      if callback.nil? || callback.recur
-        line_count.times do
-          $stderr.print "\e[A"
-        end
-        $stderr.print "\r\e[J"
-      end
+      erase_lines line_count if callback.nil? || callback.recur
 
       next unless callback
 
@@ -227,9 +262,22 @@ class Selector
     ret.new(true, min, max, options)
   end
 
-  def self.make_callback(cb, content, recur)
-    ret = Struct.new(:cb, :content, :recur)
-    ret.new(cb, content, recur)
+  def self.make_callback(cb, recur)
+    ret = Struct.new(:cb, :recur)
+    ret.new(cb, recur)
+  end
+
+  # virtual = :yes, :no, :both
+  def self.make_help(keys, msg, virtual, recur)
+    ret = Struct.new(:keys, :msg, :virtual, :recur)
+    keys = keys.map do |k|
+      if k == ENTER
+        '<Enter>'
+      else
+        k
+      end
+    end
+    ret.new(keys, msg, virtual, recur)
   end
 
   def format_option(pos)
@@ -264,11 +312,43 @@ class Selector
     nil
   end
 
-  def compute_lines(s, win_width)
-    len = s.length
-    lines = 1 + len / win_width
-    lines -= 1 if len % win_width == 0
-    lines
+  def collect_help_str
+    def single_help_str(plain, h, can_virtual)
+      c = lambda do |color|
+        if plain
+          ''
+        else
+          color
+        end
+      end
+      s = " * #{c.call(GREEN)}#{h.keys.join('/')}#{c.call(NC)}: #{h.msg}"
+      s += " #{c.call(RED)}(ends the selector)#{c.call(NC)}" unless h.recur
+      if can_virtual
+        if h.virtual == :yes
+          s += " #{c.call(BLUE)}(virtual)#{c.call(NC)}"
+        elsif h.virtual == :no
+          s += " #{c.call(YELLOW)}(non-virtual)#{c.call(NC)}"
+        end
+      end
+      s
+    end
+
+    helps = []
+    helps.push(self.class.make_help([ENTER], 'select the option', :no, false)) unless @enter_overriden
+    helps.push(self.class.make_help(%w[v V], 'start or quit virtual mode', :both, true)) if can_virtual?
+    helps += [
+      self.class.make_help(['k', 'K', '<Arrow Up>'], 'move up', :both, true),
+      self.class.make_help(['j', 'J', '<Arrow Down>'], 'move down', :both, true),
+      self.class.make_help(%w[q Q], 'quit selector or virtual mode', :both, false),
+      self.class.make_help(['[0~9]'], 'go to the option at given number', :both, true),
+      self.class.make_help(['/'], 'search for string', :both, true),
+      self.class.make_help(['n/N'], 'search forwards/search backwards', :both, true)
+    ] + @helps
+    helps.map do |h|
+      plain = single_help_str(true, h, can_virtual?)
+      colored = single_help_str(false, h, can_virtual?)
+      [colored, plain.length]
+    end
   end
 end
 

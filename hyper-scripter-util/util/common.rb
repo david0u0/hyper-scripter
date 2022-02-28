@@ -4,7 +4,6 @@ class HSEnv
 
   def initialize(script_dir = nil)
     find_hs_env(script_dir)
-    warn "hyper script home = #{@home}, executable = #{@exe}"
     @prefix = ''
   end
 

@@ -124,14 +124,14 @@ class Historian < Selector
       echoing = true
     }, msg: 'print the argument to stdout')
 
-    register_keys(%w[c C], lambda { |_, _|
-      sourcing = true
-    }, msg: 'set next command')
-
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
       HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
-    }, msg: 'replce the argument')
+    }, msg: 'replace the argument')
+
+    register_keys(%w[c C], lambda { |_, _|
+      sourcing = true
+    }, msg: 'set next command')
 
     option = run(sequence: sequence).content
     name = option.name
@@ -193,7 +193,7 @@ class Historian < Selector
       HS_ENV.do_hs("history rm #{scripts_str} #{min}..#{max}", false)
       load_history
       exit_virtual
-    }, msg: 'delete the history', recur: true)
+    }, msg: 'delete the history in range', recur: true)
   end
 
   # prevent the call to `util/historian` screw up historical query

@@ -61,7 +61,7 @@ fn bench_fuzz(c: &mut Criterion) {
         shorts.push(short);
     }
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     c.bench_function("fuzzy_func", |b| {
         b.iter(|| {
             rt.block_on(async {

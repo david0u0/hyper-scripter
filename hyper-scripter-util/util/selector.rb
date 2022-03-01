@@ -113,15 +113,20 @@ class Selector
     pos = 0
     mode = :normal
     win_width = get_win_width
-    warn HELP_MSG.to_s
+    help_printed = false
     loop do
+      if sequence.empty? && !help_printed
+        warn HELP_MSG.to_s if sequence.empty?
+        help_printed = true
+      end
+
       option_count = @options.length
       raise Empty if option_count == 0
 
       line_count = 0
       @virtual_state&.set_point(pos)
 
-      if sequence.length == 0
+      if sequence.empty?
         @options.each_with_index do |_, i|
           leading = pos == i ? '>' : ' '
           option = format_option(i)
@@ -142,12 +147,12 @@ class Selector
         $stderr.print ":#{@number}"
       end
 
-      resp = if sequence.length > 0
+      resp = if sequence.empty?
+               read_char
+             else
                ch = sequence[0]
                sequence = sequence[1..-1]
                ch
-             else
-               read_char
              end
 
       callback = nil

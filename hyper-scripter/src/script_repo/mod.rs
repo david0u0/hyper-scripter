@@ -406,26 +406,24 @@ impl ScriptRepo {
 
             let script = builder.build();
 
-            let hide_by_time = if let Some((mut time_bound, archaeology)) = time_bound {
+            let mut hide = false;
+            if let Some((mut time_bound, archaeology)) = time_bound {
                 if let Some(neglect) = record.neglect {
                     log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
                     time_bound = std::cmp::max(neglect, time_bound);
                 }
                 let overtime = time_bound > script.last_major_time();
-                archaeology ^ overtime
-            } else {
-                false
-            };
-            if hide_by_time {
+                hide = archaeology ^ overtime
+            }
+            if !hide {
+                hide = !filter.filter(&script.tags);
+            }
+
+            if hide {
                 hidden_map.insert(name, script);
             } else {
-                let tags_arr: Vec<_> = script.tags.iter().collect(); // FIXME: need not colletct
-                if filter.filter(&tags_arr) {
-                    log::trace!("腳本 {:?} 通過篩選", name);
-                    map.insert(name, script);
-                } else {
-                    hidden_map.insert(name, script);
-                }
+                log::trace!("腳本 {:?} 通過篩選", name);
+                map.insert(name, script);
             }
         }
         Ok(ScriptRepo {

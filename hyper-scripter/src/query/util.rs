@@ -148,8 +148,8 @@ pub async fn do_script_query<'b>(
         }
     }
 }
-pub async fn do_script_query_strict<'b>(
-    script_query: &ScriptQuery,
+pub async fn do_script_query_strict<'b, 'a>(
+    script_query: &'a ScriptQuery,
     script_repo: &'b mut ScriptRepo,
 ) -> Result<RepoEntry<'b>> {
     // FIXME: 一旦 NLL 進化就修掉這段 unsafe

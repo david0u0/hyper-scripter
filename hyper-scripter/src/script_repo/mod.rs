@@ -2,12 +2,14 @@ use crate::error::Result;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::tag::{Tag, TagFilterGroup};
 use crate::Either;
+use crate::MyRaw;
 use chrono::{Duration, Utc};
-use futures::join;
+use futures::{future::join_all, join};
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
+use tokio::task::spawn_blocking;
 
 pub mod helper;
 pub use helper::RepoEntry;
@@ -361,64 +363,74 @@ impl ScriptRepo {
         )
         .fetch_all(&db_env.info_pool)
         .await?;
-        for record in scripts.into_iter() {
-            let name = record.name;
-            log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
-            let script_name = name.clone().into_script_name_unchecked()?; // NOTE: 從資料庫撈出來就別檢查了吧
+        let filter_raw = MyRaw::new(filter);
+        let script_fut = scripts.into_iter().map(|record| {
+            spawn_blocking(move || -> Result<_> {
+                let name = record.name;
+                log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
+                let script_name = name.clone().into_script_name_unchecked()?; // NOTE: 從資料庫撈出來就別檢查了吧
 
-            let mut builder = ScriptInfo::builder(
-                record.id,
-                script_name,
-                record.ty.into(),
-                record.tags.split(',').filter_map(|s| {
-                    if s.is_empty() {
-                        None
-                    } else {
-                        // TODO: 錯誤處理，至少印個警告
-                        s.parse().ok()
-                    }
-                }),
-            );
+                let mut builder = ScriptInfo::builder(
+                    record.id,
+                    script_name,
+                    record.ty.into(),
+                    record.tags.split(',').filter_map(|s| {
+                        if s.is_empty() {
+                            None
+                        } else {
+                            // TODO: 錯誤處理，至少印個警告
+                            s.parse().ok()
+                        }
+                    }),
+                );
 
-            builder.created_time(record.created_time);
-            builder.exec_count(record.exec_count as u64);
-            if let Some(time) = record.write {
-                builder.write_time(time);
-            }
-            if let Some(time) = record.read {
-                builder.read_time(time);
-            }
-            if let Some(time) = record.miss {
-                builder.miss_time(time);
-            }
-            if let Some(time) = record.exec {
-                builder.exec_time(time);
-            }
-            if let Some(time) = record.exec_done {
-                builder.exec_done_time(time);
-            }
-            if let Some(time) = record.neglect {
-                builder.neglect_time(time);
-            }
-            if let Some(time) = record.humble {
-                builder.humble_time(time);
-            }
-
-            let script = builder.build();
-
-            let mut hide = false;
-            if let Some((mut time_bound, archaeology)) = time_bound {
-                if let Some(neglect) = record.neglect {
-                    log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
-                    time_bound = std::cmp::max(neglect, time_bound);
+                builder.created_time(record.created_time);
+                builder.exec_count(record.exec_count as u64);
+                if let Some(time) = record.write {
+                    builder.write_time(time);
                 }
-                let overtime = time_bound > script.last_major_time();
-                hide = archaeology ^ overtime
-            }
-            if !hide {
-                hide = !filter.filter(&script.tags);
-            }
+                if let Some(time) = record.read {
+                    builder.read_time(time);
+                }
+                if let Some(time) = record.miss {
+                    builder.miss_time(time);
+                }
+                if let Some(time) = record.exec {
+                    builder.exec_time(time);
+                }
+                if let Some(time) = record.exec_done {
+                    builder.exec_done_time(time);
+                }
+                if let Some(time) = record.neglect {
+                    builder.neglect_time(time);
+                }
+                if let Some(time) = record.humble {
+                    builder.humble_time(time);
+                }
 
+                let script = builder.build();
+
+                let mut hide = false;
+                if let Some((mut time_bound, archaeology)) = time_bound {
+                    if let Some(neglect) = record.neglect {
+                        log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
+                        time_bound = std::cmp::max(neglect, time_bound);
+                    }
+                    let overtime = time_bound > script.last_major_time();
+                    hide = archaeology ^ overtime
+                }
+                if !hide {
+                    // SAFETY: 等等就會 join
+                    let filter = unsafe { &*filter_raw.get() };
+                    hide = !filter.filter(&script.tags);
+                }
+                Ok((hide, name, script))
+            })
+        });
+
+        let scripts = join_all(script_fut).await;
+        for res in scripts {
+            let (hide, name, script) = res??;
             if hide {
                 hidden_map.insert(name, script);
             } else {

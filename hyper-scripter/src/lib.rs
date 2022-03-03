@@ -28,3 +28,22 @@ pub enum Either<T, U> {
     One(T),
     Two(U),
 }
+
+#[derive(Copy, Clone)]
+pub struct MyRaw<T>(T);
+unsafe impl<T> Send for MyRaw<T> {}
+impl MyRaw<*const str> {
+    pub unsafe fn as_str(&self) -> &str {
+        &*self.0
+    }
+}
+impl<U: ?Sized> MyRaw<*const U> {
+    fn new(r: &U) -> MyRaw<*const U> {
+        MyRaw(r as *const _)
+    }
+}
+impl<T: Copy> MyRaw<T> {
+    pub fn get(&self) -> T {
+        self.0
+    }
+}

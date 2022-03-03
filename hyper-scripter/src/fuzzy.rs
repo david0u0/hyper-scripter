@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::state::State;
+use crate::MyRaw;
 use futures::future::join_all;
 use fuzzy_matcher::{
     skim::{SkimMatcherV2, SkimScoreConfig},
@@ -60,23 +61,6 @@ pub trait FuzzKey {
 impl<T: AsRef<str>> FuzzKey for T {
     fn fuzz_key(&self) -> Cow<'_, str> {
         Cow::Borrowed(self.as_ref())
-    }
-}
-
-#[derive(Copy, Clone)]
-struct MyRaw<T>(T);
-unsafe impl<T> Send for MyRaw<T> {}
-impl MyRaw<*const str> {
-    fn new(s: &str) -> MyRaw<*const str> {
-        MyRaw(s as *const str)
-    }
-    unsafe fn as_str(&self) -> &str {
-        &*self.0
-    }
-}
-impl<T: Copy> MyRaw<T> {
-    fn get(&self) -> T {
-        self.0
     }
 }
 

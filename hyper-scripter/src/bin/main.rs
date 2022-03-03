@@ -468,7 +468,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 println!("tag filters:");
                 for filter in conf.tag_filters.iter() {
                     let content = &filter.content;
-                    print!("  {} = [{}]", filter.name, content);
+                    print!("  {} = {}", filter.name, content);
                     if content.mandatory {
                         print!(" (mandatory)")
                     }
@@ -478,7 +478,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     println!()
                 }
                 println!("main tag filter:");
-                print!("  [{}]", conf.main_tag_filter);
+                print!("  {}", conf.main_tag_filter);
                 if conf.main_tag_filter.mandatory {
                     print!(" (mandatory)")
                 }

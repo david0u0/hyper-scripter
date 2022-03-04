@@ -127,7 +127,7 @@ impl Default for Config {
                     inactivated: false,
                 },
                 NamedTagFilter {
-                    content: "+all,^removed!".parse().unwrap(),
+                    content: "+all,^remove!".parse().unwrap(),
                     name: "no-removed".to_owned(),
                     inactivated: false,
                 },
@@ -139,7 +139,7 @@ impl Default for Config {
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls", "--grouping", "none", "--limit", "5"]),
                 gen_alias("e", &["edit"]),
-                gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "removed", "*"]),
+                gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous-args"]),
                 gen_alias("pc", &["=util/historian!", "--sequence", "c"]),

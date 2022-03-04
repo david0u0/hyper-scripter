@@ -344,7 +344,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::RM { queries, purge } => {
             let (mut repo, closer) = repo.init().await?;
-            let delete_tag: Option<TagFilter> = Some("+removed".parse().unwrap());
+            let delete_tag: Option<TagFilter> = Some("+remove".parse().unwrap());
             let mut to_purge = vec![]; // (name, ty, id)
             for mut entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);

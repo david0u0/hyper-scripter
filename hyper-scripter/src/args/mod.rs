@@ -58,7 +58,7 @@ pub struct RootArgs {
         global = true,
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Filter by tags, e.g. `all,^removed`"
+        help = "Filter by tags, e.g. `all,^remove`"
     )]
     pub filter: Vec<TagFilter>,
     #[structopt(
@@ -73,7 +73,7 @@ pub struct RootArgs {
         long,
         global = true,
         conflicts_with = "recent",
-        help = "Shorthand for `-f=all,^removed --timeless`"
+        help = "Shorthand for `-f=all,^remove --timeless`"
     )]
     all: bool,
     #[structopt(long, global = true, help = "Show scripts within recent days.")]
@@ -402,7 +402,7 @@ impl Root {
     pub fn sanitize_flags(&mut self) {
         if self.root_args.all {
             self.root_args.timeless = true;
-            self.root_args.filter = vec!["all,^removed".parse().unwrap()];
+            self.root_args.filter = vec!["all,^remove".parse().unwrap()];
         }
     }
     pub fn sanitize(&mut self) -> Result {
@@ -468,7 +468,7 @@ mod test {
     #[test]
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
-        let args = build_args("alias trash -f removed");
+        let args = build_args("alias trash -f remove");
         assert_eq!(args.root_args.filter, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
@@ -480,7 +480,7 @@ mod test {
                 assert_eq!(*unset, false);
                 assert_eq!(*short, false);
                 assert_eq!(before, "trash");
-                assert_eq!(after, &["-f", "removed"]);
+                assert_eq!(after, &["-f", "remove"]);
             }
             _ => panic!("{:?} should be alias...", args),
         }
@@ -507,7 +507,7 @@ mod test {
         }
 
         let args = build_args("la -l");
-        assert_eq!(args.root_args.filter, vec!["all,^removed".parse().unwrap()]);
+        assert_eq!(args.root_args.filter, vec!["all,^remove".parse().unwrap()]);
         assert_eq!(args.root_args.all, true);
         match &args.subcmd {
             Some(Subs::LS(opt)) => {

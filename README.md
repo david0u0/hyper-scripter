@@ -29,7 +29,7 @@ USAGE:
     hyper-scripter [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
-    -a, --all         Shorthand for `-f=all,^removed`
+    -a, --all         Shorthand for `-f=all,^remove`
     -h, --help        Prints help information
         --no-alias
         --timeless    Show scripts of all time.
@@ -64,7 +64,7 @@ recent = 999999
 [alias.la]
 after = ['ls', '-a']
 [alias.gc]
-after = ['rm', '-f', 'removed', '*']
+after = ['rm', '-f', 'remove', '*']
 
 # ...
 # Type and tag filters will be discussed later

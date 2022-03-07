@@ -43,8 +43,21 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
         })
     };
 
+    // TODO: 測試 toggle 功能，以及名字不存在的錯誤
+    let tag_group = {
+        let mut toggle: HashSet<_> = toggle.into_iter().collect();
+        let mut tag_group = conf.get_tag_filter_group(&mut toggle);
+        if let Some(name) = toggle.into_iter().next() {
+            return Err(Error::TagFilterNotFound(name));
+        }
+        for filter in filter.into_iter() {
+            tag_group.push(filter);
+        }
+        tag_group
+    };
+
     let (env, init) = init_env(need_journal).await?;
-    let mut repo = ScriptRepo::new(recent, env)
+    let mut repo = ScriptRepo::new(recent, env, &tag_group)
         .await
         .context("載入腳本倉庫失敗")?;
     if no_trace {
@@ -59,17 +72,6 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
         main_util::prepare_pre_run(None)?;
         main_util::load_templates()?;
     }
-
-    // TODO: 測試 toggle 功能，以及名字不存在的錯誤
-    let mut toggle: HashSet<_> = toggle.into_iter().collect();
-    let mut tag_group = conf.get_tag_filter_group(&mut toggle);
-    if let Some(name) = toggle.into_iter().next() {
-        return Err(Error::TagFilterNotFound(name));
-    }
-    for filter in filter.into_iter() {
-        tag_group.push(filter);
-    }
-    repo.filter_by_tag(&tag_group);
 
     Ok(repo)
 }

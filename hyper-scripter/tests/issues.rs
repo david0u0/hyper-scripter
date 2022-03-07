@@ -117,9 +117,9 @@ fn test_edit_existing_bang() {
 
         let mut repo = {
             let (env, _) = init_env(true).await.unwrap();
-            ScriptRepo::new(None, env).await.unwrap()
+            let group = "all,^hide".parse::<TagFilter>().unwrap().into();
+            ScriptRepo::new(None, env, &group).await.unwrap()
         };
-        repo.filter_by_tag(&"all,^hide".parse::<TagFilter>().unwrap().into());
 
         fn assert_tags<'a>(expect: &[&str], actual: impl Iterator<Item = &'a Tag>) {
             let expect: Vec<Tag> = expect.iter().map(|s| s.parse().unwrap()).collect();

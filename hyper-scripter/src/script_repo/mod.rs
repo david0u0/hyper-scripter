@@ -342,8 +342,13 @@ impl ScriptRepo {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
-    pub async fn new(recent: Option<RecentFilter>, db_env: DBEnv) -> Result<ScriptRepo> {
+    pub async fn new(
+        recent: Option<RecentFilter>,
+        db_env: DBEnv,
+        filter: &TagFilterGroup,
+    ) -> Result<ScriptRepo> {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
+        let mut map: HashMap<String, ScriptInfo> = Default::default();
         let time_bound = recent.map(|r| {
             let mut time = Utc::now().naive_utc();
             time -= Duration::days(r.recent.into());
@@ -356,7 +361,6 @@ impl ScriptRepo {
         )
         .fetch_all(&db_env.info_pool)
         .await?;
-        let mut map: HashMap<String, ScriptInfo> = Default::default();
         for record in scripts.into_iter() {
             let name = record.name;
             log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
@@ -402,19 +406,23 @@ impl ScriptRepo {
 
             let script = builder.build();
 
-            let hide_by_time = if let Some((mut time_bound, archaeology)) = time_bound {
+            let mut hide = false;
+            if let Some((mut time_bound, archaeology)) = time_bound {
                 if let Some(neglect) = record.neglect {
                     log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
                     time_bound = std::cmp::max(neglect, time_bound);
                 }
                 let overtime = time_bound > script.last_major_time();
-                archaeology ^ overtime
-            } else {
-                false
-            };
-            if hide_by_time {
+                hide = archaeology ^ overtime
+            }
+            if !hide {
+                hide = !filter.filter(&script.tags);
+            }
+
+            if hide {
                 hidden_map.insert(name, script);
             } else {
+                log::trace!("腳本 {:?} 通過篩選", name);
                 map.insert(name, script);
             }
         }
@@ -497,22 +505,5 @@ impl ScriptRepo {
             entry,
             env: &self.db_env,
         }
-    }
-    pub fn filter_by_tag(&mut self, filter: &TagFilterGroup) {
-        // TODO: 優化
-        log::debug!("根據標籤 {:?} 進行篩選", filter);
-        let drain = self.map.drain();
-        let mut map = HashMap::default();
-        for (key, info) in drain {
-            let tags_arr: Vec<_> = info.tags.iter().collect();
-            if filter.filter(&tags_arr) {
-                log::trace!("腳本 {:?} 通過篩選", info.name);
-                map.insert(key, info);
-            } else {
-                log::trace!("掰掰，{:?}", info.name);
-                self.hidden_map.insert(key, info);
-            }
-        }
-        self.map = map;
     }
 }

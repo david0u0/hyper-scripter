@@ -5,6 +5,8 @@ use fxhash::FxHashSet as HashSet;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;
 
+pub type TagSet = HashSet<Tag>;
+
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TagFilterGroup(Vec<TagFilter>);
 impl TagFilterGroup {
@@ -15,7 +17,7 @@ impl TagFilterGroup {
             self.0 = vec![filter];
         }
     }
-    pub fn filter(&self, tags: &[&Tag]) -> bool {
+    pub fn filter(&self, tags: &TagSet) -> bool {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.filter(tags);
@@ -177,10 +179,9 @@ impl TagFilter {
         self.fill_allowed_map(&mut set);
         set.into_iter()
     }
-    pub fn filter(&self, tags: &[&Tag]) -> Option<bool> {
+    pub fn filter(&self, tags: &TagSet) -> Option<bool> {
         let mut pass: Option<bool> = None;
         for filter in self.tags.iter() {
-            // TODO: 優化
             if filter.tag.match_all() || tags.contains(&&filter.tag) {
                 pass = Some(filter.allow);
             }

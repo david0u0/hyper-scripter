@@ -58,14 +58,14 @@ pub struct RootArgs {
         global = true,
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Filter by tags, e.g. `all,^remove`"
+        help = "Select by tags, e.g. `all,^remove`"
     )]
-    pub filter: Vec<TagFilter>,
+    pub select: Vec<TagFilter>,
     #[structopt(
         long,
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Toggle named filter temporarily"
+        help = "Toggle named selector temporarily"
     )]
     pub toggle: Vec<String>, // TODO: new type?
     #[structopt(
@@ -402,7 +402,7 @@ impl Root {
     pub fn sanitize_flags(&mut self) {
         if self.root_args.all {
             self.root_args.timeless = true;
-            self.root_args.filter = vec!["all,^remove".parse().unwrap()];
+            self.root_args.select = vec!["all,^remove".parse().unwrap()];
         }
     }
     pub fn sanitize(&mut self) -> Result {
@@ -469,7 +469,7 @@ mod test {
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
         let args = build_args("alias trash -f remove");
-        assert_eq!(args.root_args.filter, vec![]);
+        assert_eq!(args.root_args.select, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
                 unset,
@@ -488,7 +488,7 @@ mod test {
     #[test]
     fn test_strange_alias() {
         let args = build_args("-f e e -t e something -T e");
-        assert_eq!(args.root_args.filter, vec!["e".parse().unwrap()]);
+        assert_eq!(args.root_args.select, vec!["e".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match &args.subcmd {
             Some(Subs::Edit {
@@ -507,7 +507,7 @@ mod test {
         }
 
         let args = build_args("la -l");
-        assert_eq!(args.root_args.filter, vec!["all,^remove".parse().unwrap()]);
+        assert_eq!(args.root_args.select, vec!["all,^remove".parse().unwrap()]);
         assert_eq!(args.root_args.all, true);
         match &args.subcmd {
             Some(Subs::LS(opt)) => {
@@ -526,7 +526,7 @@ mod test {
     #[test]
     fn test_external_run_tags() {
         let args = build_args("-f test --dummy -r 42 =script -a --");
-        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match args.subcmd {
             Some(Subs::Run {
@@ -547,7 +547,7 @@ mod test {
         }
 
         let args = build_args("-f test --dump-args tags --name myname +mytag");
-        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         assert!(args.root_args.dump_args);
         match args.subcmd {

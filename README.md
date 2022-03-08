@@ -29,14 +29,14 @@ USAGE:
     hyper-scripter [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
-    -a, --all         Shorthand for `-f=all,^remove`
+    -a, --all         Shorthand for `-s=all,^remove`
     -h, --help        Prints help information
         --no-alias
         --timeless    Show scripts of all time.
     -V, --version     Prints version information
 
 OPTIONS:
-    -f, --filter <filter>      Filter by tags, e.g. `all,^mytag`
+    -s, --select <select>      Filter by tags, e.g. `all,^mytag`
     -H, --hs-home <hs-home>    Path to hyper script home
         --recent <recent>      Show scripts within recent days.
 
@@ -64,7 +64,7 @@ recent = 999999
 [alias.la]
 after = ['ls', '-a']
 [alias.gc]
-after = ['rm', '-f', 'remove', '*']
+after = ['rm', '-s', 'remove', '*']
 
 # ...
 # Type and tag filters will be discussed later

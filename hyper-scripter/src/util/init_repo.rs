@@ -25,7 +25,7 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
         no_trace,
         humble,
         archaeology,
-        filter,
+        select,
         toggle,
         recent,
         timeless,
@@ -50,8 +50,8 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
         if let Some(name) = toggle.into_iter().next() {
             return Err(Error::TagFilterNotFound(name));
         }
-        for filter in filter.into_iter() {
-            tag_group.push(filter);
+        for select in select.into_iter() {
+            tag_group.push(select);
         }
         tag_group
     };

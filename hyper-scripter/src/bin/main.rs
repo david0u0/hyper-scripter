@@ -77,7 +77,7 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     Config::set_prompt_level(root.root_args.prompt_level);
-    let explicit_filter = !root.root_args.filter.is_empty();
+    let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();
     let need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
@@ -169,13 +169,13 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 if let Some(tags) = tags {
                     innate_tags.push(tags);
                     EditTagArgs {
-                        explicit_filter,
+                        explicit_select,
                         explicit_tag: true,
                         content: innate_tags,
                     }
                 } else {
                     EditTagArgs {
-                        explicit_filter,
+                        explicit_select,
                         explicit_tag: false,
                         content: innate_tags,
                     }
@@ -423,7 +423,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 .iter()
                 .position(|f| f.name == name)
                 .ok_or_else(|| {
-                    log::error!("試著刪除不存在的篩選器 {:?}", name);
+                    log::error!("試著刪除不存在的選擇器 {:?}", name);
                     Error::TagFilterNotFound(name)
                 })?;
             conf.tag_filters.remove(pos);
@@ -432,15 +432,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             subcmd: Some(TagsSubs::Toggle { name }),
         }) => {
             let conf = conf_mut!();
-            let filter = conf
+            let selector = conf
                 .tag_filters
                 .iter_mut()
                 .find(|f| f.name == name)
                 .ok_or_else(|| {
-                    log::error!("試著切換不存在的篩選器 {:?}", name);
+                    log::error!("試著切換不存在的選擇器 {:?}", name);
                     Error::TagFilterNotFound(name)
                 })?;
-            filter.inactivated = !filter.inactivated;
+            selector.inactivated = !selector.inactivated;
         }
         Subs::Tags(Tags {
             subcmd:
@@ -465,19 +465,19 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 print!("known tags:\n  ");
                 print_iter(known_tags_iter(&mut repo), " ");
                 println!("");
-                println!("tag filters:");
-                for filter in conf.tag_filters.iter() {
-                    let content = &filter.content;
-                    print!("  {} = {}", filter.name, content);
+                println!("tag selector:");
+                for selector in conf.tag_filters.iter() {
+                    let content = &selector.content;
+                    print!("  {} = {}", selector.name, content);
                     if content.mandatory {
                         print!(" (mandatory)")
                     }
-                    if filter.inactivated {
+                    if selector.inactivated {
                         print!(" (inactivated)")
                     }
                     println!()
                 }
-                println!("main tag filter:");
+                println!("main tag selector:");
                 print!("  {}", conf.main_tag_filter);
                 if conf.main_tag_filter.mandatory {
                     print!(" (mandatory)")
@@ -491,21 +491,21 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }) => {
             let conf = conf_mut!();
             if let Some(name) = name {
-                log::debug!("處理篩選器 {:?}", name);
-                let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
-                if let Some(existing_filter) = tag_filters.iter_mut().find(|f| f.name == name) {
-                    log::info!("修改篩選器 {} {}", name, content);
-                    existing_filter.content = content;
+                log::debug!("處理選擇器 {:?}", name);
+                let tag_selector: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
+                if let Some(existing_selector) = tag_selector.iter_mut().find(|f| f.name == name) {
+                    log::info!("修改選擇器 {} {}", name, content);
+                    existing_selector.content = content;
                 } else {
-                    log::info!("新增篩選器 {} {}", name, content);
-                    tag_filters.push(NamedTagFilter {
+                    log::info!("新增選擇器 {} {}", name, content);
+                    tag_selector.push(NamedTagFilter {
                         content: content,
                         name,
                         inactivated: false,
                     });
                 }
             } else {
-                log::info!("加入主篩選器 {:?}", content);
+                log::info!("加入主選擇器 {:?}", content);
                 conf.main_tag_filter = content;
             }
         }

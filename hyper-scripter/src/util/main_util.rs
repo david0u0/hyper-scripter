@@ -15,7 +15,7 @@ pub struct EditTagArgs {
     /// 命令行參數裡帶著 tag 選項，例如 hs edit --tag some-tag edit
     pub explicit_tag: bool,
     /// 命令行參數裡帶著 filter 選項，例如 hs --filter some-tag edit
-    pub explicit_filter: bool,
+    pub explicit_select: bool,
 }
 
 pub async fn mv(
@@ -69,7 +69,7 @@ pub async fn edit_or_create(
         match query::do_script_query(&query, script_repo, false, false).await {
             // TODO: 手動測試文件？
             Err(Error::DontFuzz) | Ok(None) => {
-                if tags.explicit_filter {
+                if tags.explicit_select {
                     return Err(RedundantOpt::Filter.into());
                 }
                 final_ty = ty.unwrap_or_default();
@@ -110,7 +110,7 @@ pub async fn edit_or_create(
             Err(e) => return Err(e),
         }
     } else {
-        if tags.explicit_filter {
+        if tags.explicit_select {
             return Err(RedundantOpt::Filter.into());
         }
         final_ty = ty.unwrap_or_default();

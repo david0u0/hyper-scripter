@@ -1,7 +1,7 @@
 # [HS_HELP]: Interactively run script from history.
 # [HS_HELP]:
 # [HS_HELP]: e.g.:
-# [HS_HELP]:     hs historian -f hs hs/test --limit 20
+# [HS_HELP]:     hs historian -s hs hs/test --limit 20
 
 require 'json'
 require_relative './common'
@@ -43,20 +43,20 @@ class Historian < Selector
   end
 
   def load_scripts(query, root_args)
-    filters = root_args['filter']
+    selects = root_args['select']
     timeless = root_args['timeless']
     recent = root_args['recent']
     # TODO: toggle
     # TODO: arch
 
-    filter_str = filters.map { |s| "--filter #{s}" }.join(' ')
+    select_str = selects.map { |s| "--select #{s}" }.join(' ')
     time_str = if recent.nil?
                  timeless ? '--timeless' : ''
                else
                  "--recent #{recent}"
                end
     query_str = query.map { |s| escape_wildcard(s) }.join(' ')
-    @scripts = HS_ENV.do_hs("#{time_str} #{filter_str} \
+    @scripts = HS_ENV.do_hs("#{time_str} #{select_str} \
                  ls --grouping none --plain --name #{query_str}", false).split
   end
 

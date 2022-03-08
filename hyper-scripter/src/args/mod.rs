@@ -73,7 +73,7 @@ pub struct RootArgs {
         long,
         global = true,
         conflicts_with = "recent",
-        help = "Shorthand for `-f=all,^remove --timeless`"
+        help = "Shorthand for `-s=all,^remove --timeless`"
     )]
     all: bool,
     #[structopt(long, global = true, help = "Show scripts within recent days.")]
@@ -468,7 +468,7 @@ mod test {
     #[test]
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
-        let args = build_args("alias trash -f remove");
+        let args = build_args("alias trash -s remove");
         assert_eq!(args.root_args.select, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
@@ -487,7 +487,7 @@ mod test {
     }
     #[test]
     fn test_strange_alias() {
-        let args = build_args("-f e e -t e something -T e");
+        let args = build_args("-s e e -t e something -T e");
         assert_eq!(args.root_args.select, vec!["e".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match &args.subcmd {
@@ -525,7 +525,7 @@ mod test {
     }
     #[test]
     fn test_external_run_tags() {
-        let args = build_args("-f test --dummy -r 42 =script -a --");
+        let args = build_args("-s test --dummy -r 42 =script -a --");
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match args.subcmd {
@@ -546,7 +546,7 @@ mod test {
             }
         }
 
-        let args = build_args("-f test --dump-args tags --name myname +mytag");
+        let args = build_args("-s test --dump-args tags --name myname +mytag");
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         assert!(args.root_args.dump_args);

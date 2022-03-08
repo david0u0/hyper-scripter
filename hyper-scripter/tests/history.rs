@@ -53,7 +53,7 @@ fn test_humble_amend_rm_id() {
         assert_list(&recorded, list);
     };
 
-    test.filter("--humble").run("flag-humble").unwrap();
+    test.select("--humble").run("flag-humble").unwrap();
     assert_last(&baseline);
     test.run("normal").unwrap();
     assert_last(&test);
@@ -68,7 +68,7 @@ fn test_humble_amend_rm_id() {
     assert_last(&baseline);
     assert_history(&["h", "flag-humble"]);
 
-    test.filter("--dummy").run("r").unwrap(); // 因為是 --dummy 所以不會觸發 rm-id
+    test.select("--dummy").run("r").unwrap(); // 因為是 --dummy 所以不會觸發 rm-id
     assert_last(&test);
     baseline.run("").unwrap();
     test.run("r").unwrap();
@@ -96,14 +96,14 @@ fn test_humble_amend_rm_id() {
 
     // 測一下 --no-trace 會不會搞爛東西
     run!("history rm {} 1..", test.get_name()).unwrap();
-    test.filter("--no-trace").run("a").unwrap();
-    test.filter("--no-trace").run("r").unwrap();
-    test.filter("--no-trace").run("h").unwrap();
+    test.select("--no-trace").run("a").unwrap();
+    test.select("--no-trace").run("r").unwrap();
+    test.select("--no-trace").run("h").unwrap();
     assert_history(&[]);
     // 測一下 --humble 會不會搞爛東西
-    test.filter("--humble").run("a").unwrap();
-    test.filter("--humble").run("r").unwrap();
-    test.filter("--humble").run("h").unwrap();
+    test.select("--humble").run("a").unwrap();
+    test.select("--humble").run("r").unwrap();
+    test.select("--humble").run("h").unwrap();
     assert_history(&["h", "do-the-amend"]);
     assert_last(&baseline);
 }
@@ -348,7 +348,7 @@ fn test_event_path() {
 }
 
 #[test]
-fn test_humble_and_time_filter() {
+fn test_humble_and_time_select() {
     let _g = setup();
     const CONTENT: &str = r#"
     $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
@@ -357,17 +357,17 @@ fn test_humble_and_time_filter() {
     run!("history neglect {}", test.get_name()).unwrap();
     test.can_find_by_name().unwrap_err();
 
-    test.filter("-a --dummy").run("a").unwrap(); // normal
+    test.select("-a --dummy").run("a").unwrap(); // normal
     test.can_find_by_name().unwrap();
     run!("history rm - 1").unwrap();
     test.can_find_by_name().unwrap_err();
 
-    test.filter("-a").run("b").unwrap(); // humble by id
+    test.select("-a").run("b").unwrap(); // humble by id
     test.can_find_by_name().unwrap();
     run!("history rm - 1").unwrap();
     test.can_find_by_name().unwrap_err();
 
-    test.filter("--humble -a").run("c").unwrap(); // humble by flag
+    test.select("--humble -a").run("c").unwrap(); // humble by flag
     test.can_find_by_name().unwrap();
     run!("history rm - 1").unwrap();
     test.can_find_by_name().unwrap_err();

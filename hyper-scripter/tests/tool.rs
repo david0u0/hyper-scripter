@@ -83,7 +83,7 @@ pub fn load_conf() -> Config {
 }
 pub fn setup<'a>() -> MutexGuard<'a, ()> {
     let g = setup_with_utils();
-    run!("rm --purge * -f all").unwrap();
+    run!("rm --purge * -s all").unwrap();
     g
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
@@ -197,10 +197,10 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     res
 }
 
-pub fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
+pub fn get_ls(select: Option<&str>, query: Option<&str>) -> Vec<String> {
     let ls_res = run!(
         "ls {} --grouping none --plain --name {}",
-        filter.map(|f| format!("-f {}", f)).unwrap_or_default(),
+        select.map(|f| format!("-s {}", f)).unwrap_or_default(),
         query.unwrap_or_default()
     )
     .unwrap();
@@ -215,16 +215,16 @@ pub fn get_ls(filter: Option<&str>, query: Option<&str>) -> Vec<String> {
         })
         .collect::<Vec<_>>()
 }
-pub fn assert_ls_len(expect: usize, filter: Option<&str>, query: Option<&str>) {
-    let res = get_ls(filter, query);
-    assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", filter, res);
+pub fn assert_ls_len(expect: usize, select: Option<&str>, query: Option<&str>) {
+    let res = get_ls(select, query);
+    assert_eq!(expect, res.len(), "ls {:?} 結果為 {:?}", select, res);
 }
-pub fn assert_ls<T: ToString>(expect: Vec<T>, filter: Option<&str>, query: Option<&str>) {
+pub fn assert_ls<T: ToString>(expect: Vec<T>, select: Option<&str>, query: Option<&str>) {
     let mut expect: Vec<_> = expect.into_iter().map(|s| s.to_string()).collect();
     expect.sort();
-    let mut res = get_ls(filter, query);
+    let mut res = get_ls(select, query);
     res.sort();
-    assert_eq!(expect, res, "ls {:?} 結果為 {:?}", filter, res);
+    assert_eq!(expect, res, "ls {:?} 結果為 {:?}", select, res);
 }
 
 // TODO: 把整合測試的大部份地方改用這個結構
@@ -262,40 +262,40 @@ impl ScriptTest {
         let msg = msg.map(|s| format!("\n{}", s)).unwrap_or_default();
         run!("{}", s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
-    pub fn archaeology<'a>(&'a self) -> ScriptTestWithFilter<'a> {
-        ScriptTestWithFilter {
+    pub fn archaeology<'a>(&'a self) -> ScriptTestWithSelect<'a> {
+        ScriptTestWithSelect {
             script: self,
-            filter: "-A",
+            select: "-A",
         }
     }
-    pub fn filter<'a>(&'a self, filter: &'a str) -> ScriptTestWithFilter<'a> {
-        ScriptTestWithFilter {
+    pub fn select<'a>(&'a self, select: &'a str) -> ScriptTestWithSelect<'a> {
+        ScriptTestWithSelect {
             script: self,
-            filter,
+            select,
         }
     }
     pub fn run(&self, args: &str) -> Result<String> {
-        self.filter("").run(args)
+        self.select("").run(args)
     }
     pub fn can_find(&self, command: &str) -> Result {
-        self.filter("").can_find(command)
+        self.select("").can_find(command)
     }
     pub fn can_find_by_name(&self) -> Result {
-        self.filter("").can_find_by_name()
+        self.select("").can_find_by_name()
     }
 }
-pub struct ScriptTestWithFilter<'a> {
+pub struct ScriptTestWithSelect<'a> {
     script: &'a ScriptTest,
-    filter: &'a str,
+    select: &'a str,
 }
-impl<'a> ScriptTestWithFilter<'a> {
+impl<'a> ScriptTestWithSelect<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
-        run!("{} ={} {}", self.filter, self.script.name, args)
+        run!("{} ={} {}", self.select, self.script.name, args)
     }
     pub fn can_find(&self, command: &str) -> Result {
         let res = run!(
             "{} ls --plain --grouping=none --name {}",
-            self.filter,
+            self.select,
             command
         )?;
         if res == self.script.name {

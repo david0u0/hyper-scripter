@@ -109,7 +109,7 @@ fn gen_tag_string(a: &[i8; 3]) -> String {
         v.join(",")
     }
 }
-fn gen_tag_filter_string(rng: &mut StdRng, mut a: [i8; 3]) -> String {
+fn gen_tag_select_string(rng: &mut StdRng, mut a: [i8; 3]) -> String {
     for i in 0..3 {
         let should_messup = rng.gen_bool(0.5);
         if should_messup {
@@ -238,33 +238,33 @@ fn run_criterion(c: &mut Criterion, name: &str, script_count: usize, epoch: usiz
             let b = MyBencher::new(b, script_count, epoch, with_alias);
             b.run(|rng, name, tag_arr| {
                 let name = sample_name(rng, name);
-                let filter = gen_tag_filter_string(rng, tag_arr.clone());
-                format!("-f +{} {}", filter, name)
+                let select = gen_tag_select_string(rng, tag_arr.clone());
+                format!("-s +{} {}", select, name)
             });
         });
     } else if name.contains("exact") {
         c.bench_function(name, |b| {
             let b = MyBencher::new(b, script_count, epoch, with_alias);
             b.run(|rng, name, tag_arr| {
-                let filter = gen_tag_filter_string(rng, tag_arr.clone());
-                format!("-f +{} ={}", filter, name)
+                let select = gen_tag_select_string(rng, tag_arr.clone());
+                format!("-s +{} ={}", select, name)
             });
         });
     } else if name.contains("prev") {
         c.bench_function(name, |b| {
             let b = MyBencher::new(b, script_count, epoch, with_alias);
             b.run(|rng, _, _| {
-                let filter = gen_tag_string(&gen_tag_arr(rng, -1, 1));
+                let select = gen_tag_string(&gen_tag_arr(rng, -1, 1));
                 let prev = rng.gen_range(1..=script_count);
-                format!("-f +{} ^{}", filter, prev)
+                format!("-s +{} ^{}", select, prev)
             });
         });
     } else if name.contains("ls") {
         c.bench_function(name, |b| {
             let b = MyBencher::new(b, script_count, epoch, with_alias);
             b.run(|rng, _, tag_arr| {
-                let filter = gen_tag_filter_string(rng, tag_arr.clone());
-                format!("-f +{} ls", filter)
+                let select = gen_tag_select_string(rng, tag_arr.clone());
+                format!("-s +{} ls", select)
             });
         });
     } else if name.contains("history") {

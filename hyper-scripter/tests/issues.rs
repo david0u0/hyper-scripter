@@ -68,7 +68,7 @@ fn test_hs_in_hs() {
     outer.run("").unwrap();
     inner.can_find("^2").unwrap();
 
-    outer.filter("--humble").run("").unwrap();
+    outer.select("--humble").run("").unwrap();
     inner.can_find("^2").unwrap_err();
 
     let outer_humble = ScriptTest::new(
@@ -135,7 +135,7 @@ fn test_edit_existing_bang() {
                     EditTagArgs {
                         content: $tag.parse().unwrap(),
                         explicit_tag: false,
-                        explicit_filter: false,
+                        explicit_select: false,
                     },
                 )
             };
@@ -198,7 +198,7 @@ fn test_edit_without_change() {
     let (orphan, res) = ScriptTest::new_regardless("orphan", None, Some(""));
     res.expect_err("空編輯應該是一個錯誤");
     orphan
-        .filter("-a")
+        .select("-a")
         .can_find_by_name()
         .expect_err("空編輯新腳本應該要被砍掉");
 }

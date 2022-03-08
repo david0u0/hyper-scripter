@@ -47,7 +47,7 @@ class HSEnv
 
   def hs_command_str(arg, all)
     visible_str = if all
-                    '-f all --timeless'
+                    '-s all --timeless'
                   else
                     ''
                   end

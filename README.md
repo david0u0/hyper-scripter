@@ -36,7 +36,7 @@ FLAGS:
     -V, --version     Prints version information
 
 OPTIONS:
-    -s, --select <select>      Filter by tags, e.g. `all,^mytag`
+    -s, --select <select>      Select by tags, e.g. `all,^mytag`
     -H, --hs-home <hs-home>    Path to hyper script home
         --recent <recent>      Show scripts within recent days.
 
@@ -50,7 +50,7 @@ SUBCOMMANDS:
     mv       Move the script to another one
     rm       Remove the script
     run      Run the script
-    tags     Manage script tags. If a tag filter is given, set it as default, otherwise show tag information.
+    tags     Manage script tags. If a tag selector is given, set it as default, otherwise show tag information.
     which    Execute the script query and get the exact file
 ```
 
@@ -67,7 +67,7 @@ after = ['ls', '-a']
 after = ['rm', '-s', 'remove', '*']
 
 # ...
-# Type and tag filters will be discussed later
+# Type and tag selectors will be discussed later
 ```
 
 ## Type and templates
@@ -97,7 +97,7 @@ env = []
 ```
 
 # Advanced topics
-## tag filters
+## tag selectors
 ## script query
 > ### bang!
 ## list query

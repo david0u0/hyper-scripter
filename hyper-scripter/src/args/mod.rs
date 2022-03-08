@@ -4,7 +4,7 @@ use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
 use crate::script_type::{ScriptFullType, ScriptType};
-use crate::tag::TagFilter;
+use crate::tag::TagSelector;
 use crate::Either;
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -60,7 +60,7 @@ pub struct RootArgs {
         number_of_values = 1,
         help = "Select by tags, e.g. `all,^remove`"
     )]
-    pub select: Vec<TagFilter>,
+    pub select: Vec<TagSelector>,
     #[structopt(
         long,
         conflicts_with = "all",
@@ -178,7 +178,7 @@ pub enum Subs {
         #[structopt(long, short)]
         no_template: bool,
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
         #[structopt(default_value = "?", help = EDIT_QUERY_HELP)]
@@ -250,7 +250,7 @@ pub enum Subs {
     #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(help = SCRIPT_QUERY_HELP)]
         origin: ListQuery,
         #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
@@ -261,7 +261,7 @@ pub enum Subs {
         #[structopt(long, short = "T", help = TYPE_HELP)]
         ty: Option<ScriptType>,
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(help = LIST_QUERY_HELP)]
         origin: ListQuery,
         #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]

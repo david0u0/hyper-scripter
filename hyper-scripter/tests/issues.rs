@@ -109,7 +109,7 @@ fn test_edit_existing_bang() {
     rt.block_on(async {
         use hyper_scripter::error::{Error, RedundantOpt};
         use hyper_scripter::script_repo::ScriptRepo;
-        use hyper_scripter::tag::{Tag, TagFilter};
+        use hyper_scripter::tag::{Tag, TagSelector};
         use hyper_scripter::util::{
             init_env,
             main_util::{edit_or_create, EditTagArgs},
@@ -117,7 +117,7 @@ fn test_edit_existing_bang() {
 
         let mut repo = {
             let (env, _) = init_env(true).await.unwrap();
-            let group = "all,^hide".parse::<TagFilter>().unwrap().into();
+            let group = "all,^hide".parse::<TagSelector>().unwrap().into();
             ScriptRepo::new(None, env, &group).await.unwrap()
         };
 

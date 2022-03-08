@@ -46,9 +46,9 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
     // TODO: 測試 toggle 功能，以及名字不存在的錯誤
     let tag_group = {
         let mut toggle: HashSet<_> = toggle.into_iter().collect();
-        let mut tag_group = conf.get_tag_filter_group(&mut toggle);
+        let mut tag_group = conf.get_tag_selector_group(&mut toggle);
         if let Some(name) = toggle.into_iter().next() {
-            return Err(Error::TagFilterNotFound(name));
+            return Err(Error::TagSelectorNotFound(name));
         }
         for select in select.into_iter() {
             tag_group.push(select);

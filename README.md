@@ -29,14 +29,14 @@ USAGE:
     hyper-scripter [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
-    -a, --all         Shorthand for `-f=all,^remove`
+    -a, --all         Shorthand for `-s=all,^remove`
     -h, --help        Prints help information
         --no-alias
         --timeless    Show scripts of all time.
     -V, --version     Prints version information
 
 OPTIONS:
-    -f, --filter <filter>      Filter by tags, e.g. `all,^mytag`
+    -s, --select <select>      Select by tags, e.g. `all,^mytag`
     -H, --hs-home <hs-home>    Path to hyper script home
         --recent <recent>      Show scripts within recent days.
 
@@ -50,7 +50,7 @@ SUBCOMMANDS:
     mv       Move the script to another one
     rm       Remove the script
     run      Run the script
-    tags     Manage script tags. If a tag filter is given, set it as default, otherwise show tag information.
+    tags     Manage script tags. If a tag selector is given, set it as default, otherwise show tag information.
     which    Execute the script query and get the exact file
 ```
 
@@ -64,10 +64,10 @@ recent = 999999
 [alias.la]
 after = ['ls', '-a']
 [alias.gc]
-after = ['rm', '-f', 'remove', '*']
+after = ['rm', '-s', 'remove', '*']
 
 # ...
-# Type and tag filters will be discussed later
+# Type and tag selectors will be discussed later
 ```
 
 ## Type and templates
@@ -97,7 +97,7 @@ env = []
 ```
 
 # Advanced topics
-## tag filters
+## tag selectors
 ## script query
 > ### bang!
 ## list query

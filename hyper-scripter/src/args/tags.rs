@@ -1,4 +1,4 @@
-use crate::tag::TagFilter;
+use crate::tag::TagSelector;
 use serde::Serialize;
 use structopt::clap::AppSettings::AllowLeadingHyphen;
 use structopt::StructOpt;
@@ -20,7 +20,7 @@ pub enum TagsSubs {
     Set {
         #[structopt(long, short)]
         name: Option<String>,
-        content: TagFilter,
+        content: TagSelector,
     },
     LS {
         #[structopt(long, short)]

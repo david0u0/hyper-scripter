@@ -2,7 +2,7 @@ use crate::error::{Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::state::State;
-use crate::tag::{TagFilter, TagFilterGroup};
+use crate::tag::{TagSelector, TagSelectorGroup};
 use crate::util;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use colored::Color;
@@ -42,8 +42,8 @@ fn is_false(b: &bool) -> bool {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct NamedTagFilter {
-    pub content: TagFilter,
+pub struct NamedTagSelector {
+    pub content: TagSelector,
     pub name: String,
     #[serde(default, skip_serializing_if = "is_false")]
     pub inactivated: bool,
@@ -89,11 +89,11 @@ impl_de_by_from_str!(PromptLevel);
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
     pub recent: Option<u32>,
-    pub main_tag_filter: TagFilter,
+    pub main_tag_selector: TagSelector,
     prompt_level: PromptLevel,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
-    pub tag_filters: Vec<NamedTagFilter>,
+    pub tag_selectors: Vec<NamedTagSelector>,
     pub alias: HashMap<String, Alias>,
     pub types: HashMap<ScriptType, ScriptTypeConfig>,
     pub env: HashMap<String, String>,
@@ -115,31 +115,31 @@ impl Default for Config {
             recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
             editor: vec!["vim".to_string()],
             prompt_level: PromptLevel::Smart,
-            tag_filters: vec![
-                NamedTagFilter {
+            tag_selectors: vec![
+                NamedTagSelector {
                     content: "+pin,util".parse().unwrap(),
                     name: "pin".to_owned(),
                     inactivated: false,
                 },
-                NamedTagFilter {
+                NamedTagSelector {
                     content: "+all,^hide!".parse().unwrap(),
                     name: "no-hidden".to_owned(),
                     inactivated: false,
                 },
-                NamedTagFilter {
+                NamedTagSelector {
                     content: "+all,^remove!".parse().unwrap(),
                     name: "no-removed".to_owned(),
                     inactivated: false,
                 },
             ],
-            main_tag_filter: "+all".parse().unwrap(),
+            main_tag_selector: "+all".parse().unwrap(),
             types: ScriptTypeConfig::default_script_types(),
             alias: [
                 gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls", "--grouping", "none", "--limit", "5"]),
                 gen_alias("e", &["edit"]),
-                gen_alias("gc", &["rm", "--timeless", "--purge", "-f", "remove", "*"]),
+                gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous-args"]),
                 gen_alias("pc", &["=util/historian!", "--sequence", "c"]),
@@ -265,17 +265,17 @@ impl Config {
             .get(ty)
             .ok_or_else(|| Error::UnknownType(ty.to_string()))
     }
-    pub fn get_tag_filter_group(&self, toggle: &mut HashSet<String>) -> TagFilterGroup {
-        let mut group = TagFilterGroup::default();
-        for f in self.tag_filters.iter() {
+    pub fn get_tag_selector_group(&self, toggle: &mut HashSet<String>) -> TagSelectorGroup {
+        let mut group = TagSelectorGroup::default();
+        for f in self.tag_selectors.iter() {
             let inactivated = f.inactivated ^ toggle.remove(&f.name);
             if inactivated {
                 log::debug!("{:?} 未啟用", f);
                 continue;
             }
-            group.push(f.content.clone()); // TODO: TagFilterGroup 可以多帶點 lifetime 減少複製
+            group.push(f.content.clone()); // TODO: TagSelectorGroup 可以多帶點 lifetime 減少複製
         }
-        group.push(self.main_tag_filter.clone());
+        group.push(self.main_tag_selector.clone());
         group
     }
 }
@@ -287,7 +287,7 @@ mod test {
     #[test]
     fn test_config_serde() {
         let c1 = Config {
-            main_tag_filter: "a,^b,c".parse().unwrap(),
+            main_tag_selector: "a,^b,c".parse().unwrap(),
             ..Default::default()
         };
         let s = to_string_pretty(&c1).unwrap();

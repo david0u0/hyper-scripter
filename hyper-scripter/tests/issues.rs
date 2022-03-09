@@ -68,7 +68,7 @@ fn test_hs_in_hs() {
     outer.run("").unwrap();
     inner.can_find("^2").unwrap();
 
-    outer.filter("--humble").run("").unwrap();
+    outer.select("--humble").run("").unwrap();
     inner.can_find("^2").unwrap_err();
 
     let outer_humble = ScriptTest::new(
@@ -109,7 +109,7 @@ fn test_edit_existing_bang() {
     rt.block_on(async {
         use hyper_scripter::error::{Error, RedundantOpt};
         use hyper_scripter::script_repo::ScriptRepo;
-        use hyper_scripter::tag::{Tag, TagFilter};
+        use hyper_scripter::tag::{Tag, TagSelector};
         use hyper_scripter::util::{
             init_env,
             main_util::{edit_or_create, EditTagArgs},
@@ -117,7 +117,7 @@ fn test_edit_existing_bang() {
 
         let mut repo = {
             let (env, _) = init_env(true).await.unwrap();
-            let group = "all,^hide".parse::<TagFilter>().unwrap().into();
+            let group = "all,^hide".parse::<TagSelector>().unwrap().into();
             ScriptRepo::new(None, env, &group).await.unwrap()
         };
 
@@ -135,7 +135,7 @@ fn test_edit_existing_bang() {
                     EditTagArgs {
                         content: $tag.parse().unwrap(),
                         explicit_tag: false,
-                        explicit_filter: false,
+                        explicit_select: false,
                     },
                 )
             };
@@ -198,7 +198,7 @@ fn test_edit_without_change() {
     let (orphan, res) = ScriptTest::new_regardless("orphan", None, Some(""));
     res.expect_err("空編輯應該是一個錯誤");
     orphan
-        .filter("-a")
+        .select("-a")
         .can_find_by_name()
         .expect_err("空編輯新腳本應該要被砍掉");
 }

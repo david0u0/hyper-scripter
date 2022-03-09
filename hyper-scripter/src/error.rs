@@ -69,7 +69,7 @@ pub enum Error {
     EditorError(i32, Vec<String>),
 
     RedundantOpt(RedundantOpt),
-    TagFilterNotFound(String),
+    TagSelectorNotFound(String),
     DontFuzz,
     NoPreviousArgs,
     Empty,
@@ -133,7 +133,7 @@ pub enum RedundantOpt {
     Scripts(Vec<String>),
     Type,
     Tag,
-    Filter,
+    Selector,
 }
 
 impl From<RedundantOpt> for Error {

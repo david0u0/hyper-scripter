@@ -7,22 +7,22 @@ use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
-use crate::tag::{Tag, TagFilter};
+use crate::tag::{Tag, TagSelector};
 use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
-    pub content: TagFilter,
+    pub content: TagSelector,
     /// 命令行參數裡帶著 tag 選項，例如 hs edit --tag some-tag edit
     pub explicit_tag: bool,
-    /// 命令行參數裡帶著 filter 選項，例如 hs --filter some-tag edit
-    pub explicit_filter: bool,
+    /// 命令行參數裡帶著 select 選項，例如 hs --select some-tag edit
+    pub explicit_select: bool,
 }
 
 pub async fn mv(
     entry: &mut RepoEntry<'_>,
     new_name: Option<ScriptName>,
     ty: Option<ScriptType>,
-    tags: Option<TagFilter>,
+    tags: Option<TagSelector>,
 ) -> Result {
     let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {
@@ -69,8 +69,8 @@ pub async fn edit_or_create(
         match query::do_script_query(&query, script_repo, false, false).await {
             // TODO: 手動測試文件？
             Err(Error::DontFuzz) | Ok(None) => {
-                if tags.explicit_filter {
-                    return Err(RedundantOpt::Filter.into());
+                if tags.explicit_select {
+                    return Err(RedundantOpt::Selector.into());
                 }
                 final_ty = ty.unwrap_or_default();
                 let name = query.into_script_name()?;
@@ -110,8 +110,8 @@ pub async fn edit_or_create(
             Err(e) => return Err(e),
         }
     } else {
-        if tags.explicit_filter {
-            return Err(RedundantOpt::Filter.into());
+        if tags.explicit_select {
+            return Err(RedundantOpt::Selector.into());
         }
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");

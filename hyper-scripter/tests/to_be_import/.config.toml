@@ -1,21 +1,21 @@
 # NOTE: 亂搞近期篩選器，測試 --timeless 選項
 recent = 1
 
-main_tag_filter = 'none' # 亂搞主篩選器
+main_tag_selector = 'none' # 亂搞主篩選器
 
 editor = ["vim"]
 
 prompt_level = "always" # 亂搞 prompt level，確保全名搜尋不會觸發提示
 
-[[tag_filters]]
+[[tag_selectors]]
 content = '+pin,util'
 name = 'pin'
 
-[[tag_filters]]
+[[tag_selectors]]
 content = '+all,^hide!'
 name = 'no-hidden'
 
-[[tag_filters]]
+[[tag_selectors]]
 content = '+all,^removed!'
 name = 'no-removed'
 

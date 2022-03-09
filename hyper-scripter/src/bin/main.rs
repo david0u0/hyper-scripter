@@ -1,6 +1,6 @@
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
-use hyper_scripter::config::{Config, NamedTagFilter};
+use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
@@ -9,7 +9,7 @@ use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, Script
 use hyper_scripter::script::{IntoScriptName, ScriptName};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
-use hyper_scripter::tag::{Tag, TagFilter};
+use hyper_scripter::tag::{Tag, TagSelector};
 use hyper_scripter::util::{
     self, completion_util,
     holder::RepoHolder,
@@ -77,7 +77,7 @@ struct MainReturn {
 
 async fn main_inner(root: Root) -> Result<MainReturn> {
     Config::set_prompt_level(root.root_args.prompt_level);
-    let explicit_filter = !root.root_args.filter.is_empty();
+    let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();
     let need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
@@ -165,17 +165,17 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             let (mut repo, closer) = repo.init().await?;
             let edit_tags = {
                 // TODO: 不要這麼愛 clone
-                let mut innate_tags = conf.main_tag_filter.clone();
+                let mut innate_tags = conf.main_tag_selector.clone();
                 if let Some(tags) = tags {
                     innate_tags.push(tags);
                     EditTagArgs {
-                        explicit_filter,
+                        explicit_select,
                         explicit_tag: true,
                         content: innate_tags,
                     }
                 } else {
                     EditTagArgs {
-                        explicit_filter,
+                        explicit_select,
                         explicit_tag: false,
                         content: innate_tags,
                     }
@@ -344,7 +344,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::RM { queries, purge } => {
             let (mut repo, closer) = repo.init().await?;
-            let delete_tag: Option<TagFilter> = Some("+remove".parse().unwrap());
+            let delete_tag: Option<TagSelector> = Some("+remove".parse().unwrap());
             let mut to_purge = vec![]; // (name, ty, id)
             for mut entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
@@ -419,28 +419,28 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }) => {
             let conf = conf_mut!();
             let pos = conf
-                .tag_filters
+                .tag_selectors
                 .iter()
                 .position(|f| f.name == name)
                 .ok_or_else(|| {
-                    log::error!("試著刪除不存在的篩選器 {:?}", name);
-                    Error::TagFilterNotFound(name)
+                    log::error!("試著刪除不存在的選擇器 {:?}", name);
+                    Error::TagSelectorNotFound(name)
                 })?;
-            conf.tag_filters.remove(pos);
+            conf.tag_selectors.remove(pos);
         }
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::Toggle { name }),
         }) => {
             let conf = conf_mut!();
-            let filter = conf
-                .tag_filters
+            let selector = conf
+                .tag_selectors
                 .iter_mut()
                 .find(|f| f.name == name)
                 .ok_or_else(|| {
-                    log::error!("試著切換不存在的篩選器 {:?}", name);
-                    Error::TagFilterNotFound(name)
+                    log::error!("試著切換不存在的選擇器 {:?}", name);
+                    Error::TagSelectorNotFound(name)
                 })?;
-            filter.inactivated = !filter.inactivated;
+            selector.inactivated = !selector.inactivated;
         }
         Subs::Tags(Tags {
             subcmd:
@@ -449,7 +449,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     known: false,
                 }),
         }) => {
-            print_iter(conf.tag_filters.iter().map(|f| &f.name), " ");
+            print_iter(conf.tag_selectors.iter().map(|f| &f.name), " ");
         }
         Subs::Tags(Tags {
             subcmd:
@@ -465,21 +465,21 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 print!("known tags:\n  ");
                 print_iter(known_tags_iter(&mut repo), " ");
                 println!("");
-                println!("tag filters:");
-                for filter in conf.tag_filters.iter() {
-                    let content = &filter.content;
-                    print!("  {} = {}", filter.name, content);
+                println!("tag selector:");
+                for selector in conf.tag_selectors.iter() {
+                    let content = &selector.content;
+                    print!("  {} = {}", selector.name, content);
                     if content.mandatory {
                         print!(" (mandatory)")
                     }
-                    if filter.inactivated {
+                    if selector.inactivated {
                         print!(" (inactivated)")
                     }
                     println!()
                 }
-                println!("main tag filter:");
-                print!("  {}", conf.main_tag_filter);
-                if conf.main_tag_filter.mandatory {
+                println!("main tag selector:");
+                print!("  {}", conf.main_tag_selector);
+                if conf.main_tag_selector.mandatory {
                     print!(" (mandatory)")
                 }
                 println!();
@@ -491,22 +491,22 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }) => {
             let conf = conf_mut!();
             if let Some(name) = name {
-                log::debug!("處理篩選器 {:?}", name);
-                let tag_filters: &mut Vec<NamedTagFilter> = &mut conf.tag_filters;
-                if let Some(existing_filter) = tag_filters.iter_mut().find(|f| f.name == name) {
-                    log::info!("修改篩選器 {} {}", name, content);
-                    existing_filter.content = content;
+                log::debug!("處理選擇器 {:?}", name);
+                let tag_selector: &mut Vec<NamedTagSelector> = &mut conf.tag_selectors;
+                if let Some(existing_selector) = tag_selector.iter_mut().find(|f| f.name == name) {
+                    log::info!("修改選擇器 {} {}", name, content);
+                    existing_selector.content = content;
                 } else {
-                    log::info!("新增篩選器 {} {}", name, content);
-                    tag_filters.push(NamedTagFilter {
+                    log::info!("新增選擇器 {} {}", name, content);
+                    tag_selector.push(NamedTagSelector {
                         content: content,
                         name,
                         inactivated: false,
                     });
                 }
             } else {
-                log::info!("加入主篩選器 {:?}", content);
-                conf.main_tag_filter = content;
+                log::info!("加入主選擇器 {:?}", content);
+                conf.main_tag_selector = content;
             }
         }
         Subs::History {

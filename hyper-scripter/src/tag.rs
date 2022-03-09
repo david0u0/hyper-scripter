@@ -8,19 +8,19 @@ use std::str::FromStr;
 pub type TagSet = HashSet<Tag>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct TagFilterGroup(Vec<TagFilter>);
-impl TagFilterGroup {
-    pub fn push(&mut self, filter: TagFilter) {
-        if filter.append {
-            self.0.push(filter);
+pub struct TagSelectorGroup(Vec<TagSelector>);
+impl TagSelectorGroup {
+    pub fn push(&mut self, selector: TagSelector) {
+        if selector.append {
+            self.0.push(selector);
         } else {
-            self.0 = vec![filter];
+            self.0 = vec![selector];
         }
     }
-    pub fn filter(&self, tags: &TagSet) -> bool {
+    pub fn select(&self, tags: &TagSet) -> bool {
         let mut pass = false;
         for f in self.0.iter() {
-            let res = f.filter(tags);
+            let res = f.select(tags);
             if f.mandatory {
                 if res != Some(true) {
                     return false;
@@ -32,20 +32,20 @@ impl TagFilterGroup {
         pass
     }
 }
-impl From<TagFilter> for TagFilterGroup {
-    fn from(t: TagFilter) -> Self {
-        TagFilterGroup(vec![t])
+impl From<TagSelector> for TagSelectorGroup {
+    fn from(t: TagSelector) -> Self {
+        TagSelectorGroup(vec![t])
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TagFilter {
+pub struct TagSelector {
     tags: Vec<TagControl>,
     pub append: bool,
     pub mandatory: bool,
 }
-impl_de_by_from_str!(TagFilter);
-impl_ser_by_to_string!(TagFilter);
+impl_de_by_from_str!(TagSelector);
+impl_ser_by_to_string!(TagSelector);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagControl {
@@ -92,7 +92,7 @@ impl FromStr for TagControl {
 }
 const MANDATORY_SUFFIX: &str = "!";
 const APPEND_PREFIX: &str = "+";
-impl FromStr for TagFilter {
+impl FromStr for TagSelector {
     type Err = Error;
     fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
         let append = if s.starts_with(APPEND_PREFIX) {
@@ -110,13 +110,13 @@ impl FromStr for TagFilter {
         };
 
         let mut tags = vec![];
-        for filter in s.split(',') {
-            tags.push(filter.parse()?);
+        for ctrl in s.split(',') {
+            tags.push(ctrl.parse()?);
         }
         if tags.is_empty() {
             return Err(Error::Format(TagCode, s.to_owned()));
         }
-        Ok(TagFilter {
+        Ok(TagSelector {
             tags,
             append,
             mandatory,
@@ -124,7 +124,7 @@ impl FromStr for TagFilter {
     }
 }
 
-impl Display for TagFilter {
+impl Display for TagSelector {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let mut first = true;
         if self.append {
@@ -146,7 +146,7 @@ impl Display for TagFilter {
         Ok(())
     }
 }
-impl TagFilter {
+impl TagSelector {
     pub fn push(&mut self, flow: Self) {
         if flow.append {
             self.tags.extend(flow.tags.into_iter());
@@ -179,11 +179,11 @@ impl TagFilter {
         self.fill_allowed_map(&mut set);
         set.into_iter()
     }
-    pub fn filter(&self, tags: &TagSet) -> Option<bool> {
+    pub fn select(&self, tags: &TagSet) -> Option<bool> {
         let mut pass: Option<bool> = None;
-        for filter in self.tags.iter() {
-            if filter.tag.match_all() || tags.contains(&&filter.tag) {
-                pass = Some(filter.allow);
+        for ctrl in self.tags.iter() {
+            if ctrl.tag.match_all() || tags.contains(&&ctrl.tag) {
+                pass = Some(ctrl.allow);
             }
         }
         pass

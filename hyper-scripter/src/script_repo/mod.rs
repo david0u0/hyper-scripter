@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
-use crate::tag::{Tag, TagFilterGroup};
+use crate::tag::{Tag, TagSelectorGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
 use futures::join;
@@ -345,7 +345,7 @@ impl ScriptRepo {
     pub async fn new(
         recent: Option<RecentFilter>,
         db_env: DBEnv,
-        filter: &TagFilterGroup,
+        selector: &TagSelectorGroup,
     ) -> Result<ScriptRepo> {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let mut map: HashMap<String, ScriptInfo> = Default::default();
@@ -416,7 +416,7 @@ impl ScriptRepo {
                 hide = archaeology ^ overtime
             }
             if !hide {
-                hide = !filter.filter(&script.tags);
+                hide = !selector.select(&script.tags);
             }
 
             if hide {

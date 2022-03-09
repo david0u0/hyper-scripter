@@ -4,7 +4,7 @@ use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
 use crate::script_type::{ScriptFullType, ScriptType};
-use crate::tag::TagFilter;
+use crate::tag::TagSelector;
 use crate::Either;
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -58,14 +58,14 @@ pub struct RootArgs {
         global = true,
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Filter by tags, e.g. `all,^remove`"
+        help = "Select by tags, e.g. `all,^remove`"
     )]
-    pub filter: Vec<TagFilter>,
+    pub select: Vec<TagSelector>,
     #[structopt(
         long,
         conflicts_with = "all",
         number_of_values = 1,
-        help = "Toggle named filter temporarily"
+        help = "Toggle named selector temporarily"
     )]
     pub toggle: Vec<String>, // TODO: new type?
     #[structopt(
@@ -73,7 +73,7 @@ pub struct RootArgs {
         long,
         global = true,
         conflicts_with = "recent",
-        help = "Shorthand for `-f=all,^remove --timeless`"
+        help = "Shorthand for `-s=all,^remove --timeless`"
     )]
     all: bool,
     #[structopt(long, global = true, help = "Show scripts within recent days.")]
@@ -178,7 +178,7 @@ pub enum Subs {
         #[structopt(long, short)]
         no_template: bool,
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(long, help = "Create script without invoking the editor")]
         fast: bool,
         #[structopt(default_value = "?", help = EDIT_QUERY_HELP)]
@@ -250,7 +250,7 @@ pub enum Subs {
     #[structopt(about = "Copy the script to another one")]
     CP {
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(help = SCRIPT_QUERY_HELP)]
         origin: ListQuery,
         #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
@@ -261,7 +261,7 @@ pub enum Subs {
         #[structopt(long, short = "T", help = TYPE_HELP)]
         ty: Option<ScriptType>,
         #[structopt(long, short, help = TAGS_HELP)]
-        tags: Option<TagFilter>,
+        tags: Option<TagSelector>,
         #[structopt(help = LIST_QUERY_HELP)]
         origin: ListQuery,
         #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
@@ -402,7 +402,7 @@ impl Root {
     pub fn sanitize_flags(&mut self) {
         if self.root_args.all {
             self.root_args.timeless = true;
-            self.root_args.filter = vec!["all,^remove".parse().unwrap()];
+            self.root_args.select = vec!["all,^remove".parse().unwrap()];
         }
     }
     pub fn sanitize(&mut self) -> Result {
@@ -468,8 +468,8 @@ mod test {
     #[test]
     #[ignore = "structopt bug"]
     fn test_strange_set_alias() {
-        let args = build_args("alias trash -f remove");
-        assert_eq!(args.root_args.filter, vec![]);
+        let args = build_args("alias trash -s remove");
+        assert_eq!(args.root_args.select, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
                 unset,
@@ -487,8 +487,8 @@ mod test {
     }
     #[test]
     fn test_strange_alias() {
-        let args = build_args("-f e e -t e something -T e");
-        assert_eq!(args.root_args.filter, vec!["e".parse().unwrap()]);
+        let args = build_args("-s e e -t e something -T e");
+        assert_eq!(args.root_args.select, vec!["e".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match &args.subcmd {
             Some(Subs::Edit {
@@ -507,7 +507,7 @@ mod test {
         }
 
         let args = build_args("la -l");
-        assert_eq!(args.root_args.filter, vec!["all,^remove".parse().unwrap()]);
+        assert_eq!(args.root_args.select, vec!["all,^remove".parse().unwrap()]);
         assert_eq!(args.root_args.all, true);
         match &args.subcmd {
             Some(Subs::LS(opt)) => {
@@ -525,8 +525,8 @@ mod test {
     }
     #[test]
     fn test_external_run_tags() {
-        let args = build_args("-f test --dummy -r 42 =script -a --");
-        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        let args = build_args("-s test --dummy -r 42 =script -a --");
+        assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match args.subcmd {
             Some(Subs::Run {
@@ -546,8 +546,8 @@ mod test {
             }
         }
 
-        let args = build_args("-f test --dump-args tags --name myname +mytag");
-        assert_eq!(args.root_args.filter, vec!["test".parse().unwrap()]);
+        let args = build_args("-s test --dump-args tags --name myname +mytag");
+        assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         assert!(args.root_args.dump_args);
         match args.subcmd {

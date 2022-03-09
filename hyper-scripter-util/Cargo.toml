@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter-util"
-version = "0.5.19"
+version = "0.5.24"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"

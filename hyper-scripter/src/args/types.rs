@@ -17,7 +17,7 @@ pub enum TypesSubs {
     Other(Vec<String>),
     LS {
         #[structopt(long)]
-        show_sub: bool,
+        no_sub: bool,
     },
     Template {
         #[structopt(long, short)]
@@ -30,7 +30,7 @@ pub enum TypesSubs {
 impl Types {
     pub fn sanitize(&mut self) {
         match self.subcmd.as_ref() {
-            None => self.subcmd = Some(TypesSubs::LS { show_sub: false }),
+            None => self.subcmd = Some(TypesSubs::LS { no_sub: false }),
             Some(TypesSubs::Other(args)) => {
                 let args = ["types", "template"]
                     .into_iter()

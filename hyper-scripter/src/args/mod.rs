@@ -40,10 +40,11 @@ pub struct RootArgs {
     pub hs_home: Option<String>,
     #[structopt(long, hidden = true)]
     pub dump_args: bool,
-    #[structopt(long, help = "Don't record history")]
+    #[structopt(long, global = true, help = "Don't record history")]
     pub no_trace: bool,
     #[structopt(
         long,
+        global = true,
         conflicts_with = "no-trace",
         help = "Don't affect script time order (but still record history and affect time filter)"
     )]

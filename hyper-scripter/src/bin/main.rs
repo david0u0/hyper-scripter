@@ -553,12 +553,15 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::History {
             subcmd: History::Amend { event_id, args },
-        } => {
-            let (historian, closer) = repo.historian().await?;
-            let args = serde_json::to_string(&args)?;
-            historian.amend_args_by_id(event_id as i64, &args).await?;
-            closer.close(historian).await;
-        }
+        } => match event_id.try_into() {
+            Err(_) => log::info!("試圖修改零事件，什麼都不做"),
+            Ok(event_id) => {
+                let (historian, closer) = repo.historian().await?;
+                let args = serde_json::to_string(&args)?;
+                historian.amend_args_by_id(event_id, &args).await?;
+                closer.close(historian).await;
+            }
+        },
         Subs::History {
             subcmd: History::Tidy { queries },
         } => {
@@ -649,17 +652,21 @@ fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag
 }
 
 async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -> Result {
-    let (env, closer) = repo.env().await?;
-    let event_id = event_id as i64;
-    let res = if is_humble {
-        env.historian.humble_args_by_id(event_id).await?
-    } else {
-        env.historian.ignore_args_by_id(event_id).await?
-    };
-    if let Some(res) = res {
-        env.update_last_time_directly(res).await?;
+    match event_id.try_into() {
+        Err(_) => log::info!("試圖處理零事件，什麼都不做"),
+        Ok(event_id) => {
+            let (env, closer) = repo.env().await?;
+            let res = if is_humble {
+                env.historian.humble_args_by_id(event_id).await?
+            } else {
+                env.historian.ignore_args_by_id(event_id).await?
+            };
+            if let Some(res) = res {
+                env.update_last_time_directly(res).await?;
+            }
+            closer.close(env).await;
+        }
     }
-    closer.close(env).await;
     Ok(())
 }
 

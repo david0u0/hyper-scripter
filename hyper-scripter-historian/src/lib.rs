@@ -357,13 +357,13 @@ impl Historian {
     }
     pub async fn ignore_args_by_id(
         &self,
-        event_id: i64,
+        event_id: NonZeroU64,
     ) -> Result<Option<LastTimeRecord>, DBError> {
         self.process_args_by_id(false, event_id).await
     }
     pub async fn humble_args_by_id(
         &self,
-        event_id: i64,
+        event_id: NonZeroU64,
     ) -> Result<Option<LastTimeRecord>, DBError> {
         self.process_args_by_id(true, event_id).await
     }
@@ -371,14 +371,10 @@ impl Historian {
     async fn process_args_by_id(
         &self,
         is_humble: bool,
-        event_id: i64,
+        event_id: NonZeroU64,
     ) -> Result<Option<LastTimeRecord>, DBError> {
-        if event_id == ZERO {
-            log::info!("試圖處理零事件，什麼都不做");
-            return Ok(None);
-        }
-
         let pool = self.pool.read().unwrap();
+        let event_id = event_id.get() as i64;
         let latest_record = sqlx::query!(
             "
             SELECT id, script_id FROM events
@@ -454,12 +450,8 @@ impl Historian {
         Ok(ret)
     }
 
-    pub async fn amend_args_by_id(&self, event_id: i64, args: &str) -> Result<(), DBError> {
-        if event_id == ZERO {
-            log::info!("試圖修改零事件，什麼都不做");
-            return Ok(());
-        }
-
+    pub async fn amend_args_by_id(&self, event_id: NonZeroU64, args: &str) -> Result<(), DBError> {
+        let event_id = event_id.get() as i64;
         sqlx::query!(
             "
             UPDATE events SET ignored = false, args = ?

@@ -133,10 +133,20 @@ class Historian < Selector
       sourcing = true
     }, msg: 'set next command')
 
-    option = run(sequence: sequence).content
-    name = option.name
-    args = option.content
+    register_keys_virtual([ENTER], lambda { |_, _, options|
+    }, msg: 'Run the script multiple times with different arguments')
 
+    result = run(sequence: sequence)
+
+    if result.is_multi
+      result.options.each do |opt|
+        history = HS_ENV.system_hs("=#{opt.name}! #{opt.content}", false)
+      end
+      exit
+    end
+
+    name = result.content.name
+    args = result.content.content
     cmd = "=#{name}! -- #{args}" # known issue: \n \t \" will not be handled properly
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
@@ -152,7 +162,7 @@ class Historian < Selector
       puts args
     else
       warn cmd
-      history = HS_ENV.exec_hs(cmd, false)
+      HS_ENV.exec_hs(cmd, false)
     end
   end
 

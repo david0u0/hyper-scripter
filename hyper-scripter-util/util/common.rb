@@ -21,6 +21,12 @@ class HSEnv
     output
   end
 
+  def system_hs(arg, all)
+    cmd = hs_command_str(arg, all)
+    res = system(cmd)
+    raise StandardError, "Hyper scripter exits with error" unless res
+  end
+
   def exec_hs(arg, all)
     cmd = hs_command_str(arg, all)
     exec cmd.to_s

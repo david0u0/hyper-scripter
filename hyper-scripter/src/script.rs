@@ -1,5 +1,8 @@
 use crate::config::Config;
-use crate::error::{Contextable, Error, FormatCode::ScriptName as ScriptNameCode, Result};
+use crate::error::{
+    Contextable, DisplayError, DisplayResult, Error, FormatCode::ScriptName as ScriptNameCode,
+    Result,
+};
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelector};
@@ -36,7 +39,7 @@ impl ConcreteScriptName {
         // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
         for s in s.split('/') {
             if illegal_name(s) {
-                return Err(Error::Format(ScriptNameCode, s.to_owned()));
+                return Err(Error::Format(ScriptNameCode, s.to_owned()).into());
             }
         }
         Ok(())
@@ -77,9 +80,10 @@ pub enum ScriptName {
     Named(ConcreteScriptName),
 }
 impl FromStr for ScriptName {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        s.to_owned().into_script_name()
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        let n = s.to_owned().into_script_name()?;
+        Ok(n)
     }
 }
 impl ScriptName {
@@ -97,7 +101,9 @@ impl ScriptName {
             let id_str = m.get(1).unwrap().as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(Some(id)),
-                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())).context(e),
+                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())
+                    .context(e)
+                    .into()),
             }
         } else if check {
             if s == "." {

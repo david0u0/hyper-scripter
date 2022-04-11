@@ -1,4 +1,4 @@
-use crate::error::{Error, FormatCode, Result};
+use crate::error::{DisplayError, DisplayResult, Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::state::State;
@@ -71,14 +71,14 @@ pub enum PromptLevel {
     OnMultiFuzz,
 }
 impl FromStr for PromptLevel {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         let l = match s {
             "always" => PromptLevel::Always,
             "never" => PromptLevel::Never,
             "smart" => PromptLevel::Smart,
             "on-multi-fuzz" => PromptLevel::OnMultiFuzz,
-            _ => return Err(Error::Format(FormatCode::PromptLevel, s.to_owned())),
+            _ => return Err(Error::Format(FormatCode::PromptLevel, s.to_owned()).into()),
         };
         Ok(l)
     }

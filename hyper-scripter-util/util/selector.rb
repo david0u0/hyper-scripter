@@ -9,6 +9,7 @@ BLUE_BG_RED = "\033[31;44m\033[1m".freeze
 BLUE_BG_YELLOW = "\033[33;44m".freeze
 NC = "\033[0m".freeze
 ENTER = "\r".freeze
+NL = "\n".freeze
 HELP_MSG = "#{GREEN}press h/H for help#{NC}"
 
 def read_char
@@ -165,7 +166,7 @@ class Selector
           else
             @search_string = @search_string[0..-2]
           end
-        when ENTER
+        when ENTER, NL
           mode = :normal
         else
           @search_string += resp
@@ -177,7 +178,7 @@ class Selector
         when "\b", "\c?"
           @number /= 10
           mode = :normal if @number == 0
-        when ENTER
+        when ENTER, NL
           mode = :normal
           pos = [@number, @display_offset].max
           pos -= @display_offset
@@ -217,7 +218,7 @@ class Selector
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
-          elsif (resp == ENTER) && @virtual_state.nil? && !@enter_overriden
+          elsif (resp == ENTER || resp == NL) && @virtual_state.nil? && !@enter_overriden
             # default enter behavior, for non-virtual mode
             return self.class.make_result(pos, @options[pos])
           else

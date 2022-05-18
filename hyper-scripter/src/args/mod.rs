@@ -151,7 +151,7 @@ impl AliasRoot {
 }
 
 #[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllArgsOverrideSelf, ColoredHelp])]
+#[structopt(settings = &[AllArgsOverrideSelf, ColoredHelp, DisableHelpSubcommand])]
 pub enum Subs {
     #[structopt(external_subcommand)]
     Other(Vec<String>),

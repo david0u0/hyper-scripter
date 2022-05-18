@@ -1,8 +1,7 @@
 use super::help_str::*;
 use crate::script_type::ScriptFullType;
+use clap::{AppSettings::AllowLeadingHyphen, StructOpt};
 use serde::Serialize;
-use structopt::clap::AppSettings::AllowLeadingHyphen;
-use structopt::StructOpt;
 
 #[derive(StructOpt, Debug, Serialize)]
 pub struct Types {

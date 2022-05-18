@@ -1,5 +1,5 @@
 use super::NO_FLAG_SETTINGS;
-use structopt::StructOpt;
+use clap::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Completion {

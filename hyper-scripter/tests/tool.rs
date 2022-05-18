@@ -263,15 +263,20 @@ impl ScriptTest {
         run!("{}", s).expect_err(&format!("{} 找到東西{}", s, msg));
     }
     pub fn archaeology<'a>(&'a self) -> ScriptTestWithSelect<'a> {
-        ScriptTestWithSelect {
-            script: self,
-            select: "-A",
-        }
+        self.select("-A")
     }
     pub fn select<'a>(&'a self, select: &'a str) -> ScriptTestWithSelect<'a> {
         ScriptTestWithSelect {
             script: self,
+            allow_other_error: false,
             select,
+        }
+    }
+    pub fn allow_other_error<'a>(&'a self) -> ScriptTestWithSelect<'a> {
+        ScriptTestWithSelect {
+            script: self,
+            allow_other_error: true,
+            select: "",
         }
     }
     pub fn run(&self, args: &str) -> Result<String> {
@@ -287,13 +292,21 @@ impl ScriptTest {
 pub struct ScriptTestWithSelect<'a> {
     script: &'a ScriptTest,
     select: &'a str,
+    allow_other_error: bool,
 }
 impl<'a> ScriptTestWithSelect<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
-        run!("{} ={} {}", self.select, self.script.name, args)
+        run!(
+            allow_other_error: self.allow_other_error,
+            "{} ={} {}",
+            self.select,
+            self.script.name,
+            args
+        )
     }
     pub fn can_find(&self, command: &str) -> Result {
         let res = run!(
+            allow_other_error: self.allow_other_error,
             "{} ls --plain --grouping=none --name {}",
             self.select,
             command

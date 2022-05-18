@@ -1,7 +1,6 @@
 use crate::tag::TagSelector;
+use clap::{AppSettings::AllowLeadingHyphen, StructOpt};
 use serde::Serialize;
-use structopt::clap::AppSettings::AllowLeadingHyphen;
-use structopt::StructOpt;
 
 #[derive(StructOpt, Debug, Serialize)]
 pub struct Tags {

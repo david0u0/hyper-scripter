@@ -6,14 +6,14 @@ use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQue
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::Either;
-use serde::Serialize;
-use std::num::NonZeroUsize;
-use std::path::PathBuf;
-use structopt::clap::AppSettings::{
+use clap::AppSettings::{
     self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, ColoredHelp,
     DisableHelpFlags, DisableHelpSubcommand, DisableVersion, Hidden, TrailingVarArg,
 };
-use structopt::StructOpt;
+use clap::StructOpt;
+use serde::Serialize;
+use std::num::NonZeroUsize;
+use std::path::PathBuf;
 
 mod completion;
 pub use completion::*;
@@ -36,7 +36,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
 
 #[derive(StructOpt, Debug, Serialize)]
 pub struct RootArgs {
-    #[structopt(short = "H", long, help = "Path to hyper script home")]
+    #[structopt(short = 'H', long, help = "Path to hyper script home")]
     pub hs_home: Option<String>,
     #[structopt(long, hidden = true)]
     pub dump_args: bool,
@@ -49,7 +49,7 @@ pub struct RootArgs {
         help = "Don't affect script time order (but still record history and affect time filter)"
     )]
     pub humble: bool,
-    #[structopt(short = "A", long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+    #[structopt(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
     pub archaeology: bool,
     #[structopt(long)]
     pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
@@ -174,7 +174,7 @@ pub enum Subs {
     Migrate,
     #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
     Edit {
-        #[structopt(long, short = "T", help = TYPE_HELP)]
+        #[structopt(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptFullType>,
         #[structopt(long, short)]
         no_template: bool,
@@ -212,7 +212,7 @@ pub enum Subs {
         previous_args: bool,
         #[structopt(
             long,
-            short = "E",
+            short = 'E',
             requires = "previous-args",
             help = "Raise an error if --previous-args is given but there is no previous argument"
         )]
@@ -259,7 +259,7 @@ pub enum Subs {
     },
     #[structopt(about = "Move the script to another one")]
     MV {
-        #[structopt(long, short = "T", help = TYPE_HELP)]
+        #[structopt(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptType>,
         #[structopt(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
@@ -348,12 +348,13 @@ fn set_home(p: &Option<String>, create_on_missing: bool) -> Result {
 
 fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
-    let c: structopt::clap::App = Root::clap();
+    let c = Root::clap();
     let mut clap = &c;
     let mut had_found = false;
     for cmd in cmds {
         let cmd = cmd.as_ref();
-        if let Some(c) = clap.p.subcommands.iter().find(|s| &*s.p.meta.name == cmd) {
+        clap.find_subcommand(cmd);
+        if let Some(c) = clap.find_subcommand(cmd) {
             clap = c;
             had_found = true;
         } else if !had_found {

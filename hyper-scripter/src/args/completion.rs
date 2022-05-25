@@ -1,11 +1,7 @@
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[clap(
-    disable_help_flag = true,
-    allow_hyphen_values = true,
-    trailing_var_arg = true
-)]
+#[clap(disable_help_flag = true, allow_hyphen_values = true)]
 pub enum Completion {
     LS {
         #[clap(long)]
@@ -36,7 +32,7 @@ impl Completion {
         let args = &args[1..];
         if args.first().map(AsRef::as_ref) == Some("completion") {
             log::info!("補全模式 {:?}", args);
-            Some(Completion::from_iter(args))
+            Some(Completion::parse_from(args))
         } else {
             None
         }

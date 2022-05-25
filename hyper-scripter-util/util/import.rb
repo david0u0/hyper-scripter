@@ -76,7 +76,7 @@ def import_dir(dir, namespace)
 
       content = Shellwords.escape(content)
       tags_str = script.tags.join(',')
-      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -T #{script.ty} --no-template --fast #{content}", false)
+      HS_ENV.do_hs("edit =#{new_name} -t #{tags_str} -T #{script.ty} --no-template --fast -- #{content}", false)
     end
   end
 

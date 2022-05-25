@@ -1,7 +1,6 @@
 use crate::config::Config;
 use crate::error::{
-    Contextable, DisplayError, DisplayResult, Error, FormatCode::ScriptName as ScriptNameCode,
-    Result,
+    DisplayError, DisplayResult, Error, FormatCode::ScriptName as ScriptNameCode, Result,
 };
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
@@ -101,9 +100,7 @@ impl ScriptName {
             let id_str = m.get(1).unwrap().as_str();
             match id_str.parse::<u32>() {
                 Ok(id) => Ok(Some(id)),
-                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned())
-                    .context(e)
-                    .into()),
+                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned()).context(e)),
             }
         } else if check {
             if s == "." {

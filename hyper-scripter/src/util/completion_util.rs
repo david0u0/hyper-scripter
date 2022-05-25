@@ -63,7 +63,7 @@ async fn fuzz_arr<'a>(
 pub async fn handle_completion(comp: Completion) -> Result {
     match comp {
         Completion::LS { name, args } => {
-            let mut new_root = match Root::from_iter_safe(args) {
+            let mut new_root = match Root::try_parse_from(args) {
                 Ok(Root {
                     subcmd: Some(Subs::Tags(_) | Subs::Types(_)),
                     ..
@@ -125,7 +125,7 @@ pub async fn handle_completion(comp: Completion) -> Result {
             print!("{}", home);
         }
         Completion::ParseRun { args } => {
-            let mut root = Root::from_iter_safe(args).map_err(|e| {
+            let mut root = Root::try_parse_from(args).map_err(|e| {
                 log::warn!("補全時出錯 {}", e);
                 Error::Completion
             })?;

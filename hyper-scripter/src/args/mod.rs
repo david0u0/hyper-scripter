@@ -7,7 +7,7 @@ use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::Either;
 use clap::AppSettings::{
-    self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, TrailingVarArg,
+    self, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand,
 };
 use clap::{CommandFactory, Parser};
 use serde::Serialize;
@@ -28,7 +28,7 @@ const NO_FLAG_SETTINGS: &[AppSettings] = &[
     AllowLeadingHyphen,
     DisableHelpFlags,
     DisableHelpSubcommand,
-    TrailingVarArg,
+    AllowExternalSubcommands,
 ];
 
 #[derive(Parser, Debug, Serialize)]
@@ -167,8 +167,7 @@ pub enum Subs {
     LoadUtils,
     #[clap(about = "Migrate the database")]
     Migrate,
-    #[clap(about = "Edit hyper script")]
-    #[clap(allow_hyphen_values = true, trailing_var_arg = true)]
+    #[clap(about = "Edit hyper script", trailing_var_arg = true)]
     Edit {
         #[clap(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptFullType>,
@@ -180,6 +179,8 @@ pub enum Subs {
         fast: bool,
         #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: EditQuery<ScriptQuery>,
+        /// Because the field `content` is rarely used, don't make it allow hyphen value
+        /// Otherwise, options like `-T e` will be absorbed if placed after script query.
         content: Vec<String>,
     },
     #[clap(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
@@ -195,6 +196,7 @@ pub enum Subs {
         )]
         unset: bool,
         before: Option<String>,
+        #[clap(allow_hyphen_values = true)]
         after: Vec<String>,
     },
 
@@ -217,7 +219,10 @@ pub enum Subs {
         dir: Option<PathBuf>,
         #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
-        #[clap(help = "Command line args to pass to the script")]
+        #[clap(
+            help = "Command line args to pass to the script",
+            allow_hyphen_values = true
+        )]
         args: Vec<String>,
     },
     #[clap(about = "Execute the script query and get the exact file")]
@@ -462,8 +467,12 @@ mod test {
             _ => panic!(),
         }
     }
+    fn is_args_eq(arg1: &Root, arg2: &Root) -> bool {
+        let json1 = serde_json::to_value(arg1).unwrap();
+        let json2 = serde_json::to_value(arg2).unwrap();
+        json1 == json2
+    }
     #[test]
-    #[ignore = "clap bug"]
     fn test_strange_set_alias() {
         let args = build_args("alias trash -s remove");
         assert_eq!(args.root_args.select, vec![]);
@@ -477,7 +486,7 @@ mod test {
                 assert_eq!(*unset, false);
                 assert_eq!(*short, false);
                 assert_eq!(before, "trash");
-                assert_eq!(after, &["-f", "remove"]);
+                assert_eq!(after, &["-s", "remove"]);
             }
             _ => panic!("{:?} should be alias...", args),
         }
@@ -492,11 +501,13 @@ mod test {
                 edit_query,
                 tags,
                 ty,
+                content,
                 ..
             }) => {
                 assert_eq!(edit_query, &"something".parse().unwrap());
-                assert_eq!(tags, &Some("e".parse().unwrap()));
-                assert_eq!(ty, &Some("e".parse().unwrap()));
+                assert_eq!(tags, &"e".parse().ok());
+                assert_eq!(ty, &"e".parse().ok());
+                assert_eq!(content, &Vec::<String>::new());
             }
             _ => {
                 panic!("{:?} should be edit...", args);
@@ -523,6 +534,10 @@ mod test {
     #[test]
     fn test_external_run_tags() {
         let args = build_args("-s test --dummy -r 42 =script -a --");
+        // assert!(is_args_eq(
+        //     &args,
+        //     &build_args("-s test run --dummy -r 42 =script -a --")
+        // ));
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match args.subcmd {
@@ -544,6 +559,10 @@ mod test {
         }
 
         let args = build_args("-s test --dump-args tags --name myname +mytag");
+        assert!(is_args_eq(
+            &args,
+            &build_args("-s test --dump-args tags set --name myname +mytag")
+        ));
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         assert!(args.root_args.dump_args);
@@ -558,5 +577,11 @@ mod test {
                 panic!("{:?} should be tags...", args);
             }
         }
+
+        assert!(is_args_eq(
+            &build_args("--humble"),
+            &build_args("--humble edit -")
+        ));
+        assert!(is_args_eq(&build_args("tags"), &build_args("tags ls")));
     }
 }

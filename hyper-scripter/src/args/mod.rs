@@ -6,9 +6,6 @@ use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQue
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::Either;
-use clap::AppSettings::{
-    self, AllowExternalSubcommands, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand,
-};
 use clap::{CommandFactory, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -24,12 +21,6 @@ use help_str::*;
 pub use types::*;
 
 const APP_NAME: &str = "hs";
-const NO_FLAG_SETTINGS: &[AppSettings] = &[
-    AllowLeadingHyphen,
-    DisableHelpFlags,
-    DisableHelpSubcommand,
-    AllowExternalSubcommands,
-];
 
 #[derive(Parser, Debug, Serialize)]
 pub struct RootArgs {
@@ -106,8 +97,13 @@ pub enum AliasSubs {
     Other(Vec<String>),
 }
 #[derive(Parser, Debug, Serialize)]
-#[clap(about, author, version, settings = NO_FLAG_SETTINGS)]
-#[clap(allow_hyphen_values = true, args_override_self = true)]
+#[clap(about, author, version)]
+#[clap(
+    args_override_self = true,
+    allow_hyphen_values = true,
+    disable_help_flag = true,
+    disable_help_subcommand = true
+)]
 pub struct AliasRoot {
     #[clap(flatten)]
     pub root_args: RootArgs,
@@ -183,7 +179,11 @@ pub enum Subs {
         /// Otherwise, options like `-T e` will be absorbed if placed after script query.
         content: Vec<String>,
     },
-    #[clap(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
+    #[clap(
+        about = "Manage alias",
+        disable_help_flag = true,
+        allow_hyphen_values = true
+    )]
     Alias {
         #[clap(long, conflicts_with_all = &["before", "after"])]
         short: bool,
@@ -200,7 +200,11 @@ pub enum Subs {
         after: Vec<String>,
     },
 
-    #[clap(about = "Run the script", settings = NO_FLAG_SETTINGS)]
+    #[clap(
+        about = "Run the script",
+        disable_help_flag = true,
+        allow_hyphen_values = true
+    )]
     Run {
         #[clap(long, help = "Add a dummy run history instead of actually running it")]
         dummy: bool,
@@ -310,7 +314,7 @@ pub enum History {
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
-    #[clap(settings = NO_FLAG_SETTINGS)]
+    #[clap(disable_help_flag = true, allow_hyphen_values = true)]
     Amend {
         event_id: u64,
         #[clap(help = "Command line args to pass to the script")]
@@ -528,16 +532,12 @@ mod test {
         }
     }
     #[test]
-    fn test_default_run_tags() {
-        // TODO
-    }
-    #[test]
     fn test_external_run_tags() {
         let args = build_args("-s test --dummy -r 42 =script -a --");
-        // assert!(is_args_eq(
-        //     &args,
-        //     &build_args("-s test run --dummy -r 42 =script -a --")
-        // ));
+        assert!(is_args_eq(
+            &args,
+            &build_args("-s test run --dummy -r 42 =script -a --")
+        ));
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
         match args.subcmd {
@@ -583,5 +583,31 @@ mod test {
             &build_args("--humble edit -")
         ));
         assert!(is_args_eq(&build_args("tags"), &build_args("tags ls")));
+    }
+    #[test]
+    fn test_disable_help() {
+        let args = build_args("run =script --help");
+        match args.subcmd {
+            Some(Subs::Run {
+                script_query, args, ..
+            }) => {
+                assert_eq!(script_query, "=script".parse().unwrap());
+                assert_eq!(args, vec!["--help".to_owned()]);
+            }
+            _ => {
+                panic!("{:?} should be run...", args);
+            }
+        }
+
+        let args = build_args("alias a --help");
+        match args.subcmd {
+            Some(Subs::Alias { before, after, .. }) => {
+                assert_eq!(before, Some("a".to_owned()));
+                assert_eq!(after, vec!["--help".to_owned()]);
+            }
+            _ => {
+                panic!("{:?} should be alias...", args);
+            }
+        }
     }
 }

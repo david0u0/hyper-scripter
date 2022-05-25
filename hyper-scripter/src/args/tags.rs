@@ -1,31 +1,30 @@
 use crate::tag::TagSelector;
+use clap::Parser;
 use serde::Serialize;
-use structopt::clap::AppSettings::AllowLeadingHyphen;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize)]
 pub struct Tags {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub subcmd: Option<TagsSubs>,
 }
 
-#[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllowLeadingHyphen])]
+#[derive(Parser, Debug, Serialize)]
+#[clap(allow_hyphen_values = true)]
 pub enum TagsSubs {
-    #[structopt(external_subcommand)]
+    #[clap(external_subcommand)]
     Other(Vec<String>),
     Unset {
         name: String,
     }, // TODO: new type?
     Set {
-        #[structopt(long, short)]
+        #[clap(long, short)]
         name: Option<String>,
         content: TagSelector,
     },
     LS {
-        #[structopt(long, short)]
+        #[clap(long, short)]
         known: bool,
-        #[structopt(long, short, conflicts_with = "known")]
+        #[clap(long, short, conflicts_with = "known")]
         named: bool,
     },
     Toggle {
@@ -46,7 +45,7 @@ impl Tags {
                 let args = ["tags", "set"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(TagsSubs::from_iter(args));
+                self.subcmd = Some(TagsSubs::parse_from(args));
             }
             _ => (),
         }

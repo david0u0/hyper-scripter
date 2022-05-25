@@ -1,6 +1,6 @@
 function __hs_extract_home_and_run
     set cmd (commandline -j)
-    set hs_home (eval "hs completion home $cmd" 2>/dev/null)
+    set hs_home (eval "hs completion home -- $cmd" 2>/dev/null)
     if [ $status -eq 0 ]
         if [ ! -d $hs_home ]
             # Stop completion cause we don't want to create directory
@@ -16,7 +16,7 @@ function __hs_list_types
 end
 
 function __hs_expand_alias
-    set cmd (eval "command hs completion alias $argv" 2>/dev/null)
+    set cmd (eval "command hs completion alias -- $argv" 2>/dev/null)
     if [ $status -eq 0 ]
         echo $cmd
     else
@@ -73,10 +73,11 @@ function __hs_list_scripts
         set cmd "$orig_cmd trailing"
     end
 
-    set list (eval "command hs completion ls $name_arg $cmd" 2>/dev/null)
+    set list (eval "command hs completion ls $name_arg -- $cmd" 2>/dev/null)
     if [ $status -ne 0 ]
         return
     end
+
     for script in (string split ' ' $list)
         set res "$exact$script$bang"
         # NOTE: duplicate the script name to mimic the "reorder fuzzy search"
@@ -98,7 +99,7 @@ function __hs_not_run_arg_or_alias
         set trailing "trailing"
     end
 
-    set run_args (eval "command hs completion parse-run $orig_cmd $trailing" 2>/dev/null)
+    set run_args (eval "command hs completion parse-run -- $orig_cmd $trailing" 2>/dev/null)
     if [ $status -ne 0 ]
         return 0
     end
@@ -127,7 +128,7 @@ function __hs_is_alias
         # remove the last argument
         set cmd "$cmd_arr[1..-2]"
     end
-    eval "command hs completion alias $cmd" 2>/dev/null
+    eval "command hs completion alias -- $cmd" 2>/dev/null
 end
 
 function __hs_alias_completion
@@ -155,7 +156,7 @@ function __hs_use_subcommand
         # remove the last argument
         set cmd "$cmd_arr[1..-2]"
     end
-    eval "command hs completion no-subcommand $cmd" 2>/dev/null
+    eval "command hs completion no-subcommand -- $cmd" 2>/dev/null
 end
 
 complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -r -F

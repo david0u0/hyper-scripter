@@ -141,3 +141,19 @@ impl From<RedundantOpt> for Error {
         Error::RedundantOpt(opt)
     }
 }
+
+// TODO: 一旦 specialization 穩了就直接把 StdError 實作在我們的錯誤結構上
+#[derive(Display, Debug)]
+pub struct DisplayError(Error);
+impl From<Error> for DisplayError {
+    fn from(err: Error) -> Self {
+        DisplayError(err)
+    }
+}
+impl DisplayError {
+    pub fn into_err(self) -> Error {
+        self.0
+    }
+}
+impl std::error::Error for DisplayError {}
+pub type DisplayResult<T = ()> = std::result::Result<T, DisplayError>;

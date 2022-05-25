@@ -285,8 +285,10 @@ fn test_fuzz_dot_or_endwith_slash() {
     t.can_find("t/").unwrap();
     t.can_find("slash/").unwrap();
 
-    t.can_find("sla//").expect_err("兩個`/`結尾仍不可行");
-    t.can_find("/sla").unwrap_err();
+    t.allow_other_error()
+        .can_find("sla//")
+        .expect_err("兩個`/`結尾仍不可行");
+    t.allow_other_error().can_find("/sla").unwrap_err();
 
     run!("e illegal/").expect_err("不應創建以`/`結尾的腳本");
 
@@ -297,10 +299,12 @@ fn test_fuzz_dot_or_endwith_slash() {
     t.can_find(".1").unwrap();
     t.can_find(".").unwrap();
 
-    t.can_find("..").expect_err("兩個`.`仍不可行");
-    t.can_find(".a").unwrap_err();
+    t.allow_other_error()
+        .can_find("..")
+        .expect_err("兩個`.`仍不可行");
+    t.allow_other_error().can_find(".a").unwrap_err();
 
-    run!("mv - .").expect_err("不應創建名為`.`的腳本");
+    run!(allow_other_error: true, "mv - .").expect_err("不應創建名為`.`的腳本");
 }
 
 #[test]

@@ -8,7 +8,7 @@ mod tree;
 mod tree_lib;
 
 use crate::{
-    error::{Error, Result},
+    error::{DisplayError, DisplayResult, Result},
     query::ListQuery,
     script::ScriptInfo,
 };
@@ -71,8 +71,8 @@ impl Default for Grouping {
     }
 }
 impl FromStr for Grouping {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         let g = match s {
             "tag" => Grouping::Tag,
             "tree" => Grouping::Tree,

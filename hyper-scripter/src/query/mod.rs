@@ -1,11 +1,12 @@
 use crate::error::{
-    Contextable, Error,
+    Contextable, DisplayError, DisplayResult, Error,
     FormatCode::{Regex as RegexCode, ScriptQuery as ScriptQueryCode},
     Result,
 };
 use crate::impl_ser_by_to_string;
 use crate::script::{ConcreteScriptName, IntoScriptName, ScriptName};
 use regex::Regex;
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 
 mod util;
@@ -20,9 +21,9 @@ pub enum EditQuery<Q> {
     #[display(fmt = "{}", _0)]
     Query(Q),
 }
-impl<Q: FromStr<Err = Error>> FromStr for EditQuery<Q> {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
+impl<Q: FromStr<Err = DisplayError>> FromStr for EditQuery<Q> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         Ok(if s == "?" {
             EditQuery::NewAnonimous
         } else {
@@ -85,8 +86,8 @@ pub enum ScriptOrDirQuery {
     Dir(DirQuery),
 }
 impl FromStr for ScriptOrDirQuery {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         Ok(if s == "/" {
             ScriptOrDirQuery::Dir(DirQuery::Root)
         } else if s.ends_with('/') {
@@ -107,8 +108,8 @@ pub enum ListQuery {
     Query(ScriptQuery),
 }
 impl FromStr for ListQuery {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         if s.contains('*') {
             let s = s.to_owned();
             // TODO: 好好檢查
@@ -123,7 +124,7 @@ impl FromStr for ListQuery {
                 Ok(re) => Ok(ListQuery::Pattern(re, s, bang)),
                 Err(e) => {
                     log::error!("正規表達式錯誤：{}", e);
-                    Err(Error::Format(RegexCode, s))
+                    Err(Error::Format(RegexCode, s).into())
                 }
             }
         } else {
@@ -141,7 +142,7 @@ pub struct ScriptQuery {
 impl Default for ScriptQuery {
     fn default() -> Self {
         ScriptQuery {
-            inner: ScriptQueryInner::Prev(1),
+            inner: ScriptQueryInner::Prev(none0_usize(1)),
             bang: false,
         }
     }
@@ -165,7 +166,7 @@ impl_ser_by_to_string!(ScriptQuery);
 enum ScriptQueryInner {
     Fuzz(String),
     Exact(ScriptName),
-    Prev(usize),
+    Prev(NonZeroUsize),
 }
 impl IntoScriptName for ScriptQuery {
     fn into_script_name(self) -> Result<ScriptName> {
@@ -177,7 +178,10 @@ impl IntoScriptName for ScriptQuery {
     }
 }
 
-fn parse_prev(s: &str) -> Result<usize> {
+fn none0_usize(n: usize) -> NonZeroUsize {
+    NonZeroUsize::new(n).unwrap()
+}
+fn parse_prev(s: &str) -> Result<NonZeroUsize> {
     // NOTE: 解析 `^^^^ = Prev(4)`
     let mut is_pure_prev = true;
     for ch in s.chars() {
@@ -187,23 +191,23 @@ fn parse_prev(s: &str) -> Result<usize> {
         }
     }
     if is_pure_prev {
-        return Ok(s.len());
+        return Ok(none0_usize(s.len()));
     }
     // NOTE: 解析 `^4 = Prev(4)`
-    match s[1..s.len()].parse::<usize>() {
-        Ok(0) => Err(Error::Format(ScriptQueryCode, s.to_owned())).context("歷史查詢不可為0"),
+    match s[1..s.len()].parse::<NonZeroUsize>() {
         Ok(prev) => Ok(prev),
-        Err(e) => Err(Error::Format(ScriptQueryCode, s.to_owned()))
-            .context(format!("解析整數錯誤：{}", e)),
+        Err(e) => Err(Error::Format(ScriptQueryCode, s.to_owned())
+            .context(format!("解析整數錯誤：{}", e))
+            .into()),
     }
 }
 impl FromStr for ScriptQuery {
-    type Err = Error;
-    fn from_str(mut s: &str) -> Result<Self> {
+    type Err = DisplayError;
+    fn from_str(mut s: &str) -> DisplayResult<Self> {
         let bang = if s.ends_with('!') {
             if s == "!" {
                 return Ok(ScriptQuery {
-                    inner: ScriptQueryInner::Prev(1),
+                    inner: ScriptQueryInner::Prev(none0_usize(1)),
                     bang: true,
                 });
             }
@@ -217,7 +221,7 @@ impl FromStr for ScriptQuery {
             let name = s.to_owned().into_script_name()?;
             ScriptQueryInner::Exact(name)
         } else if s == "-" {
-            ScriptQueryInner::Prev(1)
+            ScriptQueryInner::Prev(none0_usize(1))
         } else if s.starts_with('^') {
             ScriptQueryInner::Prev(parse_prev(s)?)
         } else {

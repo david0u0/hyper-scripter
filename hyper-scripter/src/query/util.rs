@@ -83,7 +83,7 @@ pub async fn do_script_query<'b>(
     match &script_query.inner {
         ScriptQueryInner::Prev(prev) => {
             assert!(!finding_filtered); // XXX 很難看的作法，應設法靜態檢查
-            let latest = script_repo.latest_mut(*prev, visibility);
+            let latest = script_repo.latest_mut(prev.get(), visibility);
             log::trace!("找最新腳本");
             return if latest.is_some() {
                 Ok(latest)

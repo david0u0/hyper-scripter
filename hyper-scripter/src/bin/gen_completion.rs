@@ -1,8 +1,9 @@
+use clap::CommandFactory;
+use clap_complete::{generate, Shell};
 use hyper_scripter::args::Root;
-use structopt::clap::Shell;
-use structopt::StructOpt;
+use std::io;
 
 fn main() {
-    let mut clap = Root::clap();
-    clap.gen_completions("hs", Shell::Fish, ".")
+    let mut cmd = Root::command();
+    generate(Shell::Fish, &mut cmd, "hs", &mut io::stdout());
 }

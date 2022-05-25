@@ -1,28 +1,27 @@
 use super::help_str::*;
 use crate::script_type::ScriptFullType;
+use clap::Parser;
 use serde::Serialize;
-use structopt::clap::AppSettings::AllowLeadingHyphen;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize)]
 pub struct Types {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub subcmd: Option<TypesSubs>,
 }
 
-#[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllowLeadingHyphen])]
+#[derive(Parser, Debug, Serialize)]
+#[clap(allow_hyphen_values = true)] // 為了允許 hs types --edit sh 這樣的命令
 pub enum TypesSubs {
-    #[structopt(external_subcommand)]
+    #[clap(external_subcommand)]
     Other(Vec<String>),
     LS {
-        #[structopt(long)]
+        #[clap(long)]
         no_sub: bool,
     },
     Template {
-        #[structopt(long, short)]
+        #[clap(long, short)]
         edit: bool,
-        #[structopt(help = TYPE_HELP)]
+        #[clap(help = TYPE_HELP)]
         ty: ScriptFullType,
     },
 }
@@ -35,7 +34,7 @@ impl Types {
                 let args = ["types", "template"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(TypesSubs::from_iter(args));
+                self.subcmd = Some(TypesSubs::parse_from(args));
             }
             _ => (),
         }

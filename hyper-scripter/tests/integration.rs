@@ -43,6 +43,17 @@ fn test_tags() {
 }
 
 #[test]
+fn test_help() {
+    let _g = setup();
+    let help_msg = "This is a help message";
+    run!("e --no-template ? | # [HS_HELP]: {}", help_msg).unwrap();
+    assert_eq!(run!("help -").unwrap(), help_msg);
+    assert_ne!(run!("help").unwrap(), help_msg);
+    assert_ne!(run!("help mv").unwrap(), help_msg);
+    run!("help a-non-existing-script").expect_err("不該找到腳本");
+}
+
+#[test]
 fn test_mv_cp() {
     let _g = setup();
 

@@ -1,4 +1,4 @@
-use crate::error::{Error, FormatCode::Tag as TagCode};
+use crate::error::{DisplayError, DisplayResult, Error, FormatCode::Tag as TagCode};
 use crate::util::illegal_name;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::FxHashSet as HashSet;
@@ -66,18 +66,18 @@ impl Tag {
     }
 }
 impl FromStr for Tag {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Error> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         if illegal_name(s) {
             log::error!("標籤格式不符：{}", s);
-            return Err(Error::Format(TagCode, s.to_owned()));
+            return Err(Error::Format(TagCode, s.to_owned()).into());
         }
         Ok(Tag(s.to_owned()))
     }
 }
 impl FromStr for TagControl {
-    type Err = Error;
-    fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
+    type Err = DisplayError;
+    fn from_str(mut s: &str) -> DisplayResult<Self> {
         let allow = if s.starts_with('^') {
             s = &s[1..s.len()];
             false
@@ -93,8 +93,8 @@ impl FromStr for TagControl {
 const MANDATORY_SUFFIX: &str = "!";
 const APPEND_PREFIX: &str = "+";
 impl FromStr for TagSelector {
-    type Err = Error;
-    fn from_str(mut s: &str) -> std::result::Result<Self, Error> {
+    type Err = DisplayError;
+    fn from_str(mut s: &str) -> DisplayResult<Self> {
         let append = if s.starts_with(APPEND_PREFIX) {
             s = &s[APPEND_PREFIX.len()..];
             true
@@ -114,7 +114,7 @@ impl FromStr for TagSelector {
             tags.push(ctrl.parse()?);
         }
         if tags.is_empty() {
-            return Err(Error::Format(TagCode, s.to_owned()));
+            return Err(Error::Format(TagCode, s.to_owned()).into());
         }
         Ok(TagSelector {
             tags,

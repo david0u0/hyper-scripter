@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{DisplayError, DisplayResult, Error};
 use crate::impl_ser_by_to_string;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
@@ -134,8 +134,8 @@ impl AsRef<str> for ScriptType {
     }
 }
 impl FromStr for ScriptType {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         Ok(s.to_owned().into())
     }
 }
@@ -151,8 +151,8 @@ pub struct ScriptFullType {
     pub sub: Option<ScriptType>,
 }
 impl FromStr for ScriptFullType {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
         if let Some((first, second)) = s.split_once("/") {
             Ok(ScriptFullType {
                 ty: first.parse()?,

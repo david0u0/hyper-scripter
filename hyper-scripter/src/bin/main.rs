@@ -1,7 +1,7 @@
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagSelector};
-use hyper_scripter::error::{Error, ExitCode, RedundantOpt, Result};
+use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
@@ -211,7 +211,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         }
         Subs::Help { args } => {
             let (mut repo, closer) = repo.init().await?;
-            let script_query: ScriptQuery = args[0].parse()?;
+            let script_query: ScriptQuery =
+                args[0].parse().map_err(|e: DisplayError| e.into_err())?;
             let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
             create_read_event(&mut entry).await?;

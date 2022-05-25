@@ -1,4 +1,4 @@
-use clap::{CommandFactory, Parser};
+use clap::CommandFactory;
 use clap_complete::{generate, Shell};
 use hyper_scripter::args::Root;
 use std::io;

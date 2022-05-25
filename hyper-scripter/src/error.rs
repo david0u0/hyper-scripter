@@ -150,5 +150,10 @@ impl From<Error> for DisplayError {
         DisplayError(err)
     }
 }
+impl DisplayError {
+    pub fn into_err(self) -> Error {
+        self.0
+    }
+}
 impl std::error::Error for DisplayError {}
 pub type DisplayResult<T = ()> = std::result::Result<T, DisplayError>;

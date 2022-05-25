@@ -1,33 +1,33 @@
 use super::NO_FLAG_SETTINGS;
-use clap::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 pub enum Completion {
-    #[structopt(settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     LS {
-        #[structopt(long)]
+        #[clap(long)]
         name: Option<String>, // NOTE: 不用 ScriptName，因為有 `hs/` 這種輸入要考慮
-        #[structopt(required = true, min_values = 1)]
+        #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[structopt(settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     Alias {
-        #[structopt(required = true, min_values = 1)]
+        #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[structopt(settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     Home {
-        #[structopt(required = true, min_values = 1)]
+        #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[structopt(settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     ParseRun {
-        #[structopt(required = true, min_values = 1)]
+        #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[structopt(settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     NoSubcommand {
-        #[structopt(required = true, min_values = 1)]
+        #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
 }

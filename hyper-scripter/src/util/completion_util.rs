@@ -6,7 +6,7 @@ use crate::fuzzy::{fuzz_with_multifuzz_ratio, is_prefix, FuzzResult};
 use crate::path;
 use crate::script_repo::{RepoEntry, Visibility};
 use crate::SEP;
-use clap::StructOpt;
+use clap::Parser;
 use std::cmp::Reverse;
 
 fn sort(v: &mut Vec<RepoEntry<'_>>) {

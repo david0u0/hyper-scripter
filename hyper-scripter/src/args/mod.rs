@@ -7,10 +7,9 @@ use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::Either;
 use clap::AppSettings::{
-    self, AllArgsOverrideSelf, AllowExternalSubcommands, AllowLeadingHyphen, ColoredHelp,
-    DisableHelpFlags, DisableHelpSubcommand, DisableVersion, Hidden, TrailingVarArg,
+    self, AllowLeadingHyphen, DisableHelpFlags, DisableHelpSubcommand, TrailingVarArg,
 };
-use clap::StructOpt;
+use clap::{CommandFactory, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
@@ -24,36 +23,34 @@ mod types;
 use help_str::*;
 pub use types::*;
 
+const APP_NAME: &str = "hs";
 const NO_FLAG_SETTINGS: &[AppSettings] = &[
-    ColoredHelp,
     AllowLeadingHyphen,
     DisableHelpFlags,
-    TrailingVarArg,
     DisableHelpSubcommand,
-    DisableVersion,
-    AllowExternalSubcommands,
+    TrailingVarArg,
 ];
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize)]
 pub struct RootArgs {
-    #[structopt(short = 'H', long, help = "Path to hyper script home")]
+    #[clap(short = 'H', long, help = "Path to hyper script home")]
     pub hs_home: Option<String>,
-    #[structopt(long, hidden = true)]
+    #[clap(long, hide = true)]
     pub dump_args: bool,
-    #[structopt(long, global = true, help = "Don't record history")]
+    #[clap(long, global = true, help = "Don't record history")]
     pub no_trace: bool,
-    #[structopt(
+    #[clap(
         long,
         global = true,
         conflicts_with = "no-trace",
         help = "Don't affect script time order (but still record history and affect time filter)"
     )]
     pub humble: bool,
-    #[structopt(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+    #[clap(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
     pub archaeology: bool,
-    #[structopt(long)]
-    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 structopt 之外，寫在這裡只是為了生成幫助訊息
-    #[structopt(
+    #[clap(long)]
+    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 clap 之外，寫在這裡只是為了生成幫助訊息
+    #[clap(
         short,
         long,
         global = true,
@@ -62,14 +59,14 @@ pub struct RootArgs {
         help = "Select by tags, e.g. `all,^remove`"
     )]
     pub select: Vec<TagSelector>,
-    #[structopt(
+    #[clap(
         long,
         conflicts_with = "all",
         number_of_values = 1,
         help = "Toggle named selector temporarily"
     )]
     pub toggle: Vec<String>, // TODO: new type?
-    #[structopt(
+    #[clap(
         short,
         long,
         global = true,
@@ -77,42 +74,43 @@ pub struct RootArgs {
         help = "Shorthand for `-s=all,^remove --timeless`"
     )]
     all: bool,
-    #[structopt(long, global = true, help = "Show scripts within recent days.")]
+    #[clap(long, global = true, help = "Show scripts within recent days.")]
     pub recent: Option<u32>,
-    #[structopt(
+    #[clap(
         long,
         global = true,
         help = "Show scripts of all time.",
         conflicts_with = "recent"
     )]
     pub timeless: bool,
-    #[structopt(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
+    #[clap(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
 }
 
-#[derive(StructOpt, Debug, Serialize)]
-#[structopt(global_setting = ColoredHelp, settings = &[AllowLeadingHyphen, AllArgsOverrideSelf])]
+#[derive(Parser, Debug, Serialize)]
+#[clap(about, author, version)]
+#[clap(allow_hyphen_values = true, args_override_self = true)]
 pub struct Root {
-    #[structopt(skip = false)]
+    #[clap(skip = false)]
     #[serde(skip)]
     is_from_alias: bool,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub root_args: RootArgs,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub subcmd: Option<Subs>,
 }
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize)]
 pub enum AliasSubs {
-    #[structopt(external_subcommand)]
+    #[clap(external_subcommand)]
     Other(Vec<String>),
 }
-#[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = NO_FLAG_SETTINGS)]
+#[derive(Parser, Debug, Serialize)]
+#[clap(about, author, version, settings = NO_FLAG_SETTINGS)]
 pub struct AliasRoot {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub root_args: RootArgs,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub subcmd: Option<AliasSubs>,
 }
 impl AliasRoot {
@@ -150,47 +148,44 @@ impl AliasRoot {
     }
 }
 
-#[derive(StructOpt, Debug, Serialize)]
-#[structopt(settings = &[AllArgsOverrideSelf, ColoredHelp, DisableHelpSubcommand])]
+#[derive(Parser, Debug, Serialize)]
+#[clap(disable_help_subcommand = true, args_override_self = true)]
 pub enum Subs {
-    #[structopt(external_subcommand)]
+    #[clap(external_subcommand)]
     Other(Vec<String>),
-    #[structopt(
+    #[clap(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
-    #[structopt(
-        about = "Prints this message, the help of the given subcommand(s), or a script's help message.",
-        setting = AllowLeadingHyphen
-    )]
     Help { args: Vec<String> },
-    #[structopt(setting = Hidden, about = "Print the help message of env variables")]
+    #[clap(hide = true, about = "Print the help message of env variables")]
     EnvHelp {
-        #[structopt(default_value = "-", help = SCRIPT_QUERY_HELP)]
+        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
     },
-    #[structopt(setting = Hidden)]
+    #[clap(hide = true)]
     LoadUtils,
-    #[structopt(about = "Migrate the database")]
+    #[clap(about = "Migrate the database")]
     Migrate,
-    #[structopt(about = "Edit hyper script", settings = &[AllowLeadingHyphen, TrailingVarArg])]
+    #[clap(about = "Edit hyper script")]
+    #[clap(allow_hyphen_values = true, trailing_var_arg = true)]
     Edit {
-        #[structopt(long, short = 'T', help = TYPE_HELP)]
+        #[clap(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptFullType>,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         no_template: bool,
-        #[structopt(long, short, help = TAGS_HELP)]
+        #[clap(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[structopt(long, help = "Create script without invoking the editor")]
+        #[clap(long, help = "Create script without invoking the editor")]
         fast: bool,
-        #[structopt(default_value = "?", help = EDIT_QUERY_HELP)]
+        #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: EditQuery<ScriptQuery>,
         content: Vec<String>,
     },
-    #[structopt(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
+    #[clap(about = "Manage alias", settings = NO_FLAG_SETTINGS)]
     Alias {
-        #[structopt(long, conflicts_with_all = &["before", "after"])]
+        #[clap(long, conflicts_with_all = &["before", "after"])]
         short: bool,
-        #[structopt(
+        #[clap(
             long,
             short,
             requires = "before",
@@ -202,142 +197,142 @@ pub enum Subs {
         after: Vec<String>,
     },
 
-    #[structopt(about = "Run the script", settings = NO_FLAG_SETTINGS)]
+    #[clap(about = "Run the script", settings = NO_FLAG_SETTINGS)]
     Run {
-        #[structopt(long, help = "Add a dummy run history instead of actually running it")]
+        #[clap(long, help = "Add a dummy run history instead of actually running it")]
         dummy: bool,
-        #[structopt(long, short)]
+        #[clap(long, short)]
         repeat: Option<u64>,
-        #[structopt(long, short, help = "Use arguments from last run")]
+        #[clap(long, short, help = "Use arguments from last run")]
         previous_args: bool,
-        #[structopt(
+        #[clap(
             long,
             short = 'E',
             requires = "previous-args",
             help = "Raise an error if --previous-args is given but there is no previous argument"
         )]
         error_no_previous: bool,
-        #[structopt(long, short, requires = "previous-args", help = "")]
+        #[clap(long, short, requires = "previous-args", help = "")]
         dir: Option<PathBuf>,
-        #[structopt(default_value = "-", help = SCRIPT_QUERY_HELP)]
+        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
-        #[structopt(help = "Command line args to pass to the script")]
+        #[clap(help = "Command line args to pass to the script")]
         args: Vec<String>,
     },
-    #[structopt(about = "Execute the script query and get the exact file")]
+    #[clap(about = "Execute the script query and get the exact file")]
     Which {
-        #[structopt(default_value = "-", help = SCRIPT_QUERY_HELP)]
+        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
     },
-    #[structopt(about = "Print the script to standard output")]
+    #[clap(about = "Print the script to standard output")]
     Cat {
-        #[structopt(default_value = "-", help = SCRIPT_QUERY_HELP)]
+        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
     },
-    #[structopt(about = "Remove the script")]
+    #[clap(about = "Remove the script")]
     RM {
-        #[structopt(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[structopt(
+        #[clap(
             long,
             help = "Actually remove scripts, rather than hiding them with tag."
         )]
         purge: bool,
     },
-    #[structopt(about = "List hyper scripts")]
+    #[clap(about = "List hyper scripts")]
     LS(List),
-    #[structopt(about = "Manage script types")]
+    #[clap(about = "Manage script types")]
     Types(Types),
-    #[structopt(about = "Copy the script to another one")]
+    #[clap(about = "Copy the script to another one")]
     CP {
-        #[structopt(long, short, help = TAGS_HELP)]
+        #[clap(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[structopt(help = SCRIPT_QUERY_HELP)]
+        #[clap(help = SCRIPT_QUERY_HELP)]
         origin: ListQuery,
-        #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
+        #[clap(help = EDIT_CONCRETE_QUERY_HELP)]
         new: EditQuery<ScriptOrDirQuery>,
     },
-    #[structopt(about = "Move the script to another one")]
+    #[clap(about = "Move the script to another one")]
     MV {
-        #[structopt(long, short = 'T', help = TYPE_HELP)]
+        #[clap(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptType>,
-        #[structopt(long, short, help = TAGS_HELP)]
+        #[clap(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[structopt(help = LIST_QUERY_HELP)]
+        #[clap(help = LIST_QUERY_HELP)]
         origin: ListQuery,
-        #[structopt(help = EDIT_CONCRETE_QUERY_HELP)]
+        #[clap(help = EDIT_CONCRETE_QUERY_HELP)]
         new: Option<EditQuery<ScriptOrDirQuery>>,
     },
-    #[structopt(about = "Manage script tags")]
+    #[clap(about = "Manage script tags")]
     Tags(Tags),
-    #[structopt(about = "Manage script history")]
+    #[clap(about = "Manage script history")]
     History {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         subcmd: History,
     },
 }
 
-#[derive(StructOpt, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize)]
 pub enum History {
     RM {
         // TODO: dir
-        #[structopt(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...
-    #[structopt(
+    #[clap(
         name = "rm-id",
         about = "Remove an event by it's id.\nUseful if you want to keep those illegal arguments from polluting the history."
     )]
     RMID { event_id: u64 },
-    #[structopt(about = "Humble an event by it's id")]
+    #[clap(about = "Humble an event by it's id")]
     Humble { event_id: u64 },
     Show {
-        #[structopt(default_value = "-", help = LIST_QUERY_HELP)]
+        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[structopt(short, long, default_value = "10")]
+        #[clap(short, long, default_value = "10")]
         limit: u32,
-        #[structopt(long)]
+        #[clap(long)]
         with_name: bool,
-        #[structopt(short, long, default_value = "0")]
+        #[clap(short, long, default_value = "0")]
         offset: u32,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         dir: Option<PathBuf>,
     },
     Neglect {
-        #[structopt(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
-    #[structopt( settings = NO_FLAG_SETTINGS)]
+    #[clap(settings = NO_FLAG_SETTINGS)]
     Amend {
         event_id: u64,
-        #[structopt(help = "Command line args to pass to the script")]
+        #[clap(help = "Command line args to pass to the script")]
         args: Vec<String>,
     },
     Tidy {
-        #[structopt(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
 }
 
-#[derive(StructOpt, Debug, Serialize, Default)]
-#[structopt(settings = &[AllArgsOverrideSelf])]
+#[derive(Parser, Debug, Serialize, Default)]
+#[clap(args_override_self = true)]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項
-    #[structopt(short, long, help = "Show verbose information.")]
+    #[clap(short, long, help = "Show verbose information.")]
     pub long: bool,
-    #[structopt(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
+    #[clap(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
     pub grouping: Grouping,
-    #[structopt(long, help = "Limit the amount of scripts found.")]
+    #[clap(long, help = "Limit the amount of scripts found.")]
     pub limit: Option<NonZeroUsize>,
-    #[structopt(long, help = "No color and other decoration.")]
+    #[clap(long, help = "No color and other decoration.")]
     pub plain: bool,
-    #[structopt(long, help = "Show file path to the script.", conflicts_with = "long")]
+    #[clap(long, help = "Show file path to the script.", conflicts_with = "long")]
     pub file: bool,
-    #[structopt(long, help = "Show name of the script.", conflicts_with = "long")]
+    #[clap(long, help = "Show name of the script.", conflicts_with = "long")]
     pub name: bool,
-    #[structopt(help = LIST_QUERY_HELP)]
+    #[clap(help = LIST_QUERY_HELP)]
     pub queries: Vec<ListQuery>,
 }
 
@@ -348,7 +343,7 @@ fn set_home(p: &Option<String>, create_on_missing: bool) -> Result {
 
 fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
-    let c = Root::clap();
+    let c = Root::command();
     let mut clap = &c;
     let mut had_found = false;
     for cmd in cmds {
@@ -361,32 +356,31 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
             return Ok(());
         }
     }
-    let mut clap = clap.clone().setting(ColoredHelp);
-    clap.print_help()?;
+    clap.clone().print_help()?;
     println!();
     std::process::exit(0);
 }
 
 fn handle_alias_args(args: Vec<String>) -> Result<Root> {
     if args.iter().any(|s| s == "--no-alias") {
-        log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 structopt 之外！
-        let root = Root::from_iter(args);
+        log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 clap 之外！
+        let root = Root::parse_from(args);
         return Ok(root);
     }
-    match AliasRoot::from_iter_safe(&args) {
+    match AliasRoot::try_parse_from(&args) {
         Ok(alias_root) => {
             log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
-                Some(new_args) => Root::from_iter(new_args),
-                None => Root::from_iter(&args),
+                Some(new_args) => Root::parse_from(new_args),
+                None => Root::parse_from(&args),
             };
             root.is_from_alias = true;
             Ok(root)
         }
         Err(e) => {
-            log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::from_iter 中再來報錯
-            Root::from_iter(args);
+            log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::parse_from 中再來報錯
+            Root::parse_from(args);
             unreachable!()
         }
     }
@@ -410,10 +404,10 @@ impl Root {
     pub fn sanitize(&mut self) -> Result {
         match &mut self.subcmd {
             Some(Subs::Other(args)) => {
-                let args = ["hs", "run"]
+                let args = [APP_NAME, "run"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(Subs::from_iter(args));
+                self.subcmd = Some(Subs::parse_from(args));
                 log::info!("執行模式 {:?}", self.subcmd);
             }
             Some(Subs::Help { args }) => {
@@ -458,7 +452,7 @@ pub fn handle_args(args: Vec<String>) -> Result<Either<Root, Completion>> {
 mod test {
     use super::*;
     fn build_args<'a>(args: &'a str) -> Root {
-        let v: Vec<_> = std::iter::once("hs")
+        let v: Vec<_> = std::iter::once(APP_NAME)
             .chain(args.split(' '))
             .map(|s| s.to_owned())
             .collect();
@@ -468,7 +462,7 @@ mod test {
         }
     }
     #[test]
-    #[ignore = "structopt bug"]
+    #[ignore = "clap bug"]
     fn test_strange_set_alias() {
         let args = build_args("alias trash -s remove");
         assert_eq!(args.root_args.select, vec![]);

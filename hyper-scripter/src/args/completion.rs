@@ -1,31 +1,30 @@
-use super::NO_FLAG_SETTINGS;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
+#[clap(
+    disable_help_flag = true,
+    allow_hyphen_values = true,
+    trailing_var_arg = true
+)]
 pub enum Completion {
-    #[clap(settings = NO_FLAG_SETTINGS)]
     LS {
         #[clap(long)]
         name: Option<String>, // NOTE: 不用 ScriptName，因為有 `hs/` 這種輸入要考慮
         #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[clap(settings = NO_FLAG_SETTINGS)]
     Alias {
         #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[clap(settings = NO_FLAG_SETTINGS)]
     Home {
         #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[clap(settings = NO_FLAG_SETTINGS)]
     ParseRun {
         #[clap(required = true, min_values = 1)]
         args: Vec<String>,
     },
-    #[clap(settings = NO_FLAG_SETTINGS)]
     NoSubcommand {
         #[clap(required = true, min_values = 1)]
         args: Vec<String>,

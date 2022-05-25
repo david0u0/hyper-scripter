@@ -10,7 +10,7 @@ pub struct Types {
 }
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(allow_hyphen_values = true)]
+#[clap(allow_hyphen_values = true)] // 為了允許 hs types --edit sh 這樣的命令
 pub enum TypesSubs {
     #[clap(external_subcommand)]
     Other(Vec<String>),

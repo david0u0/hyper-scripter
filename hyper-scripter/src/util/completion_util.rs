@@ -14,7 +14,7 @@ fn sort(v: &mut Vec<RepoEntry<'_>>) {
 }
 
 fn parse_alias_root(args: &[String]) -> Result<AliasRoot> {
-    match AliasRoot::from_iter_safe(args) {
+    match AliasRoot::try_parse_from(args) {
         Ok(root) => Ok(root),
         Err(e) => {
             log::warn!("展開別名時出錯 {}", e);
@@ -97,12 +97,19 @@ pub async fn handle_completion(comp: Completion) -> Result {
         Completion::NoSubcommand { args } => {
             if let Ok(root) = parse_alias_root(&args) {
                 if root.subcmd.is_some() {
+                    log::debug!("子命令 = {:?}", root.subcmd);
                     return Err(Error::Completion);
                 }
             } // else: 解析錯誤當然不可能有子命令啦
         }
         Completion::Alias { args } => {
             let root = parse_alias_root(&args)?;
+
+            if root.root_args.no_alias {
+                log::info!("無別名模式");
+                return Err(Error::Completion);
+            }
+
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             let conf = Config::load(&home)?;
             if let Some(new_args) = root.expand_alias(&args, &conf) {

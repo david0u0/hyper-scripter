@@ -89,7 +89,7 @@ pub struct RootArgs {
 
 #[derive(Parser, Debug, Serialize)]
 #[clap(about, author, version)]
-#[clap(allow_hyphen_values = true, args_override_self = true)]
+#[clap(allow_hyphen_values = true, args_override_self = true)] // NOTE: 我們需要那個 `allow_hyphen_values` 來允許 hs --dummy 這樣的命令
 pub struct Root {
     #[clap(skip = false)]
     #[serde(skip)]
@@ -107,6 +107,7 @@ pub enum AliasSubs {
 }
 #[derive(Parser, Debug, Serialize)]
 #[clap(about, author, version, settings = NO_FLAG_SETTINGS)]
+#[clap(allow_hyphen_values = true, args_override_self = true)]
 pub struct AliasRoot {
     #[clap(flatten)]
     pub root_args: RootArgs,

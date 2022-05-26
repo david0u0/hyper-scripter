@@ -6,6 +6,7 @@ use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQue
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::Either;
+use crate::APP_NAME;
 use clap::{CommandFactory, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -19,8 +20,6 @@ mod help_str;
 mod types;
 use help_str::*;
 pub use types::*;
-
-const APP_NAME: &str = "hs";
 
 #[derive(Parser, Debug, Serialize)]
 pub struct RootArgs {

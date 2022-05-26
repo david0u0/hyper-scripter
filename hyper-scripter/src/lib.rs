@@ -23,6 +23,7 @@ pub mod state;
 pub mod tag;
 pub mod util;
 
+pub const APP_NAME: &str = "hs";
 pub const SEP: &str = "/";
 pub enum Either<T, U> {
     One(T),

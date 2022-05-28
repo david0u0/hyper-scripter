@@ -12,7 +12,7 @@ use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagSelector};
 use hyper_scripter::util::{
     self, completion_util,
-    holder::RepoHolder,
+    holder::{RepoHolder, Resource},
     main_util::{self, EditTagArgs},
     print_iter, PrepareRespond,
 };
@@ -58,7 +58,10 @@ async fn main_err_handle() -> Result<Vec<Error>> {
         return Ok(vec![]);
     }
 
-    let res = main_inner(root).await?;
+    let mut resource = Resource::None;
+    let res = main_inner(root, &mut resource).await;
+    resource.close().await;
+    let res = res?;
     if let Some(conf) = res.conf {
         log::info!("存入改變後的設定檔");
         conf.store()?;
@@ -75,20 +78,21 @@ struct MainReturn {
     errs: Vec<Error>,
 }
 
-async fn main_inner(root: Root) -> Result<MainReturn> {
+async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
     Config::set_prompt_level(root.root_args.prompt_level);
     let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();
     let need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
-    let repo = RepoHolder {
-        root_args: root.root_args,
-        need_journal,
-    };
 
     let mut ret = MainReturn {
         conf: None,
         errs: vec![],
+    };
+    let repo = RepoHolder {
+        resource,
+        need_journal,
+        root_args: root.root_args,
     };
 
     macro_rules! conf_mut {
@@ -100,9 +104,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
 
     match root.subcmd.unwrap() {
         Subs::LoadUtils => {
-            let (mut repo, closer) = repo.init().await?;
-            main_util::load_utils(&mut repo).await?;
-            closer.close(repo).await;
+            let repo = repo.init().await?;
+            main_util::load_utils(repo).await?;
         }
         Subs::Alias {
             unset: false,
@@ -162,7 +165,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             no_template,
         } => {
             // TODO: 這裡邏輯太複雜了，抽出來測試吧
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let edit_tags = {
                 // TODO: 不要這麼愛 clone
                 let mut innate_tags = conf.main_tag_selector.clone();
@@ -182,7 +185,7 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
             };
             let (path, mut entry, sub_type) =
-                main_util::edit_or_create(edit_query, &mut repo, ty, edit_tags).await?;
+                main_util::edit_or_create(edit_query, repo, ty, edit_tags).await?;
             let mut prepare_resp =
                 util::prepare_script(&path, &*entry, sub_type.as_ref(), no_template, &content)?;
             create_read_event(&mut entry).await?;
@@ -206,14 +209,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 return Err(err);
             }
-
-            closer.close(repo).await;
         }
         Subs::Help { args } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let script_query: ScriptQuery =
                 args[0].parse().map_err(|e: DisplayError| e.into_err())?;
-            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             log::info!("檢視用法： {:?}", entry.name);
             create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
@@ -229,7 +230,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 print_iter(envs, "\n");
             }
-            closer.close(repo).await;
         }
         Subs::Run {
             script_query,
@@ -240,8 +240,8 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             repeat,
             dir,
         } => {
-            let (mut repo, closer) = repo.init().await?;
-            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let repo = repo.init().await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             main_util::run_n_times(
                 repeat.unwrap_or(1),
                 dummy,
@@ -253,37 +253,33 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 dir,
             )
             .await?;
-            closer.close(repo).await;
         }
         Subs::Which { script_query } => {
-            let (mut repo, closer) = repo.init().await?;
-            let entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let repo = repo.init().await?;
+            let entry = query::do_script_query_strict(&script_query, repo).await?;
             log::info!("定位 {:?}", entry.name);
             // NOTE: 不檢查存在與否
             let p = path::get_home().join(entry.file_path_fallback());
             println!("{}", p.to_string_lossy());
-            closer.close(repo).await;
         }
         Subs::Cat { script_query } => {
-            let (mut repo, closer) = repo.init().await?;
-            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let repo = repo.init().await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             log::info!("打印 {:?}", entry.name);
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             print!("{}", content);
             create_read_event(&mut entry).await?;
-            closer.close(repo).await;
         }
         Subs::EnvHelp { script_query } => {
-            let (mut repo, closer) = repo.init().await?;
-            let mut entry = query::do_script_query_strict(&script_query, &mut repo).await?;
+            let repo = repo.init().await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             log::info!("打印 {:?} 的環境變數", entry.name);
             create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
             let content = util::read_file(&script_path)?;
             let envs = extract_env_from_content(&content);
             print_iter(envs, "\n");
-            closer.close(repo).await;
         }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS { no_sub }),
@@ -339,15 +335,14 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 display_style,
             };
             let stdout = std::io::stdout();
-            let (mut repo, closer) = repo.init().await?;
-            fmt_list(&mut stdout.lock(), &mut repo, opt).await?;
-            closer.close(repo).await;
+            let repo = repo.init().await?;
+            fmt_list(&mut stdout.lock(), repo, opt).await?;
         }
         Subs::RM { queries, purge } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let delete_tag: Option<TagSelector> = Some("+remove".parse().unwrap());
             let mut to_purge = vec![]; // (name, ty, id)
-            for mut entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
+            for mut entry in query::do_list_query(repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 if purge {
                     log::debug!("真的刪除腳本！");
@@ -372,11 +367,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     log::warn!("刪除腳本實體遭遇錯誤：{}", e);
                 }
             }
-            closer.close(repo).await;
         }
         Subs::CP { origin, new, tags } => {
-            let (mut repo, closer) = repo.init().await?;
-            let cp_pairs = create_dir_pair(&mut repo, origin, new).await?;
+            let repo = repo.init().await?;
+            let cp_pairs = create_dir_pair(repo, origin, new).await?;
             for (og_name, new_name) in cp_pairs.into_iter() {
                 // TODO: 用 id 之類的加速？
                 let entry = repo.get_mut(&og_name, Visibility::All).unwrap();
@@ -391,7 +385,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
                 create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
             }
-            closer.close(repo).await;
         }
         Subs::MV {
             origin,
@@ -399,21 +392,20 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
             tags,
             ty,
         } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             if let Some(new) = new {
-                let mv_pairs = create_dir_pair(&mut repo, origin, new).await?;
+                let mv_pairs = create_dir_pair(repo, origin, new).await?;
                 for (og_name, new_name) in mv_pairs.into_iter() {
                     // TODO: 用 id 之類的加速？
                     let mut script = repo.get_mut(&og_name, Visibility::All).unwrap();
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
-                let mut scripts = query::do_list_query(&mut repo, &[origin]).await?;
+                let mut scripts = query::do_list_query(repo, &[origin]).await?;
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;
                 }
             }
-            closer.close(repo).await;
         }
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::Unset { name }),
@@ -459,12 +451,12 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     known,
                 }),
         }) => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             if known {
-                print_iter(known_tags_iter(&mut repo), " ");
+                print_iter(known_tags_iter(repo), " ");
             } else {
                 print!("known tags:\n  ");
-                print_iter(known_tags_iter(&mut repo), " ");
+                print_iter(known_tags_iter(repo), " ");
                 println!("");
                 println!("tag selector:");
                 for selector in conf.tag_selectors.iter() {
@@ -485,7 +477,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 }
                 println!();
             }
-            closer.close(repo).await;
         }
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::Set { content, name }),
@@ -513,9 +504,9 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         Subs::History {
             subcmd: History::RM { queries, range },
         } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let historian = repo.historian().clone();
-            let mut scripts = query::do_list_query(&mut repo, &queries).await?;
+            let mut scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let res_vec = historian
                 .ignore_args_range(&ids, range.get_min(), range.get_max())
@@ -540,7 +531,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                         .await?;
                 }
             }
-            closer.close(repo).await;
         }
         Subs::History {
             subcmd: History::RMID { event_id },
@@ -557,31 +547,28 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
         } => match event_id.try_into() {
             Err(_) => log::info!("試圖修改零事件，什麼都不做"),
             Ok(event_id) => {
-                let (historian, closer) = repo.historian().await?;
+                let historian = repo.historian().await?;
                 let args = serde_json::to_string(&args)?;
                 historian.amend_args_by_id(event_id, &args).await?;
-                closer.close(historian).await;
             }
         },
         Subs::History {
             subcmd: History::Tidy { queries },
         } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let historian = repo.historian().clone();
-            for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
+            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
                 historian.tidy(entry.id).await?;
             }
-            closer.close(repo).await;
         }
         Subs::History {
             subcmd: History::Neglect { queries },
         } => {
-            let (mut repo, closer) = repo.init().await?;
-            for entry in query::do_list_query(&mut repo, &queries).await?.into_iter() {
+            let repo = repo.init().await?;
+            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
                 let id = entry.id;
                 entry.get_env().handle_neglect(id).await?;
             }
-            closer.close(repo).await;
         }
         Subs::History {
             subcmd:
@@ -593,10 +580,10 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                     dir,
                 },
         } => {
-            let (mut repo, closer) = repo.init().await?;
+            let repo = repo.init().await?;
             let historian = repo.historian().clone();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let scripts = query::do_list_query(&mut repo, &queries).await?;
+            let scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let args_list = historian
                 .previous_args_list(&ids, limit, offset, dir.as_deref())
@@ -617,7 +604,6 @@ async fn main_inner(root: Root) -> Result<MainReturn> {
                 print_iter(args.into_iter().map(|s| util::to_display_args(s)), " ");
                 println!("");
             }
-            closer.close(repo).await;
         }
         sub => unimplemented!("{:?}", sub),
     }
@@ -652,11 +638,11 @@ fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag
     v.into_iter().map(|(k, _)| k)
 }
 
-async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -> Result {
+async fn process_event_by_id<'a>(is_humble: bool, repo: RepoHolder<'a>, event_id: u64) -> Result {
     match event_id.try_into() {
         Err(_) => log::info!("試圖處理零事件，什麼都不做"),
         Ok(event_id) => {
-            let (env, closer) = repo.env().await?;
+            let env = repo.env().await?;
             let res = if is_humble {
                 env.historian.humble_args_by_id(event_id).await?
             } else {
@@ -665,7 +651,6 @@ async fn process_event_by_id(is_humble: bool, repo: RepoHolder, event_id: u64) -
             if let Some(res) = res {
                 env.update_last_time_directly(res).await?;
             }
-            closer.close(env).await;
         }
     }
     Ok(())

@@ -314,7 +314,7 @@ complete -c hs -n "__fish_prev_arg_in tags" -f -a "unset"
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "set"
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "ls"
 complete -c hs -n "__fish_prev_arg_in tags" -f -a "toggle"
-complete -c hs -n "__fish_seen_subcommand_from tags" -s n -l name
+complete -c hs -n "__fish_seen_subcommand_from tags" -s n -l name -r -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name -r -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from ls" -s k -l known # FIXME: 這會補到另一個 ls 上 =_=
 complete -k -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags append)"

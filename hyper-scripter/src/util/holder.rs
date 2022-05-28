@@ -4,48 +4,56 @@ use crate::script_repo::{DBEnv, ScriptRepo};
 use crate::{path, util};
 use hyper_scripter_historian::Historian;
 
-pub struct RepoHolder {
-    pub root_args: RootArgs,
-    pub need_journal: bool,
+pub enum Resource {
+    None,
+    Repo(ScriptRepo),
+    Historian(Historian),
+    Env(DBEnv),
+}
+impl Resource {
+    pub async fn close(self) {
+        match self {
+            Self::None => (),
+            Self::Repo(repo) => repo.close().await,
+            Self::Historian(historian) => historian.close().await,
+            Self::Env(env) => env.close().await,
+        }
+    }
 }
 
-pub struct RepoCloser;
-pub struct HistorianCloser;
-pub struct EnvCloser;
+pub struct RepoHolder<'a> {
+    pub root_args: RootArgs,
+    pub need_journal: bool,
+    pub resource: &'a mut Resource,
+}
 
-impl RepoHolder {
-    pub async fn init(self) -> Result<(ScriptRepo, RepoCloser)> {
-        Ok((
-            util::init_repo(self.root_args, self.need_journal).await?,
-            RepoCloser,
-        ))
+impl<'a> RepoHolder<'a> {
+    pub async fn init(self) -> Result<&'a mut ScriptRepo> {
+        let repo = util::init_repo(self.root_args, self.need_journal).await?;
+        *self.resource = Resource::Repo(repo);
+        match self.resource {
+            Resource::Repo(repo) => Ok(repo),
+            _ => unreachable!(),
+        }
     }
-    pub async fn historian(self) -> Result<(Historian, HistorianCloser)> {
+    pub async fn historian(self) -> Result<&'a mut Historian> {
         let historian = Historian::new(path::get_home().to_owned()).await?;
-        Ok((historian, HistorianCloser))
+        *self.resource = Resource::Historian(historian);
+        match self.resource {
+            Resource::Historian(historian) => Ok(historian),
+            _ => unreachable!(),
+        }
     }
-    pub async fn env(self) -> Result<(DBEnv, EnvCloser)> {
+    pub async fn env(self) -> Result<&'a mut DBEnv> {
         let (env, init) = util::init_env(self.need_journal).await?;
         if init {
             log::error!("還沒初始化就想做進階操作 ==");
             std::process::exit(0);
         }
-        Ok((env, EnvCloser))
-    }
-}
-
-impl RepoCloser {
-    pub async fn close(self, repo: ScriptRepo) {
-        repo.close().await
-    }
-}
-impl HistorianCloser {
-    pub async fn close(self, historian: Historian) {
-        historian.close().await
-    }
-}
-impl EnvCloser {
-    pub async fn close(self, env: DBEnv) {
-        env.close().await
+        *self.resource = Resource::Env(env);
+        match self.resource {
+            Resource::Env(env) => Ok(env),
+            _ => unreachable!(),
+        }
     }
 }

@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script::ScriptInfo;
-use crate::script_type::{get_default_template, AsScriptFullTypeRef, DisplayTy, ScriptType};
+use crate::script_type::{get_default_template, AsScriptFullTypeRef, ScriptType};
 use chrono::{DateTime, Utc};
 use colored::Color;
 use std::borrow::Cow;
@@ -162,7 +162,7 @@ pub fn get_or_create_template_path<T: AsScriptFullTypeRef>(
     let tmpl_path = path::get_template_path(ty)?;
     if !tmpl_path.exists() {
         if check_subtype && ty.get_sub().is_some() {
-            return Err(Error::UnknownType(DisplayTy(ty).to_string()));
+            return Err(Error::UnknownType(ty.display().to_string()));
         }
         let default_tmpl = get_default_template(ty);
         return write_file(&tmpl_path, default_tmpl).map(|_| (tmpl_path, Some(default_tmpl)));

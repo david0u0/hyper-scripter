@@ -1,7 +1,7 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
-use crate::script_type::{AsScriptFullTypeRef, DisplayTy, ScriptType};
+use crate::script_type::{AsScriptFullTypeRef, ScriptType};
 use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use fxhash::FxHashSet as HashSet;
@@ -214,7 +214,7 @@ pub fn open_script(
 pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
     let p = get_home()
         .join(TEMPLATE)
-        .join(format!("{}.hbs", DisplayTy(ty)));
+        .join(format!("{}.hbs", ty.display()));
     if let Some(dir) = p.parent() {
         if !dir.exists() {
             log::info!("找不到模板資料夾，創建之");

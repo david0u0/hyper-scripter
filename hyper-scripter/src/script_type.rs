@@ -179,6 +179,9 @@ impl_ser_by_to_string!(ScriptFullType);
 pub trait AsScriptFullTypeRef {
     fn get_ty(&self) -> &ScriptType;
     fn get_sub(&self) -> Option<&ScriptType>;
+    fn display<'a>(&'a self) -> DisplayTy<'a, Self> {
+        DisplayTy(self)
+    }
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         if let Some(sub) = &self.get_sub() {
             write!(w, "{}/{}", self.get_ty(), sub)
@@ -338,7 +341,7 @@ create_default_types! {
 }
 
 /// 因為沒辦法直接對 AsScriptFullTypeRef 實作 Display 不得不多包一層…
-pub struct DisplayTy<'a, U>(pub &'a U);
+pub struct DisplayTy<'a, U: ?Sized>(pub &'a U);
 impl<'a, U: AsScriptFullTypeRef> Display for DisplayTy<'a, U> {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         self.0.fmt(w)

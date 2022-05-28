@@ -40,7 +40,12 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     let root = match root {
         Either::One(root) => root,
         Either::Two(comp) => {
-            completion_util::handle_completion(comp).await?;
+            let mut repo = None;
+            let res = completion_util::handle_completion(comp, &mut repo).await;
+            if let Some(repo) = repo {
+                repo.close().await;
+            }
+            res?;
             std::process::exit(0);
         }
     };

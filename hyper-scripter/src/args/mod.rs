@@ -96,7 +96,6 @@ pub enum AliasSubs {
     Other(Vec<String>),
 }
 #[derive(Parser, Debug, Serialize)]
-#[clap(about, author, version)]
 #[clap(
     args_override_self = true,
     allow_hyphen_values = true,

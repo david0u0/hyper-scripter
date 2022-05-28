@@ -157,6 +157,7 @@ pub struct LastTimeRecord {
 
 impl Historian {
     pub async fn close(self) {
+        log::info!("close the historian database");
         if let Ok(pool) = self.pool.read() {
             pool.close().await;
         }

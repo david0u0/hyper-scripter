@@ -66,7 +66,7 @@ impl ConcreteScriptName {
         Self::new_unchecked(self.stem_inner().to_owned())
     }
     pub fn join(&mut self, other: &ConcreteScriptName) {
-        write!(&mut self.inner, "/{}", other.stem()).unwrap();
+        write!(&mut self.inner, "/{}", other.stem_inner()).unwrap();
     }
     pub fn join_id(&mut self, other: u32) {
         write!(&mut self.inner, "/{}", other).unwrap();
@@ -94,25 +94,20 @@ impl ScriptName {
         check: bool,
     ) -> Result<Option<u32>> {
         log::debug!("檢查腳本名：{}", s);
-        let reg = regex::Regex::new(r"^\.(\d+)$")?;
-        let m = reg.captures(s);
-        if let Some(m) = m {
-            let id_str = m.get(1).unwrap().as_str();
-            match id_str.parse::<u32>() {
+
+        if s.starts_with('.') {
+            if s.len() == 1 && allow_dot {
+                log::info!("特殊規則：允許單一個`.`");
+                return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
+            }
+            match s[1..].parse::<u32>() {
                 Ok(id) => Ok(Some(id)),
                 Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned()).context(e)),
             }
         } else if check {
-            if s == "." {
-                if allow_dot {
-                    log::info!("特殊規則：允許單一個`.`");
-                    return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
-                }
-            } else if s.ends_with('/') {
-                if allow_endwith_slash {
-                    log::info!("特殊規則：允許以`/`結尾");
-                    s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
-                }
+            if s.ends_with('/') && allow_endwith_slash {
+                log::info!("特殊規則：允許以`/`結尾");
+                s = &s[..s.len() - 1]; // NOTE: 有了補全，很容易補出帶著`/`結尾的指令，放寬標準吧
             }
             ConcreteScriptName::valid(&s)?;
             Ok(None)

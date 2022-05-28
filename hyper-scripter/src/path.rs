@@ -150,12 +150,12 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
     }
 
     let mut ids = vec![];
+    let re = regex::Regex::new(r"\..+$").unwrap();
     for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
         let name = entry?.file_name();
         let name = name
             .to_str()
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
-        let re = regex::Regex::new(r"\..+$").unwrap();
         let name = re.replace(name, "");
         match name.parse::<u32>() {
             Ok(id) => ids.push(id),
@@ -231,12 +231,12 @@ pub fn get_sub_types(ty: &ScriptType) -> Result<Vec<ScriptType>> {
     }
 
     let mut subs = vec![];
+    let re = regex::Regex::new(r"\.hbs$").unwrap();
     for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
         let name = entry?.file_name();
         let name = name
             .to_str()
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
-        let re = regex::Regex::new(r"\.hbs$").unwrap();
         let name = re.replace(&name, "");
         subs.push(name.parse()?);
     }

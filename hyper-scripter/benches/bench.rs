@@ -3,7 +3,7 @@
 
 use criterion::{black_box, Bencher, Criterion};
 use criterion_macro::criterion;
-use hyper_scripter::{fuzzy::*, util::main_util::prepare_pre_run};
+use hyper_scripter::{fuzzy::*, script::ScriptName, util::main_util::prepare_pre_run};
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
 
 #[allow(dead_code)]
@@ -35,14 +35,19 @@ fn gen_name(rng: &mut StdRng) -> String {
     }
 }
 fn sample_name(rng: &mut StdRng, name: &str) -> String {
-    let mut ret = "".to_owned();
-    let len = rng.gen_range(SHORT);
-    let mut idx_sample: Vec<_> = sample(rng, LONG, len).iter().collect();
-    idx_sample.sort();
-    for idx in idx_sample.into_iter() {
-        ret.push(name.chars().nth(idx).unwrap());
+    loop {
+        let mut ret = "".to_owned();
+        let len = rng.gen_range(SHORT);
+        let mut idx_sample: Vec<_> = sample(rng, LONG, len).iter().collect();
+        idx_sample.sort();
+        for idx in idx_sample.into_iter() {
+            ret.push(name.chars().nth(idx).unwrap());
+        }
+        if ScriptName::valid(&ret, true, true, true).is_err() {
+            continue;
+        }
+        return ret;
     }
-    ret
 }
 
 #[criterion]

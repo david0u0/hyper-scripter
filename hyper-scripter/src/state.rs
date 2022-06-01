@@ -19,10 +19,7 @@ macro_rules! set_once {
         use std::sync::Once;
         static ONCE: Once = Once::new();
         ONCE.call_once(|| {
-            #[cfg(test)]
-            $state.set_test($f());
-            #[cfg(not(test))]
-            $state.set($f());
+            $state.set_force($f());
         });
     }};
 }
@@ -36,13 +33,13 @@ impl<T: Sized> State<T> {
         }
     }
 
+    /// 不論是否為測試中，強制設定狀態
+    pub fn set_force(&self, data: T) {
+        self.set_inner(data)
+    }
     #[cfg(test)]
     pub fn set(&self, _data: T) {
         log::info!("測試中，不設定狀態");
-    }
-    #[cfg(test)]
-    pub fn set_test(&self, data: T) {
-        self.set_inner(data)
     }
     #[cfg(not(test))]
     pub fn set(&self, data: T) {

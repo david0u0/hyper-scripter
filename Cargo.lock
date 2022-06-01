@@ -847,7 +847,6 @@ dependencies = [
  "handlebars",
  "hyper-scripter-historian",
  "hyper-scripter-util",
- "lazy_static",
  "log",
  "openssl",
  "prettytable-rs",

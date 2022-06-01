@@ -2,6 +2,8 @@ use hyper_scripter::{
     config::{Config, PromptLevel},
     error::EXIT_KNOWN_ERR,
     path::normalize_path,
+    set_once,
+    state::State,
 };
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -9,10 +11,6 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Mutex, MutexGuard, Once};
 
 pub const HOME_RELATIVE: &str = "./.hyper_scripter";
-lazy_static::lazy_static! {
-    static ref LOCK: Mutex<()> = Mutex::new(());
-    static ref HOME: PathBuf = normalize_path(HOME_RELATIVE).unwrap();
-}
 
 fn get_exe() -> String {
     #[cfg(not(debug_assertions))]
@@ -76,7 +74,7 @@ impl Error {
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub fn get_home() -> PathBuf {
-    HOME.clone()
+    normalize_path(HOME_RELATIVE).unwrap()
 }
 pub fn load_conf() -> Config {
     Config::load(hyper_scripter::path::get_home()).unwrap()
@@ -87,7 +85,9 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
     g
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
-    let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    static LOCK: State<Mutex<()>> = State::new();
+    set_once!(LOCK, || Mutex::new(()));
+    let guard = LOCK.get().lock().unwrap_or_else(|err| err.into_inner());
     let _ = env_logger::try_init();
     let home: PathBuf = get_home();
     match std::fs::remove_dir_all(&home) {

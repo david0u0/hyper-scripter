@@ -46,6 +46,7 @@ default = []
 hard-home = []
 no-state-check = []
 benching = []
+no-log = ["log/max_level_off"]
 
 [dependencies]
 console = "0.13.0"
@@ -84,7 +85,6 @@ tokio = { version = "1", features = ["full"] }
 log = "0.4.8"
 
 [dev-dependencies]
-lazy_static = "1.4"
 rand = "0.8.3"
 criterion = "0.3"
 criterion-macro = "0.3"

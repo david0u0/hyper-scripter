@@ -97,7 +97,7 @@ fn test_sub_tmpl() {
     modify_types_vec(&mut types, &[JS_SUPER_WEIRD_NAME], &[]);
     assert_eq!(get_types_vec(), types);
 
-    run!("e weird-test -T {} --fast", JS_SUPER_WEIRD_NAME).unwrap();
+    run!("e weird-test -T {} -f", JS_SUPER_WEIRD_NAME).unwrap();
     assert_eq!(WEIRD_JS_STR, run!("weird-test").unwrap());
     run!("traverse-test").expect("刪個子模版不應影響已存在的腳本！");
 }

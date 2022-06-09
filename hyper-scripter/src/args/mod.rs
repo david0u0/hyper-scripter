@@ -169,7 +169,7 @@ pub enum Subs {
         no_template: bool,
         #[clap(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[clap(long, help = "Create script without invoking the editor")]
+        #[clap(long, short, help = "Create script without invoking the editor")]
         fast: bool,
         #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: EditQuery<ScriptQuery>,

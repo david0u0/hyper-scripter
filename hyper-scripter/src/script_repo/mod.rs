@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
+use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelectorGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
@@ -369,13 +370,12 @@ impl ScriptRepo {
             let mut builder = ScriptInfo::builder(
                 record.id,
                 script_name,
-                record.ty.into(),
+                ScriptType::new_unchecked(record.ty),
                 record.tags.split(',').filter_map(|s| {
                     if s.is_empty() {
                         None
                     } else {
-                        // TODO: 錯誤處理，至少印個警告
-                        s.parse().ok()
+                        Some(Tag::new_unchecked(s.to_string()))
                     }
                 }),
             );

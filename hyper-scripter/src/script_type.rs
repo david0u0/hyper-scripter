@@ -118,14 +118,8 @@ end";
 #[derive(Clone, Display, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct ScriptType(String);
-impl From<&str> for ScriptType {
-    fn from(s: &str) -> Self {
-        s.parse().unwrap()
-    }
-}
-impl From<String> for ScriptType {
-    fn from(s: String) -> Self {
-        // TODO: 檢查
+impl ScriptType {
+    pub fn new_unchecked(s: String) -> Self {
         ScriptType(s)
     }
 }
@@ -141,12 +135,12 @@ impl FromStr for ScriptType {
             log::error!("類型格式不符：{}", s);
             return Err(Error::Format(TypeCode, s.to_owned()).into());
         }
-        Ok(s.to_owned().into())
+        Ok(ScriptType(s.to_string()))
     }
 }
 impl Default for ScriptType {
     fn default() -> Self {
-        "sh".into()
+        ScriptType("sh".to_string())
     }
 }
 

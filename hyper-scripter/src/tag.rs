@@ -86,6 +86,9 @@ impl Tag {
         // TODO: loop invariant 優化
         &self.0 == "all"
     }
+    pub fn new_unchecked(s: String) -> Self {
+        Tag(s)
+    }
 }
 impl FromStr for Tag {
     type Err = DisplayError;

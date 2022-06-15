@@ -35,6 +35,7 @@ pub enum FormatCode {
     PromptLevel,
     Config,
     ScriptName,
+    ScriptType,
     Regex,
     RangeQuery,
     ScriptQuery,

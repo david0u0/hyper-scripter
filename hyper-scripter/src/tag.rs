@@ -1,4 +1,5 @@
 use crate::error::{DisplayError, DisplayResult, Error, FormatCode::Tag as TagCode};
+use crate::script_type::ScriptType;
 use crate::util::illegal_name;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::FxHashSet as HashSet;
@@ -17,10 +18,10 @@ impl TagSelectorGroup {
             self.0 = vec![selector];
         }
     }
-    pub fn select(&self, tags: &TagSet) -> bool {
+    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> bool {
         let mut pass = false;
         for f in self.0.iter() {
-            let res = f.select(tags);
+            let res = f.select(tags, ty);
             if f.mandatory {
                 if res != Some(true) {
                     return false;
@@ -50,8 +51,29 @@ impl_ser_by_to_string!(TagSelector);
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagControl {
     allow: bool,
-    tag: Tag,
+    tag: TagOrType,
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Display)]
+pub enum TagOrType {
+    #[display(fmt = "@{}", _0)]
+    Type(ScriptType),
+    #[display(fmt = "{}", _0)]
+    Tag(Tag),
+}
+impl_de_by_from_str!(TagOrType);
+impl_ser_by_to_string!(TagOrType);
+impl FromStr for TagOrType {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        Ok(if s.starts_with('@') {
+            TagOrType::Type(s[1..].parse()?)
+        } else {
+            TagOrType::Tag(s.parse()?)
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub struct Tag(String);
 impl AsRef<str> for Tag {
@@ -138,7 +160,7 @@ impl Display for TagSelector {
             if !f.allow {
                 write!(w, "^")?;
             }
-            write!(w, "{}", f.tag.0)?;
+            write!(w, "{}", f.tag)?;
         }
         if self.mandatory {
             write!(w, "{}", MANDATORY_SUFFIX)?;
@@ -159,18 +181,22 @@ impl TagSelector {
         U: std::hash::BuildHasher,
     {
         for control in self.tags.into_iter() {
+            let tag = match control.tag {
+                TagOrType::Type(_) => continue, // 類型篩選，跳過
+                TagOrType::Tag(t) => t,
+            };
             if control.allow {
                 // NOTE: `match_all` 是特殊的，不用被外界知道，雖然知道了也不會怎樣
-                if control.tag.match_all() {
+                if tag.match_all() {
                     continue;
                 }
-                set.insert(control.tag);
+                set.insert(tag);
             } else {
-                if control.tag.match_all() {
+                if tag.match_all() {
                     set.clear(); // XXX: is this the right thing to do?
                     continue;
                 }
-                set.remove(&control.tag);
+                set.remove(&tag);
             }
         }
     }
@@ -179,10 +205,14 @@ impl TagSelector {
         self.fill_allowed_map(&mut set);
         set.into_iter()
     }
-    pub fn select(&self, tags: &TagSet) -> Option<bool> {
+    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> Option<bool> {
         let mut pass: Option<bool> = None;
         for ctrl in self.tags.iter() {
-            if ctrl.tag.match_all() || tags.contains(&&ctrl.tag) {
+            let hit = match &ctrl.tag {
+                TagOrType::Type(t) => ty == t,
+                TagOrType::Tag(t) => t.match_all() || tags.contains(t),
+            };
+            if hit {
                 pass = Some(ctrl.allow);
             }
         }

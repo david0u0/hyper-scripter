@@ -47,6 +47,7 @@ impl Display for Error {
                     ScriptName => write!(f, "script name")?,
                     Regex => write!(f, "regular expression")?,
                     ScriptQuery => write!(f, "script query")?,
+                    ScriptType => write!(f, "script type")?,
                     Tag => write!(f, "tag")?,
                     PromptLevel => write!(f, "prompt level")?,
                     NonEmptyArray => {

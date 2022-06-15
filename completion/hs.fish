@@ -48,6 +48,28 @@ function __hs_list_tags
     end
 end
 
+function __hs_list_tags_and_types
+    __hs_list_tags $argv
+
+    if [ "$argv" = "append" ]
+        set append 1
+    else if [ "$argv" = "both" ]
+        set append 1
+        set no_append 1
+    else
+        set no_append 1
+    end
+
+    for ty in (string split ' ' (__hs_extract_home_and_run types ls --no-sub))
+        if set -q append
+            echo +@$ty\t+$ty
+        end
+        if set -q no_append
+            echo @$ty\t$ty
+        end
+    end
+end
+
 function __hs_list_scripts
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
@@ -160,7 +182,7 @@ function __hs_use_subcommand
 end
 
 complete -c hs -n "__hs_use_subcommand" -s H -l hs-home -d 'Path to hyper script home' -r -F
-complete -k -c hs -n "__hs_use_subcommand" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__hs_use_subcommand" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__hs_use_subcommand" -l recent -d 'Show scripts within recent days.' -r -f -a ""
 complete -c hs -n "__hs_use_subcommand" -l prompt-level -d 'Prompt level of fuzzy finder.' -r -f -a "never always smart on-multi-fuzz"
 complete -c hs -n "__hs_use_subcommand" -l toggle -d 'Toggle named selector temporarily' -r -f -a "(__hs_list_named_selectors)"
@@ -188,7 +210,7 @@ complete -c hs -n "__hs_use_subcommand" -f -a "types" -d 'Manage script types'
 complete -c hs -n "__hs_use_subcommand" -f -a "tags" -d 'Manage script tags. If a tag selector is given, store it to config, otherwise show tag information.'
 complete -c hs -n "__hs_use_subcommand" -f -a "history" -d 'Manage script history'
 
-complete -k -c hs -n "__fish_seen_subcommand_from help" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from help" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from help" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from help" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from help" -l no-trace -d 'Do not record history'
@@ -199,7 +221,7 @@ complete -c hs -n "__fish_seen_subcommand_from help" -l timeless -d 'Show script
 
 complete -c hs -n "__fish_seen_subcommand_from edit" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
 complete -k -c hs -n "__fish_seen_subcommand_from edit" -s t -l tags -r -f -a "(__hs_list_tags both)"
-complete -k -c hs -n "__fish_seen_subcommand_from edit" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from edit" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from edit" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from edit" -s n -l no-template
 complete -c hs -n "__fish_seen_subcommand_from edit" -l fast -d 'Create script without invoking the editor'
@@ -210,7 +232,7 @@ complete -c hs -n "__fish_seen_subcommand_from edit" -s A -l archaeology -d 'Sho
 complete -c hs -n "__fish_seen_subcommand_from edit" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from edit" -l timeless -d 'Show scripts of all time.'
 
-complete -k -c hs -n "__fish_seen_subcommand_from alias" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from alias" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from alias" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from alias" -s u -l unset -d 'Unset an alias.'
 complete -c hs -n "__fish_seen_subcommand_from alias" -l no-trace -d 'Do not record history'
@@ -219,7 +241,7 @@ complete -c hs -n "__fish_seen_subcommand_from alias" -s A -l archaeology -d 'Sh
 complete -c hs -n "__fish_seen_subcommand_from alias" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from alias" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_seen_subcommand_from run" -s r -l repeat
-complete -k -c hs -n "__fish_seen_subcommand_from run" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from run" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from run" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from run" -l dummy -d 'Add a dummy run history instead of actually running it'
 complete -c hs -n "__fish_seen_subcommand_from run" -s p -l previous-args
@@ -229,7 +251,7 @@ complete -c hs -n "__fish_seen_subcommand_from run" -l humble -d 'Do not affect 
 complete -c hs -n "__fish_seen_subcommand_from run" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from run" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from run" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from which" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from which" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from which" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from which" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from which" -l no-trace -d 'Do not record history'
@@ -237,7 +259,7 @@ complete -c hs -n "__fish_seen_subcommand_from which" -l humble -d 'Do not affec
 complete -c hs -n "__fish_seen_subcommand_from which" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from which" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from which" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from cat" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from cat" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from cat" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from cat" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from cat" -l no-trace -d 'Do not record history'
@@ -246,7 +268,7 @@ complete -c hs -n "__fish_seen_subcommand_from cat" -s A -l archaeology -d 'Show
 complete -c hs -n "__fish_seen_subcommand_from cat" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from cat" -l timeless -d 'Show scripts of all time.'
 
-complete -k -c hs -n "__fish_seen_subcommand_from rm" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from rm" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from rm" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from rm" -l purge -d 'Actually remove scripts, rather than hiding them with tag.'
 complete -c hs -n "__fish_seen_subcommand_from rm" -s h -l help -d 'Prints help information'
@@ -261,7 +283,7 @@ complete -c hs -n "__fish_seen_subcommand_from types" -f -a "(__hs_list_types)"
 complete -c hs -n "__fish_seen_subcommand_from template" -s e -l edit
 
 complete -c hs -n "__fish_seen_subcommand_from ls" -l grouping -d 'Grouping style.' -r -f -a "tag tree none"
-complete -k -c hs -n "__fish_seen_subcommand_from ls" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from ls" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from ls" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -s l -l long -d 'Show verbose information.'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l plain -d 'No color and other decoration.'
@@ -275,7 +297,7 @@ complete -c hs -n "__fish_seen_subcommand_from ls" -s A -l archaeology -d 'Show 
 complete -c hs -n "__fish_seen_subcommand_from ls" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l timeless -d 'Show scripts of all time.'
 complete -c hs -n "__fish_seen_subcommand_from cp" -s t -l tags
-complete -k -c hs -n "__fish_seen_subcommand_from cp" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from cp" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from cp" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from cp" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from cp" -l no-trace -d 'Do not record history'
@@ -283,9 +305,9 @@ complete -c hs -n "__fish_seen_subcommand_from cp" -l humble -d 'Do not affect s
 complete -c hs -n "__fish_seen_subcommand_from cp" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from cp" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from cp" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_seen_subcommand_from mv" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types)"
+complete -c hs -n "__fish_seen_subcommand_from mv" -s T -l ty -d 'Type of the script, e.g. `sh`' -r -f -a "(__hs_list_types --no-sub)"
 complete -k -c hs -n "__fish_seen_subcommand_from mv" -s t -l tags -r -f -a "(__hs_list_tags both)"
-complete -k -c hs -n "__fish_seen_subcommand_from mv" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from mv" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from mv" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from mv" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from mv" -l no-trace -d 'Do not record history'
@@ -294,7 +316,7 @@ complete -c hs -n "__fish_seen_subcommand_from mv" -s A -l archaeology -d 'Show 
 complete -c hs -n "__fish_seen_subcommand_from mv" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from mv" -l timeless -d 'Show scripts of all time.'
 
-complete -k -c hs -n "__fish_seen_subcommand_from tags" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from tags" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from tags" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from tags" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_seen_subcommand_from tags" -l humble -d 'Do not affect script time (but will still record history)'
@@ -308,13 +330,12 @@ complete -c hs -n "__fish_prev_arg_in tags" -f -a "toggle"
 complete -c hs -n "__fish_seen_subcommand_from tags" -s n -l name -r -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from set" -s n -l name -r -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from ls" -s k -l known # FIXME: 這會補到另一個 ls 上 =_=
-complete -k -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags append)"
-complete -k -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"
-complete -k -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags append)"
+complete -k -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags_and_types append)"
+complete -k -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags_and_types append)"
 complete -c hs -n "__fish_seen_subcommand_from unset" -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from toggle" -f -a "(__hs_list_named_selectors)"
 
-complete -k -c hs -n "__fish_seen_subcommand_from history" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from history" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from history" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from history" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from history" -l no-trace -d 'Do not record history'
@@ -330,7 +351,7 @@ complete -c hs -n "__fish_prev_arg_in history" -f -a "show"
 complete -c hs -n "__fish_prev_arg_in history" -f -a "neglect"
 complete -c hs -n "__fish_prev_arg_in history" -f -a "amend"
 complete -c hs -n "__fish_prev_arg_in history" -f -a "tidy"
-complete -k -c hs -n "__fish_seen_subcommand_from rm" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from rm" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from rm" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from rm" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from rm" -l no-trace -d 'Do not record history'
@@ -338,7 +359,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm" -l humble -d 'Do not affect s
 complete -c hs -n "__fish_seen_subcommand_from rm" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from rm" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from rm" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from rm-id" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from rm-id" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from rm-id" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from rm-id" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from rm-id" -l no-trace -d 'Do not record history'
@@ -349,7 +370,7 @@ complete -c hs -n "__fish_seen_subcommand_from rm-id" -l timeless -d 'Show scrip
 complete -c hs -n "__fish_seen_subcommand_from show" -s l -l limit
 complete -c hs -n "__fish_seen_subcommand_from show" -s o -l offset
 complete -c hs -n "__fish_seen_subcommand_from show" -s d -l dir
-complete -k -c hs -n "__fish_seen_subcommand_from show" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from show" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from show" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from show" -l with-name
 complete -c hs -n "__fish_seen_subcommand_from show" -s h -l help -d 'Prints help information'
@@ -358,7 +379,7 @@ complete -c hs -n "__fish_seen_subcommand_from show" -l humble -d 'Do not affect
 complete -c hs -n "__fish_seen_subcommand_from show" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from show" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from show" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from neglect" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from neglect" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from neglect" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from neglect" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from neglect" -l no-trace -d 'Do not record history'
@@ -366,14 +387,14 @@ complete -c hs -n "__fish_seen_subcommand_from neglect" -l humble -d 'Do not aff
 complete -c hs -n "__fish_seen_subcommand_from neglect" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from neglect" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from neglect" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from amend" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from amend" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from amend" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from amend" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_seen_subcommand_from amend" -l humble -d 'Do not affect script time (but will still record history)'
 complete -c hs -n "__fish_seen_subcommand_from amend" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from amend" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from amend" -l timeless -d 'Show scripts of all time.'
-complete -k -c hs -n "__fish_seen_subcommand_from tidy" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags both)"
+complete -k -c hs -n "__fish_seen_subcommand_from tidy" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from tidy" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from tidy" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from tidy" -l no-trace -d 'Do not record history'

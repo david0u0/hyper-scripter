@@ -1,5 +1,6 @@
-use crate::error::{DisplayError, DisplayResult, Error};
+use crate::error::{DisplayError, DisplayResult, Error, FormatCode::ScriptType as TypeCode};
 use crate::impl_ser_by_to_string;
+use crate::util::illegal_name;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
@@ -136,6 +137,10 @@ impl AsRef<str> for ScriptType {
 impl FromStr for ScriptType {
     type Err = DisplayError;
     fn from_str(s: &str) -> DisplayResult<Self> {
+        if illegal_name(s) {
+            log::error!("類型格式不符：{}", s);
+            return Err(Error::Format(TypeCode, s.to_owned()).into());
+        }
         Ok(s.to_owned().into())
     }
 }

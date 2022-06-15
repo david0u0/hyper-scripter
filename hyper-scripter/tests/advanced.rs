@@ -116,3 +116,33 @@ fn test_bang_list_query() {
     assert_ls(vec![&a, &b, &c, &d], None, Some("dir/*!"));
     run!("ls dir2/*!").expect_err("不存在的列表查詢還是得報錯");
 }
+
+#[test]
+fn test_type_select() {
+    let _g = setup();
+    let a_rb = "a";
+    let b = "b";
+    let c_rb = "c";
+    let d = "d";
+    let e_hide_rb = "e";
+    let f_tag_rb = "f";
+
+    run!("e -f {}", b).unwrap();
+    run!("e -f {}", d).unwrap();
+    run!("e -f -T rb {}", a_rb).unwrap();
+    run!("e -f -T rb {}", c_rb).unwrap();
+    run!("e -f -t hide -T rb {}", e_hide_rb).unwrap();
+    run!("e -f -t tag -T rb {}", f_tag_rb).unwrap();
+
+    assert_ls(vec![a_rb, b, c_rb, d, f_tag_rb], None, None);
+    assert_ls(vec![b, d], Some("@sh"), None);
+    assert_ls(vec![b, d, f_tag_rb], Some("@sh,tag"), None);
+
+    assert_ls(vec![a_rb, c_rb, f_tag_rb], Some("+^@sh"), None);
+    assert_ls(vec![a_rb, c_rb], Some("+^@sh,^tag"), None);
+
+    assert_ls(vec![a_rb, c_rb, e_hide_rb, f_tag_rb], Some("@rb"), None);
+    assert_ls(vec![a_rb, b, c_rb, d, f_tag_rb], Some("+@rb"), None);
+
+    assert_ls(vec![a_rb, c_rb, f_tag_rb], Some("+@rb!"), None);
+}

@@ -416,7 +416,7 @@ impl ScriptRepo {
                 hide = archaeology ^ overtime
             }
             if !hide {
-                hide = !selector.select(&script.tags);
+                hide = !selector.select(&script.tags, &script.ty);
             }
 
             if hide {

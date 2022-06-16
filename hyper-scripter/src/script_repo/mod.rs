@@ -356,9 +356,8 @@ impl ScriptRepo {
             (time, r.archaeology)
         });
 
-        // FIXME: should use left join, but it breaks sqlx ^0.5
         let scripts = sqlx::query!(
-            "SELECT * FROM script_infos si JOIN last_events le ON si.id = le.script_id"
+            "SELECT * FROM script_infos si LEFT JOIN last_events le ON si.id = le.script_id"
         )
         .fetch_all(&db_env.info_pool)
         .await?;
@@ -381,7 +380,9 @@ impl ScriptRepo {
             );
 
             builder.created_time(record.created_time);
-            builder.exec_count(record.exec_count as u64);
+            if let Some(count) = record.exec_count {
+                builder.exec_count(count as u64);
+            }
             if let Some(time) = record.write {
                 builder.write_time(time);
             }

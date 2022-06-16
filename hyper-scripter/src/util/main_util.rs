@@ -8,6 +8,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
+use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 
 pub struct EditTagArgs {
@@ -24,8 +25,8 @@ pub async fn mv(
     ty: Option<ScriptType>,
     tags: Option<TagSelector>,
 ) -> Result {
-    let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     if ty.is_some() || new_name.is_some() {
+        let og_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
         let new_name = new_name.as_ref().unwrap_or(&entry.name);
         let new_ty = ty.as_ref().unwrap_or(&entry.ty);
         let new_path = path::open_script(new_name, new_ty, None)?; // NOTE: 不判斷存在性，因為接下來要對新舊腳本同路徑的狀況做特殊處理
@@ -88,6 +89,11 @@ pub async fn edit_or_create(
                     }
                     check_path_collision(&p, script_repo)?;
                     log::warn!("編輯野生腳本！");
+                } else {
+                    // NOTE: 創建資料夾
+                    if let Some(parent) = p.parent() {
+                        super::handle_fs_res(&[&p], create_dir_all(parent))?;
+                    }
                 }
                 (name, p)
             }
@@ -293,12 +299,17 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             vec!["util".parse().unwrap()]
         };
         let p = path::open_script(&name, &ty, Some(false))?;
-        let mut entry = script_repo
+
+        // NOTE: 創建資料夾
+        if let Some(parent) = p.parent() {
+            super::handle_fs_res(&[&p], create_dir_all(parent))?;
+        }
+
+        let entry = script_repo
             .entry(&name)
             .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
             .await?;
         super::prepare_script(&p, &*entry, None, true, &[u.content])?;
-        entry.update(|info| info.write()).await?;
     }
     Ok(())
 }

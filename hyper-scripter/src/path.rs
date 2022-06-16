@@ -192,8 +192,11 @@ pub fn open_script(
     ty: &ScriptType,
     check_exist: Option<bool>,
 ) -> Result<PathBuf> {
+    let mut err_in_fallback = None;
     let script_path = if check_exist == Some(true) {
-        name.to_file_path_fallback(ty)
+        let (p, e) = name.to_file_path_fallback(ty);
+        err_in_fallback = e;
+        p
     } else {
         name.to_file_path(ty)?
     };
@@ -201,6 +204,9 @@ pub fn open_script(
 
     if let Some(should_exist) = check_exist {
         if !script_path.exists() && should_exist {
+            if let Some(e) = err_in_fallback {
+                return Err(e);
+            }
             return Err(
                 Error::PathNotFound(vec![script_path]).context("開腳本失敗：應存在卻不存在")
             );
@@ -246,6 +252,11 @@ pub fn get_sub_types(ty: &ScriptType) -> Result<Vec<ScriptType>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    impl From<&'static str> for ScriptType {
+        fn from(s: &'static str) -> Self {
+            ScriptType::new_unchecked(s.to_string())
+        }
+    }
     #[test]
     fn test_anonymous_ids() {
         let mut ids = get_anonymous_ids().unwrap();
@@ -290,6 +301,6 @@ mod test {
         assert_eq!(p, get_home().join("second.no-such-type"));
         // 用類別名當擴展名仍找不到，當然還是要報錯
         let err = open_script(&not_exist, &"no-such-type".into(), Some(true)).unwrap_err();
-        assert!(matches!(err, Error::PathNotFound(_)));
+        assert!(matches!(err, Error::UnknownType(_)));
     }
 }

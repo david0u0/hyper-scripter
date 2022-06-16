@@ -346,30 +346,41 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
         Subs::RM { queries, purge } => {
             let repo = repo.init().await?;
             let delete_tag: Option<TagSelector> = Some("+remove".parse().unwrap());
-            let mut to_purge = vec![]; // (name, ty, id)
+            let mut to_purge = vec![]; // (Option<path>, id)
             for mut entry in query::do_list_query(repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
+                let try_open_res = path::open_script(&entry.name, &entry.ty, Some(true));
                 if purge {
                     log::debug!("真的刪除腳本！");
-                    to_purge.push((entry.name.clone(), entry.ty.clone(), entry.id));
+                    let p = match try_open_res {
+                        Ok(p) => Some(p),
+                        Err(e) => {
+                            log::warn!("試開腳本時出錯：{}", e);
+                            None
+                        }
+                    };
+                    to_purge.push((p, entry.id));
                 } else {
                     log::debug!("不要真的刪除腳本，改用標籤隱藏之：{:?}", entry.name);
-                    let res = main_util::mv(&mut entry, None, None, delete_tag.clone()).await;
-                    match res {
+                    match try_open_res {
                         Err(Error::PathNotFound(_)) => {
                             log::warn!("{:?} 實體不存在，消滅之", entry.name);
-                            to_purge.push((entry.name.clone(), entry.ty.clone(), entry.id));
+                            to_purge.push((None, entry.id));
                         }
-                        Err(e) => return Err(e),
+                        Err(e) => {
+                            log::warn!("試開腳本時出錯：{}", e); // e.g. unknown type
+                        }
                         _ => (),
                     }
+                    main_util::mv(&mut entry, None, None, delete_tag.clone()).await?;
                 }
             }
-            for (name, ty, id) in to_purge.into_iter() {
-                let p = path::open_script(&name, &ty, None)?;
+            for (p, id) in to_purge.into_iter() {
                 repo.remove(id).await?;
-                if let Err(e) = util::remove(&p) {
-                    log::warn!("刪除腳本實體遭遇錯誤：{}", e);
+                if let Some(p) = p {
+                    if let Err(e) = util::remove(&p) {
+                        log::warn!("刪除腳本實體遭遇錯誤：{}", e);
+                    }
                 }
             }
         }

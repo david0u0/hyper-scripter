@@ -230,10 +230,6 @@ pub fn prepare_script<T: AsRef<str>>(
         let birthplace = path::normalize_path(".")?;
         let birthplace_rel = relative_to_home(&birthplace);
 
-        // NOTE: 創建資料夾和檔案
-        if let Some(parent) = path.parent() {
-            handle_fs_res(&[path], create_dir_all(parent))?;
-        }
         let mut file = handle_fs_res(&[path], File::create(&path))?;
 
         let content = content.iter().map(|s| s.as_ref().split('\n')).flatten();

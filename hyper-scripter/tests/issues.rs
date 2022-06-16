@@ -2,6 +2,7 @@
 #[path = "tool.rs"]
 mod tool;
 
+use hyper_scripter::script_type::ScriptType;
 use std::fs::remove_file;
 use tool::*;
 
@@ -318,4 +319,43 @@ fn test_existing_path() {
     run!("e =dir/file.sh/file | echo 1").unwrap_err();
 
     assert_ls_len(1, Some("all"), None);
+}
+
+#[test]
+fn test_unknown_type_strange_ext() {
+    println!("測試未知腳本類型");
+    let _g = setup();
+
+    let ty: ScriptType = "rb".parse().unwrap();
+    let name = "this-name";
+    let mut conf = load_conf();
+    let ty_conf = conf.types.get_mut(&ty).unwrap();
+    ty_conf.ext = Some("strange-ext".to_owned());
+    conf.store().unwrap();
+
+    run!("e {} -T rb | puts 1", name).unwrap();
+
+    let which = run!("which -").unwrap();
+    assert!(which.ends_with(&format!("/{}.strange-ext", name)));
+    assert_eq!(run!("-").unwrap(), "1");
+
+    let mut conf = load_conf();
+    conf.types.remove(&ty);
+    conf.store().unwrap();
+
+    let which = run!("which -").unwrap();
+    assert!(which.ends_with(&format!("/{}.rb", name)));
+    run!("-").unwrap_err();
+
+    assert_ls_len(1, None, None);
+    run!("rm {}", name).unwrap();
+    assert_ls_len(0, None, None);
+    assert_ls_len(1, Some("all"), None);
+
+    run!("mv -t all {}!", name).unwrap();
+    assert_ls_len(1, None, None);
+
+    run!("rm {} --purge", name).unwrap();
+    assert_ls_len(0, None, None);
+    assert_ls_len(0, Some("all"), None);
 }

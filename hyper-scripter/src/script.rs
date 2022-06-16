@@ -136,14 +136,23 @@ impl ScriptName {
     }
     /// 回傳值是相對於 HS_HOME 的路徑
     pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
-        self.to_file_path_inner(ty, false)
+        self.to_file_path_inner(ty, false).map(|t| t.0)
     }
     /// 回傳值是相對於 HS_HOME 的路徑，對未知的類別直接用類別名作擴展名
-    pub fn to_file_path_fallback(&self, ty: &ScriptType) -> PathBuf {
+    pub fn to_file_path_fallback(&self, ty: &ScriptType) -> (PathBuf, Option<Error>) {
         self.to_file_path_inner(ty, true).unwrap()
     }
-    fn to_file_path_inner(&self, ty: &ScriptType, fallback: bool) -> Result<PathBuf> {
-        fn add_ext(name: &mut String, ty: &ScriptType, fallback: bool) -> Result {
+    fn to_file_path_inner(
+        &self,
+        ty: &ScriptType,
+        fallback: bool,
+    ) -> Result<(PathBuf, Option<Error>)> {
+        fn add_ext(
+            name: &mut String,
+            ty: &ScriptType,
+            fallback: bool,
+            err: &mut Option<Error>,
+        ) -> Result {
             let ext = match Config::get().get_script_conf(ty) {
                 Err(e) => {
                     if !fallback {
@@ -153,6 +162,7 @@ impl ScriptName {
                         "取腳本路徑時找不到類別設定：{}，直接把類別名當擴展名試試",
                         e,
                     );
+                    *err = Some(e);
                     Some(ty.as_ref())
                 }
                 Ok(c) => c.ext.as_ref().map(|s| s.as_ref()),
@@ -162,17 +172,18 @@ impl ScriptName {
             }
             Ok(())
         }
+        let mut err = None;
         match self {
             ScriptName::Anonymous(id) => {
                 let mut file_name = id.to_string();
                 let dir: PathBuf = ANONYMOUS.into();
-                add_ext(&mut file_name, ty, fallback)?;
-                Ok(dir.join(file_name))
+                add_ext(&mut file_name, ty, fallback, &mut err)?;
+                Ok((dir.join(file_name), err))
             }
             ScriptName::Named(name) => {
                 let mut file_name = name.to_string();
-                add_ext(&mut file_name, ty, fallback)?;
-                Ok(file_name.into())
+                add_ext(&mut file_name, ty, fallback, &mut err)?;
+                Ok((file_name.into(), err))
             }
         }
     }
@@ -274,7 +285,7 @@ impl ScriptInfo {
         )
     }
     pub fn file_path_fallback(&self) -> PathBuf {
-        self.name.to_file_path_fallback(&self.ty)
+        self.name.to_file_path_fallback(&self.ty).0
     }
     pub fn read(&mut self) {
         self.read_time = ScriptTime::now(());

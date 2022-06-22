@@ -518,14 +518,20 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             }
         }
         Subs::History {
-            subcmd: History::RM { queries, range },
+            subcmd:
+                History::RM {
+                    queries,
+                    dir,
+                    range,
+                },
         } => {
             let repo = repo.init().await?;
             let historian = repo.historian().clone();
             let mut scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
+            let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let res_vec = historian
-                .ignore_args_range(&ids, range.get_min(), range.get_max())
+                .ignore_args_range(&ids, dir.as_deref(), range.get_min(), range.get_max())
                 .await?;
             // TODO: 測試多個腳本的狀況
             for (entry, res) in scripts.iter_mut().zip(res_vec) {

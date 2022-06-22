@@ -316,7 +316,7 @@ fn test_event_path() {
     run!(dir: &dir_a, "- c").unwrap();
 
     const SHOW: &str = "history show -";
-    let do_test = move || {
+    let do_test = || {
         let recorded = run!("{}", SHOW).unwrap();
         assert_list(&recorded, &["c", "b", "a"]);
 
@@ -345,6 +345,12 @@ fn test_event_path() {
     do_test();
     run!("history tidy -").unwrap();
     do_test();
+
+    run!("history rm --dir {} - 1..", dir_a).unwrap();
+    let recorded = run!("{}", SHOW).unwrap();
+    assert_list(&recorded, &["c", "b"]);
+    let recorded = run!("{} --dir {}", SHOW, dir_a).unwrap();
+    assert_list(&recorded, &[]);
 }
 
 #[test]

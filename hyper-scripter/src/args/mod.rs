@@ -283,7 +283,8 @@ pub enum Subs {
 #[derive(Parser, Debug, Serialize)]
 pub enum History {
     RM {
-        // TODO: dir
+        #[clap(short, long)]
+        dir: Option<PathBuf>,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
         range: RangeQuery,

@@ -274,7 +274,7 @@ impl Historian {
     ) -> Result<Option<String>, DBError> {
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
-        let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
+        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
         let res = sqlx::query!(
             "
             SELECT args FROM events
@@ -305,7 +305,7 @@ impl Historian {
         let offset = offset as i64;
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
-        let dir = dir.as_ref().map(|p| p.as_ref()).unwrap_or(EMPTY_STR);
+        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
         // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
         let res = last_arg!(
             "args, script_id",
@@ -407,6 +407,7 @@ impl Historian {
     pub async fn ignore_args_range(
         &self,
         ids: &[i64],
+        dir: Option<&Path>,
         min: NonZeroU64,
         max: Option<NonZeroU64>,
     ) -> Result<Vec<LastTimeRecord>, DBError> {
@@ -418,6 +419,9 @@ impl Historian {
         } else {
             -1
         };
+        let no_dir = dir.is_none();
+        let dir = dir.map(|p| p.to_string_lossy());
+        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
         log::info!("忽略歷史 {} {} {}", offset, limit, ids_str);
 
         let pool = self.pool.read().unwrap();
@@ -427,6 +431,7 @@ impl Historian {
             "ignored",
             pool,
             "
+            (? OR dir == ?) AND
             (script_id || args) IN (
                 WITH args AS (
                     SELECT args, max(time) as time, script_id FROM events
@@ -436,6 +441,8 @@ impl Historian {
                 ) SELECT script_id || args as t FROM args
             )
             ",
+            no_dir,
+            dir,
             ids_str,
             EXEC_CODE,
             limit,

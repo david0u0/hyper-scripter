@@ -297,6 +297,7 @@ impl Historian {
         ids: &[i64],
         limit: u32,
         offset: u32,
+        no_humble: bool,
         dir: Option<&Path>,
     ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
         let ids = join_id_str(ids);
@@ -311,10 +312,14 @@ impl Historian {
             "args, script_id",
             offset,
             limit,
-            "AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)",
+            "
+            AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
+            AND (NOT ? OR NOT humble)
+            ",
             ids,
             no_dir,
-            dir
+            dir,
+            no_humble
         )
         .fetch_all(&*self.pool.read().unwrap())
         .await?;

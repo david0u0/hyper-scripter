@@ -598,6 +598,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     queries,
                     limit,
                     with_name,
+                    no_humble,
                     offset,
                     dir,
                 },
@@ -608,7 +609,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let args_list = historian
-                .previous_args_list(&ids, limit, offset, dir.as_deref())
+                .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
                 .await?;
             for (script_id, args) in args_list {
                 log::debug!("嘗試打印參數 {} {}", script_id, args);

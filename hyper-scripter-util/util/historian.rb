@@ -31,10 +31,12 @@ class Historian < Selector
   def history_show
     return '' if @scripts.length == 0
 
+    # when there are multiple scripts, showing humble events will be a mess
+    no_humble = @single ? '' : "--no-humble"
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
     HS_ENV.do_hs(
       "history show --limit #{@limit} --offset #{@offset} \
-      --with-name #{dir_str} #{scripts_str}", false
+      --with-name #{dir_str} #{no_humble} #{scripts_str}", false
     )
   end
 

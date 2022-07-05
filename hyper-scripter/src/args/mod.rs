@@ -304,6 +304,8 @@ pub enum History {
         limit: u32,
         #[clap(long)]
         with_name: bool,
+        #[clap(long)]
+        no_humble: bool,
         #[clap(short, long, default_value = "0")]
         offset: u32,
         #[clap(short, long)]
@@ -625,5 +627,17 @@ mod test {
                 panic!("{:?} should be history amend...", args);
             }
         }
+    }
+    #[test]
+    #[ignore = "clap bug"]
+    fn test_allow_hyphen() {
+        assert!(is_args_eq(
+            &build_args("alias a -u"),
+            &build_args("alias a -- -u")
+        ));
+        assert!(is_args_eq(
+            &build_args("run s --repeat 1"),
+            &build_args("run s -- --repeat 1")
+        ));
     }
 }

@@ -514,3 +514,20 @@ fn test_multi_history() {
         h.ls();
     }
 }
+
+fn test_no_humble() {
+    let _g = setup();
+    let test = ScriptTest::new("test", None, None);
+    test.run("1").unwrap();
+    test.select("--humble").run("2").unwrap();
+    test.run("4").unwrap();
+    test.run("3").unwrap();
+    test.select("--humble").run("4").unwrap();
+    test.run("5").unwrap();
+
+    let recorded = run!("history show {}", test.get_name()).unwrap();
+    assert_list(&recorded, &["5", "4", "3", "2", "1"]);
+
+    let recorded = run!("history show {} --no-humble", test.get_name()).unwrap();
+    assert_list(&recorded, &["5", "3", "4", "1"]);
+}

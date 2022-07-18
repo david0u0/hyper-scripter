@@ -95,13 +95,13 @@ class Historian < Selector
 
   def format_option(pos)
     opt = @options[pos]
-    return opt.content if @single
-
-    max_cnt = @options.length + @offset
     just = @max_name_len - pos_len(pos)
-
-    name = "(#{opt.name})".rjust(just + 2)
-    "#{name} #{opt.content}"
+    if @single
+      name = ' ' * (just - opt.name.length)
+    else
+      name = "(#{opt.name}) ".rjust(just + 3)
+    end
+    "#{name}#{opt.content}"
   end
 
   def run(sequence: '')

@@ -104,7 +104,11 @@ impl DBEnv {
     pub async fn handle_neglect(&self, id: i64) -> Result {
         let time = Utc::now().naive_utc();
         sqlx::query!(
-            "UPDATE last_events SET neglect = ? WHERE script_id = ?",
+            "
+            INSERT OR IGNORE INTO last_events (script_id) VALUES(?);
+            UPDATE last_events SET neglect = ? WHERE script_id = ?
+            ",
+            id,
             time,
             id
         )

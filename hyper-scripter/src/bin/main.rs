@@ -14,7 +14,7 @@ use hyper_scripter::util::{
     self, completion_util,
     holder::{RepoHolder, Resource},
     main_util::{self, EditTagArgs},
-    print_iter, PrepareRespond,
+    print_iter,
 };
 use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
@@ -191,8 +191,13 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             };
             let (path, mut entry, sub_type) =
                 main_util::edit_or_create(edit_query, repo, ty, edit_tags).await?;
-            let mut prepare_resp =
-                util::prepare_script(&path, &*entry, sub_type.as_ref(), no_template, &content)?;
+            let mut prepare_resp = Some(util::prepare_script(
+                &path,
+                &*entry,
+                sub_type.as_ref(),
+                no_template,
+                &content,
+            )?);
             create_read_event(&mut entry).await?;
             if !fast {
                 let res = util::open_editor(&path);
@@ -200,7 +205,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     ret.errs.push(err);
                 }
             } else {
-                prepare_resp = PrepareRespond::NoAfterProcess;
+                prepare_resp = None
             }
             let after_res = main_util::after_script(&mut entry, &path, &prepare_resp).await;
             if let Err(err) = after_res {

@@ -360,14 +360,14 @@ use super::PrepareRespond;
 pub async fn after_script(
     entry: &mut RepoEntry<'_>,
     path: &Path,
-    prepare_resp: &PrepareRespond,
+    prepare_resp: &Option<PrepareRespond>,
 ) -> Result {
     let mut record_write = true;
     match prepare_resp {
-        PrepareRespond::NoAfterProcess => {
+        None => {
             log::debug!("不執行後處理");
         }
-        PrepareRespond::NoContent { is_new, time } => {
+        Some(PrepareRespond { is_new, time }) => {
             let modified = super::file_modify_time(path)?;
             if time >= &modified {
                 if *is_new {

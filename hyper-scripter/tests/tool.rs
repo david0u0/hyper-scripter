@@ -21,10 +21,15 @@ fn get_exe() -> String {
     format!("{}/../target/{}/hs", env!("CARGO_MANIFEST_DIR"), mode)
 }
 
+fn get_editor_script() -> String {
+    format!("{}/tests/editor.sh", env!("CARGO_MANIFEST_DIR"))
+}
+
 #[derive(Debug, Default)]
 pub struct RunEnv {
     pub home: Option<PathBuf>,
     pub dir: Option<PathBuf>,
+    pub no_touch: Option<bool>,
     pub silent: Option<bool>,
     pub allow_other_error: Option<bool>,
 }
@@ -110,7 +115,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
 
     // 避免編輯器堵住整個程式
     let mut conf = load_conf();
-    conf.editor = vec!["echo".to_owned()];
+    conf.editor = vec!["bash".to_owned(), get_editor_script()];
     conf.store().unwrap();
 
     guard
@@ -160,10 +165,14 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
 
     log::info!("開始執行 {:?}", args_vec);
     let mut cmd = Command::new(normalize_path(get_exe()).unwrap());
+    let no_touch = env.no_touch;
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
         cmd.current_dir(&dir);
         cmd.env("PWD", dir);
+    }
+    if no_touch == Some(true) {
+        cmd.env("NO_TOUCH", "1");
     }
     let mut child = cmd
         .args(&full_args)

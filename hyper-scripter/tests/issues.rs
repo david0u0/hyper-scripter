@@ -177,12 +177,18 @@ fn test_edit_without_change() {
     println!("沒有動到檔案就不要記錄寫入事件");
     let _g = setup();
 
+    const ORPHAN: &str = "orphan";
+    run!(no_touch: true, "e {}", ORPHAN).expect_err("空編輯應該是一個錯誤");
+    assert_ls_len(0, Some("all"), None);
+    run!(no_touch: true, "e {} | this is a test", ORPHAN).expect_err("帶內容不存檔，仍視為未編輯");
+    assert_ls_len(0, Some("all"), None);
+
     let t = ScriptTest::new("target", None, None);
     let base = ScriptTest::new("baseline", None, None);
     base.can_find("!").unwrap();
     run!("history neglect {}", t.get_name()).unwrap();
     t.can_find_by_name().expect_err("被忽略還找得到？");
-    run!("e {}!", t.get_name()).unwrap(); // nothing changed!
+    run!(no_touch: true, "e {}!", t.get_name()).unwrap(); // nothing changed!
     t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
 
     base.can_find("-").unwrap();
@@ -195,13 +201,6 @@ fn test_edit_without_change() {
         run!("-").unwrap(),
         "帶內容編輯應打破時間篩選"
     );
-
-    let (orphan, res) = ScriptTest::new_regardless("orphan", None, Some(""));
-    res.expect_err("空編輯應該是一個錯誤");
-    orphan
-        .select("-a")
-        .can_find_by_name()
-        .expect_err("空編輯新腳本應該要被砍掉");
 }
 
 #[test]

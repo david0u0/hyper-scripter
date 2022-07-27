@@ -212,9 +212,9 @@ fn relative_to_home(p: &Path) -> Option<&Path> {
 }
 
 #[derive(Debug)]
-pub enum PrepareRespond {
-    NoAfterProcess,
-    NoContent { is_new: bool, time: DateTime<Utc> },
+pub struct PrepareRespond {
+    pub is_new: bool,
+    pub time: DateTime<Utc>,
 }
 pub fn prepare_script<T: AsRef<str>>(
     path: &Path,
@@ -272,13 +272,9 @@ pub fn prepare_script<T: AsRef<str>>(
         }
     }
 
-    Ok(if has_content {
-        PrepareRespond::NoAfterProcess
-    } else {
-        PrepareRespond::NoContent {
-            is_new,
-            time: file_modify_time(path)?,
-        }
+    Ok(PrepareRespond {
+        is_new,
+        time: file_modify_time(path)?,
     })
 }
 fn write_prepare_script<W: Write>(

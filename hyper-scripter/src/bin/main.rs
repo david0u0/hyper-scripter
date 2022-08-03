@@ -355,7 +355,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             for mut entry in query::do_list_query(repo, &queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 let try_open_res = path::open_script(&entry.name, &entry.ty, Some(true));
-                if purge {
+                if purge || entry.name.is_anonymous() {
                     log::debug!("真的刪除腳本！");
                     let p = match try_open_res {
                         Ok(p) => Some(p),

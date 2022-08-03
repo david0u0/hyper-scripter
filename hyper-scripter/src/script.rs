@@ -126,6 +126,7 @@ impl ScriptName {
         }
     }
     pub fn is_anonymous(&self) -> bool {
+        log::debug!("判斷是否為匿名：{:?}", self);
         matches!(self, ScriptName::Anonymous(_))
     }
     pub fn key(&self) -> Cow<'_, str> {

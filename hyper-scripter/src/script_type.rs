@@ -22,18 +22,6 @@ cd {{birthplace}}
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const SHELL_CD_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
-
-set -e
-{{#if birthplace_in_home}}
-echo 'cd ~/{{birthplace_rel}}' > $HS_SOURCE
-{{else}}
-echo 'cd {{birthplace}}' > $HS_SOURCE
-{{/if}}
-{{#each content}}{{{this}}}
-{{/each}}";
-
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
 // [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
@@ -85,6 +73,43 @@ Dir.chdir(\"{{birthplace}}\")
 {{/if}}
 {{#each content}}{{{this}}}
 {{/each}}";
+
+const RB_CD_WELCOME_MSG: &str = "{{#if birthplace_in_home}}BASE = \"#{ENV['HOME']}/{{birthplace_rel}}\"
+{{else}}BASE = '{{birthplace}}'
+{{/if}}
+require_relative \"#{ENV['HS_HOME']}/util/common.rb\"
+
+def cd(dir)
+  File.open(HS_ENV.env_var(:source), 'w') do |file|
+    file.write(\"cd #{BASE}/#{dir}\")
+  end
+  exit
+end
+
+cd(ARGV[0]) if ARGV != []
+
+Dir.chdir(BASE)
+dirs = Dir.entries('.').select do |c|
+  !c.start_with?('.') && File.directory?(c)
+end
+dirs.push('.')
+
+require_relative \"#{ENV['HS_HOME']}/util/selector.rb\"
+selector = Selector.new
+selector.load(dirs)
+
+dir = begin
+  selector.run.content
+rescue Selector::Empty
+  warn 'empty'
+  exit 1
+rescue Selector::Quit
+  warn 'quit'
+  exit
+end
+
+HS_ENV.do_hs(\"run --dummy =#{HS_ENV.env_var(:name)}! #{dir}\", false)
+cd(dir)";
 
 const RB_TRAVERSE_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
@@ -295,7 +320,7 @@ create_default_types! {
         cmd: Some("bash".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default()
-    }, ["cd": SHELL_CD_WELCOME_MSG]),
+    }, []),
     ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
         ext: Some("sh".to_owned()),
         color: "white".to_owned(),
@@ -329,7 +354,7 @@ create_default_types! {
         cmd: Some("ruby".to_owned()),
         args: vec!["{{path}}".to_owned()],
         env: Default::default(),
-    }, ["traverse": RB_TRAVERSE_WELCOME_MSG]),
+    }, ["traverse": RB_TRAVERSE_WELCOME_MSG, "cd": RB_CD_WELCOME_MSG]),
     ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
         ext: None,
         color: "bright black".to_owned(),

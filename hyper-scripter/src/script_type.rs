@@ -74,10 +74,12 @@ Dir.chdir(\"{{birthplace}}\")
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const RB_CD_WELCOME_MSG: &str = "{{#if birthplace_in_home}}BASE = \"#{ENV['HOME']}/{{birthplace_rel}}\"
+const RB_CD_WELCOME_MSG: &str =
+    "{{#if birthplace_in_home}}BASE = \"#{ENV['HOME']}/{{birthplace_rel}}\"
 {{else}}BASE = '{{birthplace}}'
 {{/if}}
 require_relative \"#{ENV['HS_HOME']}/util/common.rb\"
+require 'set'
 
 def cd(dir)
   File.open(HS_ENV.env_var(:source), 'w') do |file|
@@ -89,14 +91,27 @@ end
 cd(ARGV[0]) if ARGV != []
 
 Dir.chdir(BASE)
-dirs = Dir.entries('.').select do |c|
+dirs_set = Dir.entries('.').select do |c|
   !c.start_with?('.') && File.directory?(c)
+end.to_set
+dirs_set.add('.')
+
+history_arr = HS_ENV.do_hs(\"history show =#{HS_ENV.env_var(:name)}!\", false).lines.map do |l|
+  l.strip
+end.select { |l| !l.empty? }
+
+history_arr = history_arr.select do |d|
+  if dirs_set.include?(d)
+    dirs_set.delete(d)
+    true
+  else
+    false
+  end
 end
-dirs.push('.')
 
 require_relative \"#{ENV['HS_HOME']}/util/selector.rb\"
 selector = Selector.new
-selector.load(dirs)
+selector.load(history_arr + dirs_set.to_a)
 
 dir = begin
   selector.run.content

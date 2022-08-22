@@ -294,9 +294,13 @@ pub enum History {
         name = "rm-id",
         about = "Remove an event by it's id.\nUseful if you want to keep those illegal arguments from polluting the history."
     )]
-    RMID { event_id: u64 },
+    RMID {
+        event_id: u64,
+    },
     #[clap(about = "Humble an event by it's id")]
-    Humble { event_id: u64 },
+    Humble {
+        event_id: u64,
+    },
     Show {
         #[clap(default_value = "-", help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
@@ -324,10 +328,7 @@ pub enum History {
         )]
         args: Vec<String>,
     },
-    Tidy {
-        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
-        queries: Vec<ListQuery>,
-    },
+    Tidy,
 }
 
 #[derive(Parser, Debug, Serialize, Default)]

@@ -479,6 +479,26 @@ impl Historian {
         Ok(())
     }
 
+    /// 除了輸入進來的 script id 外，其它事件通通砍除
+    pub async fn clear_except_script_ids(&self, script_ids: &[i64]) -> Result<(), DBError> {
+        let ids = join_id_str(script_ids);
+        let pool = self.pool.read().unwrap();
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        sqlx::query!(
+            "
+            DELETE FROM events
+            WHERE instr(?, '[' || script_id || ']') <= 0
+            ",
+            ids
+        )
+        .execute(&*pool)
+        .await?;
+
+        sqlx::query!("VACUUM").execute(&*pool).await?;
+
+        Ok(())
+    }
+
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {
         let pool = self.pool.read().unwrap();
         // XXX: 笑死這啥鬼

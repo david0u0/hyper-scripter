@@ -343,7 +343,7 @@ fn test_event_path() {
     };
 
     do_test();
-    run!("history tidy -").unwrap();
+    run!("history tidy").unwrap();
     do_test();
 
     run!("history rm --dir {} - 1..", dir_a).unwrap();

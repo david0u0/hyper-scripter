@@ -188,29 +188,45 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
     term.hide_cursor()?;
     hijack_ctrlc_once();
 
-    let ok = loop {
+    enum Res {
+        Y,
+        N,
+        Exit,
+    }
+
+    let res = loop {
         term.write_str(&msg)?;
         match term.read_key() {
-            Ok(Key::Char('Y' | 'y') | Key::Enter) => break true,
-            Ok(Key::Char('N' | 'n')) => break false,
+            Ok(Key::Char('Y' | 'y') | Key::Enter) => break Res::Y,
+            Ok(Key::Char('N' | 'n')) => break Res::N,
             Ok(Key::Char(ch)) => term.write_line(&format!(" Unknown key '{}'", ch))?,
+            Ok(Key::Escape) => {
+                break Res::Exit;
+            }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::Interrupted {
-                    term.show_cursor()?;
-                    std::process::exit(1);
+                    break Res::Exit;
                 } else {
                     return Err(e.into());
                 }
             }
-            _ => term.write_line(&format!(" Unknown key"))?,
+            _ => term.write_line(" Unknown key")?,
         }
     };
     term.show_cursor()?;
-    if ok {
-        term.write_line(&" Y".color(Color::Green).to_string())?;
-        Ok(())
-    } else {
-        term.write_line(&" N".color(Color::Red).to_string())?;
-        Err(Error::DontFuzz)
+
+    match res {
+        Res::Exit => {
+            term.show_cursor()?;
+            std::process::exit(1);
+        }
+        Res::Y => {
+            term.write_line(&" Y".color(Color::Green).to_string())?;
+            Ok(())
+        }
+        Res::N => {
+            term.write_line(&" N".color(Color::Red).to_string())?;
+            Err(Error::DontFuzz)
+        }
     }
 }

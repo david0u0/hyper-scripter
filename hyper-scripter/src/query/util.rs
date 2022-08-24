@@ -1,3 +1,4 @@
+use super::the_multifuzz_algo::{the_multifuzz_algo, MultiFuzzObj};
 use super::{ListQuery, ScriptQuery, ScriptQueryInner};
 use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
@@ -69,6 +70,12 @@ pub async fn do_list_query<'a>(
     }
 }
 
+impl<'a> MultiFuzzObj for RepoEntry<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.last_time().cmp(&other.last_time())
+    }
+}
+
 pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
     script_repo: &'b mut ScriptRepo,
@@ -117,19 +124,7 @@ pub async fn do_script_query<'b>(
                 #[cfg(not(feature = "benching"))]
                 Some(fuzzy::Multi { ans, others, .. }) => {
                     is_multi_fuzz = true;
-                    // NOTE: 從一堆分數相近者中選出最新的
-                    // 但注意不要是「正解」的前綴，否則使用者可能永遠無法用模糊搜拿到名字比較短的候選者
-                    // 例如 正解：ab 候選：ab1，且候選人較新
-                    let prefix = ans.name.key();
-                    let prefix = prefix.as_ref();
-                    let true_ans = others
-                        .into_iter()
-                        .filter(|t| !fuzzy::is_prefix(prefix, &*t.name.key(), SEP))
-                        .max_by_key(|t| t.last_time());
-                    match true_ans {
-                        Some(t) if t.last_time() > ans.last_time() => t,
-                        _ => ans,
-                    }
+                    the_multifuzz_algo(ans, others)
                 }
                 None => return Ok(None),
             };

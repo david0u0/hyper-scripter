@@ -13,6 +13,7 @@ mod util;
 pub use util::*;
 mod range_query;
 pub use range_query::*;
+mod the_multifuzz_algo;
 
 #[derive(Debug, Eq, PartialEq, Display)]
 pub enum EditQuery<Q> {

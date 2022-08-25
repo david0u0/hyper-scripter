@@ -183,8 +183,6 @@ pub enum Subs {
         allow_hyphen_values = true
     )]
     Alias {
-        #[clap(long, conflicts_with_all = &["before", "after"])]
-        short: bool,
         #[clap(
             long,
             short,

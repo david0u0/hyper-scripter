@@ -130,7 +130,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     .ok_or_else(|| Error::NoAlias(before.clone()))?
                     .after
                     .join(" ");
-                println!("{}=\"{}\"", before, after);
+                println!("{}\t{}", before, after);
             }
         }
         Subs::Alias {
@@ -148,17 +148,12 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
         Subs::Alias {
             unset: false,
             before: None,
-            short,
             ..
         } => {
             log::info!("印出所有別名");
             for (before, alias) in conf.alias.iter() {
-                print!("{}", before);
-                if !short {
-                    let after = alias.after.join(" ");
-                    print!("=\"{}\"", after);
-                }
-                println!("");
+                let after = alias.after.join(" ");
+                println!("{}\t{}", before, after);
             }
         }
         Subs::Edit {

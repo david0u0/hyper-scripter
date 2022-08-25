@@ -140,7 +140,7 @@ function __hs_list_alias
         return
     end
 
-    __hs_extract_home_and_run alias --short
+    __hs_extract_home_and_run alias
 end
 
 function __hs_is_alias

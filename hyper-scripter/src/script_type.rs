@@ -13,7 +13,7 @@ const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
 
-set -e
+set -eu
 {{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}
@@ -52,7 +52,7 @@ if [ $? = 0 ]; then
     exit
 fi
 
-set -e
+set -eu
 {{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}

@@ -182,24 +182,32 @@ pub fn get_or_create_template<T: AsScriptFullTypeRef>(
     read_file(&tmpl_path)
 }
 
-// 如果有需要跳脫的字元就吐 json 格式，否則就照原字串
+/// copied from `shell_escape` crate
 pub fn to_display_args(arg: String) -> String {
-    let mut need_escape = false;
-    for ch in arg.chars() {
+    fn non_whitelisted(ch: char) -> bool {
         match ch {
-            ' ' | '>' | '|' | '\'' | '#' | '<' | ';' | '(' | ')' | '{' | '}' | '$' => {
-                need_escape = true
-            }
-            _ => (),
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '=' | '/' | ',' | '.' | '+' => false,
+            _ => true,
         }
     }
-
-    let escaped: String = serde_json::to_string(&arg).unwrap();
-    if need_escape || arg != escaped[1..escaped.len() - 1] {
-        escaped
-    } else {
-        arg
+    if !arg.is_empty() && !arg.contains(non_whitelisted) {
+        return arg;
     }
+
+    let mut es = String::with_capacity(arg.len() + 2);
+    es.push('\'');
+    for ch in arg.chars() {
+        match ch {
+            '\'' | '!' => {
+                es.push_str("'\\");
+                es.push(ch);
+                es.push('\'');
+            }
+            _ => es.push(ch),
+        }
+    }
+    es.push('\'');
+    es
 }
 
 fn relative_to_home(p: &Path) -> Option<&Path> {

@@ -4,6 +4,7 @@
 # [HS_HELP]:     hs historian -s hs hs/test --limit 20
 
 require 'json'
+require 'shellwords'
 require_relative './common'
 require_relative './selector'
 
@@ -155,7 +156,7 @@ class Historian < Selector
         case ENV['SHELL'].split('/').last
         when 'fish'
           cmd = "#{HS_ENV.env_var(:cmd)} #{cmd}"
-          file.write("commandline #{cmd.inspect}")
+          file.write("commandline #{Shellwords.escape(cmd)}")
         else
           warn "#{ENV['SHELL']} not supported"
         end

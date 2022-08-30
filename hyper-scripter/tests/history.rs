@@ -19,9 +19,9 @@ fn test_history_args() {
     let _g = setup();
     run!("e arg-receiver | # do nothing").unwrap();
 
-    run!("{}", r#" receiver arg1 arg"2" arg\3 "#).unwrap();
+    run!("{}", r#" receiver arg1 arg"2" arg\3 arg'4 "#).unwrap();
     let recorded = run!("history show receiver").unwrap();
-    assert_list(&recorded, &[r#"arg1 "arg\"2\"" "arg\\3""#]);
+    assert_eq!(&recorded, r#"arg1 'arg"2"' 'arg\3' 'arg'\''4'"#);
 }
 
 #[test]

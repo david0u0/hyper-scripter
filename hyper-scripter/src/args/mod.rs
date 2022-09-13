@@ -486,12 +486,10 @@ mod test {
         match &args.subcmd {
             Some(Subs::Alias {
                 unset,
-                short,
                 after,
                 before: Some(before),
             }) => {
                 assert_eq!(*unset, false);
-                assert_eq!(*short, false);
                 assert_eq!(before, "trash");
                 assert_eq!(after, &["-s", "remove"]);
             }

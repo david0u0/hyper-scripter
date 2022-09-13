@@ -39,7 +39,7 @@ mod test {
     #[derive(PartialEq, Eq, Clone, Copy, Debug)]
     struct MyObj {
         s: &'static str,
-        order: u8,
+        order: usize,
     }
     impl FuzzKey for MyObj {
         fn fuzz_key(&self) -> Cow<'_, str> {
@@ -51,35 +51,42 @@ mod test {
             other.order.cmp(&self.order)
         }
     }
+    fn reorder<const S: usize>(mut arr: [&mut MyObj; S]) {
+        for (i, obj) in arr.iter_mut().enumerate() {
+            obj.order = i;
+        }
+    }
 
     #[test]
     fn test_the_multifuzz_algo() {
-        let mut ans = MyObj {
-            s: "dir",
-            order: 99,
+        let mut ans = MyObj { s: "dir", order: 0 };
+        let mut other_p = MyObj {
+            s: "dir/a",
+            order: 0,
         };
-        let mut other = vec![
-            MyObj {
-                s: "dir/a",
-                order: 2,
-            },
-            MyObj {
-                s: "dother",
-                order: 3,
-            },
-        ];
+        let mut other = MyObj {
+            s: "dother",
+            order: 0,
+        };
+        macro_rules! run_the_algo {
+            () => {
+                the_multifuzz_algo(ans, vec![other, other_p])
+            };
+        }
 
-        assert_eq!(ans, the_multifuzz_algo(ans, other.clone()));
-        other[0].order = 4;
-        assert_eq!(other[1], the_multifuzz_algo(ans, other.clone()));
-        ans.order = 0;
-        assert_eq!(ans, the_multifuzz_algo(ans, other.clone()));
+        reorder([&mut other_p, &mut other, &mut ans]);
+        assert_eq!(ans, run_the_algo!());
+        reorder([&mut other, &mut other_p, &mut ans]);
+        assert_eq!(other, run_the_algo!());
+        reorder([&mut ans, &mut other, &mut other_p]);
+        assert_eq!(ans, run_the_algo!());
 
         assert_eq!(ans, the_multifuzz_algo(ans, vec![]));
-        assert_eq!(ans, the_multifuzz_algo(ans, vec![other[0]]));
-        assert_eq!(ans, the_multifuzz_algo(ans, vec![other[1]]));
-        ans.order = 99;
-        assert_eq!(ans, the_multifuzz_algo(ans, vec![other[0]]));
-        assert_eq!(other[1], the_multifuzz_algo(ans, vec![other[1]]));
+
+        assert_eq!(ans, the_multifuzz_algo(ans, vec![other_p]));
+        assert_eq!(ans, the_multifuzz_algo(ans, vec![other]));
+        reorder([&mut other, &mut other_p, &mut ans]);
+        assert_eq!(ans, the_multifuzz_algo(ans, vec![other_p]));
+        assert_eq!(other, the_multifuzz_algo(ans, vec![other]));
     }
 }

@@ -237,7 +237,15 @@ pub async fn fmt_list<W: Write>(
                 if k.is_empty() {
                     None
                 } else {
-                    v.iter().map(|s| s.exec_count).max()
+                    v.iter()
+                        .map(|s| {
+                            if s.exec_time.is_none() {
+                                0
+                            } else {
+                                s.exec_count
+                            }
+                        })
+                        .max()
                 }
             });
 

@@ -71,8 +71,8 @@ pub async fn do_list_query<'a>(
 }
 
 impl<'a> MultiFuzzObj for RepoEntry<'a> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.last_time().cmp(&other.last_time())
+    fn beats(&self, other: &Self) -> bool {
+        self.last_time() > other.last_time()
     }
 }
 

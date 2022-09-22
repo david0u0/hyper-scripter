@@ -31,18 +31,7 @@ impl<T: MultiFuzzObj> MultiFuzzTuple<T> {
         self.obj.fuzz_key()
     }
     fn cmp(&self, other: &Self) -> Ordering {
-        match other.fuzz_key().len().cmp(&self.fuzz_key().len()) {
-            Ordering::Equal => {
-                if self.is_ans {
-                    Ordering::Less
-                } else if other.is_ans {
-                    Ordering::Greater
-                } else {
-                    Ordering::Equal
-                }
-            }
-            o @ _ => o,
-        }
+        other.fuzz_key().len().cmp(&self.fuzz_key().len())
     }
 }
 
@@ -54,16 +43,14 @@ fn find_dag_sink<T: MultiFuzzObj>(
     candidates[offset].visited = true;
     let cur_key = candidates[offset].fuzz_key();
     // SAFETY: 同一個元素的鍵不可能被拜訪第二次，而且唯一的可變性發生在 `visited` 欄位
-    let cur_key = unsafe {
-        &*(cur_key.as_ref() as *const str)
-    };
+    let cur_key = unsafe { &*(cur_key.as_ref() as *const str) };
     let mut prefix_found = false;
     for i in offset + 1..candidates.len() {
         if candidates[i].visited {
             continue;
         }
         let other_key = candidates[i].fuzz_key();
-        if is_prefix(&other_key, cur_key, SEP) {
+        if other_key.len() != cur_key.len() && is_prefix(&other_key, cur_key, SEP) {
             prefix_found = true;
             find_dag_sink(i, candidates, best_sink);
         }
@@ -82,34 +69,39 @@ fn find_dag_sink<T: MultiFuzzObj>(
 }
 
 /// with several elements equally maximum, the **FIRST** position will be returned
-fn find_max_pos<T: MultiFuzzObj>(candidates: &[MultiFuzzTuple<T>]) -> usize {
+fn find_max_and_ans_pos<T: MultiFuzzObj>(candidates: &[MultiFuzzTuple<T>]) -> (usize, usize) {
     let mut max_pos = 0;
+    let mut ans_pos = 0;
     for i in 1..candidates.len() {
+        if candidates[i].is_ans {
+            ans_pos = i;
+        }
         if candidates[i].obj.beats(&candidates[max_pos].obj) {
             max_pos = i;
         }
     }
-    max_pos
+    (max_pos, ans_pos)
 }
 
 /// 從多個模糊搜分數相近者中裁決出「最合適者」。函式過程不太直覺，故在此詳述。
 /// 參數：正解(ans)即分數最高者，其它(others)即其它分數相近的候選人。
+///       應保證正解的長度不大於所有其它人
 ///
 /// 1. 建立一個有向無環圖，從「最強者」（根據 MultiFuzzObj::beats）出發，找到所有沉沒點
 /// 2. 於所有沉沒點中選出最強者
+/// 3. 若最強者為正解之前綴（重排序），回傳正解
 pub(super) fn the_multifuzz_algo<T: MultiFuzzObj>(ans: T, others: Vec<T>) -> T {
     let mut candidates: Vec<_> = others.into_iter().map(|t| MultiFuzzTuple::new(t)).collect();
     candidates.push(MultiFuzzTuple::new_ans(ans));
     candidates.sort_by(MultiFuzzTuple::cmp);
-    let max_pos = find_max_pos(&candidates);
-    let mut ans_pos = None;
-    find_dag_sink(max_pos, &mut candidates, &mut ans_pos);
-    candidates
-        .into_iter()
-        .skip(ans_pos.unwrap())
-        .next()
-        .unwrap()
-        .obj
+    let (max_pos, ans_pos) = find_max_and_ans_pos(&candidates);
+    let mut ret_pos = None;
+    find_dag_sink(max_pos, &mut candidates, &mut ret_pos);
+    let mut ret_pos = ret_pos.unwrap();
+    if is_prefix(&candidates[ret_pos].fuzz_key(), &candidates[ans_pos].fuzz_key(), SEP) {
+        ret_pos = ans_pos;
+    }
+    candidates.into_iter().skip(ret_pos).next().unwrap().obj
 }
 
 #[cfg(test)]
@@ -191,22 +183,29 @@ mod test {
     }
     #[test]
     fn test_multifuzz_determined_ans() {
-        let abcd = MyObj::new("a/b/c/d");
-        let bacd = MyObj::new("b/a/c/d");
-        let cabd = MyObj::new("c/a/b/d");
-        let dacb = MyObj::new("d/a/c/b");
-        let acbd = MyObj::new("a/c/b/d");
+        let mut abcd = MyObj::new("a/b/c/d");
+        let mut bacd = MyObj::new("b/a/c/d");
+        let mut cabd = MyObj::new("c/a/b/d");
+        let mut dacb = MyObj::new("d/a/c/b");
+        let mut acbd = MyObj::new("a/c/b/d");
 
         let mut abc = MyObj::new("a/b/c");
-        abc.order = 99;
+        let mut cab = MyObj::new("c/a/b");
 
+        reorder([&mut abcd, &mut bacd, &mut cabd, &mut dacb, &mut acbd]);
         assert_eq!(abcd, the_multifuzz_algo(abcd, vec![bacd, cabd, dacb, acbd]));
         assert_eq!(bacd, the_multifuzz_algo(bacd, vec![abcd, cabd, dacb, acbd]));
         assert_eq!(dacb, the_multifuzz_algo(dacb, vec![abcd, bacd, cabd, acbd]));
 
         // prefix is still preferred
-        assert_eq!(abc, the_multifuzz_algo(abcd, vec![bacd, cabd, dacb, abc]));
-        assert_eq!(abc, the_multifuzz_algo(bacd, vec![abcd, cabd, dacb, abc]));
-        assert_eq!(abc, the_multifuzz_algo(dacb, vec![abcd, bacd, cabd, abc]));
+        reorder([&mut abc, &mut cab]);
+        assert_eq!(
+            abc,
+            the_multifuzz_algo(abc, vec![cab, abcd, bacd, cabd, dacb])
+        );
+        assert_eq!(
+            cab,
+            the_multifuzz_algo(cab, vec![abc, abcd, bacd, cabd, dacb])
+        );
     }
 }

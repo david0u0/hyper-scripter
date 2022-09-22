@@ -231,7 +231,7 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
 // TODO: 把這些 sep: &str 換成標準庫的 Pattern
 
 pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
-    if prefix.len() >= target.len() {
+    if prefix.len() > target.len() {
         return false;
     }
 

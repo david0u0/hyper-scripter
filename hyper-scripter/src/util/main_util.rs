@@ -284,8 +284,7 @@ pub async fn run_n_times(
 }
 
 pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
-    let utils = hyper_scripter_util::get_all();
-    for u in utils.into_iter() {
+    for u in hyper_scripter_util::get_all() {
         log::info!("載入小工具 {}", u.name);
         let name = u.name.to_owned().into_script_name()?;
         if script_repo.get_mut(&name, Visibility::All).is_some() {

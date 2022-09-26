@@ -10,16 +10,13 @@ mod get_all_utils {
     include!(concat!(env!("OUT_DIR"), "/get_all_utils.rs"));
 }
 
-pub fn get_all() -> Vec<Util> {
-    get_all_utils::get_all()
-        .iter()
-        .map(|u| Util {
-            is_hidden: u.is_hidden,
-            name: u.name,
-            ty: u.ty,
-            content: u.content,
-        })
-        .collect()
+pub fn get_all() -> impl ExactSizeIterator<Item = Util> {
+    get_all_utils::get_all().iter().map(|u| Util {
+        is_hidden: u.is_hidden,
+        name: u.name,
+        ty: u.ty,
+        content: u.content,
+    })
 }
 
 #[cfg(test)]
@@ -27,7 +24,7 @@ mod test {
     use super::*;
     #[test]
     fn test_get_all() {
-        let utils = get_all();
+        let utils: Vec<_> = get_all().collect();
         let comm = utils
             .iter()
             .find(|u| u.name == "util/common")

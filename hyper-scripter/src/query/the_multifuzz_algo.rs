@@ -98,7 +98,11 @@ pub(super) fn the_multifuzz_algo<T: MultiFuzzObj>(ans: T, others: Vec<T>) -> T {
     let mut ret_pos = None;
     find_dag_sink(max_pos, &mut candidates, &mut ret_pos);
     let mut ret_pos = ret_pos.unwrap();
-    if is_prefix(&candidates[ret_pos].fuzz_key(), &candidates[ans_pos].fuzz_key(), SEP) {
+    if is_prefix(
+        &candidates[ret_pos].fuzz_key(),
+        &candidates[ans_pos].fuzz_key(),
+        SEP,
+    ) {
         ret_pos = ans_pos;
     }
     candidates.into_iter().skip(ret_pos).next().unwrap().obj

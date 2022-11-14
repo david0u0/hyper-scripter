@@ -55,9 +55,7 @@ fn join_here_abs<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     if path.is_absolute() {
         return Ok(path.to_owned());
     }
-    // NOTE: 用 $PWD 可以取到 symlink 還沒解開前的路徑
-    // 若用 std::env::current_dir，該路徑已為真實路徑
-    let here = std::env::var("PWD")?;
+    let here = std::env::current_dir()?;
     Ok(AsRef::<Path>::as_ref(&here).join(path))
 }
 

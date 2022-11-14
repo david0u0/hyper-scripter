@@ -169,7 +169,7 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
         cmd.current_dir(&dir);
-        cmd.env("PWD", dir);
+        // cmd.env("PWD", dir); NOTE: 不應使用 PWD 環境變數
     }
     if no_touch == Some(true) {
         cmd.env("NO_TOUCH", "1");

@@ -219,6 +219,13 @@ fn relative_to_home(p: &Path) -> Option<&Path> {
     p.strip_prefix(&home).ok()
 }
 
+fn get_birthplace() -> Result<PathBuf> {
+    // NOTE: 用 $PWD 可以取到 symlink 還沒解開前的路徑
+    // 若用 std::env::current_dir，該路徑已為真實路徑
+    let here = std::env::var("PWD")?;
+    Ok(here.into())
+}
+
 #[derive(Debug)]
 pub struct PrepareRespond {
     pub is_new: bool,
@@ -235,7 +242,7 @@ pub fn prepare_script<T: AsRef<str>>(
     let has_content = !content.is_empty();
     let is_new = !path.exists();
     if is_new {
-        let birthplace = path::normalize_path(".")?;
+        let birthplace = get_birthplace()?;
         let birthplace_rel = relative_to_home(&birthplace);
 
         let mut file = handle_fs_res(&[path], File::create(&path))?;

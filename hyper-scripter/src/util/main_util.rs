@@ -1,7 +1,7 @@
 use crate::args::Subs;
 use crate::config::Config;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
-use crate::extract_msg::extract_env_from_content;
+use crate::extract_msg::{collect_envs, extract_env_from_content};
 use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -142,21 +142,10 @@ fn run(
     script_path: &Path,
     info: &ScriptInfo,
     remaining: &[String],
-    content: &str,
-    run_id: i64,
+    hs_tmpl_val: &serde_json::Value,
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
-    let name = &info.name.key();
-    let hs_home = path::get_home();
-    let hs_tags: Vec<_> = info.tags.iter().map(|t| t.as_ref()).collect();
-
-    let hs_exe = std::env::current_exe()?;
-    let hs_exe = hs_exe.to_string_lossy();
-
-    let hs_cmd = std::env::args().next().unwrap_or_default();
-
-    let hs_env_help: Vec<_> = extract_env_from_content(content).collect();
 
     let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
@@ -165,20 +154,8 @@ fn run(
         return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
     };
 
-    let info: serde_json::Value;
-    info = json!({
-        "path": script_path,
-        "home": hs_home,
-        "run_id": run_id,
-        "tags": hs_tags,
-        "cmd": hs_cmd,
-        "exe": hs_exe,
-        "env_help": hs_env_help,
-        "name": name,
-        "content": content,
-    });
-    let env = conf.gen_env(&info)?;
-    let ty_env = script_conf.gen_env(&info)?;
+    let env = conf.gen_env(&hs_tmpl_val)?;
+    let ty_env = script_conf.gen_env(&hs_tmpl_val)?;
 
     let pre_run_script = prepare_pre_run(None)?;
     let (cmd, shebang) = super::shebang_handle::handle(&pre_run_script)?;
@@ -199,7 +176,7 @@ fn run(
         return Err(Error::PreRunError(code));
     }
 
-    let args = script_conf.args(&info)?;
+    let args = script_conf.args(&hs_tmpl_val)?;
     let full_args = args
         .iter()
         .map(|s| s.as_str())
@@ -252,21 +229,45 @@ pub async fn run_n_times(
     let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    let run_id = entry.update(|info| info.exec(content, &args, here)).await?;
+
+    let hs_env_help: Vec<_> = extract_env_from_content(&content)
+        .map(|s| s.to_string())
+        .collect();
+    let env_record = collect_envs(&hs_env_help);
+    let env_record = serde_json::to_string(&env_record)?;
+
+    let run_id = entry
+        .update(|info| info.exec(content, &args, env_record, here))
+        .await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");
         return Ok(());
     }
+    // Start packing hs tmpl val
+    let hs_home = path::get_home();
+    let hs_tags: Vec<_> = entry.tags.iter().map(|t| t.as_ref()).collect();
+    let hs_cmd = std::env::args().next().unwrap_or_default();
+
+    let hs_exe = std::env::current_exe()?;
+    let hs_exe = hs_exe.to_string_lossy();
+
+    let content = &entry.exec_time.as_ref().unwrap().data().unwrap().0;
+    let hs_tmpl_val = json!({
+        "path": script_path,
+        "home": hs_home,
+        "run_id": run_id,
+        "tags": hs_tags,
+        "cmd": hs_cmd,
+        "exe": hs_exe,
+        "env_help": hs_env_help,
+        "name": &entry.name.key(),
+        "content": content,
+    });
+    // End packing hs tmpl val
 
     for _ in 0..repeat {
-        let run_res = run(
-            &script_path,
-            &*entry,
-            &args,
-            &entry.exec_time.as_ref().unwrap().data().unwrap().0,
-            run_id,
-        );
+        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val);
         let ret_code: i32;
         match run_res {
             Err(Error::ScriptError(code)) => {

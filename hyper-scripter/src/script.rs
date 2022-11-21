@@ -226,8 +226,8 @@ pub struct ScriptInfo {
     pub write_time: ScriptTime,
     pub miss_time: Option<ScriptTime>,
     pub neglect_time: Option<ScriptTime>,
-    /// (content, args, dir)
-    pub exec_time: Option<ScriptTime<(String, String, Option<PathBuf>)>>,
+    /// (content, args, env_record, dir)
+    pub exec_time: Option<ScriptTime<(String, String, String, Option<PathBuf>)>>,
     /// (return code, main event id)
     pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
     pub exec_count: u64,
@@ -299,10 +299,16 @@ impl ScriptInfo {
     pub fn miss(&mut self) {
         self.miss_time = Some(ScriptTime::now(()));
     }
-    pub fn exec(&mut self, content: String, args: &[String], dir: Option<PathBuf>) {
+    pub fn exec(
+        &mut self,
+        content: String,
+        args: &[String],
+        env_record: String,
+        dir: Option<PathBuf>,
+    ) {
         log::trace!("{:?} 執行內容為 {}", self, content);
         let args_ser = serde_json::to_string(args).unwrap();
-        self.exec_time = Some(ScriptTime::now((content, args_ser, dir)));
+        self.exec_time = Some(ScriptTime::now((content, args_ser, env_record, dir)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
         self.exec_count += 1;
     }

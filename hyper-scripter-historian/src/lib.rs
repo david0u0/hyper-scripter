@@ -26,8 +26,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
     let res = sqlx::query!(
         "
         INSERT INTO events
-        (script_id, type, cmd, args, content, time, main_event_id, dir, humble)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (script_id, type, cmd, args, content, time, main_event_id, dir, envs, humble)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
         ",
         event.script_id,
@@ -38,6 +38,7 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.time,
         event.main_event_id,
         event.dir,
+        event.envs,
         event.humble
     )
     .fetch_one(pool)
@@ -53,6 +54,7 @@ struct DBEvent<'a> {
     time: NaiveDateTime,
     args: Option<&'a str>,
     dir: Option<&'a str>,
+    envs: Option<&'a str>,
     content: Option<&'a str>,
     humble: bool,
     main_event_id: i64,
@@ -66,6 +68,7 @@ impl<'a> DBEvent<'a> {
             cmd,
             humble,
             main_event_id: ZERO,
+            envs: None,
             content: None,
             args: None,
             dir: None,
@@ -81,6 +84,10 @@ impl<'a> DBEvent<'a> {
     }
     fn content(mut self, value: &'a str) -> Self {
         self.content = Some(value);
+        self
+    }
+    fn envs(mut self, value: &'a str) -> Self {
+        self.envs = Some(value);
         self
     }
     fn humble(mut self) -> Self {
@@ -202,7 +209,12 @@ impl Historian {
             EventData::Write | EventData::Read | EventData::Miss => {
                 self.raw_record(db_event).await?
             }
-            EventData::Exec { content, args, dir } => {
+            EventData::Exec {
+                content,
+                args,
+                envs,
+                dir,
+            } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
                     "
@@ -223,7 +235,7 @@ impl Historian {
                 }
                 db_event.content = content;
                 let dir = dir.map(|p| p.to_string_lossy()).unwrap_or_default();
-                self.raw_record(db_event.dir(dir.as_ref()).args(args))
+                self.raw_record(db_event.envs(envs).dir(dir.as_ref()).args(args))
                     .await?
             }
             EventData::ExecDone {

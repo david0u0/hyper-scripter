@@ -289,13 +289,14 @@ impl DBEnv {
             }
         }
         if let Some(time) = info.exec_time.as_ref() {
-            if let Some((content, args, dir)) = time.data() {
+            if let Some((content, args, envs, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
                 last_event_id = record_event!(
                     **time,
                     EventData::Exec {
                         content,
                         args,
+                        envs,
                         dir: dir.as_deref(),
                     }
                 )

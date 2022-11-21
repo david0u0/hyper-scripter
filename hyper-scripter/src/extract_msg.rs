@@ -22,8 +22,32 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
 }
 
 pub fn extract_env_from_content(content: &str) -> impl Iterator<Item = &str> {
-    extract_msg_from_content(content, ENV_KEY).map(str::trim)
+    extract_msg_from_content(content, ENV_KEY).filter_map(|s| {
+        let s = s.trim();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    })
 }
+fn extract_env_from_env_lines<'a, T: AsRef<str>>(lines: &'a [T]) -> impl Iterator<Item = &'a str> {
+    lines
+        .iter()
+        .map(|s| s.as_ref().split_whitespace().next().unwrap())
+}
+// 使用此函式前需確保 lines 中沒有空字串
+pub fn collect_envs<'a, T: AsRef<str>>(lines: &'a [T]) -> Vec<(&'a str, String)> {
+    let mut v = vec![];
+    for env in extract_env_from_env_lines(lines) {
+        if let Ok(env_val) = std::env::var(env) {
+            v.push((env, env_val));
+        }
+    }
+    v.sort_by_key(|(k, _)| *k);
+    v
+}
+
 pub fn extract_help_from_content(content: &str) -> impl Iterator<Item = &str> {
     fn trim_first_white(s: &str) -> &str {
         if let Some(s) = s.strip_prefix(' ') {

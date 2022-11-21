@@ -15,6 +15,7 @@ pub enum EventData<'a> {
     Exec {
         content: &'a str,
         args: &'a str,
+        envs: &'a str,
         dir: Option<&'a Path>,
     },
     ExecDone {

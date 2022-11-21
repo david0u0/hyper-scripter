@@ -31,7 +31,7 @@ class Option
   end
 
   def envs_str
-    envs.map { |e| "#{e[0]}=#{e[1]}" }.join(', ')
+    envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
   end
 end
 

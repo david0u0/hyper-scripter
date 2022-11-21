@@ -240,7 +240,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             script_query,
             dummy,
             args,
-            previous_args,
+            previous,
             error_no_previous,
             repeat,
             dir,
@@ -253,7 +253,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 &mut entry,
                 args,
                 &mut ret.errs,
-                previous_args,
+                previous,
                 error_no_previous,
                 dir,
             )
@@ -636,8 +636,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 for (script_id, args, envs) in args_list {
                     log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
                     let args: Vec<String> = serde_json::from_str(&args)?;
-                    let envs: Vec<(String, String)> =
-                        serde_json::from_str(&envs).unwrap_or_default();
+                    let envs: Vec<(String, String)> = serde_json::from_str(&envs)?;
                     print_basic(script_id, args)?;
                     for (k, v) in envs.into_iter() {
                         println!("  {} {}", k, v);

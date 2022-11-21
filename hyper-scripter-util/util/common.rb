@@ -52,7 +52,7 @@ class HSEnv
   end
 
   def hs_command_str(arg, all, envs = [])
-    envs_str = envs.map { |e| "#{e[0]}=#{e[1]}" }.join(', ')
+    envs_str = envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
     visible_str = if all
                     '-s all --timeless'
                   else

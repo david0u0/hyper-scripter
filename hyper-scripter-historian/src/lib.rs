@@ -311,13 +311,13 @@ impl Historian {
         &self,
         id: i64,
         dir: Option<&Path>,
-    ) -> Result<Option<String>, DBError> {
+    ) -> Result<Option<(String, String)>, DBError> {
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
         let dir = dir.as_deref().unwrap_or(EMPTY_STR);
         let res = sqlx::query!(
             "
-            SELECT args FROM events
+            SELECT args, envs FROM events
             WHERE type = ? AND script_id = ? AND NOT ignored
             AND (? OR dir = ?)
             ORDER BY time DESC LIMIT 1
@@ -329,7 +329,7 @@ impl Historian {
         )
         .fetch_optional(&*self.pool.read().unwrap())
         .await?;
-        Ok(res.map(|res| res.args.unwrap_or_default()))
+        Ok(res.map(|res| (res.args.unwrap_or_default(), res.envs.unwrap_or_default())))
     }
 
     pub async fn previous_args_list(

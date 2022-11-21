@@ -207,15 +207,15 @@ pub enum Subs {
         #[clap(long, short)]
         repeat: Option<u64>,
         #[clap(long, short, help = "Use arguments from last run")]
-        previous_args: bool,
+        previous: bool,
         #[clap(
             long,
             short = 'E',
-            requires = "previous-args",
-            help = "Raise an error if --previous-args is given but there is no previous argument"
+            requires = "previous",
+            help = "Raise an error if --previous is given but there is no previous run"
         )]
         error_no_previous: bool,
-        #[clap(long, short, requires = "previous-args", help = "")]
+        #[clap(long, short, requires = "previous", help = "")]
         dir: Option<PathBuf>,
         #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
@@ -546,7 +546,7 @@ mod test {
         match args.subcmd {
             Some(Subs::Run {
                 dummy: true,
-                previous_args: false,
+                previous: false,
                 error_no_previous: false,
                 repeat: Some(42),
                 dir: None,

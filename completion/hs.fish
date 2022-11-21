@@ -244,7 +244,7 @@ complete -c hs -n "__fish_seen_subcommand_from run" -s r -l repeat
 complete -k -c hs -n "__fish_seen_subcommand_from run" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from run" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from run" -l dummy -d 'Add a dummy run history instead of actually running it'
-complete -c hs -n "__fish_seen_subcommand_from run" -s p -l previous-args
+complete -c hs -n "__fish_seen_subcommand_from run" -s p -l previous
 complete -c hs -n "__fish_seen_subcommand_from run" -s d -l dir
 complete -c hs -n "__fish_seen_subcommand_from run" -l no-trace -d 'Do not record history'
 complete -c hs -n "__fish_seen_subcommand_from run" -l humble -d 'Do not affect script time (but will still record history)'

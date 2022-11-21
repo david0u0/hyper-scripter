@@ -143,6 +143,7 @@ fn run(
     info: &ScriptInfo,
     remaining: &[String],
     hs_tmpl_val: &serde_json::Value,
+    remaining_envs: &[(String, String)],
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
@@ -167,6 +168,7 @@ fn run(
     let mut cmd = super::create_cmd(cmd, args);
     cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
+    cmd.envs(remaining_envs.iter().map(|(a, b)| (a, b)));
 
     let stat = super::run_cmd(cmd)?;
     log::info!("預腳本執行結果：{:?}", stat);
@@ -201,14 +203,15 @@ pub async fn run_n_times(
     entry: &mut RepoEntry<'_>,
     mut args: Vec<String>,
     res: &mut Vec<Error>,
-    use_previous_args: bool,
+    use_previous: bool,
     error_no_previous: bool,
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
     super::hijack_ctrlc_once();
 
-    if use_previous_args {
+    let mut prev_env_vec = vec![];
+    if use_previous {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
@@ -216,12 +219,14 @@ pub async fn run_n_times(
                 return Err(Error::NoPreviousArgs);
             }
             None => log::warn!("無前一次參數，當作空的"),
-            Some(arg_str) => {
+            Some((arg_str, envs_str)) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
-                let mut previous_arg_vec: Vec<String> =
+                let mut prev_arg_vec: Vec<String> =
                     serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
-                previous_arg_vec.extend(args.into_iter());
-                args = previous_arg_vec;
+                prev_env_vec =
+                    serde_json::from_str(&envs_str).context(format!("反序列失敗 {}", envs_str))?;
+                prev_arg_vec.extend(args.into_iter());
+                args = prev_arg_vec;
             }
         }
     }
@@ -267,7 +272,7 @@ pub async fn run_n_times(
     // End packing hs tmpl val
 
     for _ in 0..repeat {
-        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val);
+        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &prev_env_vec);
         let ret_code: i32;
         match run_res {
             Err(Error::ScriptError(code)) => {

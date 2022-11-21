@@ -141,7 +141,7 @@ impl Default for Config {
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
-                gen_alias("p", &["run", "--previous-args"]),
+                gen_alias("p", &["run", "--previous"]),
                 gen_alias("pc", &["=util/historian!", "--sequence", "c"]),
                 gen_alias("pr", &["=util/historian!", "--sequence", "r"]),
                 gen_alias("purge", &["rm", "--purge"]),

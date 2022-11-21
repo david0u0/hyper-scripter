@@ -475,7 +475,7 @@ _hs() {
             return 0
             ;;
         hs__history__show)
-            opts="-l -o -d -h -A -s -a --version --limit --with-name --offset --dir --help --no-trace --humble --archaeology --select --all --recent --timeless <QUERIES>..."
+            opts="-l -o -d -h -A -s -a --version --limit --with-name --show-env --offset --dir --help --no-trace --humble --archaeology --select --all --recent --timeless <QUERIES>..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -705,7 +705,7 @@ _hs() {
             return 0
             ;;
         hs__run)
-            opts="-r -p -E -d -A -s -a --dummy --repeat --previous-args --error-no-previous --dir --no-trace --humble --archaeology --select --all --recent --timeless <SCRIPT_QUERY> <ARGS>..."
+            opts="-r -p -E -d -A -s -a --dummy --repeat --previous --error-no-previous --dir --no-trace --humble --archaeology --select --all --recent --timeless <SCRIPT_QUERY> <ARGS>..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

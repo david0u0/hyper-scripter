@@ -603,6 +603,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     with_name,
                     no_humble,
                     offset,
+                    show_env,
                     dir,
                 },
         } => {
@@ -611,12 +612,8 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
-            let args_list = historian
-                .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
-                .await?;
-            for (script_id, args) in args_list {
-                log::debug!("嘗試打印參數 {} {}", script_id, args);
-                let args: Vec<String> = serde_json::from_str(&args)?;
+
+            let mut print_basic = |script_id: i64, args: Vec<String>| -> Result {
                 if with_name {
                     let entry = repo.get_mut_by_id(script_id).ok_or_else(|| {
                         log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
@@ -629,6 +626,32 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 }
                 print_iter(args.into_iter().map(|s| util::to_display_args(s)), " ");
                 println!("");
+                Ok(())
+            };
+
+            if show_env {
+                let args_list = historian
+                    .previous_args_list_with_envs(&ids, limit, offset, no_humble, dir.as_deref())
+                    .await?;
+                for (script_id, args, envs) in args_list {
+                    log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
+                    let args: Vec<String> = serde_json::from_str(&args)?;
+                    let envs: Vec<(String, String)> =
+                        serde_json::from_str(&envs).unwrap_or_default();
+                    print_basic(script_id, args)?;
+                    for (k, v) in envs.into_iter() {
+                        println!("  {} {}", k, v);
+                    }
+                }
+            } else {
+                let args_list = historian
+                    .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
+                    .await?;
+                for (script_id, args) in args_list {
+                    log::debug!("嘗試打印參數 {} {}", script_id, args);
+                    let args: Vec<String> = serde_json::from_str(&args)?;
+                    print_basic(script_id, args)?;
+                }
             }
         }
         sub => unimplemented!("{:?}", sub),

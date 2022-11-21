@@ -101,17 +101,17 @@ impl<'a> DBEvent<'a> {
 }
 
 macro_rules! last_arg {
-    ($select:literal, $offset:expr, $limit:expr, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
+    ($select:literal, $offset:expr, $limit:expr, $group_by:literal, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
         sqlx::query!(
             "
             WITH args AS (
-                SELECT args, script_id, max(time) as time FROM events
+                SELECT " + $select + ", max(time) as time FROM events
                 WHERE type = ? AND NOT ignored "
                 +
                 $where
                 $(+ $more_where)*
                 +
-                " GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
+                " GROUP BY args, script_id " + $group_by + " ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
                 + " FROM args
@@ -121,6 +121,34 @@ macro_rules! last_arg {
             $limit,
             $offset,
         )
+    }};
+}
+macro_rules! do_last_arg {
+    ($select:literal, $maybe_envs:literal, $ids:expr, $limit:expr, $offset:expr, $no_humble:expr, $dir:expr, $historian:expr) => {{
+        let ids = join_id_str($ids);
+        log::info!("查詢歷史 {}", ids);
+        let limit = $limit as i64;
+        let offset = $offset as i64;
+        let no_dir = $dir.is_none();
+        let dir = $dir.map(|p| p.to_string_lossy());
+        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        last_arg!(
+            $select,
+            offset,
+            limit,
+            $maybe_envs,
+            "
+            AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
+            AND (NOT ? OR NOT humble)
+            ",
+            ids,
+            no_dir,
+            dir,
+            $no_humble
+        )
+        .fetch_all(&*$historian.pool.read().unwrap())
+        .await
     }};
 }
 
@@ -312,32 +340,46 @@ impl Historian {
         no_humble: bool,
         dir: Option<&Path>,
     ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
-        let ids = join_id_str(ids);
-        log::info!("查詢歷史 {}", ids);
-        let limit = limit as i64;
-        let offset = offset as i64;
-        let no_dir = dir.is_none();
-        let dir = dir.map(|p| p.to_string_lossy());
-        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
-        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
-        let res = last_arg!(
-            "args, script_id",
-            offset,
-            limit,
-            "
-            AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
-            AND (NOT ? OR NOT humble)
-            ",
+        let res = do_last_arg!(
+            "script_id, args",
+            "",
             ids,
-            no_dir,
+            limit,
+            offset,
+            no_humble,
             dir,
-            no_humble
-        )
-        .fetch_all(&*self.pool.read().unwrap())
-        .await?;
+            self
+        )?;
         Ok(res
             .into_iter()
             .map(|res| (res.script_id, res.args.unwrap_or_default())))
+    }
+
+    pub async fn previous_args_list_with_envs(
+        &self,
+        ids: &[i64],
+        limit: u32,
+        offset: u32,
+        no_humble: bool,
+        dir: Option<&Path>,
+    ) -> Result<impl ExactSizeIterator<Item = (i64, String, String)>, DBError> {
+        let res = do_last_arg!(
+            "script_id, args, envs",
+            ", envs",
+            ids,
+            limit,
+            offset,
+            no_humble,
+            dir,
+            self
+        )?;
+        Ok(res.into_iter().map(|res| {
+            (
+                res.script_id,
+                res.args.unwrap_or_default(),
+                res.envs.unwrap_or_default(),
+            )
+        }))
     }
 
     async fn make_last_time_record(&self, script_id: i64) -> Result<LastTimeRecord, DBError> {

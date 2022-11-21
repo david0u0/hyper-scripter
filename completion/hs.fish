@@ -373,6 +373,7 @@ complete -c hs -n "__fish_seen_subcommand_from show" -s d -l dir
 complete -k -c hs -n "__fish_seen_subcommand_from show" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from show" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from show" -l with-name
+complete -c hs -n "__fish_seen_subcommand_from show" -l show-env
 complete -c hs -n "__fish_seen_subcommand_from show" -l no-humble
 complete -c hs -n "__fish_seen_subcommand_from show" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from show" -l no-trace -d 'Do not record history'

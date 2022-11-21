@@ -312,6 +312,8 @@ pub enum History {
         offset: u32,
         #[clap(short, long)]
         dir: Option<PathBuf>,
+        #[clap(long)]
+        show_env: bool,
     },
     Neglect {
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]

@@ -142,10 +142,10 @@ impl Default for Config {
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous"]),
-                gen_alias("pc", &["=util/historian!", "--sequence", "c"]),
-                gen_alias("pr", &["=util/historian!", "--sequence", "r"]),
+                gen_alias("pc", &["=util/historian!", "--show-env", "--sequence", "c"]),
+                gen_alias("pr", &["=util/historian!", "--show-env", "--sequence", "r"]),
                 gen_alias("purge", &["rm", "--purge"]),
-                gen_alias("h", &["=util/historian!"]),
+                gen_alias("h", &["=util/historian!", "--show-env"]),
             ]
             .into_iter()
             .collect(),

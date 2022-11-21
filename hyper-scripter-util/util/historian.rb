@@ -46,9 +46,9 @@ class Historian < Selector
     # when there are multiple scripts, showing humble events will be a mess
     no_humble = @single ? '' : '--no-humble'
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    show_env = @single ? '--show-env' : ''
+    show_env_str = @show_env ? '--show-env' : ''
     s = @scripts.map { |s| "=#{s}!" }.join(' ')
-    "#{no_humble} #{show_env} #{dir_str} #{s}"
+    "#{no_humble} #{show_env_str} #{dir_str} #{s}"
   end
 
   def history_show
@@ -90,7 +90,8 @@ class Historian < Selector
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
-    @dir = show_obj['dir'] # TODO: forbid delete?
+    @dir = show_obj['dir']
+    @show_env = show_obj['show_env']
     query = show_obj['queries']
     @single = query.length == 1 && !query[0].include?('*')
 
@@ -99,7 +100,7 @@ class Historian < Selector
     super(offset: @offset + 1)
 
     load_history
-    warn "historian for #{@options[0]&.name}" if @single
+    warn "historian for #{@scripts[0]}" if @single
     register_all
   end
 

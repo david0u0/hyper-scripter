@@ -523,6 +523,8 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     queries,
                     dir,
                     range,
+                    no_humble,
+                    show_env,
                 },
         } => {
             let repo = repo.init().await?;
@@ -531,7 +533,14 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let res_vec = historian
-                .ignore_args_range(&ids, dir.as_deref(), range.get_min(), range.get_max())
+                .ignore_args_range(
+                    &ids,
+                    dir.as_deref(),
+                    no_humble,
+                    show_env,
+                    range.get_min(),
+                    range.get_max(),
+                )
                 .await?;
             // TODO: 測試多個腳本的狀況
             for (entry, res) in scripts.iter_mut().zip(res_vec) {

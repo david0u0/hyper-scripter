@@ -515,6 +515,7 @@ fn test_multi_history() {
     }
 }
 
+#[test]
 fn test_no_humble() {
     let _g = setup();
     let test = ScriptTest::new("test", None, None);

@@ -153,13 +153,13 @@ macro_rules! do_last_arg {
 }
 
 macro_rules! ignore_or_humble_arg {
-    ($ignore_or_humble:literal, $pool:expr, $cond:literal, $($var:expr),+) => {
+    ($ignore_or_humble:literal, $pool:expr, $cond:literal $(+ $more_cond:literal)*, $($var:expr),+) => {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
                 SELECT id FROM events WHERE type = ? AND NOT ignored AND "
-                + $cond
+                + $cond $(+ $more_cond)*
                 + "
             )
             ",
@@ -167,13 +167,15 @@ macro_rules! ignore_or_humble_arg {
             EXEC_CODE,
             $($var),*
         )
-        .execute(&*$pool).await?;
+        .execute(&*$pool)
+        .await?;
+
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND NOT ignored AND
             "
-                + $cond,
+                + $cond $(+ $more_cond)*,
             EXEC_CODE,
             $($var),*
         )
@@ -467,6 +469,8 @@ impl Historian {
         &self,
         ids: &[i64],
         dir: Option<&Path>,
+        no_humble: bool,
+        show_env: bool,
         min: NonZeroU64,
         max: Option<NonZeroU64>,
     ) -> Result<Vec<LastTimeRecord>, DBError> {
@@ -484,29 +488,41 @@ impl Historian {
         log::info!("忽略歷史 {} {} {}", offset, limit, ids_str);
 
         let pool = self.pool.read().unwrap();
-        // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
-        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
-        ignore_or_humble_arg!(
-            "ignored",
-            pool,
-            "
-            (? OR dir == ?) AND
-            (script_id || args) IN (
-                WITH args AS (
-                    SELECT args, max(time) as time, script_id FROM events
-                    WHERE instr(?, '[' || script_id || ']') > 0
-                    AND type = ? AND NOT ignored
-                    GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
-                ) SELECT script_id || args as t FROM args
-            )
-            ",
-            no_dir,
-            dir,
-            ids_str,
-            EXEC_CODE,
-            limit,
-            offset
-        );
+        macro_rules! ignore_arg {
+            ($($target:literal)*) => {{
+                // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
+                // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+                ignore_or_humble_arg!(
+                    "ignored",
+                    pool,
+                    "
+                    (? OR dir == ?) AND
+                    (script_id || args " $(+ "||" + $target)* + ") IN (
+                        WITH records AS (
+                            SELECT max(time) as time, args, script_id " $(+ "," + $target)* +" FROM events
+                            WHERE instr(?, '[' || script_id || ']') > 0
+                            AND type = ? AND NOT ignored
+                            AND (NOT ? OR NOT humble)
+                            GROUP BY args, script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
+                        ) SELECT script_id || args " $(+ "||" + $target)* + " as t FROM records
+                    )
+                    ",
+                    no_dir,
+                    dir,
+                    ids_str,
+                    EXEC_CODE,
+                    no_humble,
+                    limit,
+                    offset
+                );
+            }};
+        }
+
+        if show_env {
+            ignore_arg!("envs");
+        } else {
+            ignore_arg!();
+        }
 
         log::info!("ignore last args");
         let mut ret = vec![];

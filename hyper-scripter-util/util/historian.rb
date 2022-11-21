@@ -43,19 +43,20 @@ class Historian < Selector
   attr_reader :script_name
 
   def scripts_str
-    @scripts.map { |s| "=#{s}!" }.join(' ')
+    # when there are multiple scripts, showing humble events will be a mess
+    no_humble = @single ? '' : '--no-humble'
+    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
+    show_env = @single ? '--show-env' : ''
+    s = @scripts.map { |s| "=#{s}!" }.join(' ')
+    "#{no_humble} #{show_env} #{dir_str} #{s}"
   end
 
   def history_show
     return '' if @scripts.length == 0
 
-    # when there are multiple scripts, showing humble events will be a mess
-    no_humble = @single ? '' : '--no-humble'
-    show_env = @single ? '--show-env' : ''
-    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
     HS_ENV.do_hs(
       "history show --limit #{@limit} --offset #{@offset} \
-      --with-name #{dir_str} #{show_env} #{no_humble} #{scripts_str}", false
+      --with-name #{scripts_str}", false
     )
   end
 
@@ -143,7 +144,7 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{} #{scripts_str} #{obj.number}", false)
     }, msg: 'replace the argument')
 
     register_keys(%w[c C], lambda { |_, _|

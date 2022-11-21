@@ -282,7 +282,11 @@ pub enum Subs {
 pub enum History {
     RM {
         #[clap(short, long)]
-        dir: Option<PathBuf>,
+        dir: Option<PathBuf>, // FIXME: this flag isn't working...
+        #[clap(long)]
+        show_env: bool,
+        #[clap(long)]
+        no_humble: bool,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
         range: RangeQuery,

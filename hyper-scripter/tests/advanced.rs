@@ -146,3 +146,47 @@ fn test_type_select() {
 
     assert_ls(vec![a_rb, c_rb, f_tag_rb], Some("+@rb!"), None);
 }
+
+#[test]
+fn test_prev_env() {
+    let MY_ENV = "MY_ENV";
+    let MY_OTHER_ENV = "MY_OTHER_ENV";
+    let MY_ENV_HELP = "MY_ENV_HELP";
+    run!(
+        "e --no-template ? | 
+        # [HS_ENV]: {}
+        # [HS_ENV]: {}
+        # [HS_ENV_HELP]: {}
+        echo ${}:${}:${}
+        ",
+        MY_ENV,
+        MY_OTHER_ENV,
+        MY_ENV_HELP,
+        MY_ENV,
+        MY_OTHER_ENV,
+        MY_ENV_HELP,
+    )
+    .unwrap();
+
+    let env = vec![
+        (MY_ENV.to_owned(), "A".to_owned()),
+        (MY_OTHER_ENV.to_owned(), "B".to_owned()),
+        (MY_ENV_HELP.to_owned(), "C".to_owned()),
+    ];
+
+    assert_eq!(run!("-").unwrap(), "::");
+    assert_eq!(run!("run -p").unwrap(), "::");
+
+    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "A:B:C");
+    assert_eq!(run!("run -p").unwrap(), "A:B:");
+    assert_eq!(run!("run -p").unwrap(), "A:B:");
+    assert_eq!(run!("run -p").unwrap(), "A:B:");
+
+    let env = vec![(MY_ENV.to_owned(), "X".to_owned())];
+    // -p is weaker than normal env var
+    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "X:B:");
+    assert_eq!(run!("run -p").unwrap(), "X:B:");
+
+    assert_eq!(run!("-").unwrap(), "::");
+    assert_eq!(run!("run -p").unwrap(), "::");
+}

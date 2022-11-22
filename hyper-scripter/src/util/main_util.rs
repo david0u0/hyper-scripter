@@ -212,7 +212,7 @@ pub async fn run_n_times(
     log::info!("執行 {:?}", entry.name);
     super::hijack_ctrlc_once();
 
-    let mut prev_env_vec = vec![];
+    let mut env_vec = vec![];
     if use_previous {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         let historian = &entry.get_env().historian;
@@ -225,7 +225,7 @@ pub async fn run_n_times(
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
                 let mut prev_arg_vec: Vec<String> =
                     serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
-                prev_env_vec =
+                env_vec =
                     serde_json::from_str(&envs_str).context(format!("反序列失敗 {}", envs_str))?;
                 prev_arg_vec.extend(args.into_iter());
                 args = prev_arg_vec;
@@ -238,17 +238,14 @@ pub async fn run_n_times(
     let content = super::read_file(&script_path)?;
 
     let mut hs_env_desc = vec![];
-    let mut env_record = vec![];
     for (need_save, line) in extract_env_from_content_help_aware(&content) {
         hs_env_desc.push(line.to_owned());
         if need_save {
-            if let Some(env_pair) = EnvPair::new(&line, &prev_env_vec) {
-                env_record.push(env_pair);
-            }
+            EnvPair::process_line(line, &mut env_vec);
         }
     }
-    EnvPair::sort(&mut env_record);
-    let env_record = serde_json::to_string(&env_record)?;
+    EnvPair::sort(&mut env_vec);
+    let env_record = serde_json::to_string(&env_vec)?;
 
     let run_id = entry
         .update(|info| info.exec(content, &args, env_record, here))
@@ -281,7 +278,7 @@ pub async fn run_n_times(
     // End packing hs tmpl val
 
     for _ in 0..repeat {
-        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &prev_env_vec);
+        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
         let ret_code: i32;
         match run_res {
             Err(Error::ScriptError(code)) => {

@@ -12,6 +12,19 @@ impl_ser_by_to_string!(EnvPair);
 impl_de_by_from_str!(EnvPair);
 impl EnvPair {
     /// 使用此函式前需確保 line 非空字串
+    pub fn process_line(line: &str, env_vec: &mut Vec<Self>) {
+        let env = line.split_whitespace().next().unwrap();
+        if let Some(p) = env_vec.iter_mut().find(|p| env == p.key) {
+            if let Ok(val) = std::env::var(env) {
+                p.val = val.clone();
+            }
+        } else if let Ok(val) = std::env::var(env) {
+            env_vec.push(EnvPair {
+                key: env.to_owned(),
+                val,
+            });
+        }
+    }
     pub fn new(line: &str, env_vec: &[Self]) -> Option<Self> {
         let env = line.split_whitespace().next().unwrap();
         if let Ok(val) = std::env::var(env) {

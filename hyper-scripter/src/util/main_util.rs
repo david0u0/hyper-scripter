@@ -1,7 +1,7 @@
 use crate::args::Subs;
 use crate::config::Config;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
-use crate::extract_msg::{collect_envs, extract_env_from_content};
+use crate::extract_msg::{extract_env_from_content, EnvPair};
 use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -143,7 +143,7 @@ fn run(
     info: &ScriptInfo,
     remaining: &[String],
     hs_tmpl_val: &serde_json::Value,
-    remaining_envs: &[(String, String)],
+    remaining_envs: &[EnvPair],
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
@@ -168,7 +168,7 @@ fn run(
     let mut cmd = super::create_cmd(cmd, args);
     cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
-    cmd.envs(remaining_envs.iter().map(|(a, b)| (a, b)));
+    cmd.envs(remaining_envs.iter().map(|p| (&p.key, &p.val)));
 
     let stat = super::run_cmd(cmd)?;
     log::info!("預腳本執行結果：{:?}", stat);
@@ -238,7 +238,7 @@ pub async fn run_n_times(
     let hs_env_help: Vec<_> = extract_env_from_content(&content)
         .map(|s| s.to_string())
         .collect();
-    let env_record = collect_envs(&hs_env_help);
+    let env_record = EnvPair::collect_envs(&hs_env_help);
     let env_record = serde_json::to_string(&env_record)?;
 
     let run_id = entry

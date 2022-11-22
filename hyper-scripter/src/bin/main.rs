@@ -2,6 +2,7 @@ use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
+use hyper_scripter::extract_msg::EnvPair;
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
@@ -645,10 +646,10 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 for (script_id, args, envs) in args_list {
                     log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
                     let args: Vec<String> = serde_json::from_str(&args)?;
-                    let envs: Vec<(String, String)> = serde_json::from_str(&envs)?;
+                    let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
                     print_basic(script_id, args)?;
-                    for (k, v) in envs.into_iter() {
-                        println!("  {} {}", k, v);
+                    for p in envs.into_iter() {
+                        println!("  {} {}", p.key, p.val);
                     }
                 }
             } else {

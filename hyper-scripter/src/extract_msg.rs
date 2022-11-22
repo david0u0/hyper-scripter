@@ -1,3 +1,7 @@
+use crate::error::{Error, Result};
+use crate::{impl_de_by_from_str, impl_ser_by_to_string};
+use std::str::FromStr;
+
 const HELP_KEY: &str = "[HS_HELP]:";
 const ENV_KEY: &str = "[HS_ENV_HELP]:";
 
@@ -31,21 +35,44 @@ pub fn extract_env_from_content(content: &str) -> impl Iterator<Item = &str> {
         }
     })
 }
-fn extract_env_from_env_lines<'a, T: AsRef<str>>(lines: &'a [T]) -> impl Iterator<Item = &'a str> {
-    lines
-        .iter()
-        .map(|s| s.as_ref().split_whitespace().next().unwrap())
+
+#[derive(Display)]
+#[display(fmt = "{} {}", key, val)]
+pub struct EnvPair {
+    pub key: String,
+    pub val: String,
 }
-// 使用此函式前需確保 lines 中沒有空字串
-pub fn collect_envs<'a, T: AsRef<str>>(lines: &'a [T]) -> Vec<(&'a str, String)> {
-    let mut v = vec![];
-    for env in extract_env_from_env_lines(lines) {
-        if let Ok(env_val) = std::env::var(env) {
-            v.push((env, env_val));
+impl_ser_by_to_string!(EnvPair);
+impl_de_by_from_str!(EnvPair);
+impl EnvPair {
+    /// 使用此函式前需確保 lines 中沒有空字串
+    pub fn collect_envs<'a, T: AsRef<str>>(lines: &'a [T]) -> Vec<Self> {
+        let mut v = vec![];
+        for line in lines.iter() {
+            let env = line.as_ref().split_whitespace().next().unwrap();
+            if let Ok(val) = std::env::var(env) {
+                v.push(EnvPair {
+                    key: env.to_owned(),
+                    val,
+                });
+            }
+        }
+        v.sort_by(|a, b| a.key.cmp(&b.key));
+        v
+    }
+}
+impl FromStr for EnvPair {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        if let Some((key, val)) = s.split_once(' ') {
+            Ok(EnvPair {
+                key: key.to_owned(),
+                val: val.to_owned(),
+            })
+        } else {
+            Err(Error::msg("env format"))
         }
     }
-    v.sort_by_key(|(k, _)| *k);
-    v
 }
 
 pub fn extract_help_from_content(content: &str) -> impl Iterator<Item = &str> {

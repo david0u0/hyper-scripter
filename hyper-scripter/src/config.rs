@@ -159,8 +159,8 @@ impl Default for Config {
                     "{{#each tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
                 ),
                 (
-                    "HS_ENV_HELP",
-                    "{{#each env_help}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
+                    "HS_ENV_DESC",
+                    "{{#each env_desc}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
                 ),
                 ("HS_EXE", "{{exe}}"),
                 ("HS_SOURCE", "{{home}}/.hs_source"),

@@ -1,8 +1,8 @@
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagSelector};
+use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
-use hyper_scripter::extract_msg::EnvPair;
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;

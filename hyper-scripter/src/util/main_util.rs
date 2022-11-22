@@ -1,7 +1,8 @@
 use crate::args::Subs;
 use crate::config::Config;
+use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
-use crate::extract_msg::{extract_env_from_content, EnvPair};
+use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -235,10 +236,17 @@ pub async fn run_n_times(
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
 
-    let hs_env_help: Vec<_> = extract_env_from_content(&content)
-        .map(|s| s.to_string())
-        .collect();
-    let env_record = EnvPair::collect_envs(&hs_env_help);
+    let mut hs_env_desc = vec![];
+    let mut env_record = vec![];
+    for (need_save, line) in extract_env_from_content_help_aware(&content) {
+        hs_env_desc.push(line.to_owned());
+        if need_save {
+            if let Some(env_pair) = EnvPair::new(&line) {
+                env_record.push(env_pair);
+            }
+        }
+    }
+    EnvPair::sort(&mut env_record);
     let env_record = serde_json::to_string(&env_record)?;
 
     let run_id = entry
@@ -265,7 +273,7 @@ pub async fn run_n_times(
         "tags": hs_tags,
         "cmd": hs_cmd,
         "exe": hs_exe,
-        "env_help": hs_env_help,
+        "env_desc": hs_env_desc,
         "name": &entry.name.key(),
         "content": content,
     });

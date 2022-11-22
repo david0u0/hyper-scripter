@@ -1,9 +1,6 @@
-use crate::error::{Error, Result};
-use crate::{impl_de_by_from_str, impl_ser_by_to_string};
-use std::str::FromStr;
-
 const HELP_KEY: &str = "[HS_HELP]:";
-const ENV_KEY: &str = "[HS_ENV_HELP]:";
+const ENV_KEY: &str = "[HS_ENV]:";
+const ENV_HELP_KEY: &str = "[HS_ENV_HELP]:";
 
 pub struct Iter<'a, 'b> {
     content: &'a str,
@@ -26,53 +23,22 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
 }
 
 pub fn extract_env_from_content(content: &str) -> impl Iterator<Item = &str> {
-    extract_msg_from_content(content, ENV_KEY).filter_map(|s| {
+    extract_env_from_content_help_aware(content).map(|(_, s)| s)
+}
+
+/// 第一個布林值為真代表 HS_ENV，為假代表 HS_ENV_HELP
+pub fn extract_env_from_content_help_aware(content: &str) -> impl Iterator<Item = (bool, &str)> {
+    // TODO: avoid traversing twice
+    let env_iter = extract_msg_from_content(content, ENV_KEY).map(|s| (true, s));
+    let env_help_iter = extract_msg_from_content(content, ENV_HELP_KEY).map(|s| (false, s));
+    env_iter.chain(env_help_iter).filter_map(|(b, s)| {
         let s = s.trim();
         if s.is_empty() {
             None
         } else {
-            Some(s)
+            Some((b, s))
         }
     })
-}
-
-#[derive(Display)]
-#[display(fmt = "{} {}", key, val)]
-pub struct EnvPair {
-    pub key: String,
-    pub val: String,
-}
-impl_ser_by_to_string!(EnvPair);
-impl_de_by_from_str!(EnvPair);
-impl EnvPair {
-    /// 使用此函式前需確保 lines 中沒有空字串
-    pub fn collect_envs<'a, T: AsRef<str>>(lines: &'a [T]) -> Vec<Self> {
-        let mut v = vec![];
-        for line in lines.iter() {
-            let env = line.as_ref().split_whitespace().next().unwrap();
-            if let Ok(val) = std::env::var(env) {
-                v.push(EnvPair {
-                    key: env.to_owned(),
-                    val,
-                });
-            }
-        }
-        v.sort_by(|a, b| a.key.cmp(&b.key));
-        v
-    }
-}
-impl FromStr for EnvPair {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        if let Some((key, val)) = s.split_once(' ') {
-            Ok(EnvPair {
-                key: key.to_owned(),
-                val: val.to_owned(),
-            })
-        } else {
-            Err(Error::msg("env format"))
-        }
-    }
 }
 
 pub fn extract_help_from_content(content: &str) -> impl Iterator<Item = &str> {
@@ -92,14 +58,16 @@ fn extract_msg_from_content<'a, 'b>(content: &'a str, key: &'b str) -> Iter<'a, 
 
 #[cfg(test)]
 mod test {
-    fn extract_help_from_content(content: &str, long: bool) -> Vec<&str> {
-        let iter = super::extract_help_from_content(content);
+    use super::*;
+    fn extract_help(content: &str, long: bool) -> Vec<&str> {
+        let iter = extract_help_from_content(content);
         if long {
             iter.collect()
         } else {
             iter.take(1).collect()
         }
     }
+
     #[test]
     fn test_extract_help() {
         let content = "
@@ -113,8 +81,8 @@ mod test {
         # [HS_HELP]: 解析我吧，雖然我是個失敗的註解
 
         //  前面有些 垃圾[HS_HELP]:我是最後一行";
-        let short = extract_help_from_content(content, false);
-        let long = extract_help_from_content(content, true);
+        let short = extract_help(content, false);
+        let long = extract_help(content, true);
         assert_eq!(short, vec!["  解析我吧  "]);
         assert_eq!(
             long,
@@ -127,8 +95,8 @@ mod test {
         );
 
         let appended = format!("{}\n 真．最後一行", content);
-        let short2 = extract_help_from_content(&appended, false);
-        let long2 = extract_help_from_content(&appended, true);
+        let short2 = extract_help(&appended, false);
+        let long2 = extract_help(&appended, true);
         assert_eq!(short, short2);
         assert_eq!(long, long2);
     }
@@ -139,9 +107,35 @@ mod test {
         fn this_is_a_test() -> bool {}
 
         // [HS_HOLP]:我是最後一行，還拼錯字…";
-        let short = extract_help_from_content(content, false);
-        let long = extract_help_from_content(content, true);
+        let short = extract_help(content, false);
+        let long = extract_help(content, true);
         assert_eq!(short.len(), 0);
         assert_eq!(long.len(), 0);
+    }
+    #[test]
+    fn test_extract_env() {
+        let content = "
+        [HS_ENV_HELP]: env_help1
+        [HS_ENV]: env1
+        [HS_ENV]: env2
+        [HS_ENV_HELP]: env_help2
+        [HS_ENV_HELP]: env_help3
+        [HS_ENV]: env3
+        [HS_ENV_HELP]: env_help4
+        ";
+        let mut v: Vec<_> = extract_env_from_content_help_aware(content).collect();
+        v.sort();
+        assert_eq!(
+            v,
+            vec![
+                (false, "env_help1"),
+                (false, "env_help2"),
+                (false, "env_help3"),
+                (false, "env_help4"),
+                (true, "env1"),
+                (true, "env2"),
+                (true, "env3"),
+            ]
+        );
     }
 }

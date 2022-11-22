@@ -191,18 +191,27 @@ class Historian < Selector
       s = s.rstrip
       if s.start_with?(' ') # env
         opt = opts[-1]
+        next if opt.nil?
         key, _, val = s.strip.partition(' ')
         opt.add_env(key, val)
       else
         name, _, content = s.partition(' ')
-        opts.push(Option.new(name, content, cur_number + @offset + 1))
+        opts.push(process_history(name, content, cur_number + @offset + 1))
         cur_number += 1
       end
     end
-    if @single
-      opts.reject! { |opt| opt.empty? }
+    opts.reject do |opt|
+      if opt.nil?
+        true
+      elsif @single && opt.empty?
+        true
+      end
     end
-    opts
+  end
+
+  # User can overwriter this function to create their own option, or apply some filter
+  def process_history(name, content, number)
+    Option.new(name, content, number)
   end
 
   def load_history

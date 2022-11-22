@@ -188,6 +188,7 @@ fn run(
     let mut cmd = super::create_cmd(&cmd_str, full_args);
     cmd.envs(ty_env);
     cmd.envs(env);
+    cmd.envs(remaining_envs.iter().map(|p| (&p.key, &p.val)));
 
     let stat = super::run_cmd(cmd)?;
     log::info!("程式執行結果：{:?}", stat);
@@ -241,7 +242,7 @@ pub async fn run_n_times(
     for (need_save, line) in extract_env_from_content_help_aware(&content) {
         hs_env_desc.push(line.to_owned());
         if need_save {
-            if let Some(env_pair) = EnvPair::new(&line) {
+            if let Some(env_pair) = EnvPair::new(&line, &prev_env_vec) {
                 env_record.push(env_pair);
             }
         }

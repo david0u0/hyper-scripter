@@ -259,10 +259,15 @@ if __FILE__ == $0
   Historian.humble_run_id
 
   def split_args
-    if ARGV[0] == '--sequence'
-      [ARGV[1], ARGV[2..-1].join(' ')]
-    else
+    idx = ARGV.find_index("--sequence")
+    if idx.nil?
       ['', ARGV.join(' ')]
+    else
+      seq = ARGV[idx+1] || ''
+      first = ARGV[...idx]
+      second = ARGV[(idx + 2)..] || []
+      args = "#{first.join(' ')} #{second.join(' ')}"
+      [seq, args]
     end
   end
 

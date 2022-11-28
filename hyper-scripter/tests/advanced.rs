@@ -149,9 +149,9 @@ fn test_type_select() {
 
 #[test]
 fn test_prev_env() {
-    let MY_ENV = "MY_ENV";
-    let MY_OTHER_ENV = "MY_OTHER_ENV";
-    let MY_ENV_HELP = "MY_ENV_HELP";
+    const MY_ENV: &str = "MY_ENV";
+    const MY_OTHER_ENV: &str = "MY_OTHER_ENV";
+    const MY_ENV_HELP: &str = "MY_ENV_HELP";
     run!(
         "e --no-template ? | 
         # [HS_ENV]: {}

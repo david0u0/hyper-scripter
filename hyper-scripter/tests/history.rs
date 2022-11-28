@@ -389,15 +389,48 @@ fn test_multi_history() {
     let _g = setup();
 
     use std::collections::{HashMap, HashSet};
+    #[derive(Clone, Hash, PartialEq, Eq, Debug)]
+    struct Record {
+        name: String,
+        arg: u32,
+        env: Vec<(String, u32)>,
+    }
+    impl Record {
+        fn new(name: &str, arg: u32, mut env: Vec<(String, u32)>) -> Self {
+            env.sort();
+            Record {
+                name: name.to_owned(),
+                env,
+                arg,
+            }
+        }
+        fn insert_env(&mut self, env: &str, val: u32) {
+            self.env.push((env.to_owned(), val));
+            self.env.sort();
+        }
+    }
     struct Historian {
         counter: u32,
-        m: HashMap<(String, u32), u32>,
+        /// (record, time counter)
+        m: HashMap<Record, u32>,
+    }
+    macro_rules! run_silent {
+        ($($arg:tt)*) => ({
+            run!(silent: true, $($arg)*).unwrap() // NOTE: 不打印標準輸出，太吵了==
+        });
     }
     macro_rules! run_n_print {
-        ($($arg:tt)*) => ({
+        (custom_env: $env:ident, $($arg:tt)*) => ({
+            for (key, val) in $env.iter() {
+                print!("{}={} ", key, val);
+            }
             let cmd = format!($($arg)*);
             println!("{}", cmd);
-            run!(silent: true, "{}", cmd).unwrap() // NOTE: 不打印標準輸出，太吵了==
+            run_silent!(custom_env: $env, "{}", cmd)
+        });
+        ($($arg:tt)*) => ({
+            let env = vec![];
+            run_n_print!(custom_env: env, $($arg)*)
         });
     }
     impl Historian {
@@ -407,18 +440,17 @@ fn test_multi_history() {
                 m: Default::default(),
             }
         }
-        fn get_show_list(&self) -> Vec<(String, u32)> {
+        fn get_show_list(&self) -> Vec<Record> {
             let mut v: Vec<_> = self.m.iter().collect();
             v.sort_by_key(|(_, &v)| -(v as i32));
-            v.into_iter()
-                .map(|((name, arg), _)| (name.to_owned(), *arg))
-                .collect()
+            v.into_iter().map(|(record, _)| record.clone()).collect()
         }
         fn get_order(&self) -> Vec<String> {
             let mut s: HashSet<_> = HashSet::new();
             let mut ret = vec![];
-            let args = self.get_show_list();
-            for (name, _) in args.iter() {
+            let records = self.get_show_list();
+            for record in records.iter() {
+                let name = &record.name;
                 let absent = s.insert(name);
                 if absent {
                     ret.push(name.to_owned());
@@ -429,36 +461,49 @@ fn test_multi_history() {
         fn len(&self) -> usize {
             self.m.len()
         }
-        fn run(&mut self, script: &ScriptTest, arg: u32) {
-            let name = script.get_name().to_owned();
-            run_n_print!("run --dummy {}! {}", name, arg);
-
+        fn run(&mut self, script: &ScriptTest, arg: u32, env: Vec<(String, u32)>) {
+            let name = script.get_name();
             self.counter += 1;
-            self.m.insert((name, arg), self.counter);
+            self.m
+                .insert(Record::new(name, arg, env.clone()), self.counter);
+
+            let env: Vec<_> = env
+                .into_iter()
+                .map(|(env, val)| (env, val.to_string()))
+                .collect();
+            run_n_print!(custom_env: env, "run --dummy {}! {}", name, arg);
         }
         fn rm(&mut self, min: usize, max: usize) {
-            run_n_print!("history rm * {}..{}", min + 1, max + 1);
+            run_n_print!("history rm --show-env * {}..{}", min + 1, max + 1);
 
             let list = self.get_show_list();
-            for line in &list[min..max] {
-                self.m.remove(line);
+            for record in &list[min..max] {
+                self.m.remove(record);
             }
         }
         fn show(&self) {
-            let expected: Vec<_> = self
-                .get_show_list()
-                .iter()
-                .map(|(name, arg)| format!("{} {}", name, arg))
-                .collect();
-            let actual: Vec<_> = run_n_print!("-a history show * --limit 999 --with-name")
-                .lines()
-                .map(|s| s.to_owned())
-                .collect();
+            let mut actual = Vec::<Record>::new();
+            for line in run_silent!("-a history show * --limit 999 --with-name --show-env").lines()
+            {
+                if line.starts_with(' ') {
+                    // env
+                    let (env, val) = line.trim().split_once(' ').unwrap();
+                    actual
+                        .last_mut()
+                        .unwrap()
+                        .insert_env(env, val.parse().unwrap());
+                } else {
+                    let (name, arg) = line.split_once(' ').unwrap();
+                    actual.push(Record::new(name, arg.parse().unwrap(), vec![]));
+                }
+            }
+
+            let expected = self.get_show_list();
             assert_eq!(expected, actual);
         }
         fn ls(&self) {
             let expected = self.get_order();
-            let actual: Vec<_> = run_n_print!("ls --grouping none --name --plain")
+            let actual: Vec<_> = run_silent!("ls --grouping none --name --plain")
                 .split_whitespace()
                 .map(|s| s.to_owned())
                 .collect();
@@ -468,14 +513,18 @@ fn test_multi_history() {
 
     let mut h = Historian::new();
     fn new_script(name: &str) -> ScriptTest {
-        let s = ScriptTest::new(name, None, None);
+        let mut content = String::new();
+        for env in [name, "VAR"] {
+            content += &format!("# [HS_ENV]: {}\n", env);
+        }
+        let s = ScriptTest::new(name, None, Some(&content));
         run!("history neglect {}", name).unwrap();
         s
     }
-    let a = new_script("a");
-    let b = new_script("b");
-    let c = new_script("c");
-    let d = new_script("d");
+    let a = new_script("A");
+    let b = new_script("B");
+    let c = new_script("C");
+    let d = new_script("D");
     let repo = [a, b, c, d];
     let mut rng = rand::thread_rng();
 
@@ -483,8 +532,19 @@ fn test_multi_history() {
         macro_rules! run_script {
             () => {
                 let script_idx: usize = rng.gen_range(0..4);
+                let script = &repo[script_idx];
                 let arg = rng.gen_range(0..5);
-                h.run(&repo[script_idx], arg);
+                let mut env = vec![];
+                for i in 0..2 {
+                    let val: u32 = rng.gen_range(0..3);
+                    if val == 0 {
+                        continue;
+                    }
+
+                    let key = if i == 0 { script.get_name() } else { "VAR" };
+                    env.push((key.to_owned(), val));
+                }
+                h.run(&script, arg, env);
             };
         }
 
@@ -500,7 +560,7 @@ fn test_multi_history() {
                 // rm
                 loop {
                     let t1 = rng.gen_range(0..len);
-                    let t2 = rng.gen_range(t1 + 1..len + 1);
+                    let t2 = rng.gen_range(t1 + 1..=len);
                     h.rm(t1, t2);
                     break;
                 }

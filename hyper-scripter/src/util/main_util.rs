@@ -1,5 +1,4 @@
 use crate::args::Subs;
-use std::process::{Command};
 use crate::config::Config;
 use crate::env_pair::EnvPairWithExist;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
@@ -12,6 +11,7 @@ use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub struct EditTagArgs {
     pub content: TagSelector,
@@ -168,7 +168,7 @@ fn run(
         .chain(std::iter::once(pre_run_script.as_os_str()))
         .chain(remaining.iter().map(|s| s.as_ref()));
 
-    let set_cmd_envs = |cmd: &mut Command|  {
+    let set_cmd_envs = |cmd: &mut Command| {
         cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
         cmd.envs(env.iter().map(|(a, b)| (a, b)));
         cmd.envs(EnvPairWithExist::iter_new_env(remaining_envs));

@@ -222,6 +222,11 @@ class Historian < Selector
   end
 
   def register_all
+    register_keys(%w[e E], lambda { |_, obj|
+      @show_env = !@show_env
+      load_history
+    }, msg: 'toggle show env mode', recur: true)
+
     register_keys(%w[d D], lambda { |_, obj|
       HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
       load_history

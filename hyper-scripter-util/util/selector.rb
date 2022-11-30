@@ -52,6 +52,25 @@ def compute_lines(len, win_width)
   lines
 end
 
+def search_and_color(s, word, start_color, end_color)
+  target_s = s.dup
+  unless word =~ /[A-Z]/
+    target_s.downcase!
+  end
+
+  extended = 0
+  target_s.to_enum(:scan, word).each do ||
+    s = s.dup if extended == 0 # first modify, must copy the string
+    start_pos = $`.size + extended
+    end_pos = start_pos + word.length
+    s.insert(end_pos, end_color)
+    s.insert(start_pos, start_color)
+
+    extended += start_color.length + end_color.length
+  end
+  s
+end
+
 class Selector
   class Empty < StandardError
   end
@@ -293,11 +312,10 @@ class Selector
   def color_line(pos, option_str)
     if is_virtual_selected(pos)
       if @search_string.length > 0
-        return option_str.gsub(@search_string,
-                               "#{BLUE_BG_RED}#{@search_string}#{BLUE_BG}")
+        return search_and_color(option_str, @search_string, BLUE_BG_RED, BLUE_BG)
       end
     elsif @search_string.length > 0
-      return option_str.gsub(@search_string, "#{RED}#{@search_string}#{NC}")
+      return search_and_color(option_str, @search_string, RED, NC)
     end
     option_str
   end
@@ -313,6 +331,9 @@ class Selector
             (i + pos) % len
           end
       s = format_option(i)
+      unless @search_string =~ /[A-Z]/
+        s = s.downcase
+      end
       return i if s.include?(@search_string)
     end
     nil
@@ -386,3 +407,4 @@ class VirtualState
     num >= from and num < to
   end
 end
+

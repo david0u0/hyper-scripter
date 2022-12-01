@@ -1,7 +1,8 @@
 use crate::args::Subs;
 use crate::config::Config;
+use crate::env_pair::EnvPairWithExist;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
-use crate::extract_msg::extract_env_from_content;
+use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -10,6 +11,7 @@ use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub struct EditTagArgs {
     pub content: TagSelector,
@@ -142,21 +144,11 @@ fn run(
     script_path: &Path,
     info: &ScriptInfo,
     remaining: &[String],
-    content: &str,
-    run_id: i64,
+    hs_tmpl_val: &serde_json::Value,
+    remaining_envs: &[EnvPairWithExist],
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
-    let name = &info.name.key();
-    let hs_home = path::get_home();
-    let hs_tags: Vec<_> = info.tags.iter().map(|t| t.as_ref()).collect();
-
-    let hs_exe = std::env::current_exe()?;
-    let hs_exe = hs_exe.to_string_lossy();
-
-    let hs_cmd = std::env::args().next().unwrap_or_default();
-
-    let hs_env_help: Vec<_> = extract_env_from_content(content).collect();
 
     let script_conf = conf.get_script_conf(ty)?;
     let cmd_str = if let Some(cmd) = &script_conf.cmd {
@@ -165,20 +157,8 @@ fn run(
         return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
     };
 
-    let info: serde_json::Value;
-    info = json!({
-        "path": script_path,
-        "home": hs_home,
-        "run_id": run_id,
-        "tags": hs_tags,
-        "cmd": hs_cmd,
-        "exe": hs_exe,
-        "env_help": hs_env_help,
-        "name": name,
-        "content": content,
-    });
-    let env = conf.gen_env(&info)?;
-    let ty_env = script_conf.gen_env(&info)?;
+    let env = conf.gen_env(&hs_tmpl_val)?;
+    let ty_env = script_conf.gen_env(&hs_tmpl_val)?;
 
     let pre_run_script = prepare_pre_run(None)?;
     let (cmd, shebang) = super::shebang_handle::handle(&pre_run_script)?;
@@ -187,9 +167,15 @@ fn run(
         .map(|s| s.as_ref())
         .chain(std::iter::once(pre_run_script.as_os_str()))
         .chain(remaining.iter().map(|s| s.as_ref()));
+
+    let set_cmd_envs = |cmd: &mut Command| {
+        cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
+        cmd.envs(env.iter().map(|(a, b)| (a, b)));
+        cmd.envs(EnvPairWithExist::iter_new_env(remaining_envs));
+    };
+
     let mut cmd = super::create_cmd(cmd, args);
-    cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
-    cmd.envs(env.iter().map(|(a, b)| (a, b)));
+    set_cmd_envs(&mut cmd);
 
     let stat = super::run_cmd(cmd)?;
     log::info!("預腳本執行結果：{:?}", stat);
@@ -199,15 +185,14 @@ fn run(
         return Err(Error::PreRunError(code));
     }
 
-    let args = script_conf.args(&info)?;
+    let args = script_conf.args(&hs_tmpl_val)?;
     let full_args = args
         .iter()
         .map(|s| s.as_str())
         .chain(remaining.iter().map(|s| s.as_str()));
 
     let mut cmd = super::create_cmd(&cmd_str, full_args);
-    cmd.envs(ty_env);
-    cmd.envs(env);
+    set_cmd_envs(&mut cmd);
 
     let stat = super::run_cmd(cmd)?;
     log::info!("程式執行結果：{:?}", stat);
@@ -224,14 +209,15 @@ pub async fn run_n_times(
     entry: &mut RepoEntry<'_>,
     mut args: Vec<String>,
     res: &mut Vec<Error>,
-    use_previous_args: bool,
+    use_previous: bool,
     error_no_previous: bool,
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
     super::hijack_ctrlc_once();
 
-    if use_previous_args {
+    let mut env_vec = vec![];
+    if use_previous {
         let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
@@ -239,12 +225,14 @@ pub async fn run_n_times(
                 return Err(Error::NoPreviousArgs);
             }
             None => log::warn!("無前一次參數，當作空的"),
-            Some(arg_str) => {
+            Some((arg_str, envs_str)) => {
                 log::debug!("撈到前一次呼叫的參數 {}", arg_str);
-                let mut previous_arg_vec: Vec<String> =
+                let mut prev_arg_vec: Vec<String> =
                     serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
-                previous_arg_vec.extend(args.into_iter());
-                args = previous_arg_vec;
+                env_vec =
+                    serde_json::from_str(&envs_str).context(format!("反序列失敗 {}", envs_str))?;
+                prev_arg_vec.extend(args.into_iter());
+                args = prev_arg_vec;
             }
         }
     }
@@ -252,21 +240,49 @@ pub async fn run_n_times(
     let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
-    let run_id = entry.update(|info| info.exec(content, &args, here)).await?;
+
+    let mut hs_env_desc = vec![];
+    for (need_save, line) in extract_env_from_content_help_aware(&content) {
+        hs_env_desc.push(line.to_owned());
+        if need_save {
+            EnvPairWithExist::process_line(line, &mut env_vec);
+        }
+    }
+    EnvPairWithExist::sort(&mut env_vec);
+    let env_record = serde_json::to_string(&env_vec)?;
+
+    let run_id = entry
+        .update(|info| info.exec(content, &args, env_record, here))
+        .await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");
         return Ok(());
     }
+    // Start packing hs tmpl val
+    let hs_home = path::get_home();
+    let hs_tags: Vec<_> = entry.tags.iter().map(|t| t.as_ref()).collect();
+    let hs_cmd = std::env::args().next().unwrap_or_default();
+
+    let hs_exe = std::env::current_exe()?;
+    let hs_exe = hs_exe.to_string_lossy();
+
+    let content = &entry.exec_time.as_ref().unwrap().data().unwrap().0;
+    let hs_tmpl_val = json!({
+        "path": script_path,
+        "home": hs_home,
+        "run_id": run_id,
+        "tags": hs_tags,
+        "cmd": hs_cmd,
+        "exe": hs_exe,
+        "env_desc": hs_env_desc,
+        "name": &entry.name.key(),
+        "content": content,
+    });
+    // End packing hs tmpl val
 
     for _ in 0..repeat {
-        let run_res = run(
-            &script_path,
-            &*entry,
-            &args,
-            &entry.exec_time.as_ref().unwrap().data().unwrap().0,
-            run_id,
-        );
+        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
         let ret_code: i32;
         match run_res {
             Err(Error::ScriptError(code)) => {

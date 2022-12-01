@@ -34,12 +34,19 @@ fn test_humble_amend_rm_id() {
     let _g = setup();
     // 注意刪除後 humble 事件為最新的後果（可能因為寫回的緣故，越刪除時間反而更新）
     const CONTENT: &str = r#"
+    # [HS_ENV] MY_VAR
     if [ "$1" = "h" ]; then
         $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
     elif [ "$1" = "r" ]; then
         $HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID
     elif [ "$1" = "a" ]; then
         $HS_EXE -H $HS_HOME history amend $HS_RUN_ID do-the-amend
+    elif [ "$1" = "e" ]; then
+        $HS_EXE -H $HS_HOME history amend $HS_RUN_ID --env MY_VAR=1 do-the-env-amend
+        echo $HS_RUN_ID
+    elif [ "$1" = "n" ]; then
+        $HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID
+        $HS_EXE -H $HS_HOME history amend $2 --no-env do-the-env-amend
     fi"#;
 
     let test = ScriptTest::new("test", None, Some(CONTENT));
@@ -49,7 +56,7 @@ fn test_humble_amend_rm_id() {
         s.can_find("-").unwrap();
     }
     let assert_history = |list: &[&str]| {
-        let recorded = run!("history show {}", test.get_name()).unwrap();
+        let recorded = run!("history show {} --show-env", test.get_name()).unwrap();
         assert_list(&recorded, list);
     };
 
@@ -89,10 +96,25 @@ fn test_humble_amend_rm_id() {
     assert_last(&test);
     assert_history(&["do-the-amend", "h", "flag-humble"]);
 
+    let env_run_id = test.run("e").unwrap();
+    test.run("a").unwrap();
+    assert_last(&test);
+    assert_history(&[
+        "do-the-amend",
+        "do-the-env-amend",
+        "MY_VAR=1",
+        "h",
+        "flag-humble",
+    ]);
+
+    test.run(&format!("n {}", env_run_id)).unwrap();
+    assert_last(&test);
+    assert_history(&["do-the-amend", "do-the-env-amend", "h", "flag-humble"]);
+
     baseline.run("").unwrap();
     test.run("h").unwrap();
     assert_last(&baseline);
-    assert_history(&["h", "do-the-amend", "flag-humble"]);
+    assert_history(&["h", "do-the-amend", "do-the-env-amend", "flag-humble"]);
 
     // 測一下 --no-trace 會不會搞爛東西
     run!("history rm {} 1..", test.get_name()).unwrap();
@@ -389,36 +411,92 @@ fn test_multi_history() {
     let _g = setup();
 
     use std::collections::{HashMap, HashSet};
+    #[derive(Clone, Hash, PartialEq, Eq, Debug)]
+    struct Record {
+        name: String,
+        arg: u32,
+        env: Vec<(String, u32)>,
+    }
+    impl Record {
+        fn new(name: &str, arg: u32, mut env: Vec<(String, u32)>) -> Self {
+            env.sort();
+            Record {
+                name: name.to_owned(),
+                env,
+                arg,
+            }
+        }
+        fn insert_env(&mut self, env: &str, val: u32) {
+            self.env.push((env.to_owned(), val));
+            self.env.sort();
+        }
+        fn clean_clone(&self) -> Self {
+            Record {
+                name: self.name.clone(),
+                arg: self.arg,
+                env: vec![],
+            }
+        }
+    }
     struct Historian {
         counter: u32,
-        m: HashMap<(String, u32), u32>,
+        /// (record, time counter). counter == 0 indicates removed record
+        m: HashMap<Record, u32>,
+    }
+    macro_rules! run_silent {
+        ($($arg:tt)*) => ({
+            run!(silent: true, $($arg)*).unwrap() // NOTE: 不打印標準輸出，太吵了==
+        });
     }
     macro_rules! run_n_print {
-        ($($arg:tt)*) => ({
+        (custom_env: $env:ident, $($arg:tt)*) => ({
+            for (key, val) in $env.iter() {
+                print!("{}={} ", key, val);
+            }
             let cmd = format!($($arg)*);
             println!("{}", cmd);
-            run!(silent: true, "{}", cmd).unwrap() // NOTE: 不打印標準輸出，太吵了==
+            run_silent!(custom_env: $env, "{}", cmd)
+        });
+        ($($arg:tt)*) => ({
+            let env = vec![];
+            run_n_print!(custom_env: env, $($arg)*)
         });
     }
     impl Historian {
         fn new() -> Self {
             Historian {
-                counter: 0,
+                counter: 1,
                 m: Default::default(),
             }
         }
-        fn get_show_list(&self) -> Vec<(String, u32)> {
-            let mut v: Vec<_> = self.m.iter().collect();
-            v.sort_by_key(|(_, &v)| -(v as i32));
-            v.into_iter()
-                .map(|((name, arg), _)| (name.to_owned(), *arg))
-                .collect()
+        fn get_show_list(&self, show_env: bool) -> Vec<Record> {
+            if show_env {
+                let mut v: Vec<_> = self
+                    .m
+                    .iter()
+                    .filter(|&(_, counter)| *counter != 0)
+                    .collect();
+                v.sort_by_key(|(_, &v)| -(v as i32));
+                v.into_iter().map(|(record, _)| record.clone()).collect()
+            } else {
+                let mut s: HashSet<_> = HashSet::new();
+                let mut ret = vec![];
+                for mut record in self.get_show_list(true).into_iter() {
+                    record.env.clear();
+                    let absent = s.insert(record.clone());
+                    if absent {
+                        ret.push(record)
+                    }
+                }
+                ret
+            }
         }
         fn get_order(&self) -> Vec<String> {
             let mut s: HashSet<_> = HashSet::new();
             let mut ret = vec![];
-            let args = self.get_show_list();
-            for (name, _) in args.iter() {
+            let records = self.get_show_list(true);
+            for record in records.iter() {
+                let name = &record.name;
                 let absent = s.insert(name);
                 if absent {
                     ret.push(name.to_owned());
@@ -426,39 +504,78 @@ fn test_multi_history() {
             }
             ret
         }
-        fn len(&self) -> usize {
-            self.m.len()
-        }
-        fn run(&mut self, script: &ScriptTest, arg: u32) {
-            let name = script.get_name().to_owned();
-            run_n_print!("run --dummy {}! {}", name, arg);
-
+        fn run(&mut self, script: &ScriptTest, arg: u32, env: Vec<(String, u32)>) {
+            let name = script.get_name();
             self.counter += 1;
-            self.m.insert((name, arg), self.counter);
-        }
-        fn rm(&mut self, min: usize, max: usize) {
-            run_n_print!("history rm * {}..{}", min + 1, max + 1);
+            self.m
+                .insert(Record::new(name, arg, env.clone()), self.counter);
 
-            let list = self.get_show_list();
-            for line in &list[min..max] {
-                self.m.remove(line);
+            let env: Vec<_> = env
+                .into_iter()
+                .map(|(env, val)| (env, val.to_string()))
+                .collect();
+            run_n_print!(custom_env: env, "run --dummy {}! {}", name, arg);
+        }
+        fn show_env_str(show_env: bool) -> &'static str {
+            if show_env {
+                "--show-env"
+            } else {
+                ""
             }
         }
-        fn show(&self) {
-            let expected: Vec<_> = self
-                .get_show_list()
-                .iter()
-                .map(|(name, arg)| format!("{} {}", name, arg))
-                .collect();
-            let actual: Vec<_> = run_n_print!("-a history show * --limit 999 --with-name")
-                .lines()
-                .map(|s| s.to_owned())
-                .collect();
-            assert_eq!(expected, actual);
+        fn rm(&mut self, min: usize, max: usize, show_env: bool) {
+            run_n_print!(
+                "history rm {} * {}..{}",
+                Self::show_env_str(show_env),
+                min + 1,
+                max + 1
+            );
+
+            let list = self.get_show_list(show_env);
+            let s: HashSet<_> = list[min..max].into_iter().collect();
+            for (mut record, counter) in self.m.iter_mut() {
+                let record_owned;
+                if !show_env {
+                    // XXX: 醜死了，應該用另一個結構處理不帶環境的雜湊
+                    record_owned = record.clean_clone();
+                    record = &record_owned;
+                }
+                if s.contains(record) {
+                    *counter = 0;
+                }
+            }
+        }
+        fn show(&self, show_env: bool) {
+            let mut actual = Vec::<Record>::new();
+            for line in run_silent!(
+                "-a history show * --limit 999 --with-name {}",
+                Self::show_env_str(show_env)
+            )
+            .lines()
+            {
+                if line.starts_with(' ') {
+                    // env
+                    let (env, val) = line.trim().split_once('=').unwrap();
+                    actual
+                        .last_mut()
+                        .unwrap()
+                        .insert_env(env, val.parse().unwrap());
+                } else {
+                    let (name, arg) = line.split_once(' ').unwrap();
+                    actual.push(Record::new(name, arg.parse().unwrap(), vec![]));
+                }
+            }
+
+            let expected = self.get_show_list(show_env);
+            assert_eq!(
+                expected, actual,
+                "assert with show-env={}, history={:?}",
+                show_env, self.m
+            );
         }
         fn ls(&self) {
             let expected = self.get_order();
-            let actual: Vec<_> = run_n_print!("ls --grouping none --name --plain")
+            let actual: Vec<_> = run_silent!("ls --grouping none --name --plain")
                 .split_whitespace()
                 .map(|s| s.to_owned())
                 .collect();
@@ -468,14 +585,18 @@ fn test_multi_history() {
 
     let mut h = Historian::new();
     fn new_script(name: &str) -> ScriptTest {
-        let s = ScriptTest::new(name, None, None);
+        let mut content = String::new();
+        for env in [name, "VAR"] {
+            content += &format!("# [HS_ENV]: {}\n", env);
+        }
+        let s = ScriptTest::new(name, None, Some(&content));
         run!("history neglect {}", name).unwrap();
         s
     }
-    let a = new_script("a");
-    let b = new_script("b");
-    let c = new_script("c");
-    let d = new_script("d");
+    let a = new_script("A");
+    let b = new_script("B");
+    let c = new_script("C");
+    let d = new_script("D");
     let repo = [a, b, c, d];
     let mut rng = rand::thread_rng();
 
@@ -483,38 +604,59 @@ fn test_multi_history() {
         macro_rules! run_script {
             () => {
                 let script_idx: usize = rng.gen_range(0..4);
+                let script = &repo[script_idx];
                 let arg = rng.gen_range(0..5);
-                h.run(&repo[script_idx], arg);
+                let mut env = vec![];
+                for i in 0..2 {
+                    let val: u32 = rng.gen_range(0..3);
+                    if val == 0 {
+                        continue;
+                    }
+
+                    let key = if i == 0 { script.get_name() } else { "VAR" };
+                    env.push((key.to_owned(), val));
+                }
+                h.run(&script, arg, env);
             };
         }
 
-        let len = h.len();
-        if len == 0 {
-            run_script!();
-            continue;
+        let action: u32 = rng.gen_range(0..5);
+
+        let mut do_rm = false;
+        let mut rm_func = |show_env: bool| {
+            let len = h.get_show_list(show_env).len();
+            if len == 0 {
+                return;
+            }
+            do_rm = true;
+            let t1 = rng.gen_range(0..len);
+            let t2 = rng.gen_range(t1 + 1..=len);
+            h.rm(t1, t2, show_env);
+        };
+
+        match action {
+            0 => {
+                // rm with env
+                rm_func(true);
+            }
+            1 => {
+                // rm no env
+                rm_func(false);
+            }
+            _ => (),
         }
 
-        let action: u32 = rng.gen_range(0..3);
-        match action {
-            1 => {
-                // rm
-                loop {
-                    let t1 = rng.gen_range(0..len);
-                    let t2 = rng.gen_range(t1 + 1..len + 1);
-                    h.rm(t1, t2);
-                    break;
-                }
-            }
-            _ => {
-                // run
-                run_script!();
-            }
+        if !do_rm {
+            run_script!();
         }
-        h.show();
+
+        h.show(true);
+        h.show(false);
         h.ls();
     }
 }
 
+#[test]
 fn test_no_humble() {
     let _g = setup();
     let test = ScriptTest::new("test", None, None);

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# FIXME: Variable name shadowing!! What if HS_ENV_DESC contains "RED" or "VAR"?
+
 set -e
 
 >&2 echo running $NAME "$@"
@@ -12,7 +14,7 @@ GREEN='\033[1;32m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-echo "$HS_ENV_HELP" | while read line
+echo "$HS_ENV_DESC" | while read line
 do
     if [ "$line" = "" ]; then
         continue

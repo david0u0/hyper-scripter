@@ -169,9 +169,9 @@ _arguments "${_arguments_options[@]}" \
 '--recent=[Show scripts within recent days.]:RECENT: ' \
 '--dummy[Add a dummy run history instead of actually running it]' \
 '-p[Use arguments from last run]' \
-'--previous-args[Use arguments from last run]' \
-'-E[Raise an error if --previous-args is given but there is no previous argument]' \
-'--error-no-previous[Raise an error if --previous-args is given but there is no previous argument]' \
+'--previous[Use arguments from last run]' \
+'-E[Raise an error if --previous is given but there is no previous run]' \
+'--error-no-previous[Raise an error if --previous is given but there is no previous argument]' \
 '--no-trace[Don'\''t record history]' \
 '(--no-trace)--humble[Don'\''t affect script time order (but still record history and affect time filter)]' \
 '(-a --all --timeless)-A[Show scripts NOT within recent days]' \
@@ -584,6 +584,7 @@ _arguments "${_arguments_options[@]}" \
 '--recent=[Show scripts within recent days.]:RECENT: ' \
 '--version[Print version information]' \
 '--with-name[]' \
+'--show-env[]' \
 '-h[Print help information]' \
 '--help[Print help information]' \
 '--no-trace[Don'\''t record history]' \

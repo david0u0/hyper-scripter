@@ -11,7 +11,8 @@ const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
 {{/each}}";
 
 const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+# [HS_ENV]: VAR -> Description for env var `VAR` goes here
+# [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 
 set -eu
 {{#if birthplace_in_home}}
@@ -23,7 +24,8 @@ cd {{birthplace}}
 {{/each}}";
 
 const JS_WELCOME_MSG: &str = "// [HS_HELP]: Help message goes here...
-// [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+// [HS_ENV]: VAR -> Description for env var `VAR` goes here
+// [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 
 process.chdir(require('os').homedir());
 {{#if birthplace_in_home}}
@@ -42,7 +44,8 @@ writeFile('/dev/null', 'some content');
 {{/each}}";
 
 const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+# [HS_ENV]: VAR -> Description for env var `VAR` goes here
+# [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 
 NAME=${NAME/./_}
 tmux has-session -t $NAME
@@ -65,7 +68,8 @@ tmux split-window -h \"{{{content.1}}}; $SHELL\"
 tmux -2 attach-session -d";
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+# [HS_ENV]: VAR -> Description for env var `VAR` goes here
+# [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 {{#if birthplace_in_home}}
 Dir.chdir(\"#{ENV['HOME']}/{{birthplace_rel}}\")
 {{else}}
@@ -127,7 +131,8 @@ HS_ENV.do_hs(\"run --dummy =#{HS_ENV.env_var(:name)}! #{dir}\", false)
 cd(dir)";
 
 const RB_TRAVERSE_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV_HELP]: VAR -> Help message for env var `VAR` goes here
+# [HS_ENV]: VAR -> Description for env var `VAR` goes here
+# [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 
 def directory_tree(path)
   files = []
@@ -173,7 +178,7 @@ impl FromStr for ScriptType {
     fn from_str(s: &str) -> DisplayResult<Self> {
         if illegal_name(s) {
             log::error!("類型格式不符：{}", s);
-            return Err(Error::Format(TypeCode, s.to_owned()).into());
+            return TypeCode.to_display_res(s.to_owned());
         }
         Ok(ScriptType(s.to_string()))
     }

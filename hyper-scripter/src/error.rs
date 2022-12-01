@@ -41,6 +41,19 @@ pub enum FormatCode {
     ScriptQuery,
     Tag,
     NonEmptyArray,
+    EnvPair,
+}
+
+impl FormatCode {
+    pub fn to_err(&self, s: String) -> Error {
+        Error::Format(*self, s)
+    }
+    pub fn to_res<T>(&self, s: String) -> Result<T> {
+        Err(Error::Format(*self, s))
+    }
+    pub fn to_display_res<T>(&self, s: String) -> DisplayResult<T> {
+        Err(Error::Format(*self, s).into())
+    }
 }
 
 #[derive(Debug, Clone)]

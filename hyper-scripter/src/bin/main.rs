@@ -1,6 +1,7 @@
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
 use hyper_scripter::config::{Config, NamedTagSelector};
+use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
@@ -240,7 +241,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             script_query,
             dummy,
             args,
-            previous_args,
+            previous,
             error_no_previous,
             repeat,
             dir,
@@ -253,7 +254,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 &mut entry,
                 args,
                 &mut ret.errs,
-                previous_args,
+                previous,
                 error_no_previous,
                 dir,
             )
@@ -523,6 +524,8 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     queries,
                     dir,
                     range,
+                    no_humble,
+                    show_env,
                 },
         } => {
             let repo = repo.init().await?;
@@ -531,7 +534,14 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let res_vec = historian
-                .ignore_args_range(&ids, dir.as_deref(), range.get_min(), range.get_max())
+                .ignore_args_range(
+                    &ids,
+                    dir.as_deref(),
+                    no_humble,
+                    show_env,
+                    range.get_min(),
+                    range.get_max(),
+                )
                 .await?;
             // TODO: 測試多個腳本的狀況
             for (entry, res) in scripts.iter_mut().zip(res_vec) {
@@ -565,13 +575,26 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             process_event_by_id(true, repo, event_id).await?;
         }
         Subs::History {
-            subcmd: History::Amend { event_id, args },
+            subcmd:
+                History::Amend {
+                    event_id,
+                    args,
+                    env,
+                    no_env,
+                },
         } => match event_id.try_into() {
             Err(_) => log::info!("試圖修改零事件，什麼都不做"),
             Ok(event_id) => {
                 let historian = repo.historian().await?;
                 let args = serde_json::to_string(&args)?;
-                historian.amend_args_by_id(event_id, &args).await?;
+                let env = if no_env || !env.is_empty() {
+                    Some(serde_json::to_string(&env)?)
+                } else {
+                    None
+                };
+                historian
+                    .amend_args_by_id(event_id, &args, env.as_deref())
+                    .await?;
             }
         },
         Subs::History {
@@ -603,6 +626,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     with_name,
                     no_humble,
                     offset,
+                    show_env,
                     dir,
                 },
         } => {
@@ -611,12 +635,8 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
-            let args_list = historian
-                .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
-                .await?;
-            for (script_id, args) in args_list {
-                log::debug!("嘗試打印參數 {} {}", script_id, args);
-                let args: Vec<String> = serde_json::from_str(&args)?;
+
+            let mut print_basic = |script_id: i64, args: Vec<String>| -> Result {
                 if with_name {
                     let entry = repo.get_mut_by_id(script_id).ok_or_else(|| {
                         log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
@@ -629,6 +649,31 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                 }
                 print_iter(args.into_iter().map(|s| util::to_display_args(s)), " ");
                 println!("");
+                Ok(())
+            };
+
+            if show_env {
+                let args_list = historian
+                    .previous_args_list_with_envs(&ids, limit, offset, no_humble, dir.as_deref())
+                    .await?;
+                for (script_id, args, envs) in args_list {
+                    log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
+                    let args: Vec<String> = serde_json::from_str(&args)?;
+                    let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
+                    print_basic(script_id, args)?;
+                    for p in envs.into_iter() {
+                        println!("  {}", p);
+                    }
+                }
+            } else {
+                let args_list = historian
+                    .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
+                    .await?;
+                for (script_id, args) in args_list {
+                    log::debug!("嘗試打印參數 {} {}", script_id, args);
+                    let args: Vec<String> = serde_json::from_str(&args)?;
+                    print_basic(script_id, args)?;
+                }
             }
         }
         sub => unimplemented!("{:?}", sub),

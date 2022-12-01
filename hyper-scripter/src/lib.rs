@@ -7,6 +7,7 @@ extern crate derive_more;
 pub mod args;
 pub mod config;
 pub mod db;
+pub mod env_pair;
 pub mod error;
 mod error_display;
 pub mod extract_msg;

@@ -25,10 +25,9 @@ where
 {
     let v: Vec<T> = Deserialize::deserialize(deserializer)?;
     if v.is_empty() {
-        return Err(serde::de::Error::custom(Error::Format(
-            FormatCode::NonEmptyArray,
-            Default::default(),
-        )));
+        return Err(serde::de::Error::custom(
+            FormatCode::NonEmptyArray.to_err(String::new()),
+        ));
     }
     Ok(v)
 }
@@ -78,7 +77,7 @@ impl FromStr for PromptLevel {
             "never" => PromptLevel::Never,
             "smart" => PromptLevel::Smart,
             "on-multi-fuzz" => PromptLevel::OnMultiFuzz,
-            _ => return Err(Error::Format(FormatCode::PromptLevel, s.to_owned()).into()),
+            _ => return FormatCode::PromptLevel.to_display_res(s.to_owned()),
         };
         Ok(l)
     }
@@ -141,11 +140,11 @@ impl Default for Config {
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
-                gen_alias("p", &["run", "--previous-args"]),
-                gen_alias("pc", &["=util/historian!", "--sequence", "c"]),
-                gen_alias("pr", &["=util/historian!", "--sequence", "r"]),
+                gen_alias("p", &["run", "--previous"]),
+                gen_alias("pc", &["=util/historian!", "--sequence", "c", "--show-env"]),
+                gen_alias("pr", &["=util/historian!", "--sequence", "r", "--show-env"]),
                 gen_alias("purge", &["rm", "--purge"]),
-                gen_alias("h", &["=util/historian!"]),
+                gen_alias("h", &["=util/historian!", "--show-env"]),
             ]
             .into_iter()
             .collect(),
@@ -159,8 +158,8 @@ impl Default for Config {
                     "{{#each tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
                 ),
                 (
-                    "HS_ENV_HELP",
-                    "{{#each env_help}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
+                    "HS_ENV_DESC",
+                    "{{#each env_desc}}{{{this}}}{{#unless @last}}\n{{/unless}}{{/each}}",
                 ),
                 ("HS_EXE", "{{exe}}"),
                 ("HS_SOURCE", "{{home}}/.hs_source"),
@@ -182,10 +181,7 @@ impl Config {
                 let modified = util::handle_fs_res(&[&path], meta.modified())?;
 
                 let mut conf: Config = toml::from_str(&s).map_err(|err| {
-                    Error::Format(
-                        FormatCode::Config,
-                        format!("{}: {}", path.to_string_lossy(), err),
-                    )
+                    FormatCode::Config.to_err(format!("{}: {}", path.to_string_lossy(), err))
                 })?;
                 conf.last_modified = Some(modified);
                 Ok(conf)

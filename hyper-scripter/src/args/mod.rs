@@ -1,4 +1,5 @@
 use crate::config::{Alias, Config, PromptLevel};
+use crate::env_pair::EnvPair;
 use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
@@ -207,15 +208,15 @@ pub enum Subs {
         #[clap(long, short)]
         repeat: Option<u64>,
         #[clap(long, short, help = "Use arguments from last run")]
-        previous_args: bool,
+        previous: bool,
         #[clap(
             long,
             short = 'E',
-            requires = "previous-args",
-            help = "Raise an error if --previous-args is given but there is no previous argument"
+            requires = "previous",
+            help = "Raise an error if --previous is given but there is no previous run"
         )]
         error_no_previous: bool,
-        #[clap(long, short, requires = "previous-args", help = "")]
+        #[clap(long, short, requires = "previous", help = "")]
         dir: Option<PathBuf>,
         #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
@@ -282,7 +283,11 @@ pub enum Subs {
 pub enum History {
     RM {
         #[clap(short, long)]
-        dir: Option<PathBuf>,
+        dir: Option<PathBuf>, // FIXME: this flag isn't working...
+        #[clap(long)]
+        show_env: bool,
+        #[clap(long)]
+        no_humble: bool,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
         range: RangeQuery,
@@ -312,6 +317,8 @@ pub enum History {
         offset: u32,
         #[clap(short, long)]
         dir: Option<PathBuf>,
+        #[clap(long)]
+        show_env: bool,
     },
     Neglect {
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
@@ -320,6 +327,10 @@ pub enum History {
     #[clap(disable_help_flag = true, allow_hyphen_values = true)]
     Amend {
         event_id: u64,
+        #[clap(short, long)]
+        env: Vec<EnvPair>,
+        #[clap(long, conflicts_with = "env")]
+        no_env: bool,
         #[clap(
             help = "Command line args to pass to the script",
             allow_hyphen_values = true
@@ -544,7 +555,7 @@ mod test {
         match args.subcmd {
             Some(Subs::Run {
                 dummy: true,
-                previous_args: false,
+                previous: false,
                 error_no_previous: false,
                 repeat: Some(42),
                 dir: None,
@@ -612,13 +623,21 @@ mod test {
             }
         }
 
-        let args = build_args("history amend 42 --help");
+        let args = build_args("history amend 42 --env A=1 --env B=2 --help");
         match args.subcmd {
             Some(Subs::History {
-                subcmd: History::Amend { event_id, args },
+                subcmd:
+                    History::Amend {
+                        event_id,
+                        args,
+                        no_env,
+                        env,
+                    },
             }) => {
                 assert_eq!(event_id, 42);
                 assert_eq!(args, help_v);
+                assert_eq!(no_env, false);
+                assert_eq!(env, vec!["A=1".parse().unwrap(), "B=2".parse().unwrap()]);
             }
             _ => {
                 panic!("{:?} should be history amend...", args);

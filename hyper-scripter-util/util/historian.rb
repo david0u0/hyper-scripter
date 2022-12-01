@@ -13,9 +13,26 @@ class Option
     @content = content
     @number = number
     @name = name
+    @envs = []
   end
 
-  attr_reader :number, :content, :name
+  attr_reader :number, :content, :name, :envs
+
+  def add_env(key, val)
+    @envs.push([key, val])
+  end
+
+  def empty?
+    @envs.length == 0 && @content.length == 0
+  end
+  
+  def cmd_body
+    "=#{name}! -- #{content}"
+  end
+
+  def envs_str
+    envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
+  end
 end
 
 def escape_wildcard(s)
@@ -26,18 +43,20 @@ class Historian < Selector
   attr_reader :script_name
 
   def scripts_str
-    @scripts.map { |s| "=#{s}!" }.join(' ')
+    # when there are multiple scripts, showing humble events will be a mess
+    no_humble = @single ? '' : '--no-humble'
+    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
+    show_env_str = @show_env ? '--show-env' : ''
+    s = @scripts.map { |s| "=#{s}!" }.join(' ')
+    "#{no_humble} #{show_env_str} #{dir_str} #{s}"
   end
 
   def history_show
     return '' if @scripts.length == 0
 
-    # when there are multiple scripts, showing humble events will be a mess
-    no_humble = @single ? '' : "--no-humble"
-    dir_str = @dir.nil? ? '' : "--dir #{@dir}"
     HS_ENV.do_hs(
       "history show --limit #{@limit} --offset #{@offset} \
-      --with-name #{dir_str} #{no_humble} #{scripts_str}", false
+      --with-name #{scripts_str}", false
     )
   end
 
@@ -71,7 +90,8 @@ class Historian < Selector
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
     @offset = show_obj['offset']
     @limit = show_obj['limit']
-    @dir = show_obj['dir'] # TODO: forbid delete?
+    @dir = show_obj['dir']
+    @show_env = show_obj['show_env']
     query = show_obj['queries']
     @single = query.length == 1 && !query[0].include?('*')
 
@@ -80,14 +100,8 @@ class Historian < Selector
     super(offset: @offset + 1)
 
     load_history
-    warn "historian for #{@options[0]&.name}" if @single
+    warn "historian for #{@scripts[0]}" if @single
     register_all
-  end
-
-  def process_history(name, content, number)
-    return nil if (content == '') && @single
-
-    Option.new(name, content, number)
   end
 
   def pos_len(pos)
@@ -102,7 +116,9 @@ class Historian < Selector
     else
       name = "(#{opt.name}) ".rjust(just + 3)
     end
-    "#{name}#{opt.content}"
+    envs_str = opt.envs_str
+    envs_str = "(#{envs_str}) " if envs_str.length != 0
+    "#{name}#{envs_str}#{opt.content}"
   end
 
   def run(sequence: '')
@@ -129,7 +145,7 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{} #{scripts_str} #{obj.number}", false)
     }, msg: 'replace the argument')
 
     register_keys(%w[c C], lambda { |_, _|
@@ -143,40 +159,59 @@ class Historian < Selector
 
     if result.is_multi
       result.options.each do |opt|
-        history = HS_ENV.system_hs("=#{opt.name}! #{opt.content}", false)
+        history = HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
       end
       exit
     end
 
-    name = result.content.name
-    args = result.content.content
-    cmd = "=#{name}! -- #{args}" # known issue: \n \t \" will not be handled properly
+    opt = result.content
+    cmd = opt.cmd_body # known issue: \n \t \" will not be handled properly
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
         case ENV['SHELL'].split('/').last
         when 'fish'
-          cmd = "#{HS_ENV.env_var(:cmd)} #{cmd}"
+          cmd = "#{opt.envs_str} #{HS_ENV.env_var(:cmd)} #{cmd}"
           file.write("commandline #{Shellwords.escape(cmd)}")
         else
           warn "#{ENV['SHELL']} not supported"
         end
       end
     elsif echoing
-      puts args
+      puts opt.content
     else
-      warn cmd
-      HS_ENV.exec_hs(cmd, false)
+      HS_ENV.exec_hs(cmd, false, opt.envs)
     end
   end
 
   def get_history
     history = history_show
-    opts = history.lines.each_with_index.map do |s, i|
-      s = s.strip
-      name, _, content = s.partition(' ')
-      process_history(name, content, i + @offset + 1)
+    opts = []
+    cur_number = 0
+    history.lines.each do |s, i|
+      s = s.rstrip
+      if s.start_with?(' ') # env
+        opt = opts[-1]
+        next if opt.nil?
+        key, _, val = s.strip.partition('=')
+        opt.add_env(key, val)
+      else
+        name, _, content = s.partition(' ')
+        opts.push(process_history(name, content, cur_number + @offset + 1))
+        cur_number += 1
+      end
     end
-    opts.reject { |opt| opt.nil? }
+    opts.reject do |opt|
+      if opt.nil?
+        true
+      elsif @single && opt.empty?
+        true
+      end
+    end
+  end
+
+  # User can overwriter this function to create their own option, or apply some filter
+  def process_history(name, content, number)
+    Option.new(name, content, number)
   end
 
   def load_history
@@ -187,6 +222,11 @@ class Historian < Selector
   end
 
   def register_all
+    register_keys(%w[e E], lambda { |_, obj|
+      @show_env = !@show_env
+      load_history
+    }, msg: 'toggle show env mode', recur: true)
+
     register_keys(%w[d D], lambda { |_, obj|
       HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
       load_history
@@ -224,10 +264,15 @@ if __FILE__ == $0
   Historian.humble_run_id
 
   def split_args
-    if ARGV[0] == '--sequence'
-      [ARGV[1], ARGV[2..-1].join(' ')]
-    else
+    idx = ARGV.find_index("--sequence")
+    if idx.nil?
       ['', ARGV.join(' ')]
+    else
+      seq = ARGV[idx+1] || ''
+      first = ARGV[...idx]
+      second = ARGV[(idx + 2)..] || []
+      args = "#{first.join(' ')} #{second.join(' ')}"
+      [seq, args]
     end
   end
 

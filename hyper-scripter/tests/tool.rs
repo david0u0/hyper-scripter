@@ -32,6 +32,7 @@ pub struct RunEnv {
     pub no_touch: Option<bool>,
     pub silent: Option<bool>,
     pub allow_other_error: Option<bool>,
+    pub custom_env: Option<Vec<(String, String)>>,
 }
 
 #[macro_export]
@@ -173,6 +174,11 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     }
     if no_touch == Some(true) {
         cmd.env("NO_TOUCH", "1");
+    }
+    if let Some(custom_env) = env.custom_env {
+        for (k, v) in custom_env.iter() {
+            cmd.env(k, v);
+        }
     }
     let mut child = cmd
         .args(&full_args)

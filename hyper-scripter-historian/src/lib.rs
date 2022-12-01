@@ -26,8 +26,8 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
     let res = sqlx::query!(
         "
         INSERT INTO events
-        (script_id, type, cmd, args, content, time, main_event_id, dir, humble)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (script_id, type, cmd, args, content, time, main_event_id, dir, envs, humble)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
         ",
         event.script_id,
@@ -38,6 +38,7 @@ async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64
         event.time,
         event.main_event_id,
         event.dir,
+        event.envs,
         event.humble
     )
     .fetch_one(pool)
@@ -53,6 +54,7 @@ struct DBEvent<'a> {
     time: NaiveDateTime,
     args: Option<&'a str>,
     dir: Option<&'a str>,
+    envs: Option<&'a str>,
     content: Option<&'a str>,
     humble: bool,
     main_event_id: i64,
@@ -66,6 +68,7 @@ impl<'a> DBEvent<'a> {
             cmd,
             humble,
             main_event_id: ZERO,
+            envs: None,
             content: None,
             args: None,
             dir: None,
@@ -83,6 +86,10 @@ impl<'a> DBEvent<'a> {
         self.content = Some(value);
         self
     }
+    fn envs(mut self, value: &'a str) -> Self {
+        self.envs = Some(value);
+        self
+    }
     fn humble(mut self) -> Self {
         self.humble = true;
         self
@@ -94,17 +101,17 @@ impl<'a> DBEvent<'a> {
 }
 
 macro_rules! last_arg {
-    ($select:literal, $offset:expr, $limit:expr, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
+    ($select:literal, $offset:expr, $limit:expr, $group_by:literal, $where:literal $(+ $more_where:literal)* , $($var:expr),*) => {{
         sqlx::query!(
             "
             WITH args AS (
-                SELECT args, script_id, max(time) as time FROM events
+                SELECT " + $select + ", max(time) as time FROM events
                 WHERE type = ? AND NOT ignored "
                 +
                 $where
                 $(+ $more_where)*
                 +
-                " GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
+                " GROUP BY args, script_id " + $group_by + " ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
                 + " FROM args
@@ -116,15 +123,43 @@ macro_rules! last_arg {
         )
     }};
 }
+macro_rules! do_last_arg {
+    ($select:literal, $maybe_envs:literal, $ids:expr, $limit:expr, $offset:expr, $no_humble:expr, $dir:expr, $historian:expr) => {{
+        let ids = join_id_str($ids);
+        log::info!("查詢歷史 {}", ids);
+        let limit = $limit as i64;
+        let offset = $offset as i64;
+        let no_dir = $dir.is_none();
+        let dir = $dir.map(|p| p.to_string_lossy());
+        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
+        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+        last_arg!(
+            $select,
+            offset,
+            limit,
+            $maybe_envs,
+            "
+            AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
+            AND (NOT ? OR NOT humble)
+            ",
+            ids,
+            no_dir,
+            dir,
+            $no_humble
+        )
+        .fetch_all(&*$historian.pool.read().unwrap())
+        .await
+    }};
+}
 
 macro_rules! ignore_or_humble_arg {
-    ($ignore_or_humble:literal, $pool:expr, $cond:literal, $($var:expr),+) => {
+    ($ignore_or_humble:literal, $pool:expr, $cond:literal $(+ $more_cond:literal)*, $($var:expr),+) => {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
                 SELECT id FROM events WHERE type = ? AND NOT ignored AND "
-                + $cond
+                + $cond $(+ $more_cond)*
                 + "
             )
             ",
@@ -132,13 +167,15 @@ macro_rules! ignore_or_humble_arg {
             EXEC_CODE,
             $($var),*
         )
-        .execute(&*$pool).await?;
+        .execute(&*$pool)
+        .await?;
+
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND NOT ignored AND
             "
-                + $cond,
+                + $cond $(+ $more_cond)*,
             EXEC_CODE,
             $($var),*
         )
@@ -202,7 +239,12 @@ impl Historian {
             EventData::Write | EventData::Read | EventData::Miss => {
                 self.raw_record(db_event).await?
             }
-            EventData::Exec { content, args, dir } => {
+            EventData::Exec {
+                content,
+                args,
+                envs,
+                dir,
+            } => {
                 let mut content = Some(*content);
                 let last_event = sqlx::query!(
                     "
@@ -223,7 +265,7 @@ impl Historian {
                 }
                 db_event.content = content;
                 let dir = dir.map(|p| p.to_string_lossy()).unwrap_or_default();
-                self.raw_record(db_event.dir(dir.as_ref()).args(args))
+                self.raw_record(db_event.envs(envs).dir(dir.as_ref()).args(args))
                     .await?
             }
             EventData::ExecDone {
@@ -271,13 +313,13 @@ impl Historian {
         &self,
         id: i64,
         dir: Option<&Path>,
-    ) -> Result<Option<String>, DBError> {
+    ) -> Result<Option<(String, String)>, DBError> {
         let no_dir = dir.is_none();
         let dir = dir.map(|p| p.to_string_lossy());
         let dir = dir.as_deref().unwrap_or(EMPTY_STR);
         let res = sqlx::query!(
             "
-            SELECT args FROM events
+            SELECT args, envs FROM events
             WHERE type = ? AND script_id = ? AND NOT ignored
             AND (? OR dir = ?)
             ORDER BY time DESC LIMIT 1
@@ -289,7 +331,7 @@ impl Historian {
         )
         .fetch_optional(&*self.pool.read().unwrap())
         .await?;
-        Ok(res.map(|res| res.args.unwrap_or_default()))
+        Ok(res.map(|res| (res.args.unwrap_or_default(), res.envs.unwrap_or_default())))
     }
 
     pub async fn previous_args_list(
@@ -300,32 +342,46 @@ impl Historian {
         no_humble: bool,
         dir: Option<&Path>,
     ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
-        let ids = join_id_str(ids);
-        log::info!("查詢歷史 {}", ids);
-        let limit = limit as i64;
-        let offset = offset as i64;
-        let no_dir = dir.is_none();
-        let dir = dir.map(|p| p.to_string_lossy());
-        let dir = dir.as_deref().unwrap_or(EMPTY_STR);
-        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
-        let res = last_arg!(
-            "args, script_id",
-            offset,
-            limit,
-            "
-            AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
-            AND (NOT ? OR NOT humble)
-            ",
+        let res = do_last_arg!(
+            "script_id, args",
+            "",
             ids,
-            no_dir,
+            limit,
+            offset,
+            no_humble,
             dir,
-            no_humble
-        )
-        .fetch_all(&*self.pool.read().unwrap())
-        .await?;
+            self
+        )?;
         Ok(res
             .into_iter()
             .map(|res| (res.script_id, res.args.unwrap_or_default())))
+    }
+
+    pub async fn previous_args_list_with_envs(
+        &self,
+        ids: &[i64],
+        limit: u32,
+        offset: u32,
+        no_humble: bool,
+        dir: Option<&Path>,
+    ) -> Result<impl ExactSizeIterator<Item = (i64, String, String)>, DBError> {
+        let res = do_last_arg!(
+            "script_id, args, envs",
+            ", envs",
+            ids,
+            limit,
+            offset,
+            no_humble,
+            dir,
+            self
+        )?;
+        Ok(res.into_iter().map(|res| {
+            (
+                res.script_id,
+                res.args.unwrap_or_default(),
+                res.envs.unwrap_or_default(),
+            )
+        }))
     }
 
     async fn make_last_time_record(&self, script_id: i64) -> Result<LastTimeRecord, DBError> {
@@ -413,6 +469,8 @@ impl Historian {
         &self,
         ids: &[i64],
         dir: Option<&Path>,
+        no_humble: bool,
+        show_env: bool,
         min: NonZeroU64,
         max: Option<NonZeroU64>,
     ) -> Result<Vec<LastTimeRecord>, DBError> {
@@ -430,29 +488,41 @@ impl Historian {
         log::info!("忽略歷史 {} {} {}", offset, limit, ids_str);
 
         let pool = self.pool.read().unwrap();
-        // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
-        // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
-        ignore_or_humble_arg!(
-            "ignored",
-            pool,
-            "
-            (? OR dir == ?) AND
-            (script_id || args) IN (
-                WITH args AS (
-                    SELECT args, max(time) as time, script_id FROM events
-                    WHERE instr(?, '[' || script_id || ']') > 0
-                    AND type = ? AND NOT ignored
-                    GROUP BY args, script_id ORDER BY time DESC LIMIT ? OFFSET ?
-                ) SELECT script_id || args as t FROM args
-            )
-            ",
-            no_dir,
-            dir,
-            ids_str,
-            EXEC_CODE,
-            limit,
-            offset
-        );
+        macro_rules! ignore_arg {
+            ($($target:literal)*) => {{
+                // NOTE: 我們知道 script_id || args 串接起來必然是唯一的（因為 args 的格式為 [...]）
+                // FIXME: 一旦可以綁定陣列就換掉這個醜死人的 instr
+                ignore_or_humble_arg!(
+                    "ignored",
+                    pool,
+                    "
+                    (? OR dir == ?) AND
+                    (script_id || args " $(+ "||" + $target)* + ") IN (
+                        WITH records AS (
+                            SELECT max(time) as time, args, script_id " $(+ "," + $target)* +" FROM events
+                            WHERE instr(?, '[' || script_id || ']') > 0
+                            AND type = ? AND NOT ignored
+                            AND (NOT ? OR NOT humble)
+                            GROUP BY args, script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
+                        ) SELECT script_id || args " $(+ "||" + $target)* + " as t FROM records
+                    )
+                    ",
+                    no_dir,
+                    dir,
+                    ids_str,
+                    EXEC_CODE,
+                    no_humble,
+                    limit,
+                    offset
+                );
+            }};
+        }
+
+        if show_env {
+            ignore_arg!("envs");
+        } else {
+            ignore_arg!();
+        }
 
         log::info!("ignore last args");
         let mut ret = vec![];
@@ -463,19 +533,34 @@ impl Historian {
         Ok(ret)
     }
 
-    pub async fn amend_args_by_id(&self, event_id: NonZeroU64, args: &str) -> Result<(), DBError> {
+    pub async fn amend_args_by_id(
+        &self,
+        event_id: NonZeroU64,
+        args: &str,
+        envs: Option<&str>,
+    ) -> Result<(), DBError> {
         let event_id = event_id.get() as i64;
-        sqlx::query!(
-            "
-            UPDATE events SET ignored = false, args = ?
-            WHERE type = ? AND id = ?
-            ",
-            args,
-            EXEC_CODE,
-            event_id
-        )
-        .execute(&*self.pool.read().unwrap())
-        .await?;
+
+        macro_rules! amend {
+            ($($set:literal, $var:expr),*) => {{
+                sqlx::query!(
+                    "UPDATE events SET ignored = false, args = ?"
+                    + $( "," + $set + "=? " +)*
+                    "WHERE type = ? AND id = ? ",
+                    args,
+                    $($var,)*
+                    EXEC_CODE,
+                    event_id,
+                )
+                .execute(&*self.pool.read().unwrap())
+                .await?
+            }}
+        }
+        if let Some(envs) = envs {
+            amend!("envs", envs);
+        } else {
+            amend!();
+        }
         Ok(())
     }
 

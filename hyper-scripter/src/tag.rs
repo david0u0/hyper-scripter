@@ -1,4 +1,4 @@
-use crate::error::{DisplayError, DisplayResult, Error, FormatCode::Tag as TagCode};
+use crate::error::{DisplayError, DisplayResult, FormatCode::Tag as TagCode};
 use crate::script_type::ScriptType;
 use crate::util::illegal_name;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
@@ -95,7 +95,7 @@ impl FromStr for Tag {
     fn from_str(s: &str) -> DisplayResult<Self> {
         if illegal_name(s) {
             log::error!("標籤格式不符：{}", s);
-            return Err(Error::Format(TagCode, s.to_owned()).into());
+            return TagCode.to_display_res(s.to_owned());
         }
         Ok(Tag(s.to_owned()))
     }
@@ -139,7 +139,7 @@ impl FromStr for TagSelector {
             tags.push(ctrl.parse()?);
         }
         if tags.is_empty() {
-            return Err(Error::Format(TagCode, s.to_owned()).into());
+            return TagCode.to_display_res(s.to_owned());
         }
         Ok(TagSelector {
             tags,

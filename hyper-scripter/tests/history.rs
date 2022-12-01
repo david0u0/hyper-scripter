@@ -34,12 +34,19 @@ fn test_humble_amend_rm_id() {
     let _g = setup();
     // 注意刪除後 humble 事件為最新的後果（可能因為寫回的緣故，越刪除時間反而更新）
     const CONTENT: &str = r#"
+    # [HS_ENV] MY_VAR
     if [ "$1" = "h" ]; then
         $HS_EXE -H $HS_HOME history humble $HS_RUN_ID
     elif [ "$1" = "r" ]; then
         $HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID
     elif [ "$1" = "a" ]; then
         $HS_EXE -H $HS_HOME history amend $HS_RUN_ID do-the-amend
+    elif [ "$1" = "e" ]; then
+        $HS_EXE -H $HS_HOME history amend $HS_RUN_ID --env MY_VAR=1 do-the-env-amend
+        echo $HS_RUN_ID
+    elif [ "$1" = "n" ]; then
+        $HS_EXE -H $HS_HOME history rm-id $HS_RUN_ID
+        $HS_EXE -H $HS_HOME history amend $2 --no-env do-the-env-amend
     fi"#;
 
     let test = ScriptTest::new("test", None, Some(CONTENT));
@@ -49,7 +56,7 @@ fn test_humble_amend_rm_id() {
         s.can_find("-").unwrap();
     }
     let assert_history = |list: &[&str]| {
-        let recorded = run!("history show {}", test.get_name()).unwrap();
+        let recorded = run!("history show {} --show-env", test.get_name()).unwrap();
         assert_list(&recorded, list);
     };
 
@@ -89,10 +96,25 @@ fn test_humble_amend_rm_id() {
     assert_last(&test);
     assert_history(&["do-the-amend", "h", "flag-humble"]);
 
+    let env_run_id = test.run("e").unwrap();
+    test.run("a").unwrap();
+    assert_last(&test);
+    assert_history(&[
+        "do-the-amend",
+        "do-the-env-amend",
+        "MY_VAR=1",
+        "h",
+        "flag-humble",
+    ]);
+
+    test.run(&format!("n {}", env_run_id)).unwrap();
+    assert_last(&test);
+    assert_history(&["do-the-amend", "do-the-env-amend", "h", "flag-humble"]);
+
     baseline.run("").unwrap();
     test.run("h").unwrap();
     assert_last(&baseline);
-    assert_history(&["h", "do-the-amend", "flag-humble"]);
+    assert_history(&["h", "do-the-amend", "do-the-env-amend", "flag-humble"]);
 
     // 測一下 --no-trace 會不會搞爛東西
     run!("history rm {} 1..", test.get_name()).unwrap();

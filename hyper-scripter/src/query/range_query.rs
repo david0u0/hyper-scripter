@@ -1,6 +1,4 @@
-use crate::error::{
-    DisplayError, DisplayResult, Error, FormatCode::RangeQuery as RangeQueryCode, Result,
-};
+use crate::error::{DisplayError, DisplayResult, FormatCode::RangeQuery as RangeQueryCode, Result};
 use crate::impl_ser_by_to_string;
 use std::num::NonZeroU64;
 use std::str::FromStr;
@@ -15,7 +13,9 @@ const SEP: &str = "..";
 
 fn parse_int(s: &str) -> Result<NonZeroU64> {
     let num: NonZeroU64 = s.parse().map_err(|e| {
-        Error::Format(RangeQueryCode, s.to_owned()).context(format!("解析整數錯誤 {}", e))
+        RangeQueryCode
+            .to_err(s.to_owned())
+            .context(format!("解析整數錯誤 {}", e))
     })?;
     Ok(num)
 }
@@ -34,7 +34,8 @@ impl FromStr for RangeQuery {
     fn from_str(s: &str) -> DisplayResult<Self> {
         if let Some((first, second)) = s.split_once(SEP) {
             if first.is_empty() && second.is_empty() {
-                return Err(Error::Format(RangeQueryCode, s.to_owned())
+                return Err(RangeQueryCode
+                    .to_err(s.to_owned())
                     .context("不可前後皆為空")
                     .into());
             }
@@ -48,7 +49,8 @@ impl FromStr for RangeQuery {
             } else {
                 let max = parse_int(second)?;
                 if max <= min {
-                    return Err(Error::Format(RangeQueryCode, s.to_owned())
+                    return Err(RangeQueryCode
+                        .to_err(s.to_owned())
                         .context("max 不可小於等於 min")
                         .into());
                 }

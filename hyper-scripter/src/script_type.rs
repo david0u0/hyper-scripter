@@ -178,7 +178,7 @@ impl FromStr for ScriptType {
     fn from_str(s: &str) -> DisplayResult<Self> {
         if illegal_name(s) {
             log::error!("類型格式不符：{}", s);
-            return Err(Error::Format(TypeCode, s.to_owned()).into());
+            return TypeCode.to_display_res(s.to_owned());
         }
         Ok(ScriptType(s.to_string()))
     }

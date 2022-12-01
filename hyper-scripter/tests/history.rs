@@ -533,7 +533,7 @@ fn test_multi_history() {
             {
                 if line.starts_with(' ') {
                     // env
-                    let (env, val) = line.trim().split_once(' ').unwrap();
+                    let (env, val) = line.trim().split_once('=').unwrap();
                     actual
                         .last_mut()
                         .unwrap()

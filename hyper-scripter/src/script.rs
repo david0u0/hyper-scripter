@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::error::{
-    DisplayError, DisplayResult, Error, FormatCode::ScriptName as ScriptNameCode, Result,
+    Contextable, DisplayError, DisplayResult, Error, FormatCode::ScriptName as ScriptNameCode,
+    Result,
 };
 use crate::script_time::ScriptTime;
 use crate::script_type::ScriptType;
@@ -38,7 +39,7 @@ impl ConcreteScriptName {
         // FIXME: 好好想想什麼樣的腳本名可行，並補上單元測試
         for s in s.split('/') {
             if illegal_name(s) {
-                return Err(Error::Format(ScriptNameCode, s.to_owned()).into());
+                return ScriptNameCode.to_res(s.to_owned());
             }
         }
         Ok(())
@@ -102,7 +103,7 @@ impl ScriptName {
             }
             match s[1..].parse::<u32>() {
                 Ok(id) => Ok(Some(id)),
-                Err(e) => Err(Error::Format(ScriptNameCode, s.to_owned()).context(e)),
+                Err(e) => ScriptNameCode.to_res(s.to_owned()).context(e),
             }
         } else if check {
             if s.ends_with('/') && allow_endwith_slash {

@@ -533,19 +533,34 @@ impl Historian {
         Ok(ret)
     }
 
-    pub async fn amend_args_by_id(&self, event_id: NonZeroU64, args: &str) -> Result<(), DBError> {
+    pub async fn amend_args_by_id(
+        &self,
+        event_id: NonZeroU64,
+        args: &str,
+        envs: Option<&str>,
+    ) -> Result<(), DBError> {
         let event_id = event_id.get() as i64;
-        sqlx::query!(
-            "
-            UPDATE events SET ignored = false, args = ?
-            WHERE type = ? AND id = ?
-            ",
-            args,
-            EXEC_CODE,
-            event_id
-        )
-        .execute(&*self.pool.read().unwrap())
-        .await?;
+
+        macro_rules! amend {
+            ($($set:literal, $var:expr),*) => {{
+                sqlx::query!(
+                    "UPDATE events SET ignored = false, args = ?"
+                    + $( "," + $set + "=? " +)*
+                    "WHERE type = ? AND id = ? ",
+                    args,
+                    $($var,)*
+                    EXEC_CODE,
+                    event_id,
+                )
+                .execute(&*self.pool.read().unwrap())
+                .await?
+            }}
+        }
+        if let Some(envs) = envs {
+            amend!("envs", envs);
+        } else {
+            amend!();
+        }
         Ok(())
     }
 

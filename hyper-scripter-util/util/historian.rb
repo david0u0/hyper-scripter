@@ -192,7 +192,7 @@ class Historian < Selector
       if s.start_with?(' ') # env
         opt = opts[-1]
         next if opt.nil?
-        key, _, val = s.strip.partition(' ')
+        key, _, val = s.strip.partition('=')
         opt.add_env(key, val)
       else
         name, _, content = s.partition(' ')

@@ -575,13 +575,26 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             process_event_by_id(true, repo, event_id).await?;
         }
         Subs::History {
-            subcmd: History::Amend { event_id, args },
+            subcmd:
+                History::Amend {
+                    event_id,
+                    args,
+                    env,
+                    no_env,
+                },
         } => match event_id.try_into() {
             Err(_) => log::info!("試圖修改零事件，什麼都不做"),
             Ok(event_id) => {
                 let historian = repo.historian().await?;
                 let args = serde_json::to_string(&args)?;
-                historian.amend_args_by_id(event_id, &args).await?;
+                let env = if no_env || !env.is_empty() {
+                    Some(serde_json::to_string(&env)?)
+                } else {
+                    None
+                };
+                historian
+                    .amend_args_by_id(event_id, &args, env.as_deref())
+                    .await?;
             }
         },
         Subs::History {
@@ -649,7 +662,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
                     let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
                     print_basic(script_id, args)?;
                     for p in envs.into_iter() {
-                        println!("  {} {}", p.key, p.val);
+                        println!("  {}", p);
                     }
                 }
             } else {

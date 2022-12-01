@@ -1,5 +1,5 @@
 use crate::error::{
-    Contextable, DisplayError, DisplayResult, Error,
+    Contextable, DisplayError, DisplayResult,
     FormatCode::{Regex as RegexCode, ScriptQuery as ScriptQueryCode},
     Result,
 };
@@ -112,8 +112,8 @@ impl FromStr for ListQuery {
     type Err = DisplayError;
     fn from_str(s: &str) -> DisplayResult<Self> {
         if s.contains('*') {
-            let s = s.to_owned();
             // TODO: 好好檢查
+            let s = s.to_owned();
             let re = s.replace(".", r"\.");
             let re = re.replace("*", ".*");
             let (re, bang) = if re.ends_with('!') {
@@ -125,7 +125,7 @@ impl FromStr for ListQuery {
                 Ok(re) => Ok(ListQuery::Pattern(re, s, bang)),
                 Err(e) => {
                     log::error!("正規表達式錯誤：{}", e);
-                    Err(Error::Format(RegexCode, s).into())
+                    RegexCode.to_display_res(s)
                 }
             }
         } else {
@@ -197,9 +197,9 @@ fn parse_prev(s: &str) -> Result<NonZeroUsize> {
     // NOTE: 解析 `^4 = Prev(4)`
     match s[1..s.len()].parse::<NonZeroUsize>() {
         Ok(prev) => Ok(prev),
-        Err(e) => Err(Error::Format(ScriptQueryCode, s.to_owned())
-            .context(format!("解析整數錯誤：{}", e))
-            .into()),
+        Err(e) => ScriptQueryCode
+            .to_res(s.to_owned())
+            .context(format!("解析整數錯誤：{}", e)),
     }
 }
 impl FromStr for ScriptQuery {

@@ -50,6 +50,7 @@ impl Display for Error {
                     ScriptType => write!(f, "script type")?,
                     Tag => write!(f, "tag")?,
                     PromptLevel => write!(f, "prompt level")?,
+                    EnvPair => write!(f, "env pair (e.g. VAR=1)")?,
                     NonEmptyArray => {
                         write!(f, "non-empty array")?;
                         return Ok(());

@@ -1,4 +1,6 @@
-use crate::error::{Error, Result};
+use crate::error::{
+    DisplayError, DisplayResult, Error, FormatCode::EnvPair as EnvPairCode, Result,
+};
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
 use std::str::FromStr;
 
@@ -55,8 +57,8 @@ impl FromStr for EnvPairWithExist {
     }
 }
 
-#[derive(Display, Debug, Clone)]
-#[display(fmt = "{} {}", key, val)]
+#[derive(Display, Debug, Clone, Eq, PartialEq)]
+#[display(fmt = "{}={}", key, val)]
 pub struct EnvPair {
     pub key: String,
     pub val: String,
@@ -78,18 +80,15 @@ impl EnvPair {
     }
 }
 impl FromStr for EnvPair {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        if let Some((key, val)) = s.split_once(' ') {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        if let Some((key, val)) = s.split_once('=') {
             Ok(EnvPair {
                 key: key.to_owned(),
                 val: val.to_owned(),
             })
         } else {
-            Ok(EnvPair {
-                key: s.to_owned(),
-                val: String::new(),
-            })
+            EnvPairCode.to_display_res(s.to_owned())
         }
     }
 }

@@ -1,4 +1,5 @@
 use crate::config::{Alias, Config, PromptLevel};
+use crate::env_pair::EnvPair;
 use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
@@ -326,6 +327,10 @@ pub enum History {
     #[clap(disable_help_flag = true, allow_hyphen_values = true)]
     Amend {
         event_id: u64,
+        #[clap(short, long)]
+        env: Vec<EnvPair>,
+        #[clap(long, conflicts_with = "env")]
+        no_env: bool,
         #[clap(
             help = "Command line args to pass to the script",
             allow_hyphen_values = true
@@ -618,13 +623,21 @@ mod test {
             }
         }
 
-        let args = build_args("history amend 42 --help");
+        let args = build_args("history amend 42 --env A=1 --env B=2 --help");
         match args.subcmd {
             Some(Subs::History {
-                subcmd: History::Amend { event_id, args },
+                subcmd:
+                    History::Amend {
+                        event_id,
+                        args,
+                        no_env,
+                        env,
+                    },
             }) => {
                 assert_eq!(event_id, 42);
                 assert_eq!(args, help_v);
+                assert_eq!(no_env, false);
+                assert_eq!(env, vec!["A=1".parse().unwrap(), "B=2".parse().unwrap()]);
             }
             _ => {
                 panic!("{:?} should be history amend...", args);

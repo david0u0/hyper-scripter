@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
 # [HS_HELP]: Import scripts from another hyper scripter home or git repo.
 # [HS_HELP]: If a namespace is given, scripts will all be in that namespace.
 # [HS_HELP]:
 # [HS_HELP]: USAGE:
 # [HS_HELP]:     hs import [--namespace namespace] [dirname | git repo address]
 
+require 'English'
 require 'optparse'
 require 'fileutils'
 require 'shellwords'
@@ -21,7 +24,7 @@ class Script
   def initialize(name, ty, tags)
     @name = name
     @ty = ty
-    tags = ['all'] if tags.length == 0
+    tags = ['all'] if tags.empty?
     @tags = tags
   end
 end
@@ -31,15 +34,15 @@ def parse(ls_string)
   scripts = []
   ret = []
   ls_string.gsub(/(\[|\])/, ' ').split(/[\s\n\r\t]+/).each do |s|
-    next if s.length == 0
+    next if s.empty?
 
     if s.start_with?('#')
-      if scripts.length != 0
+      unless scripts.empty?
         ret.concat(scripts)
         tags = []
         scripts = []
       end
-      tags.push(s[1..-1])
+      tags.push(s[1..])
     else
       match = /(?<name>[^(]+)\((?<ty>.+)\)/.match(s)
       scripts.push(Script.new(match[:name], match[:ty], tags)) unless match.nil?
@@ -80,12 +83,12 @@ def import_dir(dir, namespace)
     end
   end
 
-  if namespace.nil?
-    puts 'Copying git directory...'
-    copy_unless_exists(dir, HS_ENV.home, '.git')
-    puts 'Copying gitignore...'
-    copy_unless_exists(dir, HS_ENV.home, '.gitignore')
-  end
+  return unless namespace.nil?
+
+  puts 'Copying git directory...'
+  copy_unless_exists(dir, HS_ENV.home, '.git')
+  puts 'Copying gitignore...'
+  copy_unless_exists(dir, HS_ENV.home, '.gitignore')
 end
 
 def import(arg, namespace)
@@ -98,7 +101,7 @@ def import(arg, namespace)
     `mkdir .tmp`
     Dir.chdir('.tmp')
     `git clone #{arg} repo`
-    exit 1 unless $?.success?
+    exit 1 unless $CHILD_STATUS.success?
     import_dir('repo', namespace)
     Dir.chdir(cur)
   end
@@ -113,7 +116,7 @@ opt = OptionParser.new do |opts|
 end
 opt.parse!
 
-if ARGV.length == 0
+if ARGV.empty?
   puts 'At least one argument is required!'
   exit 1
 end

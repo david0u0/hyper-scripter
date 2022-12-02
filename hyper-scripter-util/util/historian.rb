@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # [HS_HELP]: Interactively run script from history.
 # [HS_HELP]:
 # [HS_HELP]: e.g.:
@@ -23,9 +25,9 @@ class Option
   end
 
   def empty?
-    @envs.length == 0 && @content.length == 0
+    @envs.empty? && @content.empty?
   end
-  
+
   def cmd_body
     "=#{name}! -- #{content}"
   end
@@ -47,12 +49,12 @@ class Historian < Selector
     no_humble = @single ? '' : '--no-humble'
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
     show_env_str = @show_env ? '--show-env' : ''
-    s = @scripts.map { |s| "=#{s}!" }.join(' ')
-    "#{no_humble} #{show_env_str} #{dir_str} #{s}"
+    script_str = @scripts.map { |s| "=#{s}!" }.join(' ')
+    "#{no_humble} #{show_env_str} #{dir_str} #{script_str}"
   end
 
   def history_show
-    return '' if @scripts.length == 0
+    return '' if @scripts.empty?
 
     HS_ENV.do_hs(
       "history show --limit #{@limit} --offset #{@offset} \
@@ -111,13 +113,13 @@ class Historian < Selector
   def format_option(pos)
     opt = @options[pos]
     just = @max_name_len - pos_len(pos)
-    if @single
-      name = ' ' * (just - opt.name.length)
-    else
-      name = "(#{opt.name}) ".rjust(just + 3)
-    end
+    name = if @single
+             ' ' * (just - opt.name.length)
+           else
+             "(#{opt.name}) ".rjust(just + 3)
+           end
     envs_str = opt.envs_str
-    envs_str = "(#{envs_str}) " if envs_str.length != 0
+    envs_str = "(#{envs_str}) " unless envs_str.empty?
     "#{name}#{envs_str}#{opt.content}"
   end
 
@@ -145,7 +147,7 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("history rm #{} #{scripts_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
     }, msg: 'replace the argument')
 
     register_keys(%w[c C], lambda { |_, _|
@@ -159,7 +161,7 @@ class Historian < Selector
 
     if result.is_multi
       result.options.each do |opt|
-        history = HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
+        HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
       end
       exit
     end
@@ -187,11 +189,12 @@ class Historian < Selector
     history = history_show
     opts = []
     cur_number = 0
-    history.lines.each do |s, i|
+    history.lines.each do |s|
       s = s.rstrip
       if s.start_with?(' ') # env
         opt = opts[-1]
         next if opt.nil?
+
         key, _, val = s.strip.partition('=')
         opt.add_env(key, val)
       else
@@ -222,7 +225,7 @@ class Historian < Selector
   end
 
   def register_all
-    register_keys(%w[e E], lambda { |_, obj|
+    register_keys(%w[e E], lambda { |_, _|
       @show_env = !@show_env
       load_history
     }, msg: 'toggle show env mode', recur: true)
@@ -260,15 +263,15 @@ class Historian < Selector
   end
 end
 
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   Historian.humble_run_id
 
   def split_args
-    idx = ARGV.find_index("--sequence")
+    idx = ARGV.find_index('--sequence')
     if idx.nil?
       ['', ARGV.join(' ')]
     else
-      seq = ARGV[idx+1] || ''
+      seq = ARGV[idx + 1] || ''
       first = ARGV[...idx]
       second = ARGV[(idx + 2)..] || []
       args = "#{first.join(' ')} #{second.join(' ')}"

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # [HS_HELP]: Collect scripts in hyper scripter home.
 # [HS_HELP]: Scripts not traced will be added, scripts without an actual file will be purged.
 # [HS_HELP]:
@@ -46,7 +48,7 @@ def extract_name(file)
     name = name.sub(%r{^\.anonymous/}, '')
     num = name.to_i
     if num.to_s == name
-      name = '.' + name
+      name = ".#{name}"
     else
       # throw err
       throw "what? #{name}?"

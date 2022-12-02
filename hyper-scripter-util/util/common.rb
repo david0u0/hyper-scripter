@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+require 'English'
 class HSEnv
   ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID',
               source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
@@ -16,7 +19,7 @@ class HSEnv
   def do_hs(arg, all, envs = [])
     cmd = hs_command_str(arg, all, envs)
     output = `#{cmd}`
-    raise StandardError, "Hyper scripter exits with #{$?.exitstatus}" unless $?.success?
+    raise StandardError, "Hyper scripter exits with #{$CHILD_STATUS.exitstatus}" unless $CHILD_STATUS.success?
 
     output
   end
@@ -24,7 +27,7 @@ class HSEnv
   def system_hs(arg, all, envs = [])
     cmd = hs_command_str(arg, all, envs)
     res = system(cmd)
-    raise StandardError, "Hyper scripter exits with error" unless res
+    raise StandardError, 'Hyper scripter exits with error' unless res
   end
 
   def exec_hs(arg, all, envs = [])

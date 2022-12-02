@@ -1,38 +1,40 @@
+# frozen_string_literal: true
+
 require 'io/console'
 
-RED = "\033[1;31m".freeze
-GREEN = "\033[1;32m".freeze
-YELLOW = "\033[1;33m".freeze
-BLUE = "\033[1;34m".freeze
-BLUE_BG = "\033[0;44m".freeze
-BLUE_BG_RED = "\033[31;44m\033[1m".freeze
-BLUE_BG_YELLOW = "\033[33;44m".freeze
-NC = "\033[0m".freeze
-ENTER = "\r".freeze
-NL = "\n".freeze
-HELP_MSG = "#{GREEN}press h/H for help#{NC}"
+RED = "\033[1;31m"
+GREEN = "\033[1;32m"
+YELLOW = "\033[1;33m"
+BLUE = "\033[1;34m"
+BLUE_BG = "\033[0;44m"
+BLUE_BG_RED = "\033[31;44m\033[1m"
+BLUE_BG_YELLOW = "\033[33;44m"
+NC = "\033[0m"
+ENTER = "\r"
+NL = "\n"
+HELP_MSG = "#{GREEN}press h/H for help#{NC}".freeze
 
 def read_char
-  STDIN.echo = false
-  STDIN.raw!
-  input = STDIN.getc.chr
+  $stdin.echo = false
+  $stdin.raw!
+  input = $stdin.getc.chr
   if input == "\e"
     begin
-      input << STDIN.read_nonblock(3)
+      input << $stdin.read_nonblock(3)
     rescue StandardError
       nil
     end
     begin
-      input << STDIN.read_nonblock(2)
+      input << $stdin.read_nonblock(2)
     rescue StandardError
       nil
     end
   end
+  input
 ensure
-  STDIN.echo = true
-  STDIN.cooked!
+  $stdin.echo = true
+  $stdin.cooked!
   exit 1 if input == "\u0003" # Ctrl-C
-  return input
 end
 
 def erase_lines(line_count)
@@ -48,20 +50,18 @@ end
 
 def compute_lines(len, win_width)
   lines = 1 + len / win_width
-  lines -= 1 if len % win_width == 0
+  lines -= 1 if (len % win_width).zero?
   lines
 end
 
 def search_and_color(s, word, start_color, end_color)
   target_s = s.dup
-  unless word =~ /[A-Z]/
-    target_s.downcase!
-  end
+  target_s.downcase! unless word =~ /[A-Z]/
 
   extended = 0
-  target_s.to_enum(:scan, word).each do ||
-    s = s.dup if extended == 0 # first modify, must copy the string
-    start_pos = $`.size + extended
+  target_s.to_enum(:scan, word).each do
+    s = s.dup if extended.zero? # first modify, must copy the string
+    start_pos = Regexp.last_match.pre_match.size + extended
     end_pos = start_pos + word.length
     s.insert(end_pos, end_color)
     s.insert(start_pos, start_color)
@@ -110,7 +110,7 @@ class Selector
   end
 
   def can_virtual?
-    @virtual_callbacks.length > 0
+    !@virtual_callbacks.empty?
   end
 
   def is_virtual_selected(pos)
@@ -141,7 +141,7 @@ class Selector
       end
 
       option_count = @options.length
-      raise Empty if option_count == 0
+      raise Empty if option_count.zero?
 
       line_count = 0
       @virtual_state&.set_point(pos)
@@ -171,16 +171,17 @@ class Selector
                read_char
              else
                ch = sequence[0]
-               sequence = sequence[1..-1]
+               sequence = sequence[1..]
                ch
              end
 
       callback = nil
 
-      if mode == :search
+      case mode
+      when :search
         case resp
         when "\b", "\c?"
-          if @search_string.length == 0
+          if @search_string.empty?
             mode = :normal
           else
             @search_string = @search_string[0..-2]
@@ -192,11 +193,11 @@ class Selector
           new_pos = search_index(pos)
           pos = new_pos unless new_pos.nil?
         end
-      elsif mode == :number
+      when :number
         case resp
         when "\b", "\c?"
           @number /= 10
-          mode = :normal if @number == 0
+          mode = :normal if @number.zero?
         when ENTER, NL
           mode = :normal
           pos = [@number, @display_offset].max
@@ -212,11 +213,10 @@ class Selector
           read_char
           erase_lines lines
         when 'q', 'Q'
-          if @virtual_state.nil?
-            raise Quit
-          else
-            @virtual_state = nil
-          end
+          raise Quit if @virtual_state.nil?
+
+          @virtual_state = nil
+
         when 'j', 'J', "\e[B"
           pos = (pos + 1) % option_count
         when 'k', 'K', "\e[A"
@@ -233,11 +233,10 @@ class Selector
         when 'v', 'V'
           @virtual_state = (VirtualState.new(pos) if @virtual_state.nil? && can_virtual?)
         else
-          resp_to_i = resp.to_i
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
-          elsif (resp == ENTER || resp == NL) && @virtual_state.nil? && !@enter_overriden
+          elsif [ENTER, NL].include?(resp) && @virtual_state.nil? && !@enter_overriden
             # default enter behavior, for non-virtual mode
             return self.class.make_result(pos, @options[pos])
           else
@@ -267,9 +266,9 @@ class Selector
       end
 
       # for options count change
-      new_options = @options.length
-      pos = [@options.length - 1, pos].min
-      @virtual_state&.truncate_by_length(@options.length)
+      new_opt_len = @options.length
+      pos = [new_opt_len - 1, pos].min
+      @virtual_state&.truncate_by_length(new_opt_len)
     end
   end
 
@@ -310,14 +309,13 @@ class Selector
   end
 
   def color_line(pos, option_str)
+    return option_str if @search_string.empty?
+
     if is_virtual_selected(pos)
-      if @search_string.length > 0
-        return search_and_color(option_str, @search_string, BLUE_BG_RED, BLUE_BG)
-      end
-    elsif @search_string.length > 0
-      return search_and_color(option_str, @search_string, RED, NC)
+      search_and_color(option_str, @search_string, BLUE_BG_RED, BLUE_BG)
+    else
+      search_and_color(option_str, @search_string, RED, NC)
     end
-    option_str
   end
 
   private
@@ -331,16 +329,14 @@ class Selector
             (i + pos) % len
           end
       s = format_option(i)
-      unless @search_string =~ /[A-Z]/
-        s = s.downcase
-      end
+      s = s.downcase unless @search_string =~ /[A-Z]/
       return i if s.include?(@search_string)
     end
     nil
   end
 
   def collect_help_str
-    def single_help_str(plain, h, can_virtual)
+    single_help_str = lambda do |plain, h|
       c = lambda do |color|
         if plain
           ''
@@ -350,10 +346,11 @@ class Selector
       end
       s = " * #{c.call(GREEN)}#{h.keys.join('/')}#{c.call(NC)}: #{h.msg}"
       s += " #{c.call(RED)}(ends the selector)#{c.call(NC)}" unless h.recur
-      if can_virtual
-        if h.virtual == :yes
+      if can_virtual?
+        case h.virtual
+        when :yes
           s += " #{c.call(BLUE)}(virtual)#{c.call(NC)}"
-        elsif h.virtual == :no
+        when :no
           s += " #{c.call(YELLOW)}(non-virtual)#{c.call(NC)}"
         end
       end
@@ -372,8 +369,8 @@ class Selector
       self.class.make_help(['n/N'], 'search forwards/search backwards', :both, true)
     ] + @helps
     helps.map do |h|
-      plain = single_help_str(true, h, can_virtual?)
-      colored = single_help_str(false, h, can_virtual?)
+      plain = single_help_str.call(true, h)
+      colored = single_help_str.call(false, h)
       [colored, plain.length]
     end
   end
@@ -407,4 +404,3 @@ class VirtualState
     num >= from and num < to
   end
 end
-

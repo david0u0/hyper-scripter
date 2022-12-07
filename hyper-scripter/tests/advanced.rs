@@ -170,21 +170,26 @@ fn test_prev_env() {
 
     let env = vec![
         (MY_ENV.to_owned(), "A".to_owned()),
-        (MY_OTHER_ENV.to_owned(), "B".to_owned()),
         (MY_ENV_HELP.to_owned(), "C".to_owned()),
     ];
 
     assert_eq!(run!("-").unwrap(), "::");
     assert_eq!(run!("run -p").unwrap(), "::");
 
-    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "A:B:C");
-    assert_eq!(run!("run -p").unwrap(), "A:B:");
-    assert_eq!(run!("run -p").unwrap(), "A:B:");
+    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "A::C");
+    assert_eq!(run!("run -p").unwrap(), "A::");
+    assert_eq!(run!("run -p").unwrap(), "A::");
+    assert_eq!(run!("run -p").unwrap(), "A::");
+
+    let env = vec![
+        (MY_ENV.to_owned(), "X".to_owned()),
+        (MY_OTHER_ENV.to_owned(), "B".to_owned()),
+    ];
+    // -p is stronger than normal env var
+    assert_eq!(run!(custom_env: env.clone(), "run -p").unwrap(), "A:B:");
     assert_eq!(run!("run -p").unwrap(), "A:B:");
 
-    let env = vec![(MY_ENV.to_owned(), "X".to_owned())];
-    // -p is weaker than normal env var
-    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "X:B:");
+    assert_eq!(run!(custom_env: env, "run -").unwrap(), "X:B:");
     assert_eq!(run!("run -p").unwrap(), "X:B:");
 
     assert_eq!(run!("-").unwrap(), "::");

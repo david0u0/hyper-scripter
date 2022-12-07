@@ -1,6 +1,6 @@
 use crate::args::Subs;
 use crate::config::Config;
-use crate::env_pair::EnvPairWithExist;
+use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
@@ -145,7 +145,7 @@ fn run(
     info: &ScriptInfo,
     remaining: &[String],
     hs_tmpl_val: &serde_json::Value,
-    remaining_envs: &[EnvPairWithExist],
+    remaining_envs: &[EnvPair],
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
@@ -171,7 +171,7 @@ fn run(
     let set_cmd_envs = |cmd: &mut Command| {
         cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
         cmd.envs(env.iter().map(|(a, b)| (a, b)));
-        cmd.envs(EnvPairWithExist::iter_new_env(remaining_envs));
+        cmd.envs(remaining_envs.iter().map(|p| (&p.key, &p.val)));
     };
 
     let mut cmd = super::create_cmd(cmd, args);
@@ -245,10 +245,10 @@ pub async fn run_n_times(
     for (need_save, line) in extract_env_from_content_help_aware(&content) {
         hs_env_desc.push(line.to_owned());
         if need_save {
-            EnvPairWithExist::process_line(line, &mut env_vec);
+            EnvPair::process_line(line, &mut env_vec);
         }
     }
-    EnvPairWithExist::sort(&mut env_vec);
+    EnvPair::sort(&mut env_vec);
     let env_record = serde_json::to_string(&env_vec)?;
 
     let run_id = entry

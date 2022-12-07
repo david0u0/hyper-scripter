@@ -3,6 +3,7 @@ use term_grid::{Cell, Direction, Filling, Grid as LibGrid, GridOptions};
 pub struct Grid {
     capacity: usize,
     grid: LibGrid,
+    term_width: Option<usize>,
 }
 
 impl Grid {
@@ -12,7 +13,11 @@ impl Grid {
             filling: Filling::Spaces(2),
         });
         grid.reserve(capacity);
-        Self { grid, capacity }
+        Self {
+            grid,
+            capacity,
+            term_width: None,
+        }
     }
     pub fn add(&mut self, contents: String, width: usize) {
         let cell = Cell { contents, width };
@@ -22,11 +27,17 @@ impl Grid {
         *self = Grid::new(self.capacity);
     }
     pub fn fit_into_screen<'a>(&'a mut self) -> impl std::fmt::Display + 'a {
-        let width = console::Term::stdout().size().1 as usize;
-        if let Some(grid_display) = self.grid.fit_into_width(width) {
-            grid_display
-        } else {
-            self.grid.fit_into_columns(1)
+        if self.term_width.is_none() {
+            let w = console::Term::stdout().size_checked().map_or(0, |s| s.1);
+            self.term_width = Some(w as usize);
         }
+
+        let width = self.term_width.unwrap();
+        if width > 0 {
+            if let Some(grid_display) = self.grid.fit_into_width(width) {
+                return grid_display;
+            }
+        }
+        self.grid.fit_into_columns(1)
     }
 }

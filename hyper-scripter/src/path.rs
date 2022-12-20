@@ -10,17 +10,15 @@ use std::path::{Component, Path, PathBuf};
 
 macro_rules! resource {
     ($p:literal) => {
-        // concat!(".hs_resource/", $p)
-        $p
+        concat!(".resource/", $p)
     };
 }
 pub(crate) use resource;
 
-pub const HS_REDIRECT: &str = resource!(".redirect");
-pub const HS_PRE_RUN: &str = resource!(".prerun");
+pub const HS_REDIRECT: &str = resource!("redirect");
+pub const HS_PRE_RUN: &str = resource!("prerun");
 const HS_RESOUECE: &str = resource!("");
-const TEMPLATE: &str = resource!(".templates");
-const HAS_RESOURCE_DIR: bool = !HS_RESOUECE.is_empty();
+const TEMPLATE: &str = resource!("templates");
 
 macro_rules! hs_home_env {
     () => {
@@ -32,12 +30,19 @@ static PATH: State<PathBuf> = State::new();
 
 #[cfg(not(feature = "hard-home"))]
 fn get_default_home() -> Result<PathBuf> {
-    const ROOT_PATH: &str = "hyper_scripter";
-    use crate::error::SysPath;
-    let home = dirs::config_dir()
-        .ok_or(Error::SysPathNotFound(SysPath::Config))?
-        .join(ROOT_PATH);
-    Ok(home)
+    #[cfg(not(test))]
+    {
+        const ROOT_PATH: &str = "hyper_scripter";
+        use crate::error::SysPath;
+        let home = dirs::config_dir()
+            .ok_or(Error::SysPathNotFound(SysPath::Config))?
+            .join(ROOT_PATH);
+        Ok(home)
+    }
+    #[cfg(test)]
+    {
+        Ok(get_test_home())
+    }
 }
 #[cfg(feature = "hard-home")]
 fn get_default_home() -> Result<PathBuf> {
@@ -104,10 +109,10 @@ fn compute_home_path<T: AsRef<Path>>(p: T, create_on_missing: bool) -> Result<Pa
     if !resource.exists() {
         if create_on_missing {
             log::info!("路徑 {:?} 不存在，嘗試創建之", resource);
-            handle_fs_res(&[&path], create_dir(&path))?;
-            if HAS_RESOURCE_DIR {
-                handle_fs_res(&[&resource], create_dir(&resource))?;
+            if !path.exists() {
+                handle_fs_res(&[&path], create_dir(&path))?;
             }
+            handle_fs_res(&[&resource], create_dir(&resource))?;
         } else {
             return Err(Error::PathNotFound(vec![resource]));
         }
@@ -279,9 +284,9 @@ mod test {
     fn test_open_anonymous() {
         let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
         assert_eq!(name, ScriptName::Anonymous(3));
-        assert_eq!(p, get_test_home().join(".anonymous/3.sh"));
+        assert_eq!(p, get_test_home().join(".resource/anonymous/3.sh"));
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
-        assert_eq!(p, get_test_home().join(".anonymous/5.js"));
+        assert_eq!(p, get_test_home().join(".resource/anonymous/5.js"));
     }
     #[test]
     fn test_open() {
@@ -297,7 +302,7 @@ mod test {
             None,
         )
         .unwrap();
-        assert_eq!(p, get_test_home().join(".anonymous/1.sh"));
+        assert_eq!(p, get_test_home().join(".resource/anonymous/1.sh"));
 
         match open_script(&not_exist, &"sh".into(), Some(true)).unwrap_err() {
             Error::PathNotFound(name) => assert_eq!(name[0], get_home().join("not-exist.sh")),

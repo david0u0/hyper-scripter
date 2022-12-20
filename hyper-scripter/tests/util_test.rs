@@ -94,8 +94,16 @@ fn test_collect(og_util_cnt: usize) {
     );
     const SCREWED_UP_TXT: &str = "因為副檔名爛掉所以被當作文字檔";
     let named_txt = create_all("this/is/a/txt/coll.ect/test.ggext", None, SCREWED_UP_TXT);
-    create_all(".anonymous/10", Some("sh"), "echo 這是一個匿名收集測試");
-    create_all(".anonymous/100", None, "這是一個匿名文字檔收集測試");
+    create_all(
+        ".resource/anonymous/10",
+        Some("sh"),
+        "echo 這是一個匿名收集測試",
+    );
+    create_all(
+        ".resource/anonymous/100",
+        None,
+        "這是一個匿名文字檔收集測試",
+    );
 
     create_all(
         "this/is/a/collect/.test.rb",
@@ -110,7 +118,7 @@ fn test_collect(og_util_cnt: usize) {
     );
 
     remove_file(get_home().join("util/git")).unwrap(); // 刪掉 txt 檔
-    remove_file(get_home().join(".anonymous/3")).unwrap(); // 刪掉 txt 檔
+    remove_file(get_home().join(".resource/anonymous/3")).unwrap(); // 刪掉 txt 檔
     remove_dir_all(get_home().join("my")).unwrap(); // 刪掉 myinnate 和 mytest
     run!("-s innate ls myinnate").expect("還沒跑 collect 就壞掉了？");
     run!("-s my ls mytest").expect("還沒跑 collect 就壞掉了？");

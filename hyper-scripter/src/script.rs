@@ -16,7 +16,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
 
-pub const ANONYMOUS: &str = crate::path::resource!(".anonymous");
+pub const ANONYMOUS: &str = crate::path::resource!("anonymous");
 
 macro_rules! max {
     ($x:expr) => ( $x );

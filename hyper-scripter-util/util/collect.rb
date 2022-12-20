@@ -27,12 +27,17 @@ def directory_tree(path)
   files
 end
 
-def shoud_collect?(file)
-  first = true
-  file.split('/').each do |path|
-    next if first && path == '.anonymous'
+def trim_anonymous(name)
+  if name.start_with?('.resource/anonymous')
+    name.sub(%r{^\.resource/anonymous/}, '')
+  else
+    nil
+  end
+end
 
-    first = false
+def shoud_collect?(file)
+  file = trim_anonymous(file) || file
+  file.split('/').each do |path|
     return false if path.start_with?('.')
   end
   true
@@ -44,8 +49,9 @@ def extract_name(file)
   ty = ty.delete_prefix('.') # the first char is `.`
   ty = 'txt' if ty == ''
 
-  if name.start_with? '.anonymous'
-    name = name.sub(%r{^\.anonymous/}, '')
+  anonymous_name = trim_anonymous(name)
+  if anonymous_name
+    name = anonymous_name
     num = name.to_i
     if num.to_s == name
       name = ".#{name}"
@@ -54,6 +60,7 @@ def extract_name(file)
       throw "what? #{name}?"
     end
   end
+
   [name, ty]
 end
 

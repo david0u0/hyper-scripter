@@ -7,11 +7,11 @@ use sqlx::{
 use std::path::PathBuf;
 
 pub fn get_file() -> PathBuf {
-    path::get_home().join(path::resource!(".script_info.db"))
+    path::get_home().join(path::resource!("script_info.db"))
 }
 
 pub fn get_history_file() -> PathBuf {
-    path::get_home().join(path::resource!(".script_history.db"))
+    path::get_home().join(path::resource!("script_history.db"))
 }
 
 /// 有可能改變 need_journal 的值。

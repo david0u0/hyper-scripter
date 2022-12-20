@@ -1,8 +1,7 @@
 **/target
-.config.*
+config.*
 .hyper_scripter
 .hyper_scripter_redirect
 *.db
 *.db-*
-.hs_exe_path
 .tmp

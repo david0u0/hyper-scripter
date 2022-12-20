@@ -62,9 +62,12 @@ fn test_mv_cp() {
 
     run!("mv 1 -T sh -t test2").unwrap();
     assert_eq!("test2", run!("-").unwrap());
-    assert!(check_exist(&[".anonymous", "1.sh"]), "改腳本類型失敗");
     assert!(
-        !check_exist(&[".anonymous", "1.js"]),
+        check_exist(&[".resource/anonymous", "1.sh"]),
+        "改腳本類型失敗"
+    );
+    assert!(
+        !check_exist(&[".resource/anonymous", "1.js"]),
         "改了腳本類型舊檔案還留著？"
     );
 

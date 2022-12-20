@@ -8,9 +8,19 @@ use fxhash::FxHashSet as HashSet;
 use std::fs::{create_dir, create_dir_all, read_dir};
 use std::path::{Component, Path, PathBuf};
 
-pub const HS_REDIRECT: &str = ".hs_redirect";
-pub const HS_PRE_RUN: &str = ".hs_prerun";
-const TEMPLATE: &str = ".hs_templates";
+macro_rules! resource {
+    ($p:literal) => {
+        // concat!(".hs_resource/", $p)
+        $p
+    };
+}
+pub(crate) use resource;
+
+pub const HS_REDIRECT: &str = resource!(".redirect");
+pub const HS_PRE_RUN: &str = resource!(".prerun");
+const HS_RESOUECE: &str = resource!("");
+const TEMPLATE: &str = resource!(".templates");
+const HAS_RESOURCE_DIR: bool = !HS_RESOUECE.is_empty();
 
 macro_rules! hs_home_env {
     () => {
@@ -90,12 +100,16 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
 fn compute_home_path<T: AsRef<Path>>(p: T, create_on_missing: bool) -> Result<PathBuf> {
     let path = join_here_abs(p)?;
     log::debug!("計算路徑：{:?}", path);
-    if !path.exists() {
+    let resource = path.join(HS_RESOUECE);
+    if !resource.exists() {
         if create_on_missing {
-            log::info!("路徑 {:?} 不存在，嘗試創建之", path);
+            log::info!("路徑 {:?} 不存在，嘗試創建之", resource);
             handle_fs_res(&[&path], create_dir(&path))?;
+            if HAS_RESOURCE_DIR {
+                handle_fs_res(&[&resource], create_dir(&resource))?;
+            }
         } else {
-            return Err(Error::PathNotFound(vec![path]));
+            return Err(Error::PathNotFound(vec![resource]));
         }
     } else {
         let redirect = path.join(HS_REDIRECT);

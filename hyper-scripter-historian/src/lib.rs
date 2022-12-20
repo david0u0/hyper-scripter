@@ -19,7 +19,7 @@ const EXEC_DONE_CODE: i8 = EventType::ExecDone.get_code();
 #[derive(Debug, Clone)]
 pub struct Historian {
     pool: Arc<RwLock<SqlitePool>>,
-    dir_path: PathBuf,
+    file_path: PathBuf,
 }
 
 async fn raw_record_event(pool: &Pool<Sqlite>, event: DBEvent<'_>) -> Result<i64, DBError> {
@@ -205,20 +205,20 @@ impl Historian {
         if res.is_err() {
             pool.close().await;
             log::warn!("資料庫錯誤 {:?}，再試最後一次！", res);
-            *pool = db::get_pool(&self.dir_path).await?;
+            *pool = db::get_pool(&self.file_path).await?;
             return raw_record_event(pool, event).await;
         }
 
         res
     }
-    pub async fn new(dir_path: PathBuf) -> Result<Self, DBError> {
-        db::get_pool(&dir_path).await.map(|pool| Historian {
+    pub async fn new(file_path: PathBuf) -> Result<Self, DBError> {
+        db::get_pool(&file_path).await.map(|pool| Historian {
             pool: Arc::new(RwLock::new(pool)),
-            dir_path,
+            file_path,
         })
     }
-    pub async fn do_migrate(dir_path: &Path) -> Result<(), MigrateError> {
-        migration::do_migrate(db::get_file(dir_path)).await?;
+    pub async fn do_migrate(file: impl AsRef<Path>) -> Result<(), MigrateError> {
+        migration::do_migrate(file.as_ref()).await?;
         Ok(())
     }
 

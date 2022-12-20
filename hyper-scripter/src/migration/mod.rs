@@ -2,10 +2,8 @@ use sqlx::migrate::MigrateError;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::path::Path;
 
-pub async fn do_migrate(
-    file: impl AsRef<Path> + std::fmt::Debug,
-) -> Result<SqlitePool, MigrateError> {
-    log::info!("進行資料庫遷移 {:?}！", file);
+pub async fn do_migrate(file: impl AsRef<Path>) -> Result<SqlitePool, MigrateError> {
+    log::info!("進行資料庫遷移 {:?}！", file.as_ref());
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::new()
             .filename(file)

@@ -60,7 +60,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
 
     if matches!(root.subcmd, Some(Subs::Migrate)) {
         migration::do_migrate(db::get_file()).await?;
-        Historian::do_migrate(path::get_home()).await?;
+        Historian::do_migrate(db::get_history_file()).await?;
         return Ok(vec![]);
     }
 

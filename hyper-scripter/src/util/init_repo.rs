@@ -2,7 +2,6 @@ use super::main_util;
 use crate::args::RootArgs;
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
-use crate::path;
 use crate::script_repo::{DBEnv, RecentFilter, ScriptRepo};
 use futures::try_join;
 use fxhash::FxHashSet as HashSet;
@@ -11,7 +10,7 @@ use hyper_scripter_historian::Historian;
 /// 即使 `need_journal=false` 也可能使用 journal，具體條件同 `crate::db::get_pool`
 pub async fn init_env(mut need_journal: bool) -> Result<(DBEnv, bool)> {
     async fn init_historian() -> Result<Historian> {
-        let h = Historian::new(path::get_home().to_owned()).await?;
+        let h = Historian::new(crate::db::get_history_file()).await?;
         Ok(h)
     }
     let ((pool, init), historian) =

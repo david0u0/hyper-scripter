@@ -1,7 +1,7 @@
 use crate::args::RootArgs;
 use crate::error::Result;
 use crate::script_repo::{DBEnv, ScriptRepo};
-use crate::{path, util};
+use crate::{db, util};
 use hyper_scripter_historian::Historian;
 
 pub enum Resource {
@@ -37,7 +37,7 @@ impl<'a> RepoHolder<'a> {
         }
     }
     pub async fn historian(self) -> Result<&'a mut Historian> {
-        let historian = Historian::new(path::get_home().to_owned()).await?;
+        let historian = Historian::new(db::get_history_file()).await?;
         *self.resource = Resource::Historian(historian);
         match self.resource {
             Resource::Historian(historian) => Ok(historian),

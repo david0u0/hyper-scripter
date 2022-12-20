@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::SystemTime;
 
-const CONFIG_FILE: &str = ".config.toml";
+const CONFIG_FILE: &str = path::resource!(".config.toml");
 
 static CONFIG: State<Config> = State::new();
 static PROMPT_LEVEL: State<PromptLevel> = State::new();

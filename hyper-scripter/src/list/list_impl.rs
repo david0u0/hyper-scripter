@@ -1,6 +1,6 @@
 use super::{
-    exec_time_str, extract_help, style, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping,
-    ListOptions,
+    exec_time_str, extract_help, fmt_time, init_this_year, style, tree, DisplayIdentStyle,
+    DisplayStyle, Grid, Grouping, ListOptions,
 };
 use crate::error::Result;
 use crate::query::do_list_query;
@@ -72,6 +72,7 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
         display_style: match opt.display_style {
             DisplayStyle::Short(style, _) => DisplayStyle::Short(style, t),
             DisplayStyle::Long(_) => {
+                init_this_year();
                 let mut table = Table::new();
                 if opt.grouping != Grouping::Tree {
                     table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
@@ -116,8 +117,7 @@ pub fn fmt_meta(
             let mut buff = String::new();
             let help_msg = extract_help(&mut buff, script);
 
-            let row =
-                row![name_txt, c->ty_txt, c->script.write_time, c->exec_time_str(script), help_msg];
+            let row = row![name_txt, c->ty_txt, c->fmt_time(&script.write_time), c->exec_time_str(script), help_msg];
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, grid) => {

@@ -1,6 +1,5 @@
-use chrono::{Local, NaiveDateTime, TimeZone, Utc};
+use chrono::{NaiveDateTime, Utc};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::fmt::Debug;
 
 /// 可能帶著資料的時間。
 /// 如果有資料，代表「這些資料是新的產生，應儲存起來但還未存」
@@ -55,12 +54,5 @@ impl<T> ScriptTime<T> {
     }
     pub fn has_changed(&self) -> bool {
         self.changed.is_some()
-    }
-}
-
-impl<T> std::fmt::Display for ScriptTime<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let local_time = Local.from_utc_datetime(&self.time);
-        write!(f, "{}", local_time.format("%Y-%m-%d %H:%M"))
     }
 }

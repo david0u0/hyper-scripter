@@ -1,5 +1,5 @@
 use super::{
-    exec_time_str, extract_help, style,
+    exec_time_str, extract_help, fmt_time, style,
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
@@ -85,7 +85,8 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter
         let mut buff = String::new();
         let help_msg = extract_help(&mut buff, script);
 
-        let row = row![c->ty_txt, c->script.write_time, c->exec_time_str(script), help_msg];
+        let row =
+            row![c->ty_txt, c->fmt_time(&script.write_time), c->exec_time_str(script), help_msg];
         self.table.add_row(row);
         Ok(())
     }

@@ -1,5 +1,6 @@
 use super::{
     exec_time_str, extract_help, fmt_time, style,
+    table_lib::{Cell, Table},
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };
@@ -8,12 +9,9 @@ use crate::script::ScriptInfo;
 use crate::util::get_display_type;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
-use prettytable::{cell, format, row, Row, Table};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::io::Write;
-
-const TITLE: &[&str] = &["type", "write", "execute", "help message"];
 
 struct ShortFormatter {
     plain: bool,
@@ -72,31 +70,33 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatte
 }
 impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for LongFormatter {
     fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
-        let TrimmedScriptInfo(name, script) = t;
-        let ty = get_display_type(&script.ty);
-        let color = ty.color();
-        let ident = style(self.plain, name, |s| s.color(color).bold());
-        let ty_txt = style(self.plain, ty.display(), |s| s.color(color).bold());
-        if self.latest_script_id == script.id && !self.plain {
-            write!(f, "{}", "*".color(Color::Yellow).bold())?;
-        }
-        write!(f, "{}", ident)?;
+        unimplemented!();
+        // let TrimmedScriptInfo(name, script) = t;
+        // let ty = get_display_type(&script.ty);
+        // let color = ty.color();
+        // let ident = style(self.plain, name, |s| s.color(color).bold());
+        // let ty_txt = style(self.plain, ty.display(), |s| s.color(color).bold());
+        // if self.latest_script_id == script.id && !self.plain {
+        //     write!(f, "{}", "*".color(Color::Yellow).bold())?;
+        // }
+        // write!(f, "{}", ident)?;
 
-        let mut buff = String::new();
-        let help_msg = extract_help(&mut buff, script);
+        // let mut buff = String::new();
+        // let help_msg = extract_help(&mut buff, script);
 
-        let row =
-            row![c->ty_txt, c->fmt_time(&script.write_time), c->exec_time_str(script), help_msg];
-        self.table.add_row(row);
-        Ok(())
+        // let row =
+        //     row![c->ty_txt, c->fmt_time(&script.write_time), c->exec_time_str(script), help_msg];
+        // self.table.add_row(row);
+        // Ok(())
     }
     fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
-        let ident = style(self.plain, t, |s| s.dimmed().italic());
-        let empty = style(self.plain, "----", |s| s.dimmed());
-        write!(f, "{}", ident)?;
-        self.table
-            .add_row(Row::new(vec![cell!(c->empty).with_hspan(TITLE.len())]));
-        Ok(())
+        unimplemented!();
+        // let ident = style(self.plain, t, |s| s.dimmed().italic());
+        // let empty = style(self.plain, "----", |s| s.dimmed());
+        // write!(f, "{}", ident)?;
+        // self.table
+        //     .add_row(Row::new(vec![cell!(c->empty).with_hspan(TITLE.len())]));
+        // Ok(())
     }
 }
 
@@ -134,19 +134,18 @@ pub fn fmt<W: Write>(
     let forest = build_forest(scripts);
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
-            let mut right_table = Table::new();
-            right_table.set_format(*format::consts::FORMAT_CLEAN);
-            right_table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
-            let mut fmter = LongFormatter {
-                plain: opt.plain,
-                latest_script_id,
-                table: right_table,
-            };
-            let mut left = Vec::<u8>::new();
-            writeln!(left)?;
-            fmter.fmt_all(&mut left, forest.into_iter())?;
-            let left = std::str::from_utf8(&left)?;
-            table.add_row(row![left, fmter.table.to_string()]);
+            unimplemented!();
+            // let mut right_table = Table::new();
+            // let mut fmter = LongFormatter {
+            //     plain: opt.plain,
+            //     latest_script_id,
+            //     table: right_table,
+            // };
+            // let mut left = Vec::<u8>::new();
+            // writeln!(left)?;
+            // fmter.fmt_all(&mut left, forest.into_iter())?;
+            // let left = std::str::from_utf8(&left)?;
+            // table.add_row(row![left, fmter.table.to_string()]);
         }
         DisplayStyle::Short(ident_style, w) => {
             let mut fmter = ShortFormatter {

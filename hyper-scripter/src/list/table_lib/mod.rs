@@ -1,0 +1,256 @@
+// TODO: change all `String` to `Cow`?
+use std::fmt::{Display, Formatter, Result as FmtResult};
+
+const PADDING: usize = 2;
+
+#[derive(Debug)]
+pub struct Cell {
+    content: String,
+    len: usize,
+}
+
+impl Cell {
+    pub fn new(content: String) -> Cell {
+        Cell {
+            len: content.len(),
+            content,
+        }
+    }
+    pub fn new_with_len(content: String, len: usize) -> Cell {
+        Cell { content, len }
+    }
+}
+
+#[derive(Debug)]
+pub struct Collumn {
+    name: &'static str,
+    fixed: bool,
+    max_len: usize,
+
+    is_fixed_this_time: bool,
+    start_pos_this_time: usize,
+}
+
+impl Collumn {
+    pub const fn new(name: &'static str) -> Self {
+        Collumn {
+            name,
+            max_len: name.len(),
+            fixed: false,
+            is_fixed_this_time: false,
+            start_pos_this_time: 0,
+        }
+    }
+    pub const fn new_fixed(name: &'static str) -> Self {
+        Collumn {
+            name,
+            max_len: name.len(),
+            fixed: true,
+            is_fixed_this_time: true,
+            start_pos_this_time: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Table {
+    rows: Vec<Vec<Cell>>,
+    cols: Vec<Collumn>,
+    width: u16,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DisplayTable<'a> {
+    table: &'a Table,
+    avg: usize,
+}
+
+impl Table {
+    pub fn new(cols: Vec<Collumn>) -> Self {
+        Table {
+            rows: vec![],
+            cols,
+            width: 0,
+        }
+    }
+    pub fn add_row(&mut self, row: Vec<Cell>) {
+        fn set_max(og: &mut usize, new: usize) {
+            if *og < new {
+                *og = new;
+            }
+        }
+        for (i, cell) in row.iter().enumerate() {
+            set_max(&mut self.cols[i].max_len, cell.len);
+        }
+        self.rows.push(row);
+    }
+    pub fn set_width(&mut self, width: u16) {
+        self.width = width;
+    }
+
+    pub fn display(&mut self) -> DisplayTable<'_> {
+        let (remaining, total_dyn) = self.compute_init_remaining();
+        let mut avg = 0;
+        if remaining > 0 {
+            avg = self.compute_fix_this_time(remaining, total_dyn);
+        }
+        self.compute_start_pos(avg);
+        DisplayTable { table: self, avg }
+    }
+
+    /// (remaining, total dynamic cell)
+    fn compute_init_remaining(&mut self) -> (usize, usize) {
+        let mut remaining = self.width as i32;
+        let mut total_non_fixed = 0;
+        // fixed col
+        for col in self.cols.iter_mut() {
+            if col.fixed {
+                remaining -= col.max_len as i32;
+            } else {
+                total_non_fixed += 1;
+                col.is_fixed_this_time = false;
+            }
+        }
+        // padding
+        remaining -= ((self.cols.len() - 1) * PADDING) as i32;
+
+        if remaining <= 0 {
+            (0, total_non_fixed)
+        } else {
+            (remaining as usize, total_non_fixed)
+        }
+    }
+    fn compute_fix_this_time(&mut self, mut remaining: usize, mut total_dyn: usize) -> usize {
+        fn compute_fix_once<'a>(
+            cols: &'a mut [Collumn],
+            remaining: &mut usize,
+            total_dyn: &mut usize,
+            avg: &mut usize,
+        ) -> (&'a mut [Collumn], bool) {
+            let mut first_non_fixed = None;
+            let mut changed = false;
+            for (i, col) in cols.iter_mut().enumerate() {
+                if col.is_fixed_this_time {
+                    continue;
+                } else if *avg > col.max_len {
+                    *total_dyn -= 1;
+                    *remaining -= col.max_len;
+                    col.is_fixed_this_time = true;
+                    changed = true;
+                    if *total_dyn == 0 {
+                        break;
+                    }
+                    *avg = *remaining / *total_dyn;
+                } else {
+                    if first_non_fixed.is_none() {
+                        first_non_fixed = Some(i);
+                    }
+                }
+            }
+            if !changed {
+                (cols, true)
+            } else if let Some(first_non_fixed) = first_non_fixed {
+                (&mut cols[first_non_fixed..], false)
+            } else {
+                // assert total_dyn == 0
+                (cols, true)
+            }
+        }
+
+        if total_dyn == 0 {
+            return 0;
+        }
+        let mut cols = &mut self.cols[..];
+        let mut avg = remaining / total_dyn;
+        loop {
+            let (new_cols, ok) = compute_fix_once(cols, &mut remaining, &mut total_dyn, &mut avg);
+            if ok {
+                break;
+            }
+            cols = new_cols;
+        }
+        avg
+    }
+    fn compute_start_pos(&mut self, avg: usize) {
+        let mut cur_pos = 0;
+        for col in self.cols.iter_mut() {
+            col.start_pos_this_time = cur_pos;
+            cur_pos += if col.is_fixed_this_time || avg == 0 {
+                // avg == 0 代表怎樣都塞不下，放棄了
+                col.max_len
+            } else {
+                avg
+            };
+            cur_pos += PADDING;
+        }
+    }
+}
+
+impl<'a> Display for DisplayTable<'a> {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        let DisplayTable { table, avg } = *self;
+        let mut cur_pos = 0;
+        for col in table.cols.iter() {
+            // TODO: multi lines?
+            let front_spaces = col.start_pos_this_time - cur_pos;
+            for _ in 0..front_spaces {
+                write!(w, " ")?;
+            }
+            write!(w, "{}", col.name)?;
+            cur_pos = col.start_pos_this_time + col.name.len();
+        }
+        for row in table.rows.iter() {
+            writeln!(w, "")?;
+            let mut cur_pos = 0;
+            for (i, cell) in row.iter().enumerate() {
+                let col = &table.cols[i];
+                let front_spaces = col.start_pos_this_time - cur_pos;
+                for _ in 0..front_spaces {
+                    write!(w, " ")?;
+                }
+
+                let (content, len) = if avg == 0 {
+                    // avg == 0 代表放棄了
+                    (&cell.content[..], cell.len)
+                } else if !col.is_fixed_this_time && avg < cell.len {
+                    // TODO: more lines!
+                    (&cell.content[0..avg], avg)
+                } else {
+                    (&cell.content[..], cell.len)
+                };
+
+                write!(w, "{}", content)?;
+                cur_pos = col.start_pos_this_time + len;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn c(s: &str) -> Cell {
+        Cell::new(s.to_owned())
+    }
+    #[test]
+    fn test_table() {
+        let mut t = Table::new(vec![
+            Collumn::new_fixed("name"),
+            Collumn::new_fixed("type"),
+            Collumn::new("write"),
+            Collumn::new("execute"),
+            Collumn::new("help msg"),
+        ]);
+        t.set_width(50);
+        t.add_row(vec![
+            c("test"),
+            c("docker"),
+            c("12-08 2022"),
+            c("12-08 2022(999)"),
+            c("a super long msg, so long it can't even fit in, what a tragdy..."),
+        ]);
+
+        t.display().to_string();
+    }
+}

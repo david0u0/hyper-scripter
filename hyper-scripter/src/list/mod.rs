@@ -4,6 +4,7 @@ pub use list_impl::*;
 mod grid;
 pub use grid::Grid;
 
+mod table_lib;
 mod tree;
 mod tree_lib;
 
@@ -124,4 +125,8 @@ fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
     } else {
         s
     }
+}
+
+pub fn get_screen_width() -> u16 {
+    console::Term::stdout().size_checked().map_or(0, |s| s.1)
 }

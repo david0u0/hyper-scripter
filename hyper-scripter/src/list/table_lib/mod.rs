@@ -186,22 +186,55 @@ impl Table {
     }
 }
 
+#[derive(Default)]
+struct MultiLineManager<'a> {
+    content: Vec<Vec<(usize, &'a str)>>,
+}
+impl<'a> MultiLineManager<'a> {
+    fn process(&mut self, idx: usize, mut s: &'a str, max_len: usize) {
+        let mut cur_line_num = 0;
+        loop {
+            if s.is_empty() {
+                break;
+            }
+            if cur_line_num == self.content.len() {
+                self.content.push(vec![]);
+            }
+            let cur_line = &mut self.content[cur_line_num];
+            cur_line_num += 1;
+
+            let new_len = std::cmp::min(max_len, s.len());
+            cur_line.push((idx, &s[..new_len]));
+            s = &s[new_len..]
+        }
+    }
+}
+
 impl<'a> Display for DisplayTable<'a> {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
         let DisplayTable { table, avg } = *self;
+        let give_up = avg == 0;
         let mut cur_pos = 0;
         for col in table.cols.iter() {
-            // TODO: multi lines?
             let front_spaces = col.start_pos_this_time - cur_pos;
             for _ in 0..front_spaces {
                 write!(w, " ")?;
             }
-            write!(w, "{}", col.name)?;
-            cur_pos = col.start_pos_this_time + col.name.len();
+            let len = col.name.len();
+            let (content, len) = if !give_up && !col.is_fixed_this_time && avg < len {
+                // TODO: more lines!
+                (&col.name[0..avg], avg)
+            } else {
+                (&col.name[..], len)
+            };
+
+            write!(w, "{}", content)?;
+            cur_pos = col.start_pos_this_time + len;
         }
         for row in table.rows.iter() {
             writeln!(w, "")?;
             let mut cur_pos = 0;
+            let mut multi_lines = MultiLineManager::default();
             for (i, cell) in row.iter().enumerate() {
                 let col = &table.cols[i];
                 let front_spaces = col.start_pos_this_time - cur_pos;
@@ -209,11 +242,9 @@ impl<'a> Display for DisplayTable<'a> {
                     write!(w, " ")?;
                 }
 
-                let (content, len) = if avg == 0 {
-                    // avg == 0 代表放棄了
-                    (&cell.content[..], cell.len)
-                } else if !col.is_fixed_this_time && avg < cell.len {
-                    // TODO: more lines!
+                let (content, len) = if !give_up && !col.is_fixed_this_time && avg < cell.len {
+                    // add more lines!
+                    multi_lines.process(i, &cell.content[avg..], avg);
                     (&cell.content[0..avg], avg)
                 } else {
                     (&cell.content[..], cell.len)
@@ -221,6 +252,19 @@ impl<'a> Display for DisplayTable<'a> {
 
                 write!(w, "{}", content)?;
                 cur_pos = col.start_pos_this_time + len;
+            }
+            for line in multi_lines.content.into_iter() {
+                writeln!(w, "")?;
+                let mut cur_pos = 0;
+                for (i, content) in line.into_iter() {
+                    let col = &table.cols[i];
+                    let front_spaces = col.start_pos_this_time - cur_pos;
+                    for _ in 0..front_spaces {
+                        write!(w, " ")?;
+                    }
+                    write!(w, "{}", content)?;
+                    cur_pos = col.start_pos_this_time + content.len(); // 不再考慮顯示寬度的問題…
+                }
             }
         }
         Ok(())
@@ -235,22 +279,38 @@ mod test {
     }
     #[test]
     fn test_table() {
-        let mut t = Table::new(vec![
-            Collumn::new_fixed("name"),
-            Collumn::new_fixed("type"),
-            Collumn::new("write"),
-            Collumn::new("execute"),
-            Collumn::new("help msg"),
-        ]);
-        t.set_width(50);
-        t.add_row(vec![
-            c("test"),
-            c("docker"),
-            c("12-08 2022"),
-            c("12-08 2022(999)"),
-            c("a super long msg, so long it can't even fit in, what a tragdy..."),
-        ]);
+        fn one_test(width: u16) -> usize {
+            const NAME: &str = "a/very/long/name/so/long/it/may/not/fit";
+            let mut t = Table::new(vec![
+                Collumn::new_fixed("name"),
+                Collumn::new("type"),
+                Collumn::new_fixed("write"),
+                Collumn::new("execute"),
+                Collumn::new("help msg"),
+            ]);
+            t.set_width(width);
+            for _ in 0..10 {
+                t.add_row(vec![
+                    c(NAME),
+                    c("docker"),
+                    c("12-08 2022"),
+                    c("12-08 2022(9999999)"),
+                    c("a super long msg, so long it can't even fit in, what a terrible tragdy..."),
+                ]);
+            }
+            let s = t.display().to_string();
+            assert_eq!(s.matches(NAME).count(), 10, "name shouldn't break...");
+            println!("{}", s);
+            s.lines().count()
+        }
 
-        t.display().to_string();
+        for i in 1..10 {
+            one_test(i * i * 4);
+        }
+
+        assert_eq!(one_test(0), 11);
+        assert_eq!(one_test(50), 11, "screen too small, should fall back");
+        assert_ne!(one_test(100), 11, "should be multi lines!");
+        assert_eq!(one_test(400), 11);
     }
 }

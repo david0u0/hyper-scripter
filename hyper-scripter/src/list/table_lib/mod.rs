@@ -1,6 +1,8 @@
 // TODO: change all `String` to `Cow`?
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
+mod word_wrap;
+
 const PADDING: usize = 2;
 
 #[derive(Debug)]
@@ -203,9 +205,9 @@ impl<'a> MultiLineManager<'a> {
             let cur_line = &mut self.content[cur_line_num];
             cur_line_num += 1;
 
-            let new_len = std::cmp::min(max_len, s.len());
-            cur_line.push((idx, &s[..new_len]));
-            s = &s[new_len..]
+            let (s1, s2) = word_wrap::split(s, max_len);
+            cur_line.push((idx, s1));
+            s = s2;
         }
     }
 }
@@ -244,8 +246,9 @@ impl<'a> Display for DisplayTable<'a> {
 
                 let (content, len) = if !give_up && !col.is_fixed_this_time && avg < cell.len {
                     // add more lines!
-                    multi_lines.process(i, &cell.content[avg..], avg);
-                    (&cell.content[0..avg], avg)
+                    let (s1, s2) = word_wrap::split(&cell.content, avg);
+                    multi_lines.process(i, s2, avg);
+                    (s1, s1.len())
                 } else {
                     (&cell.content[..], cell.len)
                 };

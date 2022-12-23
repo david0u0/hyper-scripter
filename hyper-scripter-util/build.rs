@@ -45,7 +45,7 @@ fn main() -> std::io::Result<()> {
         let is_last = last_list.iter().any(|s| s == name);
         let s = format!(
             "
-                RawUtil {{
+                Util {{
                     name: \"util/{}\",
                     ty: \"{}\",
                     content: std::include_str!(r\"{}\"),
@@ -64,14 +64,15 @@ fn main() -> std::io::Result<()> {
         }
     }
     file.write_all(
-        b"pub struct RawUtil {
+        b"#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        pub struct Util {
             pub name: &'static str,
             pub ty: &'static str,
             pub content: &'static str,
             pub is_hidden: bool,
         }",
     )?;
-    file.write_all(b"pub fn get_all() -> &'static [RawUtil] {\n")?;
+    file.write_all(b"pub fn get_all() -> &'static [Util] {\n")?;
     file.write_all(format!("    &[{}, {}]", inner.join(","), last_inner.join(",")).as_bytes())?;
     file.write_all(b"}\n")?;
     Ok(())

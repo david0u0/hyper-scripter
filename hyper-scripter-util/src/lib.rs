@@ -1,30 +1,15 @@
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Util {
-    pub is_hidden: bool,
-    pub name: &'static str,
-    pub ty: &'static str,
-    pub content: &'static str,
-}
-
 mod get_all_utils {
     include!(concat!(env!("OUT_DIR"), "/get_all_utils.rs"));
 }
 
-pub fn get_all() -> impl ExactSizeIterator<Item = Util> {
-    get_all_utils::get_all().iter().map(|u| Util {
-        is_hidden: u.is_hidden,
-        name: u.name,
-        ty: u.ty,
-        content: u.content,
-    })
-}
+pub use get_all_utils::{get_all, Util};
 
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn test_get_all() {
-        let utils: Vec<_> = get_all().collect();
+        let utils: Vec<_> = get_all().into_iter().map(|u| *u).collect();
         let comm = utils
             .iter()
             .find(|u| u.name == "util/common")

@@ -14,28 +14,28 @@ use crate::{
     query::ListQuery,
     script::ScriptInfo,
 };
-use chrono::{Datelike, Local, TimeZone, Utc};
 use colored::{ColoredString, Colorize};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
+fn extract_help(script: &ScriptInfo) -> String {
+    let mut buff = String::new();
     fn inner(buff: &mut String, script: &ScriptInfo) -> Result {
         let script_path = crate::path::open_script(&script.name, &script.ty, Some(true))?;
         *buff = crate::util::read_file(&script_path)?;
         Ok(())
     }
-    match inner(buff, script) {
+    match inner(&mut buff, script) {
         Err(e) => {
             log::warn!("讀取腳本失敗{}，直接回空的幫助字串", e);
-            return "";
+            return String::new();
         }
-        Ok(p) => p,
+        Ok(()) => (),
     };
-    let mut helps = crate::extract_msg::extract_help_from_content(buff);
-    helps.next().unwrap_or_default()
+    let mut helps = crate::extract_msg::extract_help_from_content(&buff);
+    helps.next().unwrap_or_default().to_owned()
 }
 
 fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {

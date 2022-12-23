@@ -117,8 +117,7 @@ pub fn fmt_meta(
             let ty_width = ty.len();
             let ty_txt = style(opt.plain, ty, |s| s.color(color).bold());
 
-            let mut buff = String::new();
-            let help_msg = extract_help(&mut buff, script).to_owned();
+            let help_msg = extract_help(script);
 
             let row = vec![
                 Cell::new_with_len(name_txt, name_width),
@@ -291,6 +290,7 @@ pub async fn fmt_list<W: Write>(
     }
     if let Some(mut table) = final_table {
         write!(w, "{}", table.display())?;
+        log::debug!("tree table: {:?}", table);
     }
     Ok(())
 }

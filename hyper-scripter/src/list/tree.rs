@@ -1,6 +1,7 @@
 use super::{
-    exec_time_str, extract_help, fmt_time, style,
+    exec_time_str, extract_help, style,
     table_lib::{Cell, Table},
+    time_fmt,
     tree_lib::{self, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions,
 };

@@ -1,5 +1,6 @@
 // TODO: change all `String` to `Cow`?
 use std::fmt::{Display, Formatter, Result as FmtResult};
+use unicode_width::UnicodeWidthStr;
 
 mod word_wrap;
 
@@ -14,7 +15,7 @@ pub struct Cell {
 impl Cell {
     pub fn new(content: String) -> Cell {
         Cell {
-            len: content.len(),
+            len: content.width(),
             content,
         }
     }
@@ -222,7 +223,7 @@ impl<'a> Display for DisplayTable<'a> {
             for _ in 0..front_spaces {
                 write!(w, " ")?;
             }
-            let len = col.name.len();
+            let len = col.name.width();
             let (content, len) = if !give_up && !col.is_fixed_this_time && avg < len {
                 // TODO: more lines!
                 (&col.name[0..avg], avg)
@@ -248,7 +249,7 @@ impl<'a> Display for DisplayTable<'a> {
                     // add more lines!
                     let (s1, s2) = word_wrap::split(&cell.content, avg);
                     multi_lines.process(i, s2, avg);
-                    (s1, s1.len())
+                    (s1, s1.width())
                 } else {
                     (&cell.content[..], cell.len)
                 };
@@ -266,7 +267,7 @@ impl<'a> Display for DisplayTable<'a> {
                         write!(w, " ")?;
                     }
                     write!(w, "{}", content)?;
-                    cur_pos = col.start_pos_this_time + content.len(); // 不再考慮顯示寬度的問題…
+                    cur_pos = col.start_pos_this_time + content.width(); // 不再考慮顯示寬度的問題…
                 }
             }
         }
@@ -292,17 +293,31 @@ mod test {
                 Collumn::new("help msg"),
             ]);
             t.set_width(width);
-            for _ in 0..10 {
+            for _ in 0..5 {
                 t.add_row(vec![
                     c(NAME),
                     c("docker"),
                     c("12-08 2022"),
                     c("12-08 2022(9999999)"),
-                    c("a super long msg, so long it can't even fit in, what a terrible tragdy..."),
+                    c("a super long 測試msg, so long this 測試訊息 can't even fit in, what a terrible測試的tragdy..."),
+                ]);
+                t.add_row(vec![
+                    c(NAME),
+                    c("another"),
+                    c("12-08 2022"),
+                    c("12-08 2022"),
+                    c("a super long msg, so long it can't even fit in, but luckily there's no unicode..."),
+                ]);
+                t.add_row(vec![
+                    c(NAME),
+                    c("docker"),
+                    c("12-08 2022"),
+                    c("12-08 2022(9999999)"),
+                    c("測試測試測試測試測試測試測試測試測試測試測試測試測試測試測試測試"),
                 ]);
             }
             let s = t.display().to_string();
-            assert_eq!(s.matches(NAME).count(), 10, "name shouldn't break...");
+            assert_eq!(s.matches(NAME).count(), 15, "name shouldn't break...");
             println!("{}", s);
             s.lines().count()
         }
@@ -311,9 +326,9 @@ mod test {
             one_test(i * i * 4);
         }
 
-        assert_eq!(one_test(0), 11);
-        assert_eq!(one_test(50), 11, "screen too small, should fall back");
-        assert_ne!(one_test(100), 11, "should be multi lines!");
-        assert_eq!(one_test(400), 11);
+        assert_eq!(one_test(0), 16);
+        assert_eq!(one_test(50), 16, "screen too small, should fall back");
+        assert_ne!(one_test(100), 16, "should be multi lines!");
+        assert_eq!(one_test(400), 16);
     }
 }

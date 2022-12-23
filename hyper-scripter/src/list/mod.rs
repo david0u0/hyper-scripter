@@ -5,6 +5,7 @@ mod grid;
 pub use grid::Grid;
 
 mod table_lib;
+mod time_fmt;
 mod tree;
 mod tree_lib;
 
@@ -12,8 +13,6 @@ use crate::{
     error::{DisplayError, DisplayResult, Result},
     query::ListQuery,
     script::ScriptInfo,
-    script_time::ScriptTime,
-    state::State,
 };
 use chrono::{Datelike, Local, TimeZone, Utc};
 use colored::{ColoredString, Colorize};
@@ -21,23 +20,6 @@ use serde::Serialize;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
-
-static THIS_YEAR: State<i32> = State::new();
-
-fn init_this_year() {
-    let now = Utc::now().naive_local();
-    THIS_YEAR.set(now.year());
-}
-
-// TODO: return something impl Display?
-fn fmt_time<T>(time: &ScriptTime<T>) -> String {
-    let local_time = Local.from_utc_datetime(&**time);
-    if time.year() == *THIS_YEAR.get() {
-        format!("{}", local_time.format("%m-%d %H:%M"))
-    } else {
-        format!("{}", local_time.format("%m-%d %Y"))
-    }
-}
 
 fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
     fn inner(buff: &mut String, script: &ScriptInfo) -> Result {
@@ -59,7 +41,7 @@ fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
 fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {
     match &script.exec_time {
         None => Cow::Borrowed("Never"),
-        Some(t) => Cow::Owned(format!("{}({})", fmt_time(t), script.exec_count)),
+        Some(t) => Cow::Owned(format!("{} ({})", time_fmt::fmt(t), script.exec_count)),
     }
 }
 

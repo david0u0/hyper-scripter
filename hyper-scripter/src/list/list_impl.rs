@@ -1,7 +1,7 @@
 use super::{
-    exec_time_str, extract_help, fmt_time, get_screen_width, init_this_year, style,
+    exec_time_str, extract_help, get_screen_width, style,
     table_lib::{Cell, Collumn, Table},
-    tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions,
+    time_fmt, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions,
 };
 use crate::error::Result;
 use crate::query::do_list_query;
@@ -72,7 +72,7 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
         display_style: match opt.display_style {
             DisplayStyle::Short(style, _) => DisplayStyle::Short(style, t),
             DisplayStyle::Long(_) => {
-                init_this_year();
+                time_fmt::init();
                 let mut table = Table::new(gen_title());
                 table.set_width(get_screen_width());
                 DisplayStyle::Long(table)
@@ -108,7 +108,7 @@ pub fn fmt_meta(
             let name = script.name.key();
             let name_width = name.len() + 2;
             let name_txt = format!(
-                "{} {}",
+                " {}{}",
                 last_txt,
                 style(opt.plain, name, |s| s.color(color).bold()),
             );
@@ -123,7 +123,7 @@ pub fn fmt_meta(
             let row = vec![
                 Cell::new_with_len(name_txt, name_width),
                 Cell::new_with_len(ty_txt.to_string(), ty_width),
-                Cell::new(fmt_time(&script.write_time)),
+                Cell::new(time_fmt::fmt(&script.write_time)),
                 Cell::new(exec_time_str(script).to_string()),
                 Cell::new(help_msg),
             ];
@@ -201,11 +201,11 @@ impl<'a, I: ExactSizeIterator<Item = &'a ScriptInfo>> ScriptsEither<'a, I> {
 
 fn gen_title() -> Vec<Collumn> {
     vec![
-        Collumn::new_fixed("script"),
-        Collumn::new_fixed("type"),
-        Collumn::new("write"),
-        Collumn::new("execute"),
-        Collumn::new("help message"),
+        Collumn::new_fixed("Script"),
+        Collumn::new_fixed("Type"),
+        Collumn::new("Write"),
+        Collumn::new("Execute"),
+        Collumn::new("Help Message"),
     ]
 }
 

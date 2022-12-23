@@ -828,6 +828,7 @@ dependencies = [
  "term_grid",
  "tokio",
  "toml",
+ "unicode-width",
 ]
 
 [[package]]

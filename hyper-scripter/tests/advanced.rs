@@ -149,6 +149,7 @@ fn test_type_select() {
 
 #[test]
 fn test_prev_env() {
+    let _g = setup();
     const MY_ENV: &str = "MY_ENV";
     const MY_OTHER_ENV: &str = "MY_OTHER_ENV";
     const MY_ENV_HELP: &str = "MY_ENV_HELP";

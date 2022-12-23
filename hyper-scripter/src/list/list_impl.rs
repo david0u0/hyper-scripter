@@ -1,6 +1,7 @@
 use super::{
-    exec_time_str, extract_help, fmt_time, init_this_year, style, tree, DisplayIdentStyle,
-    DisplayStyle, Grid, Grouping, ListOptions,
+    exec_time_str, extract_help, get_screen_width, style,
+    table_lib::{Cell, Collumn, Table},
+    time_fmt, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions,
 };
 use crate::error::Result;
 use crate::query::do_list_query;
@@ -10,7 +11,6 @@ use crate::tag::Tag;
 use crate::util::get_display_type;
 use colored::{Color, Colorize};
 use fxhash::FxHashMap as HashMap;
-use prettytable::{cell, format, row, Cell, Row, Table};
 use std::cmp::Reverse;
 use std::fmt::Write as FmtWrite;
 use std::hash::Hash;
@@ -72,12 +72,9 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
         display_style: match opt.display_style {
             DisplayStyle::Short(style, _) => DisplayStyle::Short(style, t),
             DisplayStyle::Long(_) => {
-                init_this_year();
-                let mut table = Table::new();
-                if opt.grouping != Grouping::Tree {
-                    table.set_titles(Row::new(TITLE.iter().map(|t| cell!(c->t)).collect()));
-                }
-                table.set_format(*format::consts::FORMAT_CLEAN);
+                time_fmt::init();
+                let mut table = Table::new(gen_title());
+                table.set_width(get_screen_width());
                 DisplayStyle::Long(table)
             }
         },
@@ -102,22 +99,33 @@ pub fn fmt_meta(
     let color = ty.color();
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
+            // TODO: 整合長短的名字顯示法？
             let last_txt = if is_latest && !opt.plain {
                 "*".color(Color::Yellow).bold()
             } else {
                 " ".normal()
             };
+            let name = script.name.key();
+            let name_width = name.len() + 2;
             let name_txt = format!(
-                "{} {}",
+                " {}{}",
                 last_txt,
-                style(opt.plain, script.name.key(), |s| s.color(color).bold()),
+                style(opt.plain, name, |s| s.color(color).bold()),
             );
-            let ty_txt = style(opt.plain, ty.display(), |s| s.color(color).bold());
 
-            let mut buff = String::new();
-            let help_msg = extract_help(&mut buff, script);
+            let ty = ty.display();
+            let ty_width = ty.len();
+            let ty_txt = style(opt.plain, ty, |s| s.color(color).bold());
 
-            let row = row![name_txt, c->ty_txt, c->fmt_time(&script.write_time), c->exec_time_str(script), help_msg];
+            let help_msg = extract_help(script);
+
+            let row = vec![
+                Cell::new_with_len(name_txt, name_width),
+                Cell::new_with_len(ty_txt.to_string(), ty_width),
+                Cell::new(time_fmt::fmt(&script.write_time)),
+                Cell::new(exec_time_str(script).to_string()),
+                Cell::new(help_msg),
+            ];
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, grid) => {
@@ -128,6 +136,7 @@ pub fn fmt_meta(
                 write!(display_str, "{}", "*".color(Color::Yellow).bold())?;
             }
             let ident = ident_string(ident_style, &*ty.display(), script);
+            width += ident.len();
             let ident = style(opt.plain, ident, |s| {
                 let s = s.color(color).bold();
                 if is_latest {
@@ -136,7 +145,6 @@ pub fn fmt_meta(
                     s
                 }
             });
-            width += ident.chars().count();
             write!(display_str, "{}", ident)?;
             grid.add(display_str, width);
         }
@@ -190,7 +198,16 @@ impl<'a, I: ExactSizeIterator<Item = &'a ScriptInfo>> ScriptsEither<'a, I> {
     }
 }
 
-const TITLE: &[&str] = &["name", "type", "write", "execute", "help message"];
+fn gen_title() -> Vec<Collumn> {
+    vec![
+        Collumn::new_fixed("Script"),
+        Collumn::new_fixed("Type"),
+        Collumn::new("Write"),
+        Collumn::new("Execute"),
+        Collumn::new("Help Message"),
+    ]
+}
+
 pub async fn fmt_list<W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,
@@ -251,10 +268,15 @@ pub async fn fmt_list<W: Write>(
 
             for (tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {
-                    let tags_txt = style(opt.plain, tags.to_string(), |s| s.dimmed().italic());
+                    let tags = tags.to_string();
+                    let tags_width = tags.len();
+                    let tags_txt = style(opt.plain, tags, |s| s.dimmed().italic());
                     match &mut opt.display_style {
                         DisplayStyle::Long(table) => {
-                            table.add_row(Row::new(vec![Cell::new(&tags_txt.to_string())]));
+                            table.add_row(vec![Cell::new_with_len(
+                                tags_txt.to_string(),
+                                tags_width,
+                            )]);
                         }
                         DisplayStyle::Short(_, _) => {
                             writeln!(w, "{}", tags_txt)?;
@@ -266,8 +288,9 @@ pub async fn fmt_list<W: Write>(
             final_table = extract_table(opt);
         }
     }
-    if let Some(table) = final_table {
-        table.print(w)?;
+    if let Some(mut table) = final_table {
+        write!(w, "{}", table.display())?;
+        log::debug!("tree table: {:?}", table);
     }
     Ok(())
 }

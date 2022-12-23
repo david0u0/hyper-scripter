@@ -1,3 +1,4 @@
+use super::get_screen_width;
 use term_grid::{Cell, Direction, Filling, Grid as LibGrid, GridOptions};
 
 pub struct Grid {
@@ -28,7 +29,7 @@ impl Grid {
     }
     pub fn fit_into_screen<'a>(&'a mut self) -> impl std::fmt::Display + 'a {
         if self.term_width.is_none() {
-            let w = console::Term::stdout().size_checked().map_or(0, |s| s.1);
+            let w = get_screen_width();
             self.term_width = Some(w as usize);
         }
 

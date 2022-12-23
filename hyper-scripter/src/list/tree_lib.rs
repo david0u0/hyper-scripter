@@ -96,10 +96,8 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
         let list_len = list.len();
 
         for node in list.iter_mut().take(list_len - 1) {
-            writeln!(f)?;
             self.fmt_with(f, node, opt, false)?;
         }
-        writeln!(f)?;
         self.fmt_with(f, list.last_mut().unwrap(), opt, true)?;
         Ok(())
     }
@@ -161,7 +159,6 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
     fn fmt_all(&mut self, f: &mut W, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
         for mut root in forest {
             self.fmt(f, &mut root)?;
-            writeln!(f)?;
         }
         Ok(())
     }
@@ -204,12 +201,12 @@ mod test {
     impl<'a, W: Write> TreeFormatter<'a, &'a String, W> for Fmter {
         fn fmt_leaf(&mut self, f: &mut W, t: &&String) -> Result {
             self.counter += 1;
-            write!(f, "{} {}", t, self.counter)?;
+            writeln!(f, "{} {}", t, self.counter)?;
             Ok(())
         }
         fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
             self.counter += 2;
-            write!(f, "{}_{}", t, self.counter)?;
+            writeln!(f, "{}_{}", t, self.counter)?;
             Ok(())
         }
     }
@@ -253,8 +250,9 @@ aaa_2
     └── yyy_20
         ├── 2 21
         └── zzz_23
-            └── 7 24"
-            .trim();
+            └── 7 24
+"
+        .trim_start();
         let mut v8 = Vec::<u8>::new();
         fmter.fmt(&mut v8, &mut root).unwrap();
         assert_eq!(std::str::from_utf8(&v8).unwrap(), ans);

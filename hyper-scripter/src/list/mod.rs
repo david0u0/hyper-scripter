@@ -4,6 +4,8 @@ pub use list_impl::*;
 mod grid;
 pub use grid::Grid;
 
+mod table_lib;
+mod time_fmt;
 mod tree;
 mod tree_lib;
 
@@ -11,54 +13,35 @@ use crate::{
     error::{DisplayError, DisplayResult, Result},
     query::ListQuery,
     script::ScriptInfo,
-    script_time::ScriptTime,
-    state::State,
 };
-use chrono::{Datelike, Local, TimeZone, Utc};
 use colored::{ColoredString, Colorize};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-static THIS_YEAR: State<i32> = State::new();
-
-fn init_this_year() {
-    let now = Utc::now().naive_local();
-    THIS_YEAR.set(now.year());
-}
-
-// TODO: return something impl Display?
-fn fmt_time<T>(time: &ScriptTime<T>) -> String {
-    let local_time = Local.from_utc_datetime(&**time);
-    if time.year() == *THIS_YEAR.get() {
-        format!("{}", local_time.format("%m-%d %H:%M"))
-    } else {
-        format!("{}", local_time.format("%m-%d %Y"))
-    }
-}
-
-fn extract_help<'a>(buff: &'a mut String, script: &ScriptInfo) -> &'a str {
+fn extract_help(script: &ScriptInfo) -> String {
+    let mut buff = String::new();
     fn inner(buff: &mut String, script: &ScriptInfo) -> Result {
         let script_path = crate::path::open_script(&script.name, &script.ty, Some(true))?;
         *buff = crate::util::read_file(&script_path)?;
         Ok(())
     }
-    match inner(buff, script) {
+    match inner(&mut buff, script) {
         Err(e) => {
             log::warn!("讀取腳本失敗{}，直接回空的幫助字串", e);
-            return "";
+            return String::new();
         }
-        Ok(p) => p,
+        Ok(()) => (),
     };
-    let mut helps = crate::extract_msg::extract_help_from_content(buff);
-    helps.next().unwrap_or_default()
+    let mut helps = crate::extract_msg::extract_help_from_content(&buff);
+    helps.next().unwrap_or_default().to_owned()
 }
 
 fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {
     match &script.exec_time {
         None => Cow::Borrowed("Never"),
-        Some(t) => Cow::Owned(format!("{}({})", fmt_time(t), script.exec_count)),
+        Some(t) => Cow::Owned(format!("{} ({})", time_fmt::fmt(t), script.exec_count)),
     }
 }
 
@@ -124,4 +107,8 @@ fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
     } else {
         s
     }
+}
+
+pub fn get_screen_width() -> u16 {
+    console::Term::stdout().size_checked().map_or(0, |s| s.1)
 }

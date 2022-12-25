@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+def run_cmd(cmd)
+  output = `#{cmd}`
+  raise StandardError, "Command `#{cmd}` exit with #{$CHILD_STATUS.exitstatus}" unless $CHILD_STATUS.success?
+  output
+end
+
 require 'English'
 class HSEnv
   ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID',
@@ -18,10 +24,7 @@ class HSEnv
 
   def do_hs(arg, all, envs = [])
     cmd = hs_command_str(arg, all, envs)
-    output = `#{cmd}`
-    raise StandardError, "Hyper scripter exits with #{$CHILD_STATUS.exitstatus}" unless $CHILD_STATUS.success?
-
-    output
+    run_cmd(cmd)
   end
 
   def system_hs(arg, all, envs = [])

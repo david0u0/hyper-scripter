@@ -1,4 +1,5 @@
 // TODO: change all `String` to `Cow`?
+use colored::Colorize;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use unicode_width::UnicodeWidthStr;
 
@@ -60,6 +61,7 @@ pub struct Table {
     rows: Vec<Vec<Cell>>,
     cols: Vec<Collumn>,
     width: u16,
+    plain: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -74,7 +76,11 @@ impl Table {
             rows: vec![],
             cols,
             width: 0,
+            plain: true,
         }
+    }
+    pub fn set_plain(&mut self, plain: bool) {
+        self.plain = plain;
     }
     pub fn add_row(&mut self, row: Vec<Cell>) {
         fn set_max(og: &mut usize, new: usize) {
@@ -225,13 +231,18 @@ impl<'a> Display for DisplayTable<'a> {
             }
             let len = col.name.width();
             let (content, len) = if !give_up && !col.is_fixed_this_time && avg < len {
-                // TODO: more lines!
+                // TODO: more lines?
                 (&col.name[0..avg], avg)
             } else {
                 (&col.name[..], len)
             };
 
-            write!(w, "{}", content)?;
+            if table.plain {
+                write!(w, "{}", content)?;
+            } else {
+                write!(w, "{}", content.underline())?;
+            }
+
             cur_pos = col.start_pos_this_time + len;
         }
         for row in table.rows.iter() {

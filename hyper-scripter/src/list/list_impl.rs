@@ -75,6 +75,7 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
                 time_fmt::init();
                 let mut table = Table::new(gen_title());
                 table.set_width(get_screen_width());
+                table.set_plain(opt.plain);
                 DisplayStyle::Long(table)
             }
         },

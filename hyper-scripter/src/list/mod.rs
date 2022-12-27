@@ -14,11 +14,56 @@ use crate::{
     query::ListQuery,
     script::ScriptInfo,
 };
-use colored::{ColoredString, Colorize};
+use colored::{Color, ColoredString, Colorize};
 use serde::Serialize;
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
+
+#[derive(Clone, Copy, Debug)]
+struct LatestTxt(&'static str, &'static str);
+const SHORT_LATEST_TXT: LatestTxt = LatestTxt("*", "");
+const LONG_LATEST_TXT: LatestTxt = LatestTxt(" *", "  ");
+
+fn style_name_w<W: Write>(
+    mut w: W,
+    plain: bool,
+    is_latest: bool,
+    latest_txt: LatestTxt,
+    color: Color,
+    name: &str,
+) -> Result<usize> {
+    let mut width = name.len();
+    let last_txt = if is_latest && !plain {
+        write!(w, "{}", latest_txt.0.color(Color::Yellow).bold())?;
+        width += latest_txt.0.len();
+    } else {
+        write!(w, "{}", latest_txt.1)?;
+        width += latest_txt.1.len();
+    };
+    let name = style(plain, name, |s| {
+        let s = s.color(color).bold();
+        if is_latest {
+            s.underline()
+        } else {
+            s
+        }
+    });
+    write!(w, "{}", name)?;
+    Ok(width)
+}
+fn style_name(
+    plain: bool,
+    is_latest: bool,
+    latest_txt: LatestTxt,
+    color: Color,
+    name: &str,
+) -> Result<(String, usize)> {
+    let mut s = String::new();
+    let width = style_name_w(&mut s, plain, is_latest, latest_txt, color, name)?;
+    Ok((s, width))
+}
 
 fn extract_help(script: &ScriptInfo) -> String {
     let mut buff = String::new();

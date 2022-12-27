@@ -1,14 +1,14 @@
 use super::{
-    exec_time_str, extract_help, style,
+    exec_time_str, extract_help, style, style_name, style_name_w,
     table_lib::{Cell, Table},
     time_fmt,
     tree_lib::{self, TreeFormatter},
-    DisplayIdentStyle, DisplayStyle, ListOptions,
+    DisplayIdentStyle, DisplayStyle, ListOptions, SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::script::ScriptInfo;
 use crate::util::get_display_type;
-use colored::{Color, Colorize};
+use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -57,10 +57,13 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatte
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
         let ident = ident_string(self.ident_style, &*ty.display(), t);
-        let ident = style(self.plain, ident, |s| s.color(ty.color()).bold());
-        if self.latest_script_id == script.id && !self.plain {
-            write!(f, "{}", "*".color(Color::Yellow).bold())?;
-        }
+        let (ident, _) = style_name(
+            self.plain,
+            self.latest_script_id == script.id,
+            SHORT_LATEST_TXT,
+            ty.color(),
+            &ident,
+        )?;
         writeln!(f, "{}", ident)?;
         Ok(())
     }
@@ -77,17 +80,22 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, Vec<u8>> for LongFormatter<'b>
         let ty = get_display_type(&script.ty);
         let color = ty.color();
 
-        let mut ident_width = {
+        let (mut ident_txt, mut ident_width) = {
             let t = std::str::from_utf8(&f)?;
-            t.width()
+            (t.to_owned(), t.width())
         };
-        ident_width += name.len();
-        let ident = style(self.plain, name, |s| s.color(color).bold());
-        if self.latest_script_id == script.id && !self.plain {
-            write!(f, "{}", "*".color(Color::Yellow).bold())?;
-            ident_width += 1;
+        f.clear();
+        {
+            let name_width = style_name_w(
+                &mut ident_txt,
+                self.plain,
+                self.latest_script_id == script.id,
+                SHORT_LATEST_TXT,
+                ty.color(),
+                &name,
+            )?;
+            ident_width += name_width;
         }
-        write!(f, "{}", ident)?;
 
         let ty = ty.display();
         let ty_width = ty.len();
@@ -96,14 +104,13 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, Vec<u8>> for LongFormatter<'b>
         let help_msg = extract_help(script);
 
         let row = vec![
-            Cell::new_with_len(std::str::from_utf8(&f)?.to_string(), ident_width),
+            Cell::new_with_len(ident_txt, ident_width),
             Cell::new_with_len(ty_txt.to_string(), ty_width),
             Cell::new(time_fmt::fmt(&script.write_time)),
             Cell::new(exec_time_str(script).to_string()),
             Cell::new(help_msg),
         ];
         self.table.add_row(row);
-        f.clear();
         Ok(())
     }
     fn fmt_nonleaf(&mut self, f: &mut Vec<u8>, name: &str) -> Result {

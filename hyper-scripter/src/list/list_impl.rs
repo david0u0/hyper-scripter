@@ -1,7 +1,8 @@
 use super::{
-    exec_time_str, extract_help, get_screen_width, style,
+    exec_time_str, extract_help, get_screen_width, style, style_name,
     table_lib::{Cell, Collumn, Table},
-    time_fmt, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions,
+    time_fmt, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions, LONG_LATEST_TXT,
+    SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::query::do_list_query;
@@ -9,7 +10,7 @@ use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::get_display_type;
-use colored::{Color, Colorize};
+use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::cmp::Reverse;
 use std::fmt::Write as FmtWrite;
@@ -100,20 +101,13 @@ pub fn fmt_meta(
     let color = ty.color();
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
-            // TODO: 整合長短的名字顯示法？
-            let last_txt = if is_latest && !opt.plain {
-                "*".color(Color::Yellow).bold()
-            } else {
-                " ".normal()
-            };
-            let name = script.name.key();
-            let name_width = name.len() + 2;
-            let name_txt = format!(
-                " {}{}",
-                last_txt,
-                style(opt.plain, name, |s| s.color(color).bold()),
-            );
-
+            let (name_txt, name_width) = style_name(
+                opt.plain,
+                is_latest,
+                LONG_LATEST_TXT,
+                color,
+                &script.name.key(),
+            )?;
             let ty = ty.display();
             let ty_width = ty.len();
             let ty_txt = style(opt.plain, ty, |s| s.color(color).bold());
@@ -130,24 +124,9 @@ pub fn fmt_meta(
             table.add_row(row);
         }
         DisplayStyle::Short(ident_style, grid) => {
-            let mut display_str = String::new();
-            let mut width = 0;
-            if is_latest && !opt.plain {
-                width += 1;
-                write!(display_str, "{}", "*".color(Color::Yellow).bold())?;
-            }
             let ident = ident_string(ident_style, &*ty.display(), script);
-            width += ident.len();
-            let ident = style(opt.plain, ident, |s| {
-                let s = s.color(color).bold();
-                if is_latest {
-                    s.underline()
-                } else {
-                    s
-                }
-            });
-            write!(display_str, "{}", ident)?;
-            grid.add(display_str, width);
+            let (ident, width) = style_name(opt.plain, is_latest, SHORT_LATEST_TXT, color, &ident)?;
+            grid.add(ident, width);
         }
     }
     Ok(())

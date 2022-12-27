@@ -5,7 +5,8 @@ use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Utc};
 static NOW: State<NaiveDateTime> = State::new();
 
 pub fn init() {
-    let now = Utc::now().naive_local();
+    let now = Local::now().naive_local();
+    log::debug!("now = {:?}", now);
     NOW.set(now);
 }
 
@@ -13,6 +14,7 @@ pub fn init() {
 pub fn fmt<T>(time: &ScriptTime<T>) -> String {
     let time = Local.from_utc_datetime(&**time).naive_local();
     let now = NOW.get();
+    log::debug!("time = {:?}", time);
 
     if now.date() == time.date() {
         format!("{}", time.format("%H:%M"))

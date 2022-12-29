@@ -1,8 +1,8 @@
 use super::{
-    exec_time_str, extract_help, style, style_name, style_name_w,
+    exec_time_str, extract_help, style, style_name_w,
     table_lib::{Cell, Table},
     time_fmt,
-    tree_lib::{self, TreeFormatter},
+    tree_lib::{self, LeadingDisplay, TreeFormatter},
     DisplayIdentStyle, DisplayStyle, ListOptions, SHORT_LATEST_TXT,
 };
 use crate::error::Result;
@@ -12,10 +12,12 @@ use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use unicode_width::UnicodeWidthStr;
 
-struct ShortFormatter {
+struct ShortFormatter<W: Write> {
+    w: W,
     plain: bool,
     ident_style: DisplayIdentStyle,
     latest_script_id: i64,
@@ -52,48 +54,47 @@ impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
         }
     }
 }
-impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, W> for ShortFormatter {
-    fn fmt_leaf(&mut self, f: &mut W, t: &TrimmedScriptInfo<'b>) -> Result {
+impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>> for ShortFormatter<W> {
+    fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
         let ident = ident_string(self.ident_style, &*ty.display(), t);
-        let (ident, _) = style_name(
+        write!(self.w, "{}", l)?;
+        style_name_w!(
+            self.w,
             self.plain,
             self.latest_script_id == script.id,
             SHORT_LATEST_TXT,
             ty.color(),
-            &ident,
-        )?;
-        writeln!(f, "{}", ident)?;
+            &ident
+        );
+        writeln!(self.w, "")?;
         Ok(())
     }
-    fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
+    fn fmt_nonleaf(&mut self, l: LeadingDisplay, t: &str) -> Result {
         let ident = style(self.plain, t, |s| s.dimmed().italic());
-        writeln!(f, "{}", ident)?;
+        writeln!(self.w, "{}{}", l, ident)?;
         Ok(())
     }
 }
 
-impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, Vec<u8>> for LongFormatter<'b> {
-    fn fmt_leaf(&mut self, f: &mut Vec<u8>, t: &TrimmedScriptInfo<'b>) -> Result {
+impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
+    fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(name, script) = t;
         let ty = get_display_type(&script.ty);
         let color = ty.color();
 
-        let (mut ident_txt, mut ident_width) = {
-            let t = std::str::from_utf8(&f)?;
-            (t.to_owned(), t.width())
-        };
-        f.clear();
+        let mut ident_txt = l.to_string();
+        let mut ident_width = ident_txt.width();
         {
-            let name_width = style_name_w(
+            let name_width = style_name_w!(
                 &mut ident_txt,
                 self.plain,
                 self.latest_script_id == script.id,
                 SHORT_LATEST_TXT,
                 ty.color(),
-                &name,
-            )?;
+                &name
+            );
             ident_width += name_width;
         }
 
@@ -113,20 +114,14 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, Vec<u8>> for LongFormatter<'b>
         self.table.add_row(row);
         Ok(())
     }
-    fn fmt_nonleaf(&mut self, f: &mut Vec<u8>, name: &str) -> Result {
-        let mut ident_width = {
-            let t = std::str::from_utf8(&f)?;
-            t.width()
-        };
-        let ident = style(self.plain, name, |s| s.dimmed().italic());
+    fn fmt_nonleaf(&mut self, l: LeadingDisplay, name: &str) -> Result {
+        let mut ident_txt = l.to_string();
+        let mut ident_width = ident_txt.width();
+        let name = style(self.plain, name, |s| s.dimmed().italic());
         ident_width += name.len();
-        write!(f, "{}", ident)?;
-        let row = vec![Cell::new_with_len(
-            std::str::from_utf8(&f)?.to_string(),
-            ident_width,
-        )];
+        write!(&mut ident_txt, "{}", name)?;
+        let row = vec![Cell::new_with_len(ident_txt, ident_width)];
         self.table.add_row(row);
-        f.clear();
         Ok(())
     }
 }
@@ -170,16 +165,16 @@ pub fn fmt<W: Write>(
                 latest_script_id,
                 table,
             };
-            let mut buff = Vec::<u8>::new();
-            fmter.fmt_all(&mut buff, forest.into_iter())?;
+            fmter.fmt_all(forest.into_iter())?;
         }
         DisplayStyle::Short(ident_style, w) => {
             let mut fmter = ShortFormatter {
+                w,
                 plain: opt.plain,
                 ident_style: *ident_style,
                 latest_script_id,
             };
-            fmter.fmt_all(w, forest.into_iter())?;
+            fmter.fmt_all(forest.into_iter())?;
         }
     }
     Ok(())
@@ -226,6 +221,7 @@ mod test {
         ]);
         let forest = build_forest(scripts.iter().collect());
         let mut fmter = ShortFormatter {
+            w: Vec::<u8>::new(),
             plain: true,
             ident_style: DisplayIdentStyle::Normal,
             latest_script_id: 1,
@@ -249,8 +245,7 @@ bbb
         └── rrr(tmux)
 "
         .trim();
-        let mut v8 = Vec::<u8>::new();
-        fmter.fmt_all(&mut v8, forest.into_iter()).unwrap();
-        assert_eq!(std::str::from_utf8(&v8).unwrap().trim(), ans);
+        fmter.fmt_all(forest.into_iter()).unwrap();
+        assert_eq!(std::str::from_utf8(&fmter.w).unwrap().trim(), ans);
     }
 }

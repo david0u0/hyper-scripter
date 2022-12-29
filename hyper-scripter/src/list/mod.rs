@@ -26,33 +26,31 @@ struct LatestTxt(&'static str, &'static str);
 const SHORT_LATEST_TXT: LatestTxt = LatestTxt("*", "");
 const LONG_LATEST_TXT: LatestTxt = LatestTxt(" *", "  ");
 
-fn style_name_w<W: Write>(
-    mut w: W,
-    plain: bool,
-    is_latest: bool,
-    latest_txt: LatestTxt,
-    color: Color,
-    name: &str,
-) -> Result<usize> {
-    let mut width = name.len();
-    let last_txt = if is_latest && !plain {
-        write!(w, "{}", latest_txt.0.color(Color::Yellow).bold())?;
-        width += latest_txt.0.len();
-    } else {
-        write!(w, "{}", latest_txt.1)?;
-        width += latest_txt.1.len();
-    };
-    let name = style(plain, name, |s| {
-        let s = s.color(color).bold();
-        if is_latest {
-            s.underline()
+macro_rules! style_name_w {
+    ($w:expr, $plain:expr, $is_latest:expr, $latest_txt:expr, $color:expr, $name:expr) => {{
+        use colored::{Color, Colorize};
+        let mut width = $name.len();
+        if $is_latest && !$plain {
+            write!($w, "{}", $latest_txt.0.color(Color::Yellow).bold())?;
+            width += $latest_txt.0.len();
         } else {
-            s
+            write!($w, "{}", $latest_txt.1)?;
+            width += $latest_txt.1.len();
         }
-    });
-    write!(w, "{}", name)?;
-    Ok(width)
+        let name = style($plain, $name, |s| {
+            let s = s.color($color).bold();
+            if $is_latest {
+                s.underline()
+            } else {
+                s
+            }
+        });
+        write!($w, "{}", name)?;
+        width
+    }};
 }
+pub(crate) use style_name_w;
+
 fn style_name(
     plain: bool,
     is_latest: bool,
@@ -61,7 +59,7 @@ fn style_name(
     name: &str,
 ) -> Result<(String, usize)> {
     let mut s = String::new();
-    let width = style_name_w(&mut s, plain, is_latest, latest_txt, color, name)?;
+    let width = style_name_w!(&mut s, plain, is_latest, latest_txt, color, name);
     Ok((s, width))
 }
 
@@ -141,16 +139,15 @@ pub struct ListOptions<T = (), U = ()> {
 }
 
 #[inline]
-fn style<T: AsRef<str>, F: FnOnce(ColoredString) -> ColoredString>(
+fn style<T: AsRef<str>, F: for<'a> FnOnce(&'a str) -> ColoredString>(
     plain: bool,
     s: T,
     f: F,
 ) -> ColoredString {
-    let s = s.as_ref().normal();
-    if !plain {
-        f(s)
+    if plain {
+        s.as_ref().normal()
     } else {
-        s
+        f(s.as_ref())
     }
 }
 

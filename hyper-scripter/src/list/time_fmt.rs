@@ -1,6 +1,6 @@
 use crate::script_time::ScriptTime;
 use crate::state::State;
-use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Utc};
+use chrono::{Datelike, Local, NaiveDateTime, TimeZone};
 
 static NOW: State<NaiveDateTime> = State::new();
 

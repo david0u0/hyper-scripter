@@ -13,7 +13,6 @@ use crate::util::get_display_type;
 use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::cmp::Reverse;
-use std::fmt::Write as FmtWrite;
 use std::hash::Hash;
 use std::io::Write;
 

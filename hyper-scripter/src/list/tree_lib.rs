@@ -2,8 +2,7 @@ use crate::error::Result;
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::io::Write;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 pub trait TreeValue<'b> {
     fn tree_cmp(&self, other: &Self) -> Ordering;
@@ -82,12 +81,40 @@ pub struct TreeFmtOption {
     is_done: Vec<bool>,
 }
 
-pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
-    fn fmt_leaf(&mut self, f: &mut W, t: &T) -> Result;
-    fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result;
+pub enum LeadingDisplay<'a> {
+    Some {
+        opt: &'a TreeFmtOption,
+        self_is_end: bool,
+    },
+    None,
+}
+
+impl Display for LeadingDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if let LeadingDisplay::Some { opt, self_is_end } = self {
+            for is_done in opt.is_done.iter().take(opt.is_done.len() - 1) {
+                if *is_done {
+                    write!(f, "    ")?;
+                } else {
+                    write!(f, "│   ")?;
+                }
+            }
+            if !self_is_end {
+                write!(f, "├── ")?;
+            } else {
+                write!(f, "└── ")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub trait TreeFormatter<'a, T: TreeValue<'a>> {
+    fn fmt_leaf(&mut self, leading: LeadingDisplay<'_>, t: &T) -> Result;
+    fn fmt_nonleaf(&mut self, leading: LeadingDisplay<'_>, t: &str) -> Result;
 
     #[doc(hidden)]
-    fn fmt_lists(&mut self, f: &mut W, map: &mut Childs<'a, T>, opt: &mut TreeFmtOption) -> Result {
+    fn fmt_lists(&mut self, map: &mut Childs<'a, T>, opt: &mut TreeFmtOption) -> Result {
         if map.is_empty() {
             panic!("非葉節點至少要有一個兒子！");
         }
@@ -96,15 +123,14 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
         let list_len = list.len();
 
         for node in list.iter_mut().take(list_len - 1) {
-            self.fmt_with(f, node, opt, false)?;
+            self.fmt_with(node, opt, false)?;
         }
-        self.fmt_with(f, list.last_mut().unwrap(), opt, true)?;
+        self.fmt_with(list.last_mut().unwrap(), opt, true)?;
         Ok(())
     }
     #[doc(hidden)]
     fn fmt_with(
         &mut self,
-        f: &mut W,
         node: &mut TreeNode<'a, T>,
         opt: &mut TreeFmtOption,
         self_is_end: bool,
@@ -115,39 +141,32 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
             opt,
             self_is_end
         );
-        for is_done in opt.is_done.iter().take(opt.is_done.len() - 1) {
-            if *is_done {
-                write!(f, "    ")?;
-            } else {
-                write!(f, "│   ")?;
-            }
-        }
-        if !self_is_end {
-            write!(f, "├── ")?;
-        } else {
-            write!(f, "└── ")?;
-            *opt.is_done.last_mut().unwrap() = true;
-        }
+        let leading = LeadingDisplay::Some { opt, self_is_end };
         match node {
             TreeNode::Leaf(leaf) => {
-                self.fmt_leaf(f, leaf)?;
+                self.fmt_leaf(leading, leaf)?;
+                if self_is_end {
+                    *opt.is_done.last_mut().unwrap() = true;
+                }
             }
             TreeNode::NonLeaf { value, childs } => {
+                self.fmt_nonleaf(leading, value)?;
+                if self_is_end {
+                    *opt.is_done.last_mut().unwrap() = true;
+                }
                 opt.is_done.push(false);
-                self.fmt_nonleaf(f, value)?;
-                self.fmt_lists(f, childs, opt)?;
+                self.fmt_lists(childs, opt)?;
                 opt.is_done.pop();
             }
         }
         Ok(())
     }
-    fn fmt(&mut self, f: &mut W, node: &mut TreeNode<'a, T>) -> Result {
+    fn fmt(&mut self, node: &mut TreeNode<'a, T>) -> Result {
         match node {
-            TreeNode::Leaf(leaf) => self.fmt_leaf(f, leaf),
+            TreeNode::Leaf(leaf) => self.fmt_leaf(LeadingDisplay::None, leaf),
             TreeNode::NonLeaf { value, childs } => {
-                self.fmt_nonleaf(f, value)?;
+                self.fmt_nonleaf(LeadingDisplay::None, value)?;
                 self.fmt_lists(
-                    f,
                     childs,
                     &mut TreeFmtOption {
                         is_done: vec![false],
@@ -156,9 +175,9 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>, W: Write> {
             }
         }
     }
-    fn fmt_all(&mut self, f: &mut W, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
+    fn fmt_all(&mut self, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
         for mut root in forest {
-            self.fmt(f, &mut root)?;
+            self.fmt(&mut root)?;
         }
         Ok(())
     }
@@ -195,18 +214,20 @@ mod test {
         }
     }
 
+    #[derive(Default)]
     struct Fmter {
         counter: i32,
+        s: String,
     }
-    impl<'a, W: Write> TreeFormatter<'a, &'a String, W> for Fmter {
-        fn fmt_leaf(&mut self, f: &mut W, t: &&String) -> Result {
+    impl<'a> TreeFormatter<'a, &'a String> for Fmter {
+        fn fmt_leaf(&mut self, l: LeadingDisplay, t: &&String) -> Result {
             self.counter += 1;
-            writeln!(f, "{} {}", t, self.counter)?;
+            self.s += &format!("{}{} {}\n", l, t, self.counter);
             Ok(())
         }
-        fn fmt_nonleaf(&mut self, f: &mut W, t: &str) -> Result {
+        fn fmt_nonleaf(&mut self, l: LeadingDisplay, t: &str) -> Result {
             self.counter += 2;
-            writeln!(f, "{}_{}", t, self.counter)?;
+            self.s += &format!("{}{}_{}\n", l, t, self.counter);
             Ok(())
         }
     }
@@ -232,7 +253,7 @@ mod test {
                 l(&v[1]),
             ],
         );
-        let mut fmter = Fmter { counter: 0 };
+        let mut fmter = Fmter::default();
 
         let ans = "
 aaa_2
@@ -253,8 +274,7 @@ aaa_2
             └── 7 24
 "
         .trim_start();
-        let mut v8 = Vec::<u8>::new();
-        fmter.fmt(&mut v8, &mut root).unwrap();
-        assert_eq!(std::str::from_utf8(&v8).unwrap(), ans);
+        fmter.fmt(&mut root).unwrap();
+        assert_eq!(fmter.s, ans);
     }
 }

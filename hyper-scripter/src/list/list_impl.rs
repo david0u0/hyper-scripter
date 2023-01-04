@@ -116,7 +116,7 @@ pub fn fmt_meta(
             let row = vec![
                 Cell::new_with_len(name_txt, name_width),
                 Cell::new_with_len(ty_txt.to_string(), ty_width),
-                Cell::new(time_fmt::fmt(&script.write_time)),
+                Cell::new(time_fmt::fmt(&script.write_time).to_string()),
                 Cell::new(exec_time_str(script).to_string()),
                 Cell::new(help_msg),
             ];

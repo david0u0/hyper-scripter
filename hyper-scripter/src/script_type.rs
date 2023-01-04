@@ -48,7 +48,7 @@ const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
 
 NAME=${NAME/./_}
-tmux has-session -t $NAME
+tmux has-session -t=$NAME
 if [ $? = 0 ]; then
     echo attach to existing session
     tmux -2 attach-session -t $NAME

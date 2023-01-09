@@ -15,9 +15,25 @@ require_relative './common'
 REAL_HS_HOME = File.realpath(HS_ENV.home)
 Dir.chdir(REAL_HS_HOME)
 GIT_HOME = run_cmd('git rev-parse --show-toplevel').chop
-BRANCH = run_cmd("git rev-parse --abbrev-ref HEAD").chop
+BRANCH = run_cmd('git rev-parse --abbrev-ref HEAD').chop
 REMOTE = 'origin'
 Dir.chdir(GIT_HOME)
+
+def confirm(msg)
+  loop do
+    $stderr.print(msg, ' ')
+    case read_char
+    when 'y', 'Y'
+      warn 'Y'
+      return true
+    when 'n', 'N'
+      warn 'N'
+      return false
+    else
+      warn 'Only Y and N is allowed'
+    end
+  end
+end
 
 def get_branch_state
   ahead = !run_cmd("git rev-list #{REMOTE}/#{BRANCH}..#{BRANCH}").chop.empty?
@@ -38,7 +54,7 @@ warn "branch state = #{branch_state}"
 
 # Check if diverge
 if branch_state == :diverged
-  warn "branch is diverged!"
+  warn 'branch is diverged!'
   exit 1
 end
 
@@ -49,9 +65,9 @@ Dir.foreach(GIT_HOME) do |f|
 
   status = run_cmd("git status #{f} --porcelain")
   unless status.empty?
-    warn "#{f} is not clean:"
     warn status
-    exit 1
+    ok = confirm("#{f} is not clean. Sure to proceed? [Y/N]")
+    exit 1 unless ok
   end
 end
 
@@ -61,7 +77,7 @@ if branch_state == :behind
   system('git stash', exception: true)
   diff = run_cmd("git diff --stat #{REMOTE}/#{BRANCH} #{REAL_HS_HOME}").chop
   unless diff.empty?
-    warn "remote home had changed!"
+    warn 'remote home had changed!'
     warn diff
     system('git stash pop', exception: true)
     exit 1

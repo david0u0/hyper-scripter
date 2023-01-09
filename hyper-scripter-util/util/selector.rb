@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative './common'
 require 'io/console'
 
 RED = "\033[1;31m"
@@ -13,29 +14,6 @@ NC = "\033[0m"
 ENTER = "\r"
 NL = "\n"
 HELP_MSG = "#{GREEN}press h/H for help#{NC}".freeze
-
-def read_char
-  $stdin.echo = false
-  $stdin.raw!
-  input = $stdin.getc.chr
-  if input == "\e"
-    begin
-      input << $stdin.read_nonblock(3)
-    rescue StandardError
-      nil
-    end
-    begin
-      input << $stdin.read_nonblock(2)
-    rescue StandardError
-      nil
-    end
-  end
-  input
-ensure
-  $stdin.echo = true
-  $stdin.cooked!
-  exit 1 if input == "\u0003" # Ctrl-C
-end
 
 def erase_lines(line_count)
   line_count.times do

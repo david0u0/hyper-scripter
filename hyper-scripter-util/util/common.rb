@@ -1,8 +1,33 @@
 # frozen_string_literal: true
 
+def read_char
+  require 'io/console'
+  $stdin.echo = false
+  $stdin.raw!
+  input = $stdin.getc.chr
+  if input == "\e"
+    begin
+      input << $stdin.read_nonblock(3)
+    rescue StandardError
+      nil
+    end
+    begin
+      input << $stdin.read_nonblock(2)
+    rescue StandardError
+      nil
+    end
+  end
+  input
+ensure
+  $stdin.echo = true
+  $stdin.cooked!
+  exit 1 if input == "\u0003" # Ctrl-C
+end
+
 def run_cmd(cmd)
   output = `#{cmd}`
   raise StandardError, "Command `#{cmd}` exit with #{$CHILD_STATUS.exitstatus}" unless $CHILD_STATUS.success?
+
   output
 end
 

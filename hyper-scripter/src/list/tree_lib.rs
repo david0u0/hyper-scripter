@@ -29,6 +29,9 @@ impl<'a, T: TreeValue<'a>> TreeNode<'a, T> {
     pub fn new_leaf(t: T) -> Self {
         TreeNode::Leaf(t)
     }
+    pub fn new_nonleaf(value: &'a str, childs: Childs<'a, T>) -> Self {
+        TreeNode::NonLeaf { value, childs }
+    }
     pub fn key(&self) -> Cow<'a, str> {
         match self {
             TreeNode::Leaf(leaf) => leaf.display_key(),
@@ -94,9 +97,9 @@ impl Display for LeadingDisplay<'_> {
         if let LeadingDisplay::Some { opt, self_is_end } = self {
             for is_done in opt.is_done.iter().take(opt.is_done.len() - 1) {
                 if *is_done {
-                    write!(f, "    ")?;
+                    write!(f, "   ")?;
                 } else {
-                    write!(f, "│   ")?;
+                    write!(f, "│  ")?;
                 }
             }
             if !self_is_end {
@@ -174,12 +177,6 @@ pub trait TreeFormatter<'a, T: TreeValue<'a>> {
                 )
             }
         }
-    }
-    fn fmt_all(&mut self, forest: impl Iterator<Item = TreeNode<'a, T>>) -> Result {
-        for mut root in forest {
-            self.fmt(&mut root)?;
-        }
-        Ok(())
     }
 }
 
@@ -260,18 +257,18 @@ aaa_2
 ├── 1 3
 ├── 4 4
 ├── bbb_6
-│   ├── ccc_8
-│   │   ├── 3 9
-│   │   ├── 5 10
-│   │   └── ddd_12
-│   │       └── 6 13
-│   └── eee_15
-│       └── 8 16
+│  ├── ccc_8
+│  │  ├── 3 9
+│  │  ├── 5 10
+│  │  └── ddd_12
+│  │     └── 6 13
+│  └── eee_15
+│     └── 8 16
 └── xxx_18
-    └── yyy_20
-        ├── 2 21
-        └── zzz_23
-            └── 7 24
+   └── yyy_20
+      ├── 2 21
+      └── zzz_23
+         └── 7 24
 "
         .trim_start();
         fmter.fmt(&mut root).unwrap();

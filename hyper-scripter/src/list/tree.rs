@@ -128,7 +128,7 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
 
 type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>>;
 
-fn build_forest(scripts: Vec<&ScriptInfo>) -> Vec<TreeNode<'_>> {
+fn build_forest(scripts: Vec<&ScriptInfo>) -> TreeNode<'_> {
     let mut m = HashMap::default();
     for script in scripts.into_iter() {
         let name = script.name.key();
@@ -147,9 +147,7 @@ fn build_forest(scripts: Vec<&ScriptInfo>) -> Vec<TreeNode<'_>> {
         let leaf = TreeNode::new_leaf(TrimmedScriptInfo(name, script));
         TreeNode::insert_to_map(&mut m, &path, leaf);
     }
-    let mut forest: Vec<_> = m.into_iter().map(|(_, t)| t).collect();
-    forest.sort_by(|a, b| a.simple_cmp(b));
-    forest
+    TreeNode::new_nonleaf(".", m)
 }
 
 pub fn fmt<W: Write>(
@@ -157,7 +155,7 @@ pub fn fmt<W: Write>(
     latest_script_id: i64,
     opt: &mut ListOptions<Table, &mut W>,
 ) -> Result<()> {
-    let forest = build_forest(scripts);
+    let mut root = build_forest(scripts);
     match &mut opt.display_style {
         DisplayStyle::Long(table) => {
             let mut fmter = LongFormatter {
@@ -165,7 +163,7 @@ pub fn fmt<W: Write>(
                 latest_script_id,
                 table,
             };
-            fmter.fmt_all(forest.into_iter())?;
+            fmter.fmt(&mut root)?;
         }
         DisplayStyle::Short(ident_style, w) => {
             let mut fmter = ShortFormatter {
@@ -174,7 +172,7 @@ pub fn fmt<W: Write>(
                 ident_style: *ident_style,
                 latest_script_id,
             };
-            fmter.fmt_all(forest.into_iter())?;
+            fmter.fmt(&mut root)?;
         }
     }
     Ok(())
@@ -219,7 +217,7 @@ mod test {
             ("bbb/ccc/ggg/xxx", "tmux"),
             ("bbb/ddd", "tmux"),
         ]);
-        let forest = build_forest(scripts.iter().collect());
+        let mut root = build_forest(scripts.iter().collect());
         let mut fmter = ShortFormatter {
             w: Vec::<u8>::new(),
             plain: true,
@@ -227,25 +225,26 @@ mod test {
             latest_script_id: 1,
         };
         let ans = "
-.2(txt)
-aaa(sh)
-aaa
-└── bbb(rb)
-bbb
-├── ddd(tmux)
-└── ccc
-    ├── yyy(js)
-    ├── ddd(tmux)
-    ├── ddd
-    │   ├── www(rb)
-    │   └── eee(tmux)
-    └── ggg
-        ├── xxx(tmux)
-        ├── fff(tmux)
-        └── rrr(tmux)
+.
+├── .2(txt)
+├── aaa(sh)
+├── aaa
+│  └── bbb(rb)
+└── bbb
+   ├── ddd(tmux)
+   └── ccc
+      ├── yyy(js)
+      ├── ddd(tmux)
+      ├── ddd
+      │  ├── www(rb)
+      │  └── eee(tmux)
+      └── ggg
+         ├── xxx(tmux)
+         ├── fff(tmux)
+         └── rrr(tmux)
 "
         .trim();
-        fmter.fmt_all(forest.into_iter()).unwrap();
+        fmter.fmt(&mut root).unwrap();
         assert_eq!(std::str::from_utf8(&fmter.w).unwrap().trim(), ans);
     }
 }

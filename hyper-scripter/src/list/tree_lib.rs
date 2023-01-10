@@ -3,6 +3,8 @@ use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::result::Result as StdResult;
+use unicode_width::UnicodeWidthStr;
 
 pub trait TreeValue<'b> {
     fn tree_cmp(&self, other: &Self) -> Ordering;
@@ -92,23 +94,59 @@ pub enum LeadingDisplay<'a> {
     None,
 }
 
-impl Display for LeadingDisplay<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+enum DisplayType {
+    One,
+    Two,
+    Three,
+    Four,
+}
+impl DisplayType {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            DisplayType::One => "   ",
+            DisplayType::Two => "│  ",
+            DisplayType::Three => "├── ",
+            DisplayType::Four => "└── ",
+        }
+    }
+}
+
+impl<'a> LeadingDisplay<'a> {
+    fn visit<E, F: FnMut(DisplayType) -> StdResult<(), E>>(
+        &self,
+        mut visitor: F,
+    ) -> StdResult<(), E> {
         if let LeadingDisplay::Some { opt, self_is_end } = self {
             for is_done in opt.is_done.iter().take(opt.is_done.len() - 1) {
                 if *is_done {
-                    write!(f, "   ")?;
+                    visitor(DisplayType::One)?;
                 } else {
-                    write!(f, "│  ")?;
+                    visitor(DisplayType::Two)?;
                 }
             }
             if !self_is_end {
-                write!(f, "├── ")?;
+                visitor(DisplayType::Three)?;
             } else {
-                write!(f, "└── ")?;
+                visitor(DisplayType::Four)?;
             }
         }
         Ok(())
+    }
+    pub fn width(&self) -> usize {
+        let mut w = 0;
+        let inner = |ty: DisplayType| -> StdResult<(), ()> {
+            w += ty.as_str().width();
+            Ok(())
+        };
+        self.visit(inner).unwrap();
+        w
+    }
+}
+
+impl Display for LeadingDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let inner = |ty: DisplayType| -> FmtResult { write!(f, "{}", ty.as_str()) };
+        self.visit(inner)
     }
 }
 

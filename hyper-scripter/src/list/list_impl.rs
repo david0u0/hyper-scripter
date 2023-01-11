@@ -10,7 +10,6 @@ use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::get_display_type;
-use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::cmp::Reverse;
 use std::hash::Hash;
@@ -109,7 +108,7 @@ pub fn fmt_meta(
             )?;
             let ty = ty.display();
             let ty_width = ty.len();
-            let ty_txt = style(opt.plain, ty, |s| s.color(color).bold());
+            let ty_txt = style(opt.plain, ty, |s| s.color(color).bold().done());
 
             let help_msg = extract_help(script);
 
@@ -247,15 +246,10 @@ pub async fn fmt_list<W: Write>(
 
             for (tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {
-                    let tags = tags.to_string();
-                    let tags_width = tags.len();
-                    let tags_txt = style(opt.plain, tags, |s| s.dimmed().italic());
+                    let tags_txt = style(opt.plain, tags, |s| s.dimmed().italic().done());
                     match &mut opt.display_style {
                         DisplayStyle::Long(table) => {
-                            table.add_row(vec![Cell::new_with_len(
-                                tags_txt.to_string(),
-                                tags_width,
-                            )]);
+                            table.add_row(vec![Cell::new_with_len(tags_txt.to_string(), 0)]);
                         }
                         DisplayStyle::Short(_, _) => {
                             writeln!(w, "{}", tags_txt)?;

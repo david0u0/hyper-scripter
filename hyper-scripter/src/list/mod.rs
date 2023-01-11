@@ -9,12 +9,12 @@ mod time_fmt;
 mod tree;
 mod tree_lib;
 
+use crate::color::{Color, StyleObj, Stylize};
 use crate::{
     error::{DisplayError, DisplayResult, Result},
     query::ListQuery,
     script::ScriptInfo,
 };
-use colored::{Color, ColoredString, Colorize};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -28,21 +28,23 @@ const LONG_LATEST_TXT: LatestTxt = LatestTxt(" *", "  ");
 
 macro_rules! style_name_w {
     ($w:expr, $plain:expr, $is_latest:expr, $latest_txt:expr, $color:expr, $name:expr) => {{
-        use colored::{Color, Colorize};
+        use crate::color::{Color, Stylize};
         let mut width = $name.len();
         if $is_latest && !$plain {
-            write!($w, "{}", $latest_txt.0.color(Color::Yellow).bold())?;
+            write!(
+                $w,
+                "{}",
+                $latest_txt.0.stylize().color(Color::Yellow).bold()
+            )?;
             width += $latest_txt.0.len();
         } else {
             write!($w, "{}", $latest_txt.1)?;
             width += $latest_txt.1.len();
         }
         let name = style($plain, $name, |s| {
-            let s = s.color($color).bold();
+            s.color($color).bold();
             if $is_latest {
-                s.underline()
-            } else {
-                s
+                s.underline();
             }
         });
         write!($w, "{}", name)?;
@@ -139,16 +141,16 @@ pub struct ListOptions<T = (), U = ()> {
 }
 
 #[inline]
-fn style<T: AsRef<str>, F: for<'a> FnOnce(&'a str) -> ColoredString>(
+fn style<T: std::fmt::Display, F: for<'a> FnOnce(&'a mut StyleObj<T>)>(
     plain: bool,
     s: T,
     f: F,
-) -> ColoredString {
-    if plain {
-        s.as_ref().normal()
-    } else {
-        f(s.as_ref())
+) -> StyleObj<T> {
+    let mut s = s.stylize();
+    if !plain {
+        f(&mut s);
     }
+    s
 }
 
 pub fn get_screen_width() -> u16 {

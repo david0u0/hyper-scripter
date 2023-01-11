@@ -1,5 +1,5 @@
 // TODO: change all `String` to `Cow`?
-use colored::Colorize;
+use crate::color::Stylize;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use unicode_width::UnicodeWidthStr;
 
@@ -240,7 +240,7 @@ impl<'a> Display for DisplayTable<'a> {
             if table.plain {
                 write!(w, "{}", content)?;
             } else {
-                write!(w, "{}", content.underline())?;
+                write!(w, "{}", content.stylize().underline())?;
             }
 
             cur_pos = col.start_pos_this_time + len;

@@ -8,7 +8,6 @@ use super::{
 use crate::error::Result;
 use crate::script::ScriptInfo;
 use crate::util::get_display_type;
-use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -58,8 +57,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>> for ShortFormatter<W
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
         let ident = ident_string(self.ident_style, &*ty.display(), t);
-        // TODO: (all occurrence in this file) LeadingDisplay::to_string() only to satisfy colored API
-        let l = style(self.plain, &l.to_string(), |s| s.dimmed());
+        let l = style(self.plain, l, |s| s.dimmed().done());
         write!(self.w, "{}", l)?;
         style_name_w!(
             self.w,
@@ -73,8 +71,8 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>> for ShortFormatter<W
         Ok(())
     }
     fn fmt_nonleaf(&mut self, l: LeadingDisplay, t: &str) -> Result {
-        let ident = style(self.plain, t, |s| s.dimmed().italic());
-        let l = style(self.plain, &l.to_string(), |s| s.dimmed());
+        let ident = style(self.plain, t, |s| s.dimmed().italic().done());
+        let l = style(self.plain, l, |s| s.dimmed().done());
         writeln!(self.w, "{}{}", l, ident)?;
         Ok(())
     }
@@ -86,8 +84,8 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
         let ty = get_display_type(&script.ty);
         let color = ty.color();
 
-        let mut ident_txt = style(self.plain, &l.to_string(), |s| s.dimmed()).to_string();
         let mut ident_width = l.width();
+        let mut ident_txt = style(self.plain, l, |s| s.dimmed().done()).to_string();
         {
             let name_width = style_name_w!(
                 &mut ident_txt,
@@ -102,7 +100,7 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
 
         let ty = ty.display();
         let ty_width = ty.len();
-        let ty_txt = style(self.plain, ty, |s| s.color(color).bold());
+        let ty_txt = style(self.plain, ty, |s| s.color(color).bold().done());
 
         let help_msg = extract_help(script);
 
@@ -117,10 +115,10 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
         Ok(())
     }
     fn fmt_nonleaf(&mut self, l: LeadingDisplay, name: &str) -> Result {
-        let mut ident_txt = style(self.plain, &l.to_string(), |s| s.dimmed()).to_string();
         let mut ident_width = l.width();
-        let name = style(self.plain, name, |s| s.dimmed().italic());
+        let mut ident_txt = style(self.plain, l, |s| s.dimmed().done()).to_string();
         ident_width += name.len();
+        let name = style(self.plain, name, |s| s.dimmed().italic().done());
         write!(&mut ident_txt, "{}", name)?;
         let row = vec![Cell::new_with_len(ident_txt, ident_width)];
         self.table.add_row(row);

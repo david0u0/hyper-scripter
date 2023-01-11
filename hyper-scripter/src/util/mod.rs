@@ -1,10 +1,10 @@
+use crate::color::Color;
 use crate::config::Config;
 use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, AsScriptFullTypeRef, ScriptType};
 use chrono::{DateTime, Utc};
-use colored::Color;
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};

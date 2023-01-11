@@ -3,6 +3,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate derive_more;
 pub mod args;
+pub mod color;
 pub mod config;
 pub mod db;
 pub mod env_pair;

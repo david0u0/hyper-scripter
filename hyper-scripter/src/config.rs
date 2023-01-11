@@ -1,3 +1,4 @@
+use crate::color::Color;
 use crate::error::{DisplayError, DisplayResult, Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
@@ -5,7 +6,6 @@ use crate::state::State;
 use crate::tag::{TagSelector, TagSelectorGroup};
 use crate::util;
 use crate::{impl_de_by_from_str, impl_ser_by_to_string};
-use colored::Color;
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};

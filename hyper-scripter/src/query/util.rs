@@ -167,7 +167,7 @@ pub async fn do_script_query_strict<'b>(
 }
 
 fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
-    use colored::{Color, Colorize};
+    use crate::color::{Color, Stylize};
     use console::{Key, Term};
 
     let term = Term::stderr();
@@ -176,6 +176,7 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
     let msg = format!(
         "{} [Y/N]",
         format!("{}({})?", script.name, ty.display())
+            .stylize()
             .color(ty.color())
             .bold(),
     );
@@ -216,11 +217,11 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
             std::process::exit(1);
         }
         Res::Y => {
-            term.write_line(&" Y".color(Color::Green).to_string())?;
+            term.write_line(&" Y".stylize().color(Color::Green).to_string())?;
             Ok(())
         }
         Res::N => {
-            term.write_line(&" N".color(Color::Red).to_string())?;
+            term.write_line(&" N".stylize().color(Color::Red).to_string())?;
             Err(Error::DontFuzz)
         }
     }

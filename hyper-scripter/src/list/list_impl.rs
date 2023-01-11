@@ -10,7 +10,6 @@ use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::get_display_type;
-use colored::Colorize;
 use fxhash::FxHashMap as HashMap;
 use std::cmp::Reverse;
 use std::hash::Hash;

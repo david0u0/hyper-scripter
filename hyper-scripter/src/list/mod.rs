@@ -42,11 +42,10 @@ macro_rules! style_name_w {
             width += $latest_txt.1.len();
         }
         let name = style($plain, $name, |s| {
-            let mut s = s.color($color).bold();
+            s.color($color).bold();
             if $is_latest {
-                s = s.underline();
+                s.underline();
             }
-            s
         });
         write!($w, "{}", name)?;
         width
@@ -142,17 +141,16 @@ pub struct ListOptions<T = (), U = ()> {
 }
 
 #[inline]
-fn style<T: std::fmt::Display, F: for<'a> FnOnce(StyleObj<T>) -> StyleObj<T>>(
+fn style<T: std::fmt::Display, F: for<'a> FnOnce(&'a mut StyleObj<T>)>(
     plain: bool,
     s: T,
     f: F,
 ) -> StyleObj<T> {
-    let s = s.stylize();
-    if plain {
-        s
-    } else {
-        f(s)
+    let mut s = s.stylize();
+    if !plain {
+        f(&mut s);
     }
+    s
 }
 
 pub fn get_screen_width() -> u16 {

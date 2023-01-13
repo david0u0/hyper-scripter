@@ -11,13 +11,13 @@ description = "Database tool for hyper-scripter. Not indetended to be used direc
 [dependencies]
 log = "0.4.8"
 chrono = { version = "0.4.7", features = ["serde"] }
-sqlx = { version = "0.5.10", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate", "any" ] }
+sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate", "any" ] }
 
 [dependencies.openssl]
 version = "0.10.29"
 features = [ "vendored" ]
 
 [build-dependencies]
-sqlx = { version = "0.5.10", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate", "any" ] }
+sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate", "any" ] }
 log = "0.4.8"
 tokio = { version = "1", features = ["full"] }

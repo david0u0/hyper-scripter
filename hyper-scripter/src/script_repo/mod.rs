@@ -385,9 +385,7 @@ impl ScriptRepo {
             );
 
             builder.created_time(record.created_time);
-            if let Some(count) = record.exec_count {
-                builder.exec_count(count as u64);
-            }
+            builder.exec_count(record.exec_count as u64);
             if let Some(time) = record.write {
                 builder.write_time(time);
             }

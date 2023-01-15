@@ -58,29 +58,41 @@ if branch_state == :diverged
   exit 1
 end
 
-# Check if other files are dirty
-Dir.foreach(GIT_HOME) do |f|
-  next if ['.', '..', '.git'].include?(f)
-  next if File.identical?(REAL_HS_HOME, f)
+def recur_check_dirty(file)
+  return if File.identical?(REAL_HS_HOME, file)
 
-  status = run_cmd("git status #{f} --porcelain")
-  unless status.empty?
-    warn status
-    ok = confirm("#{f} is not clean. Sure to proceed? [Y/N]")
-    exit 1 unless ok
+  unless REAL_HS_HOME.start_with?(file)
+    status = run_cmd("git status #{file} --porcelain")
+    unless status.empty?
+      warn status
+      ok = confirm("#{file} is not clean. Sure to proceed? [Y/N]")
+      exit 1 unless ok
+    end
+    return
+  end
+
+  Dir.foreach(file) do |f|
+    next if ['.', '..', '.git'].include?(f)
+
+    recur_check_dirty("#{file}/#{f}")
   end
 end
+
+recur_check_dirty(GIT_HOME)
 
 if branch_state == :behind
   # Check if remote had changed
   system('git add -A', exception: true)
   system('git stash', exception: true)
-  diff = run_cmd("git diff --stat #{REMOTE}/#{BRANCH} #{REAL_HS_HOME}").chop
-  unless diff.empty?
-    warn 'remote home had changed!'
-    warn diff
-    system('git stash pop', exception: true)
-    exit 1
+
+  if File.exist?(REAL_HS_HOME) # else: hs home was just created, no need to check
+    diff = run_cmd("git diff --stat #{REMOTE}/#{BRANCH} #{REAL_HS_HOME}").chop
+    unless diff.empty?
+      warn 'remote home had changed!'
+      warn diff
+      system('git stash pop', exception: true)
+      exit 1
+    end
   end
 
   # prepare the files

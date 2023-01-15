@@ -33,7 +33,7 @@ class Option
   end
 
   def clear
-    @content = ""
+    @content = ''
     @envs = []
   end
 

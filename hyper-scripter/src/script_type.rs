@@ -79,10 +79,10 @@ Dir.chdir(\"{{birthplace}}\")
 {{/each}}";
 
 const RB_CD_WELCOME_MSG: &str =
-    "{{#if birthplace_in_home}}BASE = \"#{ENV['HOME']}/{{birthplace_rel}}\"
+"{{#if birthplace_in_home}}BASE = \"#{ENV['HOME']}/{{birthplace_rel}}\"
 {{else}}BASE = '{{birthplace}}'
 {{/if}}
-require_relative \"#{ENV['HS_HOME']}/util/common.rb\"
+require File.realpath(\"#{ENV['HS_HOME']}/util/common.rb\")
 require 'set'
 
 def cd(dir)
@@ -100,9 +100,7 @@ dirs_set = Dir.entries('.').select do |c|
 end.to_set
 dirs_set.add('.')
 
-history_arr = HS_ENV.do_hs(\"history show =#{HS_ENV.env_var(:name)}!\", false).lines.map do |l|
-  l.strip
-end.select { |l| !l.empty? }
+history_arr = HS_ENV.do_hs(\"history show =#{HS_ENV.env_var(:name)}!\", false).lines.map(&:strip).reject(&:empty?)
 
 history_arr = history_arr.select do |d|
   if dirs_set.include?(d)
@@ -116,9 +114,18 @@ end
 require_relative \"#{ENV['HS_HOME']}/util/selector.rb\"
 selector = Selector.new
 selector.load(history_arr + dirs_set.to_a)
+is_dot = false
+selector.register_keys('.', lambda { |_, _|
+  is_dot = true
+}, msg: 'go to \".\"')
 
 dir = begin
-  selector.run.content
+  content = selector.run.content
+  if is_dot
+    '.'
+  else
+    content
+  end
 rescue Selector::Empty
   warn 'empty'
   exit 1

@@ -7,7 +7,7 @@ use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_co
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::path;
 use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, ScriptQuery};
-use hyper_scripter::script::{IntoScriptName, ScriptName};
+use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagSelector};
@@ -636,13 +636,38 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
             let scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
 
+            enum ScriptGetter<'a> {
+                Single(&'a ScriptInfo),
+                Repo(&'a mut ScriptRepo),
+            }
+            impl<'a> ScriptGetter<'a> {
+                fn get_by_id(repo: &mut ScriptRepo, id: i64) -> Result<&ScriptInfo> {
+                    let entry = repo.get_mut_by_id(id).ok_or_else(|| {
+                        log::error!("史學家給的腳本 id {} 竟然在倉庫中找不到……", id);
+                        Error::ScriptNotFound(id.to_string())
+                    })?;
+                    Ok(entry.into_inner())
+                }
+                fn get<'b>(&'b mut self, id: i64) -> Result<&'b ScriptInfo> {
+                    match self {
+                        ScriptGetter::Single(info) => Ok(*info),
+                        ScriptGetter::Repo(repo) => Self::get_by_id(repo, id),
+                    }
+                }
+                fn new(ids: &[i64], repo: &'a mut ScriptRepo) -> Result<Self> {
+                    Ok(if ids.len() == 1 {
+                        ScriptGetter::Single(ScriptGetter::get_by_id(repo, ids[0])?)
+                    } else {
+                        ScriptGetter::Repo(repo)
+                    })
+                }
+            }
+
+            let mut script_getter = ScriptGetter::new(&ids, repo)?;
             let mut print_basic = |script_id: i64, args: Vec<String>| -> Result {
                 if with_name {
-                    let entry = repo.get_mut_by_id(script_id).ok_or_else(|| {
-                        log::error!("史學家給的腳本 id 竟然在倉庫中找不到……");
-                        Error::ScriptNotFound(script_id.to_string())
-                    })?;
-                    print!("{}", entry.name.key());
+                    let info = script_getter.get(script_id)?;
+                    print!("{}", info.name.key());
                     if !args.is_empty() {
                         print!(" ");
                     }

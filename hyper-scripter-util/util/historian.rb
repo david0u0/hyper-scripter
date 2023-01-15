@@ -32,6 +32,11 @@ class Option
     "=#{name}! -- #{content}"
   end
 
+  def clear
+    @content = ""
+    @envs = []
+  end
+
   def envs_str
     envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
   end
@@ -141,9 +146,14 @@ class Historian < Selector
   def run_as_main(sequence: '')
     sourcing = false
     echoing = false
+    run_empty = false
     register_keys(%w[p P], lambda { |_, _|
       echoing = true
     }, msg: 'print the argument to stdout')
+
+    register_keys('.', lambda { |_, _|
+      run_empty = true
+    }, msg: 'run script with empty argument')
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
@@ -167,7 +177,9 @@ class Historian < Selector
     end
 
     opt = result.content
+    opt.clear if run_empty
     cmd = opt.cmd_body # known issue: \n \t \" will not be handled properly
+
     if sourcing
       File.open(HS_ENV.env_var(:source), 'w') do |file|
         case ENV['SHELL'].split('/').last

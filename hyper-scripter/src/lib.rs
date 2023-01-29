@@ -13,6 +13,7 @@ pub mod extract_msg;
 pub mod fuzzy;
 pub mod list;
 pub mod migration;
+pub mod my_env_logger;
 pub mod path;
 pub mod query;
 pub mod script;
@@ -29,3 +30,9 @@ pub enum Either<T, U> {
     One(T),
     Two(U),
 }
+
+#[cfg(not(any(feature = "no-log", feature = "log",)))]
+compile_error!("one of the features [log/no-log] must be enabled");
+
+#[cfg(all(feature = "no-log", feature = "log",))]
+compile_error!("only one of the features [log/no-log] can be enabled");

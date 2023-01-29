@@ -5,6 +5,7 @@ use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
+use hyper_scripter::my_env_logger;
 use hyper_scripter::path;
 use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, ScriptQuery};
 use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
@@ -23,7 +24,7 @@ use hyper_scripter_historian::{Historian, LastTimeRecord};
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    my_env_logger::init();
     let errs = match main_err_handle().await {
         Err(e) => vec![e],
         Ok(v) => v,

@@ -3,7 +3,9 @@
 
 use criterion::{black_box, Bencher, Criterion};
 use criterion_macro::criterion;
-use hyper_scripter::{fuzzy::*, script::ScriptName, util::main_util::prepare_pre_run};
+use hyper_scripter::{
+    fuzzy::*, my_env_logger, script::ScriptName, util::main_util::prepare_pre_run,
+};
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
 
 #[allow(dead_code)]
@@ -52,7 +54,7 @@ fn sample_name(rng: &mut StdRng, name: &str) -> String {
 
 #[criterion]
 fn bench_fuzz(c: &mut Criterion) {
-    let _ = env_logger::try_init();
+    let _ = my_env_logger::try_init();
 
     let mut rng = StdRng::seed_from_u64(42);
     const CASE_COUNT: usize = 999;

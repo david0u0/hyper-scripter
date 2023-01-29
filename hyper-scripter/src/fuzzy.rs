@@ -339,6 +339,7 @@ fn foreach_reorder<S: StopIndicator, F: FnMut(&str) -> S>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::my_env_logger;
 
     fn extract_multifuzz<'a>(res: FuzzResult<&'a str>) -> (&'a str, Vec<&'a str>) {
         match res {
@@ -365,7 +366,7 @@ mod test {
     }
     #[tokio::test(flavor = "multi_thread")]
     async fn test_fuzz() {
-        let _ = env_logger::try_init();
+        let _ = my_env_logger::try_init();
         let t1 = "測試腳本1";
         let t2 = "測試腳本2";
         let t3 = ".42";
@@ -388,7 +389,7 @@ mod test {
     }
     #[tokio::test(flavor = "multi_thread")]
     async fn test_fuzz_with_len() {
-        let _ = env_logger::try_init();
+        let _ = my_env_logger::try_init();
         let t1 = "測試腳本1";
         let t2 = "測試腳本23456";
         let vec = vec![t1, t2];
@@ -399,7 +400,7 @@ mod test {
     }
     #[tokio::test(flavor = "multi_thread")]
     async fn test_reorder_fuzz() {
-        let _ = env_logger::try_init();
+        let _ = my_env_logger::try_init();
         let t1 = "a:c";
         let t2 = "b:a";
         let t3 = "a:b";

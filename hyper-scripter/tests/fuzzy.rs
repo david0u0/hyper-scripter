@@ -1,10 +1,9 @@
-use env_logger;
-use hyper_scripter::{fuzzy::*, SEP};
+use hyper_scripter::{fuzzy::*, my_env_logger, SEP};
 
 type Str = &'static str;
 
 fn unwrap_fuzz(target: Str, candidate: &[Str]) -> Vec<Str> {
-    let _ = env_logger::try_init();
+    let _ = my_env_logger::try_init();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let res = rt.block_on(async {
         fuzz(target, candidate.iter().map(|t| *t), SEP)

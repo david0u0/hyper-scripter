@@ -181,7 +181,7 @@ pub fn fmt<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::script::IntoScriptName;
+    use crate::{my_env_logger, script::IntoScriptName};
     use chrono::NaiveDateTime;
 
     fn build(v: Vec<(&'static str, &'static str)>) -> Vec<ScriptInfo> {
@@ -203,7 +203,7 @@ mod test {
     }
     #[test]
     fn test_fmt_tree_short() {
-        let _ = env_logger::try_init();
+        let _ = my_env_logger::try_init();
         let scripts = build(vec![
             ("bbb/ccc/ggg/rrr", "tmux"),
             ("aaa/bbb", "rb"),

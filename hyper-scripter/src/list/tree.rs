@@ -10,7 +10,6 @@ use crate::script::ScriptInfo;
 use crate::util::get_display_type;
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::fmt::Write as FmtWrite;
 use std::io::Write;
 
@@ -42,8 +41,14 @@ fn ident_string(style: DisplayIdentStyle, ty: &str, t: &TrimmedScriptInfo<'_>) -
 }
 
 impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
-    fn tree_cmp(&self, other: &Self) -> Ordering {
-        other.1.last_time().cmp(&self.1.last_time())
+    type CmpKey = u64;
+    fn cmp_key(&self) -> u64 {
+        let s = &self.1;
+        if s.exec_time.is_none() {
+            0
+        } else {
+            s.exec_count
+        }
     }
     fn display_key(&self) -> Cow<'b, str> {
         match &self.0 {
@@ -52,7 +57,7 @@ impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
         }
     }
 }
-impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>> for ShortFormatter<W> {
+impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for ShortFormatter<W> {
     fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
@@ -78,7 +83,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>> for ShortFormatter<W
     }
 }
 
-impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
+impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for LongFormatter<'b> {
     fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(name, script) = t;
         let ty = get_display_type(&script.ty);
@@ -126,7 +131,7 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>> for LongFormatter<'b> {
     }
 }
 
-type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>>;
+type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>, u64>;
 
 fn build_forest(scripts: Vec<&ScriptInfo>) -> TreeNode<'_> {
     let mut m = HashMap::default();
@@ -187,16 +192,18 @@ mod test {
     fn build(v: Vec<(&'static str, &'static str)>) -> Vec<ScriptInfo> {
         v.into_iter()
             .enumerate()
-            .map(|(id, (name, ty))| {
-                let id = id as i64;
-                let time = NaiveDateTime::from_timestamp(id, 0);
+            .map(|(idx, (name, ty))| {
+                let idx = idx as i64;
+                let time = NaiveDateTime::from_timestamp(idx, 0);
                 let mut builder = ScriptInfo::builder(
-                    id,
+                    idx,
                     name.to_owned().into_script_name().unwrap(),
                     ty.into(),
                     vec![].into_iter(),
                 );
                 builder.created_time(time);
+                builder.exec_time(time);
+                builder.exec_count(idx as u64);
                 builder.build()
             })
             .collect()
@@ -206,7 +213,6 @@ mod test {
         let _ = my_env_logger::try_init();
         let scripts = build(vec![
             ("bbb/ccc/ggg/rrr", "tmux"),
-            ("aaa/bbb", "rb"),
             ("bbb/ccc/ddd", "tmux"),
             ("bbb/ccc/ggg/fff", "tmux"),
             ("aaa", "sh"),
@@ -216,6 +222,7 @@ mod test {
             ("bbb/ccc/ddd/www", "rb"),
             ("bbb/ccc/ggg/xxx", "tmux"),
             ("bbb/ddd", "tmux"),
+            ("aaa/bbb", "rb"),
         ]);
         let mut root = build_forest(scripts.iter().collect());
         let mut fmter = ShortFormatter {
@@ -226,25 +233,26 @@ mod test {
         };
         let ans = "
 .
-├── .2(txt)
 ├── aaa(sh)
-├── aaa
-│  └── bbb(rb)
-└── bbb
-   ├── ddd(tmux)
-   └── ccc
-      ├── yyy(js)
-      ├── ddd(tmux)
-      ├── ddd
-      │  ├── www(rb)
-      │  └── eee(tmux)
-      └── ggg
-         ├── xxx(tmux)
-         ├── fff(tmux)
-         └── rrr(tmux)
+├── .2(txt)
+├── bbb
+│  ├── ddd(tmux)
+│  └── ccc
+│     ├── ddd(tmux)
+│     ├── yyy(js)
+│     ├── ddd
+│     │  ├── eee(tmux)
+│     │  └── www(rb)
+│     └── ggg
+│        ├── rrr(tmux)
+│        ├── fff(tmux)
+│        └── xxx(tmux)
+└── aaa
+   └── bbb(rb)
 "
         .trim();
         fmter.fmt(&mut root).unwrap();
+        println!("{}", std::str::from_utf8(&fmter.w).unwrap().trim());
         assert_eq!(std::str::from_utf8(&fmter.w).unwrap().trim(), ans);
     }
 }

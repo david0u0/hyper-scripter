@@ -133,6 +133,16 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for LongFormatter<'b> {
 
 type TreeNode<'b> = tree_lib::TreeNode<'b, TrimmedScriptInfo<'b>, u64>;
 
+fn split_script_name(full_name: &str) -> (&'_ str, impl Iterator<Item = &'_ str>) {
+    let (name, path) = if let Some((prefix, name)) = full_name.rsplit_once('/') {
+        (name, Some(prefix.split('/')))
+    } else {
+        (full_name, None)
+    };
+    let path = path.into_iter().flatten();
+    (name, path)
+}
+
 fn build_forest(scripts: Vec<&ScriptInfo>) -> TreeNode<'_> {
     let mut m = HashMap::default();
     for script in scripts.into_iter() {
@@ -147,10 +157,11 @@ fn build_forest(scripts: Vec<&ScriptInfo>) -> TreeNode<'_> {
                 continue;
             }
         };
-        let mut path: Vec<_> = name_key.split('/').collect();
-        let name = Cow::Borrowed(path.pop().unwrap());
+
+        let (name, path) = split_script_name(name_key);
+        let name = Cow::Borrowed(name);
         let leaf = TreeNode::new_leaf(TrimmedScriptInfo(name, script));
-        TreeNode::insert_to_map(&mut m, &path, leaf);
+        TreeNode::insert_to_map(&mut m, path, leaf);
     }
     TreeNode::new_nonleaf(".", m)
 }

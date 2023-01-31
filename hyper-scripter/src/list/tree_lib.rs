@@ -36,14 +36,18 @@ impl<'a, T: TreeValue<'a>, K> Debug for TreeNode<'a, T, K> {
     }
 }
 impl<'a, T: TreeValue<'a, CmpKey = K>, K: Ord + Copy> NonLeafInner<'a, T, K> {
-    fn insert(&mut self, path: &[&'a str], leaf: TreeNode<'a, T, K>) -> Option<K> {
+    fn insert<I: Iterator<Item = &'a str>>(
+        &mut self,
+        mut path: I,
+        leaf: TreeNode<'a, T, K>,
+    ) -> Option<K> {
         let cmp_key;
-        if path.is_empty() {
+        if let Some(p) = path.next() {
+            let e = TreeNode::next_nonleaf(&mut self.childs, p);
+            cmp_key = e.insert(path, leaf);
+        } else {
             cmp_key = leaf.cmp_key();
             self.childs.insert((true, leaf.display_key()), leaf);
-        } else {
-            let e = TreeNode::next_nonleaf(&mut self.childs, path[0]);
-            cmp_key = e.insert(&path[1..], leaf);
         }
 
         let mut need_change = false;
@@ -101,12 +105,16 @@ impl<'a, T: TreeValue<'a, CmpKey = K>, K: Ord + Copy> TreeNode<'a, T, K> {
             TreeNode::NonLeaf(t) => t.max_cmp_key,
         }
     }
-    pub fn insert_to_map(map: &mut Childs<'a, T, K>, path: &[&'a str], child: Self) {
-        if path.is_empty() {
-            map.insert((true, child.display_key()), child);
+    pub fn insert_to_map<I: Iterator<Item = &'a str>>(
+        map: &mut Childs<'a, T, K>,
+        mut path: I,
+        child: Self,
+    ) {
+        if let Some(p) = path.next() {
+            let e = Self::next_nonleaf(map, p);
+            e.insert(path, child);
         } else {
-            let e = Self::next_nonleaf(map, path[0]);
-            e.insert(&path[1..], child);
+            map.insert((true, child.display_key()), child);
         }
     }
     // NOTE: 取名 cmp 的話，clippy 會叫你實作 Ord，很麻煩
@@ -284,7 +292,7 @@ mod test {
             childs: Default::default(),
         };
         for child in childs.into_iter() {
-            non_leaf.insert(&[], child);
+            non_leaf.insert(std::iter::empty(), child);
         }
         TreeNode::NonLeaf(non_leaf)
     }

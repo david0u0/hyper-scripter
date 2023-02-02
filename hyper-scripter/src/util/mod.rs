@@ -15,11 +15,14 @@ use std::process::{Command, ExitStatus};
 pub mod completion_util;
 pub mod holder;
 pub mod main_util;
-pub mod serde;
 pub mod shebang_handle;
 
 pub mod init_repo;
 pub use init_repo::*;
+
+pub mod serde;
+pub(crate) use self::serde::impl_de_by_from_str;
+pub(crate) use self::serde::impl_ser_by_to_string;
 
 pub fn illegal_name(s: &str) -> bool {
     s.starts_with('-')

@@ -3,8 +3,8 @@ use crate::error::{
     FormatCode::{Regex as RegexCode, ScriptQuery as ScriptQueryCode},
     Result,
 };
-use crate::impl_ser_by_to_string;
 use crate::script::{ConcreteScriptName, IntoScriptName, ScriptName};
+use crate::util::impl_ser_by_to_string;
 use regex::Regex;
 use std::num::NonZeroUsize;
 use std::str::FromStr;

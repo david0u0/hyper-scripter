@@ -1,6 +1,6 @@
 use crate::error::{DisplayError, DisplayResult, Error, FormatCode::ScriptType as TypeCode};
-use crate::impl_ser_by_to_string;
 use crate::util::illegal_name;
+use crate::util::impl_ser_by_to_string;
 use fxhash::FxHashMap as HashMap;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};

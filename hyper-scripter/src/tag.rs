@@ -1,7 +1,7 @@
 use crate::error::{DisplayError, DisplayResult, FormatCode::Tag as TagCode};
 use crate::script_type::ScriptType;
 use crate::util::illegal_name;
-use crate::{impl_de_by_from_str, impl_ser_by_to_string};
+use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::FxHashSet as HashSet;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str::FromStr;

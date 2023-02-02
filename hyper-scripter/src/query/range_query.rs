@@ -1,5 +1,5 @@
 use crate::error::{DisplayError, DisplayResult, FormatCode::RangeQuery as RangeQueryCode, Result};
-use crate::impl_ser_by_to_string;
+use crate::util::impl_ser_by_to_string;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 

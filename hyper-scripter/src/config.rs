@@ -5,7 +5,7 @@ use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::state::State;
 use crate::tag::{TagSelector, TagSelectorGroup};
 use crate::util;
-use crate::{impl_de_by_from_str, impl_ser_by_to_string};
+use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};

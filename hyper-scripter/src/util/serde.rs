@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! impl_ser_by_to_string {
     ($target:ty) => {
         impl serde::Serialize for $target {
@@ -12,7 +11,6 @@ macro_rules! impl_ser_by_to_string {
     };
 }
 
-#[macro_export]
 macro_rules! impl_de_by_from_str {
     ($target:ty) => {
         impl<'de> serde::Deserialize<'de> for $target {
@@ -26,3 +24,6 @@ macro_rules! impl_de_by_from_str {
         }
     };
 }
+
+pub(crate) use impl_de_by_from_str;
+pub(crate) use impl_ser_by_to_string;

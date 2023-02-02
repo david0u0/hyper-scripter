@@ -1,5 +1,5 @@
 use crate::error::{DisplayError, DisplayResult, FormatCode::EnvPair as EnvPairCode};
-use crate::{impl_de_by_from_str, impl_ser_by_to_string};
+use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
 use std::str::FromStr;
 
 #[derive(Display, Debug, Clone, Eq, PartialEq)]

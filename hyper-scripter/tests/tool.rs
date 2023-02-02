@@ -36,7 +36,6 @@ pub struct RunEnv {
     pub custom_env: Option<Vec<(String, String)>>,
 }
 
-#[macro_export]
 macro_rules! run {
     ($($key:ident: $val:expr,)* $lit:literal) => ({
         run!($($key: $val,)* $lit,)
@@ -49,6 +48,7 @@ macro_rules! run {
         run_with_env(env, format!($lit, $($arg)*))
     });
 }
+pub(crate) use run;
 
 #[derive(Debug)]
 enum ErrorInner {

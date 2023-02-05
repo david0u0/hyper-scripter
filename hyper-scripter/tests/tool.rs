@@ -141,6 +141,14 @@ pub fn check_exist(p: &[&str]) -> bool {
     file.exists()
 }
 
+fn fmt_result(res: &Result<String>) -> String {
+    if let Ok(s) = res.as_ref() {
+        format!("\n{}", s)
+    } else {
+        format!("{:?}", res)
+    }
+}
+
 pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let home = match env.home {
         Some(h) => {
@@ -209,7 +217,7 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     } else {
         panic!("執行 {:?} 遭未知的錯誤！", args_vec);
     };
-    log::info!("執行 {:?} 完畢，結果為 {:?}", args_vec, res);
+    log::info!("執行 {:?} 完畢，結果為 {}", args_vec, fmt_result(&res));
     res
 }
 

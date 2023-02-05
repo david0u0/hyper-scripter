@@ -4,7 +4,6 @@ use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelectorGroup};
 use crate::Either;
 use chrono::{Duration, Utc};
-use futures::join;
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
@@ -91,7 +90,8 @@ impl<'b> RepoEntryOptional<'b> {
 
 impl DBEnv {
     pub async fn close(self) {
-        join!(self.historian.close(), self.info_pool.close());
+        // FIXME: sqlx bug: 這邊可能不會正確關閉，導致有些記錄遺失，暫時解是關閉後加一個 `sleep`
+        futures::join!(self.info_pool.close(), self.historian.close());
     }
     pub fn new(info_pool: SqlitePool, historian: Historian, modifies_script: bool) -> Self {
         Self {

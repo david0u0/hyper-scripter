@@ -170,50 +170,52 @@ fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
     use crate::color::{Color, Stylize};
     use console::{Key, Term};
 
-    let term = Term::stderr();
-
-    let ty = get_display_type(&script.ty);
-    let msg = format!(
-        "{} [Y/N]",
-        format!("{}({})?", script.name, ty.display())
-            .stylize()
-            .color(ty.color())
-            .bold(),
-    );
-
-    term.hide_cursor()?;
-    hijack_ctrlc_once();
-
     enum Res {
         Y,
         N,
         Exit,
     }
 
-    let res = loop {
-        term.write_str(&msg)?;
-        match term.read_key() {
-            Ok(Key::Char('Y' | 'y') | Key::Enter) => break Res::Y,
-            Ok(Key::Char('N' | 'n')) => break Res::N,
-            Ok(Key::Char(ch)) => term.write_line(&format!(" Unknown key '{}'", ch))?,
-            Ok(Key::Escape) => {
-                break Res::Exit;
-            }
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::Interrupted {
-                    break Res::Exit;
-                } else {
-                    return Err(e.into());
-                }
-            }
-            _ => term.write_line(" Unknown key")?,
-        }
-    };
-    term.show_cursor()?;
+    fn inner(term: &Term, script: &ScriptInfo) -> Result<Res> {
+        let ty = get_display_type(&script.ty);
+        let msg = format!(
+            "{} [Y/N]",
+            format!("{}({})?", script.name, ty.display())
+                .stylize()
+                .color(ty.color())
+                .bold(),
+        );
 
-    match res {
+        term.hide_cursor()?;
+        hijack_ctrlc_once();
+
+        let res = loop {
+            term.write_str(&msg)?;
+            match term.read_key() {
+                Ok(Key::Char('Y' | 'y') | Key::Enter) => break Res::Y,
+                Ok(Key::Char('N' | 'n')) => break Res::N,
+                Ok(Key::Char(ch)) => term.write_line(&format!(" Unknown key '{}'", ch))?,
+                Ok(Key::Escape) => {
+                    break Res::Exit;
+                }
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::Interrupted {
+                        break Res::Exit;
+                    } else {
+                        return Err(e.into());
+                    }
+                }
+                _ => term.write_line(" Unknown key")?,
+            }
+        };
+        Ok(res)
+    }
+
+    let term = Term::stderr();
+    let res = inner(&term, script);
+    term.show_cursor()?;
+    match res? {
         Res::Exit => {
-            term.show_cursor()?;
             std::process::exit(1);
         }
         Res::Y => {

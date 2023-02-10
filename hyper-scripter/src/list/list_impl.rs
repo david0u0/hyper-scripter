@@ -225,26 +225,30 @@ pub async fn fmt_list<W: Write>(
                 v.push(script);
             });
 
-            let mut scripts: Vec<_> = script_map.into_iter().collect();
+            let mut scripts: Vec<_> = script_map
+                .into_iter()
+                .map(|(k, v)| {
+                    // NOTE: 以群組中執行次數的最大值排序, 無標籤永遠在上
+                    let sort_key = if k.is_empty() {
+                        None
+                    } else {
+                        v.iter()
+                            .map(|s| {
+                                if s.exec_time.is_none() {
+                                    0
+                                } else {
+                                    s.exec_count
+                                }
+                            })
+                            .max()
+                    };
+                    (sort_key, k, v)
+                })
+                .collect();
 
-            // NOTE: 以群組中執行次數的最大值排序, 無標籤永遠在上
-            scripts.sort_by_key(|(k, v)| {
-                if k.is_empty() {
-                    None
-                } else {
-                    v.iter()
-                        .map(|s| {
-                            if s.exec_time.is_none() {
-                                0
-                            } else {
-                                s.exec_count
-                            }
-                        })
-                        .max()
-                }
-            });
+            scripts.sort_by_key(|(sort_key, _, _)| *sort_key);
 
-            for (tags, scripts) in scripts.into_iter() {
+            for (_, tags, scripts) in scripts.into_iter() {
                 if !opt.grouping.is_none() {
                     let tags_txt = style(opt.plain, tags, |s| s.dimmed().italic().done());
                     match &mut opt.display_style {

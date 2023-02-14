@@ -59,6 +59,41 @@ pub async fn mv(
         .await?;
     Ok(())
 }
+
+fn create<F: FnOnce(String) -> Error>(
+    query: ScriptQuery,
+    script_repo: &mut ScriptRepo,
+    ty: &ScriptType,
+    tags: &EditTagArgs,
+    f: F,
+) -> Result<(ScriptName, PathBuf)> {
+    if tags.explicit_select {
+        return Err(RedundantOpt::Selector.into());
+    }
+
+    let name = query.into_script_name()?;
+    log::debug!("打開新命名腳本：{:?}", name);
+    if script_repo.get_mut(&name, Visibility::All).is_some() {
+        return Err(f(name.to_string()));
+    }
+
+    let p =
+        path::open_script(&name, ty, None).context(format!("打開新命名腳本失敗：{:?}", name))?;
+    if p.exists() {
+        if p.is_dir() {
+            return Err(Error::PathExist(p).context("與目錄撞路徑"));
+        }
+        check_path_collision(&p, script_repo)?;
+        log::warn!("編輯野生腳本！");
+    } else {
+        // NOTE: 創建資料夾
+        if let Some(parent) = p.parent() {
+            super::handle_fs_res(&[&p], create_dir_all(parent))?;
+        }
+    }
+    Ok((name, p))
+}
+
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
 pub async fn edit_or_create(
     edit_query: EditQuery<ScriptQuery>,
@@ -69,53 +104,36 @@ pub async fn edit_or_create(
     let final_ty: ScriptFullType;
 
     let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        match query::do_script_query(&query, script_repo, false, false).await {
-            // TODO: 手動測試文件？
-            Err(Error::DontFuzz) | Ok(None) => {
-                if tags.explicit_select {
-                    return Err(RedundantOpt::Selector.into());
+        if let Some(ty) = ty {
+            final_ty = ty;
+            create(query, script_repo, &final_ty.ty, &tags, |name| {
+                log::error!("與已存在的腳本撞名");
+                Error::ScriptExist(name.to_string())
+            })?
+        } else {
+            match query::do_script_query(&query, script_repo, false, false).await {
+                Err(Error::DontFuzz) | Ok(None) => {
+                    final_ty = Default::default();
+                    create(query, script_repo, &final_ty.ty, &tags, |name| {
+                        log::error!("與被篩掉的腳本撞名");
+                        Error::ScriptIsFiltered(name.to_string())
+                    })?
                 }
-                final_ty = ty.unwrap_or_default();
-                let name = query.into_script_name()?;
-                if script_repo.get_mut(&name, Visibility::All).is_some() {
-                    log::error!("與被篩掉的腳本撞名");
-                    return Err(Error::ScriptIsFiltered(name.to_string()));
-                }
-                log::debug!("打開新命名腳本：{:?}", name);
-
-                let p = path::open_script(&name, &final_ty.ty, None)
-                    .context(format!("打開新命名腳本失敗：{:?}", name))?;
-                if p.exists() {
-                    if p.is_dir() {
-                        return Err(Error::PathExist(p).context("與目錄撞路徑"));
+                Ok(Some(entry)) => {
+                    if tags.explicit_tag {
+                        return Err(RedundantOpt::Tag.into());
                     }
-                    check_path_collision(&p, script_repo)?;
-                    log::warn!("編輯野生腳本！");
-                } else {
-                    // NOTE: 創建資料夾
-                    if let Some(parent) = p.parent() {
-                        super::handle_fs_res(&[&p], create_dir_all(parent))?;
-                    }
+                    log::debug!("打開既有命名腳本：{:?}", entry.name);
+                    let p = path::open_script(&entry.name, &entry.ty, Some(true))
+                        .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+                    // NOTE: 直接返回
+                    // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
+                    // return Ok((p, entry));
+                    let n = entry.name.clone();
+                    return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap(), None));
                 }
-                (name, p)
+                Err(e) => return Err(e),
             }
-            Ok(Some(entry)) => {
-                if ty.is_some() {
-                    return Err(RedundantOpt::Type.into());
-                }
-                if tags.explicit_tag {
-                    return Err(RedundantOpt::Tag.into());
-                }
-                log::debug!("打開既有命名腳本：{:?}", entry.name);
-                let p = path::open_script(&entry.name, &entry.ty, Some(true))
-                    .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-                // NOTE: 直接返回
-                // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
-                // return Ok((p, entry));
-                let n = entry.name.clone();
-                return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap(), None));
-            }
-            Err(e) => return Err(e),
         }
     } else {
         if tags.explicit_select {

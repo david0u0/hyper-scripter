@@ -104,11 +104,12 @@ fn test_edit_existing_bang() {
     let _g = setup();
 
     run!("e test -t hide | echo 躲貓貓").unwrap();
+    run!("e -t gg non-hidden -T rb | puts '光明正大'").unwrap();
 
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        use hyper_scripter::error::{Error, RedundantOpt};
+        use hyper_scripter::error::Error;
         use hyper_scripter::script_repo::ScriptRepo;
         use hyper_scripter::tag::{Tag, TagSelector};
         use hyper_scripter::util::{
@@ -145,19 +146,36 @@ fn test_edit_existing_bang() {
         let err = try_edit!("test", Some("rb"), "gg")
             .await
             .expect_err("沒有 BANG! 就找到編輯的腳本！？");
-        assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
+        assert!(matches!(err, Error::ScriptExist(s) if s == "test"));
 
-        let err = try_edit!("=test", Some("rb"), "gg").await.unwrap_err();
+        let err = try_edit!("test", None, "gg").await.unwrap_err();
         assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
         let err = try_edit!("test!", Some("rb"), "gg").await.unwrap_err();
-        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
+        assert!(matches!(err, Error::ScriptExist(s) if s == "test"));
 
+        // name different from `test.rb`, so we can create it
         let (p, e, sub) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
         assert_eq!(p, get_home().join("tes.rb"));
         assert!(sub.is_some());
         assert_tags(&["gg"], e.tags.iter());
 
+        let err = try_edit!("tes", Some("rb"), "+gg").await.unwrap_err();
+        assert!(matches!(err, Error::ScriptExist(s) if s == "tes"));
+
+        // simple edit, should find existing script `non-hidden.rb`
+        let (p, e, sub) = try_edit!("non-hi", None, "+zzzz").await.unwrap();
+        assert_eq!(p, get_home().join("non-hidden.rb"));
+        assert!(sub.is_none());
+        assert_tags(&["gg"], e.tags.iter());
+
+        // edit with type, so create new script `non-hi.rb`
+        let (p, e, sub) = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
+        assert_eq!(p, get_home().join("non-hi.rb"));
+        assert!(sub.is_some());
+        assert_tags(&["zzzz"], e.tags.iter());
+
+        // simple edit and name is disjoint from others, create script `test2.sh`
         let (p, e, sub) = try_edit!("test2", None, "+gg").await.unwrap();
         assert_eq!(p, get_home().join("test2.sh"));
         assert!(sub.is_none());

@@ -79,6 +79,18 @@ pub enum ScriptName {
     Anonymous(u32),
     Named(ConcreteScriptName),
 }
+/// ```
+/// use hyper_scripter::script::*;
+///
+/// let name: ScriptName = ".42".parse().unwrap();
+/// assert_eq!(name, ScriptName::Anonymous(42));
+///
+/// let name: ScriptName = "name".parse().unwrap();
+/// assert_eq!(name.to_string(), "name");
+///
+/// let res: Result<ScriptName, _> = ".0".parse();
+/// res.unwrap_err();
+/// ```
 impl FromStr for ScriptName {
     type Err = DisplayError;
     fn from_str(s: &str) -> DisplayResult<Self> {
@@ -101,8 +113,8 @@ impl ScriptName {
                 log::info!("特殊規則：允許單一個`.`");
                 return Ok(None); // NOTE: 讓匿名腳本可以直接用 `.` 來搜
             }
-            match s[1..].parse::<u32>() {
-                Ok(id) => Ok(Some(id)),
+            match s[1..].parse::<std::num::NonZeroU32>() {
+                Ok(id) => Ok(Some(id.get())),
                 Err(e) => ScriptNameCode.to_res(s.to_owned()).context(e),
             }
         } else if check {

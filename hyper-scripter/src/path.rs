@@ -11,6 +11,7 @@ use std::path::{Component, Path, PathBuf};
 pub const HS_REDIRECT: &str = ".hs_redirect";
 pub const HS_PRE_RUN: &str = ".hs_prerun";
 const TEMPLATE: &str = ".hs_templates";
+const HBS_EXT: &str = ".hbs";
 
 macro_rules! hs_home_env {
     () => {
@@ -139,7 +140,7 @@ pub fn get_home() -> &'static Path {
     PATH.get().as_ref()
 }
 
-fn get_anonymous_ids() -> Result<Vec<u32>> {
+fn get_anonymous_ids() -> Result<impl Iterator<Item = Result<u32>>> {
     // TODO: iterator
     let dir = get_home().join(ANONYMOUS);
     if !dir.exists() {
@@ -147,27 +148,37 @@ fn get_anonymous_ids() -> Result<Vec<u32>> {
         handle_fs_res(&[&dir], create_dir(&dir))?;
     }
 
-    let mut ids = vec![];
-    let re = regex::Regex::new(r"\..+$").unwrap();
-    for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
-        let name = entry?.file_name();
-        let name = name
-            .to_str()
-            .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
-        let name = re.replace(name, "");
-        match name.parse::<u32>() {
-            Ok(id) => ids.push(id),
-            _ => log::warn!("匿名腳本名無法轉為整數：{}", name),
-        }
-    }
-
-    Ok(ids)
+    let dir = handle_fs_res(&[&dir], read_dir(&dir))?;
+    let iter = dir
+        .map(|entry| -> Result<Option<u32>> {
+            let name = entry?.file_name();
+            let name = name
+                .to_str()
+                .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
+            let pre = if let Some((pre, _)) = name.split_once('.') {
+                pre
+            } else {
+                name
+            };
+            match pre.parse::<u32>() {
+                Ok(id) => Ok(Some(id)),
+                _ => {
+                    log::warn!("匿名腳本名無法轉為整數：{}", name);
+                    Ok(None)
+                }
+            }
+        })
+        .filter_map(|t| match t {
+            Ok(Some(id)) => Some(Ok(id)),
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
+        });
+    Ok(iter)
 }
 pub fn new_anonymous_name() -> Result<ScriptName> {
-    let ids: HashSet<_> = get_anonymous_ids()
-        .context("無法取得匿名腳本編號")?
-        .into_iter()
-        .collect();
+    let ids = get_anonymous_ids()?
+        .collect::<Result<HashSet<_>>>()
+        .context("無法取得匿名腳本編號")?;
     let mut i = 1;
     loop {
         if !ids.contains(&i) {
@@ -218,7 +229,7 @@ pub fn open_script(
 pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
     let p = get_home()
         .join(TEMPLATE)
-        .join(format!("{}.hbs", ty.display()));
+        .join(format!("{}{}", ty.display(), HBS_EXT));
     if let Some(dir) = p.parent() {
         if !dir.exists() {
             log::info!("找不到模板資料夾，創建之");
@@ -235,14 +246,17 @@ pub fn get_sub_types(ty: &ScriptType) -> Result<Vec<ScriptType>> {
     }
 
     let mut subs = vec![];
-    let re = regex::Regex::new(r"\.hbs$").unwrap();
     for entry in handle_fs_res(&[&dir], read_dir(&dir))? {
         let name = entry?.file_name();
         let name = name
             .to_str()
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
-        let name = re.replace(&name, "");
-        subs.push(name.parse()?);
+        if name.ends_with(HBS_EXT) {
+            let name = &name[..name.len() - HBS_EXT.len()];
+            subs.push(name.parse()?);
+        } else {
+            log::warn!("發現非模版檔案 {}", name);
+        }
     }
     Ok(subs)
 }
@@ -257,15 +271,18 @@ mod test {
     }
     #[test]
     fn test_anonymous_ids() {
-        let mut ids = get_anonymous_ids().unwrap();
+        let mut ids = get_anonymous_ids()
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         ids.sort();
-        assert_eq!(ids, vec![1, 2, 5]);
+        assert_eq!(ids, vec![1, 2, 3, 5]);
     }
     #[test]
     fn test_open_anonymous() {
         let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
-        assert_eq!(name, ScriptName::Anonymous(3));
-        assert_eq!(p, get_test_home().join(".anonymous/3.sh"));
+        assert_eq!(name, ScriptName::Anonymous(4));
+        assert_eq!(p, get_test_home().join(".anonymous/4.sh"));
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(p, get_test_home().join(".anonymous/5.js"));
     }

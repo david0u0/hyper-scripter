@@ -25,10 +25,10 @@ use hyper_scripter_historian::{Historian, LastTimeRecord};
 #[tokio::main]
 async fn main() {
     my_env_logger::init();
-    let errs = match main_err_handle().await {
-        Err(e) => vec![e],
-        Ok(v) => v,
-    };
+    let mut errs = vec![];
+    if let Err(err) = main_err_handle(&mut errs).await {
+        errs.push(err);
+    }
     let mut exit_code = ExitCode::default();
     for err in errs.iter() {
         exit_code.cmp_and_replace(err.code());
@@ -36,7 +36,7 @@ async fn main() {
     }
     std::process::exit(exit_code.code());
 }
-async fn main_err_handle() -> Result<Vec<Error>> {
+async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
     let root = match root {
@@ -54,7 +54,7 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     if root.root_args.dump_args {
         let dumped = serde_json::to_string(&root)?;
         print!("{}", dumped);
-        return Ok(vec![]);
+        return Ok(());
     }
 
     root.set_home_unless_from_alias(true)?;
@@ -62,40 +62,38 @@ async fn main_err_handle() -> Result<Vec<Error>> {
     if matches!(root.subcmd, Some(Subs::Migrate)) {
         migration::do_migrate(db::get_file()).await?;
         Historian::do_migrate(path::get_home()).await?;
-        return Ok(vec![]);
+        return Ok(());
     }
 
     let mut resource = Resource::None;
-    let res = main_inner(root, &mut resource).await;
-    resource.close().await;
-    let res = res?;
-    if let Some(conf) = res.conf {
+    let mut ret = MainReturn { conf: None, errs };
+    let res = main_inner(root, &mut resource, &mut ret).await;
+    resource.close().await; // 不論如何都要關閉資料庫！
+    res?;
+
+    if let Some(conf) = ret.conf {
         log::info!("存入改變後的設定檔");
         conf.store()?;
     } else if Config::get().is_from_dafault() {
         log::info!("存入憑空產生的設定檔");
         Config::get().store()?;
     }
-    Ok(res.errs)
+    Ok(())
 }
 
-struct MainReturn {
+struct MainReturn<'a> {
     conf: Option<Config>,
     /// 用來裝那種不會馬上造成中止的錯誤，例如 ScriptError
-    errs: Vec<Error>,
+    errs: &'a mut Vec<Error>,
 }
 
-async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
+async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_>) -> Result {
     Config::set_prompt_level(root.root_args.prompt_level);
     let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();
     let need_journal = main_util::need_write(root.subcmd.as_ref().unwrap());
 
-    let mut ret = MainReturn {
-        conf: None,
-        errs: vec![],
-    };
     let repo = RepoHolder {
         resource,
         need_journal,
@@ -704,7 +702,7 @@ async fn main_inner(root: Root, resource: &mut Resource) -> Result<MainReturn> {
         }
         sub => unimplemented!("{:?}", sub),
     }
-    Ok(ret)
+    Ok(())
 }
 
 async fn create_read_event(entry: &mut RepoEntry<'_>) -> Result<i64> {

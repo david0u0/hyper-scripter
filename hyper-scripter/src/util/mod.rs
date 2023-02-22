@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::config::Config;
-use crate::error::{Contextable, Error, Result};
+use crate::error::{Contextable, Error, FormatCode::Template as TemplateCode, Result};
 use crate::path;
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, AsScriptFullTypeRef, ScriptType};
@@ -263,7 +263,7 @@ pub fn prepare_script<T: AsRef<str>>(
             log::debug!("編輯模版資訊：{:?}", info);
             // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
             let template = get_or_create_template(&(&script.ty, sub_type), true, true)?;
-            handle_fs_res(&[path], write_prepare_script(file, &template, &info))?;
+            write_prepare_script(file, &path, &template, &info)?;
         } else {
             let mut first = true;
             for line in content {
@@ -297,15 +297,20 @@ pub fn prepare_script<T: AsRef<str>>(
 }
 fn write_prepare_script<W: Write>(
     w: W,
+    path: &Path,
     template: &str,
     info: &serde_json::Value,
-) -> std::io::Result<()> {
+) -> Result {
     use handlebars::{Handlebars, TemplateRenderError};
     let reg = Handlebars::new();
     reg.render_template_to_write(&template, &info, w)
         .map_err(|err| match err {
-            TemplateRenderError::IOError(err, ..) => err,
-            e => panic!("解析模版錯誤：{}", e),
+            TemplateRenderError::TemplateError(err) => {
+                log::warn!("解析模版錯誤：{}", err);
+                TemplateCode.to_err(template.to_owned())
+            }
+            TemplateRenderError::IOError(err, ..) => handle_fs_err(&[path], err),
+            TemplateRenderError::RenderError(err) => err.into(),
         })
 }
 

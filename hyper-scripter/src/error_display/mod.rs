@@ -51,6 +51,7 @@ impl Display for Error {
                     Tag => write!(f, "tag")?,
                     PromptLevel => write!(f, "prompt level")?,
                     EnvPair => write!(f, "env pair (e.g. VAR=1)")?,
+                    Template => write!(f, "template")?,
                     NonEmptyArray => {
                         write!(f, "non-empty array")?;
                         return Ok(());

@@ -42,6 +42,7 @@ pub enum FormatCode {
     Tag,
     NonEmptyArray,
     EnvPair,
+    Template, // TODO: 一旦特化穩定了，就讓 handlebars 錯誤自動轉成這個
 }
 
 impl FormatCode {

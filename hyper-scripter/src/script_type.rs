@@ -10,11 +10,11 @@ use std::str::FromStr;
 const DEFAULT_WELCOME_MSG: &str = "{{#each content}}{{{this}}}
 {{/each}}";
 
-const SHELL_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
+const SHELL_WELCOME_MSG: &str = "set -eux
+
+# [HS_HELP]: Help message goes here...
 # [HS_ENV]: VAR -> Description for env var `VAR` goes here
 # [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
-
-set -eu
 {{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}
@@ -55,7 +55,7 @@ if [ $? = 0 ]; then
     exit
 fi
 
-set -eu
+set -eux
 {{#if birthplace_in_home}}
 cd ~/{{birthplace_rel}}
 {{else}}

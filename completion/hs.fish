@@ -78,7 +78,26 @@ function __hs_list_scripts
     if [ -n $name ]
         if echo $name | string match -q -r ".*!\$"
             set bang "!"
-            set cmd "hs -s all --timeless"
+            set filter "-s all --timeless"
+        end
+
+        if echo $name | string match -q -r "^\^.*" || [ $name = "!" ]
+            # NOTE: Spectial case. Latest script completion.
+            # TODO: Make it support anonymous script
+            set list (__hs_extract_home_and_run ls $filter --name --plain --grouping none --limit 10)
+            if [ $status -ne 0 ]
+                return
+            end
+            set num 0
+            for script in (string split ' ' $list)
+                set num (math $num + 1)
+                set bang "$bang"
+                echo $script$bang\t^$num$bang
+            end
+            return
+        end
+
+        if set -q bang
             set name (string replace ! '' $name)
         end
         if echo $name | string match -q -r "=.*\$"
@@ -88,11 +107,9 @@ function __hs_list_scripts
         if [ -n $name ]
             set name_arg "--name $name"
         end
-        if not set -q cmd
-            set cmd "$cmd_arr[1..-2] trailing"
-        end
+        set cmd "$cmd_arr[1..-2] $filter trailing"
     else
-        set cmd "$orig_cmd trailing"
+        set cmd "$orig_cmd $filter trailing"
     end
 
     set list (eval "command hs completion ls $name_arg -- $cmd" 2>/dev/null)
@@ -140,7 +157,11 @@ function __hs_list_alias
         return
     end
 
-    __hs_extract_home_and_run alias
+    set list (__hs_extract_home_and_run alias)
+    for line in $list
+        set arr (string split \t $line)
+        echo $arr[1]
+    end
 end
 
 function __hs_is_alias

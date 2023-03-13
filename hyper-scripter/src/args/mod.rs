@@ -228,8 +228,8 @@ pub enum Subs {
     },
     #[clap(about = "Execute the script query and get the exact file")]
     Which {
-        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
-        script_query: ScriptQuery,
+        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
+        queries: Vec<ListQuery>,
     },
     #[clap(about = "Print the script to standard output")]
     Cat {

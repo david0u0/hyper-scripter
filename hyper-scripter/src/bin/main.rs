@@ -259,13 +259,15 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             )
             .await?;
         }
-        Subs::Which { script_query } => {
+        Subs::Which { queries } => {
             let repo = repo.init().await?;
-            let entry = query::do_script_query_strict(&script_query, repo).await?;
-            log::info!("定位 {:?}", entry.name);
-            // NOTE: 不檢查存在與否
-            let p = path::get_home().join(entry.file_path_fallback());
-            println!("{}", p.to_string_lossy());
+            let home = path::get_home();
+            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
+                log::info!("定位 {:?}", entry.name);
+                // NOTE: 不檢查存在與否
+                let p = home.join(entry.file_path_fallback());
+                println!("{}", p.to_string_lossy());
+            }
         }
         Subs::Cat { script_query } => {
             let repo = repo.init().await?;

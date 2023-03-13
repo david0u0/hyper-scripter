@@ -50,11 +50,59 @@ pub struct NamedTagSelector {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Alias {
+    #[serde(deserialize_with = "de_nonempty_vec")]
     pub after: Vec<String>,
 }
 impl From<Vec<String>> for Alias {
     fn from(after: Vec<String>) -> Self {
         Alias { after }
+    }
+}
+impl Alias {
+    /// ```rust
+    /// use hyper_scripter::config::Alias;
+    ///
+    /// fn get_args(alias: &Alias) -> (bool, Vec<&str>) {
+    ///     let (is_shell, args) = alias.args();
+    ///     (is_shell, args.collect())
+    /// }
+    ///
+    /// let alias = Alias::from(vec!["!".to_owned()]);
+    /// assert_eq!((false, vec!["!"]), get_args(&alias));
+    ///
+    /// let alias = Alias::from(vec!["!".to_owned(), "args".to_owned()]);
+    /// assert_eq!((false, vec!["!", "args"]), get_args(&alias));
+    ///
+    /// let alias = Alias::from(vec!["! args".to_owned()]);
+    /// assert_eq!((false, vec!["! args"]), get_args(&alias));
+    ///
+    /// let alias = Alias::from(vec!["!!".to_owned()]);
+    /// assert_eq!((true, vec!["!"]), get_args(&alias));
+    ///
+    /// let alias = Alias::from(vec!["!ls".to_owned()]);
+    /// assert_eq!((true, vec!["ls"]), get_args(&alias));
+    ///
+    /// let alias = Alias::from(vec!["!ls".to_owned(), "*".to_owned()]);
+    /// assert_eq!((true, vec!["ls", "*"]), get_args(&alias));
+    /// ```
+    pub fn args(&self) -> (bool, impl Iterator<Item = &'_ str>) {
+        let mut is_shell = false;
+        let first_args = &self.after[0];
+        let mut chars = first_args.chars();
+        if chars.next() == Some('!') {
+            if first_args.len() > 1 {
+                if chars.next() != Some(' ') {
+                    is_shell = true;
+                }
+            }
+        }
+
+        let mut iter = self.after.iter().map(String::as_str);
+        let mut first = iter.next().unwrap();
+        if is_shell {
+            first = &first[1..];
+        }
+        return (is_shell, std::iter::once(first).chain(iter));
     }
 }
 
@@ -144,8 +192,8 @@ impl Default for Config {
                 gen_alias("p", &["run", "--previous"]),
                 gen_alias("pc", &["=util/historian!", "--sequence", "c", "--show-env"]),
                 gen_alias("pr", &["=util/historian!", "--sequence", "r", "--show-env"]),
-                gen_alias("purge", &["rm", "--purge"]),
                 gen_alias("h", &["=util/historian!", "--show-env"]),
+                gen_alias("hh", &["=util/historian!", "*", "--show-env"]),
             ]
             .into_iter()
             .collect(),

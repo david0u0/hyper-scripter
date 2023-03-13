@@ -40,7 +40,10 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
     let root = match root {
-        Either::One(root) => root,
+        Either::One(Either::One(root)) => root,
+        Either::One(Either::Two(shell)) => {
+            std::process::exit(util::run_shell(&shell)?);
+        }
         Either::Two(comp) => {
             let mut repo = None;
             let res = completion_util::handle_completion(comp, &mut repo).await;

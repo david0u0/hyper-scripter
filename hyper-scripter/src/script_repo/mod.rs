@@ -2,7 +2,6 @@ use crate::error::Result;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelectorGroup};
-use crate::Either;
 use chrono::{Duration, Utc};
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
@@ -69,12 +68,6 @@ pub struct RepoEntryOptional<'b> {
     env: &'b DBEnv,
 }
 impl<'b> RepoEntryOptional<'b> {
-    pub fn into_either(self) -> Either<RepoEntry<'b>, Self> {
-        match self.entry {
-            Occupied(entry) => Either::One(RepoEntry::new(entry.into_mut(), self.env)),
-            _ => Either::Two(self),
-        }
-    }
     pub async fn or_insert(self, info: ScriptInfo) -> Result<RepoEntry<'b>> {
         let exist = matches!(&self.entry, Occupied(_));
         let info = self.entry.or_insert(info);

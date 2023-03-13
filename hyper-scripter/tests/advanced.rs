@@ -196,3 +196,21 @@ fn test_prev_env() {
     assert_eq!(run!("-").unwrap(), "::");
     assert_eq!(run!("run -p").unwrap(), "::");
 }
+
+#[test]
+fn test_shell_alias() {
+    let _g = setup();
+
+    run!("alias test-alias !echo a").unwrap();
+    assert_eq!("a", run!("test-alias").unwrap());
+    assert_eq!("a b", run!("test-alias b").unwrap());
+
+    assert_eq!("a", run!("-a test-alias").unwrap());
+    assert_eq!("a -a", run!("test-alias -a").unwrap());
+
+    run!(allow_other_error: true, "-s inva!id test-alias").expect_err("invalid args");
+    run!("-s valid test-alias").expect("valid args");
+
+    run!("alias -u test-alias").unwrap();
+    run!("test-alias").expect_err("alias is unset!");
+}

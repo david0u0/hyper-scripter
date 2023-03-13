@@ -82,7 +82,7 @@ pub struct RootArgs {
 #[clap(about, author, version)]
 #[clap(allow_hyphen_values = true, args_override_self = true)] // NOTE: 我們需要那個 `allow_hyphen_values` 來允許 hs --dummy 這樣的命令
 pub struct Root {
-    #[clap(skip = false)]
+    #[clap(skip)]
     #[serde(skip)]
     is_from_alias: bool,
     #[clap(flatten)]
@@ -128,16 +128,23 @@ impl AliasRoot {
         &'a self,
         args: &'a [T],
         conf: &'a Config,
-    ) -> Option<impl Iterator<Item = &'a str>> {
+    ) -> Option<(bool, impl Iterator<Item = &'a str>)> {
         if let Some((alias, remaining_args)) = self.find_alias(conf) {
-            let base_len = args.len() - remaining_args.len();
+            let (is_shell, after_args) = alias.args();
+
+            let base_len = if is_shell {
+                0 // shell 別名，完全無視開頭的參數（例如 `hs -s tag -H path/to/home`）
+            } else {
+                args.len() - remaining_args.len()
+            };
             let base_args = args.iter().take(base_len).map(AsRef::as_ref);
-            let after_args = alias.after.iter().map(AsRef::as_ref);
+
             let remaining_args = remaining_args[1..].iter().map(AsRef::as_ref);
+
             let new_args = base_args.chain(after_args).chain(remaining_args);
 
             // log::trace!("新的參數為 {:?}", new_args);
-            Some(new_args)
+            Some((is_shell, new_args))
         } else {
             None
         }
@@ -385,22 +392,25 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
     std::process::exit(0);
 }
 
-fn handle_alias_args(args: Vec<String>) -> Result<Root> {
+fn handle_alias_args(args: Vec<String>) -> Result<Either<Root, Vec<String>>> {
     if args.iter().any(|s| s == "--no-alias") {
         log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 clap 之外！
         let root = Root::parse_from(args);
-        return Ok(root);
+        return Ok(Either::One(root));
     }
     match AliasRoot::try_parse_from(&args) {
         Ok(alias_root) => {
             log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
-                Some(new_args) => Root::parse_from(new_args),
+                Some((true, new_args)) => {
+                    return Ok(Either::Two(new_args.map(ToOwned::to_owned).collect()));
+                }
+                Some((false, new_args)) => Root::parse_from(new_args),
                 None => Root::parse_from(&args),
             };
             root.is_from_alias = true;
-            Ok(root)
+            Ok(Either::One(root))
         }
         Err(e) => {
             log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::parse_from 中再來報錯
@@ -461,14 +471,16 @@ impl Root {
     }
 }
 
-pub fn handle_args(args: Vec<String>) -> Result<Either<Root, Completion>> {
+pub fn handle_args(args: Vec<String>) -> Result<Either<Either<Root, Vec<String>>, Completion>> {
     if let Some(completion) = Completion::from_args(&args) {
         return Ok(Either::Two(completion));
     }
     let mut root = handle_alias_args(args)?;
-    log::debug!("命令行物件：{:?}", root);
+    if let Either::One(root) = &mut root {
+        log::debug!("命令行物件：{:?}", root);
+        root.sanitize()?;
+    }
 
-    root.sanitize()?;
     Ok(Either::One(root))
 }
 
@@ -481,7 +493,7 @@ mod test {
             .map(|s| s.to_owned())
             .collect();
         match handle_args(v).unwrap() {
-            Either::One(root) => root,
+            Either::One(Either::One(root)) => root,
             _ => panic!(),
         }
     }
@@ -530,9 +542,9 @@ mod test {
             }
         }
 
-        let args = build_args("la -l");
-        assert_eq!(args.root_args.select, vec!["all,^remove".parse().unwrap()]);
+        let args = build_args("laa -l");
         assert_eq!(args.root_args.all, true);
+        assert_eq!(args.root_args.select, vec!["all,^remove".parse().unwrap()]);
         match &args.subcmd {
             Some(Subs::LS(opt)) => {
                 assert_eq!(opt.long, true);

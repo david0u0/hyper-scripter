@@ -112,7 +112,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
 
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             let conf = Config::load(&home)?;
-            if let Some(new_args) = root.expand_alias(&args, &conf) {
+            if let Some((false, new_args)) = root.expand_alias(&args, &conf) {
                 print_iter(new_args, " ");
             } else {
                 log::info!("並非別名");

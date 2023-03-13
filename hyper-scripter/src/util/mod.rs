@@ -73,9 +73,17 @@ where
     cmd
 }
 
+pub fn run_shell(args: &[String]) -> Result<i32> {
+    let cmd = args.join(" ");
+    log::debug!("shell args = {:?}", cmd);
+    let cmd = create_cmd("sh", ["-c", &cmd]);
+    let stat = run_cmd(cmd)?;
+    Ok(stat.code().unwrap_or_default())
+}
+
 pub fn open_editor(path: &Path) -> Result {
     let conf = Config::get();
-    let cmd = create_concat_cmd(&conf.editor, &[&path]);
+    let cmd = create_concat_cmd(&conf.editor, [&path]);
     let stat = run_cmd(cmd)?;
     if !stat.success() {
         let code = stat.code().unwrap_or_default();

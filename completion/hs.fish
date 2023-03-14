@@ -92,7 +92,7 @@ function __hs_list_scripts
             for script in (string split ' ' $list)
                 set num (math $num + 1)
                 set bang "$bang"
-                echo $script$bang\t^$num$bang
+                echo =$script$bang\t^$num$bang
             end
             return
         end
@@ -355,6 +355,8 @@ complete -k -c hs -n "__fish_prev_arg_in tags" -f -a "(__hs_list_tags_and_types 
 complete -k -c hs -n "__fish_seen_subcommand_from set" -f -a "(__hs_list_tags_and_types append)"
 complete -c hs -n "__fish_seen_subcommand_from unset" -f -a "(__hs_list_named_selectors)"
 complete -c hs -n "__fish_seen_subcommand_from toggle" -f -a "(__hs_list_named_selectors)"
+
+complete -k -c hs -n "__fish_prev_arg_in alias" -f -a "(__hs_list_alias)"
 
 complete -k -c hs -n "__fish_seen_subcommand_from history" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from history" -l recent -d 'Show scripts within recent days.'

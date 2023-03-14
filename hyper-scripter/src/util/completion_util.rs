@@ -65,10 +65,10 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
         Completion::LS { name, args } => {
             let mut new_root = match Root::try_parse_from(args) {
                 Ok(Root {
-                    subcmd: Some(Subs::Tags(_) | Subs::Types(_)),
+                    subcmd: Some(Subs::Tags(_) | Subs::Types(_) | Subs::Alias { before: None, .. }),
                     ..
                 }) => {
-                    // TODO: 在補全腳本中處理，而不要在這邊
+                    // XXX: 在補全腳本中處理，而不要在這邊
                     return Err(Error::Completion);
                 }
                 Ok(t) => t,

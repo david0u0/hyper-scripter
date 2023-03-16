@@ -249,10 +249,16 @@ pub fn is_prefix(prefix: &str, target: &str, sep: &str) -> bool {
     found
 }
 
-fn my_fuzz(choice: &str, pattern: &str, sep: &str, boost_exact: bool) -> Option<i64> {
+fn my_fuzz(mut choice: &str, pattern: &str, sep: &str, boost_exact: bool) -> Option<i64> {
     if boost_exact && choice == pattern {
         return Some(EXACXT_SCORE);
     }
+
+    if choice.chars().next() == Some('.') && pattern.chars().next() != Some('.') {
+        log::trace!("拔掉匿名腳本的 `.` 前綴");
+        choice = &choice[1..];
+    }
+
     let mut ans_opt = None;
     let mut first = true;
     foreach_reorder(choice, sep, &mut |choice_reordered| {
@@ -275,6 +281,7 @@ fn my_fuzz(choice: &str, pattern: &str, sep: &str, boost_exact: bool) -> Option<
                     score
                 );
             }
+
             if let Some(ans) = ans_opt {
                 ans_opt = Some(std::cmp::max(score, ans));
             } else {

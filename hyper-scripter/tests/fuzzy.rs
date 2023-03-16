@@ -60,7 +60,7 @@ const VCS2: Str = "dir/vcs2";
 
 #[test]
 fn test_fuzzy_1() {
-    assert_eq!(
+    assert_vec!(
         unwrap_fuzz(DIR, &vec![DISCORD_RUN, DISCORD_DIR]),
         vec![DISCORD_DIR]
     );
@@ -95,7 +95,7 @@ const SCRIPT: Str = "dir/script";
 #[test]
 fn test_fuzzy_6() {
     let v = vec![SCRIPT, HYPER_SCRIPTER];
-    assert_eq!(unwrap_fuzz(SCRIPT, &v), vec![SCRIPT]);
+    assert_vec!(unwrap_fuzz(SCRIPT, &v), vec![SCRIPT]);
 }
 
 const BUILD_HS: Str = "hs/build";
@@ -104,7 +104,7 @@ const UILH: Str = "uilh";
 #[test]
 fn test_fuzzy_7() {
     let v = vec![BUILD_HS, UTIL_HISTORIAN];
-    assert_eq!(unwrap_fuzz(UILH, &v), vec![BUILD_HS]);
+    assert_vec!(unwrap_fuzz(UILH, &v), vec![BUILD_HS]);
 }
 
 const AB: Str = "ab";
@@ -113,6 +113,23 @@ const A: Str = "a";
 #[test]
 fn test_fuzzy_exact() {
     let v = vec![AB, ABC];
-    assert_eq!(unwrap_fuzz(A, &v), vec![ABC, AB]);
-    assert_eq!(unwrap_fuzz(AB, &v), vec![AB]);
+    assert_vec!(unwrap_fuzz(A, &v), vec![ABC, AB]);
+    assert_vec!(unwrap_fuzz(AB, &v), vec![AB]);
+}
+
+const DOT: Str = ".";
+const DOT_ONE: Str = ".1";
+const ONE: Str = "1";
+const TWELVE: Str = "12";
+const A_SLASH_ONE: Str = "a/1";
+const A_ONE: Str = "a1";
+#[test]
+fn test_fuzzy_anonymous() {
+    let v = vec![DOT_ONE, TWELVE, A_ONE, A_SLASH_ONE];
+    assert_vec!(unwrap_fuzz(ONE, &v), vec![DOT_ONE, A_SLASH_ONE, TWELVE]);
+
+    let v = vec![DOT_ONE, TWELVE, A_ONE, ONE, A_SLASH_ONE];
+    assert_vec!(unwrap_fuzz(ONE, &v), vec![ONE]);
+
+    assert_vec!(unwrap_fuzz(DOT, &v), vec![DOT_ONE]);
 }

@@ -1,4 +1,9 @@
 # frozen_string_literal: true
+#
+# [HS_HELP]: Run the selector terminal UI.
+# [HS_HELP]:
+# [HS_HELP]: e.g.:
+# [HS_HELP]:     hs selector opt1 opt2 opt3
 
 require_relative './common'
 require 'io/console'
@@ -381,4 +386,22 @@ class VirtualState
     from, to = get_range
     num >= from and num < to
   end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  selector = Selector.new
+  selector.load(ARGV)
+
+  selector.register_keys_virtual([ENTER], lambda { |_, _, _|
+  }, msg: 'Select multiple options')
+
+  answer = []
+  result = selector.run
+  if result.is_multi
+    answer = result.options
+  else
+    answer = [result.content]
+  end
+
+  answer.each { |opt| puts opt }
 end

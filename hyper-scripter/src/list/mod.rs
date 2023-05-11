@@ -10,6 +10,7 @@ mod tree;
 mod tree_lib;
 
 use crate::color::{Color, StyleObj, Stylize};
+use crate::util::writable::{write_writable, FmtWrite, Writable};
 use crate::{
     error::{DisplayError, DisplayResult, Result},
     query::ListQuery,
@@ -17,7 +18,6 @@ use crate::{
 };
 use serde::Serialize;
 use std::borrow::Cow;
-use std::fmt::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 
@@ -26,32 +26,31 @@ struct LatestTxt(&'static str, &'static str);
 const SHORT_LATEST_TXT: LatestTxt = LatestTxt("*", "");
 const LONG_LATEST_TXT: LatestTxt = LatestTxt(" *", "  ");
 
-macro_rules! style_name_w {
-    ($w:expr, $plain:expr, $is_latest:expr, $latest_txt:expr, $color:expr, $name:expr) => {{
-        use crate::color::{Color, Stylize};
-        let mut width = $name.len();
-        if $is_latest && !$plain {
-            write!(
-                $w,
-                "{}",
-                $latest_txt.0.stylize().color(Color::Yellow).bold()
-            )?;
-            width += $latest_txt.0.len();
-        } else {
-            write!($w, "{}", $latest_txt.1)?;
-            width += $latest_txt.1.len();
+fn style_name_w(
+    mut w: impl Writable,
+    plain: bool,
+    is_latest: bool,
+    latest_txt: LatestTxt,
+    color: Color,
+    name: &str,
+) -> Result<usize> {
+    let mut width = name.len();
+    if is_latest && !plain {
+        write_writable!(w, "{}", latest_txt.0.stylize().color(Color::Yellow).bold())?;
+        width += latest_txt.0.len();
+    } else {
+        write_writable!(w, "{}", latest_txt.1)?;
+        width += latest_txt.1.len();
+    }
+    let name = style(plain, name, |s| {
+        s.color(color).bold();
+        if is_latest {
+            s.underline();
         }
-        let name = style($plain, $name, |s| {
-            s.color($color).bold();
-            if $is_latest {
-                s.underline();
-            }
-        });
-        write!($w, "{}", name)?;
-        width
-    }};
+    });
+    write_writable!(w, "{}", name)?;
+    Ok(width)
 }
-pub(crate) use style_name_w;
 
 fn style_name(
     plain: bool,
@@ -61,7 +60,7 @@ fn style_name(
     name: &str,
 ) -> Result<(String, usize)> {
     let mut s = String::new();
-    let width = style_name_w!(&mut s, plain, is_latest, latest_txt, color, name);
+    let width = style_name_w(FmtWrite(&mut s), plain, is_latest, latest_txt, color, name)?;
     Ok((s, width))
 }
 

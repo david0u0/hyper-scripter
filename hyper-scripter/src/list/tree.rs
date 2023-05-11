@@ -8,9 +8,10 @@ use super::{
 use crate::error::Result;
 use crate::script::ScriptInfo;
 use crate::util::get_display_type;
+use crate::util::writable::{FmtWrite, IoWrite};
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
-use std::fmt::Write as FmtWrite;
+use std::fmt::Write as FmtWriteTrait;
 use std::io::Write;
 
 struct ShortFormatter<W: Write> {
@@ -64,14 +65,14 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for ShortFormat
         let ident = ident_string(self.ident_style, &*ty.display(), t);
         let l = style(self.plain, l, |s| s.dimmed().done());
         write!(self.w, "{}", l)?;
-        style_name_w!(
-            self.w,
+        style_name_w(
+            IoWrite(&mut self.w),
             self.plain,
             self.latest_script_id == script.id,
             SHORT_LATEST_TXT,
             ty.color(),
-            &ident
-        );
+            &ident,
+        )?;
         writeln!(self.w, "")?;
         Ok(())
     }
@@ -92,14 +93,14 @@ impl<'b> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for LongFormatter<'b> {
         let mut ident_width = l.width();
         let mut ident_txt = style(self.plain, l, |s| s.dimmed().done()).to_string();
         {
-            let name_width = style_name_w!(
-                &mut ident_txt,
+            let name_width = style_name_w(
+                FmtWrite(&mut ident_txt),
                 self.plain,
                 self.latest_script_id == script.id,
                 SHORT_LATEST_TXT,
                 ty.color(),
-                &name
-            );
+                &name,
+            )?;
             ident_width += name_width;
         }
 

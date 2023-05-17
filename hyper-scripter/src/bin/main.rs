@@ -265,7 +265,9 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         Subs::Which { queries } => {
             let repo = repo.init().await?;
             let home = path::get_home();
-            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
+            let mut scripts = query::do_list_query(repo, &queries).await?;
+            scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
+            for entry in scripts.into_iter() {
                 log::info!("定位 {:?}", entry.name);
                 // NOTE: 不檢查存在與否
                 let p = home.join(entry.file_path_fallback());

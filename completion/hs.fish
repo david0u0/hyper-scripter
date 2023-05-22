@@ -1,6 +1,6 @@
 function __hs_extract_home_and_run
     set cmd (commandline -j)
-    set hs_home (eval "hs completion home -- $cmd" 2>/dev/null)
+    set hs_home (eval "command hs completion home -- $cmd" 2>/dev/null)
     if [ $status -eq 0 ]
         if [ ! -d $hs_home ]
             # Stop completion cause we don't want to create directory
@@ -8,7 +8,7 @@ function __hs_extract_home_and_run
         end
         set home_args "-H $hs_home"
     end
-    eval "hs --no-alias $home_args $argv" 2>/dev/null
+    eval "command hs --no-alias $home_args $argv" 2>/dev/null
 end
 
 function __hs_list_types
@@ -75,42 +75,39 @@ function __hs_list_scripts
     set cmd_arr (string split ' ' $orig_cmd)
 
     set name $cmd_arr[-1]
-    if [ -n $name ]
-        if echo $name | string match -q -r ".*!\$"
-            set bang "!"
-            set filter "-s all --timeless"
-        end
 
-        if echo $name | string match -q -r "^\^.*" || [ $name = "!" ]
-            # NOTE: Spectial case. Latest script completion.
-            # TODO: Make it support anonymous script
-            set list (__hs_extract_home_and_run ls $filter --name --plain --grouping none --limit 10)
-            if [ $status -ne 0 ]
-                return
-            end
-            set num 0
-            for script in (string split ' ' $list)
-                set num (math $num + 1)
-                set bang "$bang"
-                echo =$script$bang\t^$num$bang
-            end
+    if echo $name | string match -q -r ".*!\$"
+        set bang "!"
+        set filter "-s all --timeless"
+    end
+
+    if echo $name | string match -q -r "^\^.*" || [ $name = "!" ] || [ ! -n $name ]
+        # NOTE: Spectial case. Latest script completion.
+        # TODO: Make it support anonymous script
+        set list (__hs_extract_home_and_run ls $filter --name --plain --grouping none --limit 10)
+        if [ $status -ne 0 ]
             return
         end
-
-        if set -q bang
-            set name (string replace ! '' $name)
+        set num 0
+        for script in (string split ' ' $list)
+            set num (math $num + 1)
+            set bang "$bang"
+            echo =$script$bang\t^$num$bang
         end
-        if echo $name | string match -q -r "=.*\$"
-            set exact "="
-            set name (string replace = '' $name)
-        end
-        if [ -n $name ]
-            set name_arg "--name $name"
-        end
-        set cmd "$cmd_arr[1..-2] $filter trailing"
-    else
-        set cmd "$orig_cmd $filter trailing"
+        return
     end
+
+    if set -q bang
+        set name (string replace ! '' $name)
+    end
+    if echo $name | string match -q -r "=.*\$"
+        set exact "="
+        set name (string replace = '' $name)
+    end
+    if [ -n $name ]
+        set name_arg "--name $name"
+    end
+    set cmd "$cmd_arr[1..-2] $filter trailing"
 
     set list (eval "command hs completion ls $name_arg -- $cmd" 2>/dev/null)
     if [ $status -ne 0 ]

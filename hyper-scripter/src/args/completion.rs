@@ -1,9 +1,12 @@
 use clap::Parser;
+use std::num::NonZeroUsize;
 
 #[derive(Parser, Debug)]
 #[clap(disable_help_flag = true, allow_hyphen_values = true)]
 pub enum Completion {
     LS {
+        #[clap(long)]
+        limit: Option<NonZeroUsize>,
         #[clap(long)]
         name: Option<String>, // NOTE: 不用 ScriptName，因為有 `hs/` 這種輸入要考慮
         #[clap(required = true, min_values = 1)]

@@ -62,7 +62,7 @@ async fn fuzz_arr<'a>(
 
 pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) -> Result {
     match comp {
-        Completion::LS { name, args } => {
+        Completion::LS { name, args, limit } => {
             let mut new_root = match Root::try_parse_from(args) {
                 Ok(Root {
                     subcmd: Some(Subs::Tags(_) | Subs::Types(_) | Subs::Alias { before: None, .. }),
@@ -92,7 +92,12 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
                 t
             };
 
-            print_iter(scripts.iter().map(|s| s.name.key()), " ");
+            let iter = scripts.iter().map(|s| s.name.key());
+            if let Some(limit) = limit {
+                print_iter(iter.take(limit.get()), " ");
+            } else {
+                print_iter(iter, " ");
+            }
         }
         Completion::NoSubcommand { args } => {
             if let Ok(root) = parse_alias_root(&args) {

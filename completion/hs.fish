@@ -82,9 +82,10 @@ function __hs_list_scripts
     end
 
     if echo $name | string match -q -r "^\^.*" || [ $name = "!" ] || [ ! -n $name ]
-        # NOTE: Spectial case. Latest script completion.
+        # NOTE: Special case. Latest script completion.
         # TODO: Make it support anonymous script
-        set list (__hs_extract_home_and_run ls $filter --name --plain --grouping none --limit 10)
+        set cmd "$cmd_arr[1..-1] $filter trailing"
+        set list (eval "command hs completion ls --limit 10 $name_arg -- $cmd" 2>/dev/null)
         if [ $status -ne 0 ]
             return
         end
@@ -92,7 +93,7 @@ function __hs_list_scripts
         for script in (string split ' ' $list)
             set num (math $num + 1)
             set bang "$bang"
-            echo =$script$bang\t^$num$bang
+            echo $script$bang\t^$num$bang
         end
         return
     end

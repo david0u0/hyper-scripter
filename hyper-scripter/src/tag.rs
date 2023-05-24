@@ -41,12 +41,17 @@ impl From<TagSelector> for TagSelectorGroup {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagSelector {
-    tags: Vec<TagControl>,
+    tags: TagGroup,
     pub append: bool,
     pub mandatory: bool,
 }
 impl_de_by_from_str!(TagSelector);
 impl_ser_by_to_string!(TagSelector);
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct TagGroup(Vec<TagControl>);
+impl_de_by_from_str!(TagGroup);
+impl_ser_by_to_string!(TagGroup);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagControl {
@@ -134,15 +139,8 @@ impl FromStr for TagSelector {
             false
         };
 
-        let mut tags = vec![];
-        for ctrl in s.split(',') {
-            tags.push(ctrl.parse()?);
-        }
-        if tags.is_empty() {
-            return TagCode.to_display_res(s.to_owned());
-        }
         Ok(TagSelector {
-            tags,
+            tags: s.parse()?,
             append,
             mandatory,
         })
@@ -151,39 +149,30 @@ impl FromStr for TagSelector {
 
 impl Display for TagSelector {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
-        let mut first = true;
         if self.append {
             write!(w, "{}", APPEND_PREFIX)?;
         }
-        for f in self.tags.iter() {
-            if !first {
-                write!(w, ",")?;
-            }
-            first = false;
-            if !f.allow {
-                write!(w, "^")?;
-            }
-            write!(w, "{}", f.tag)?;
-        }
+        write!(w, "{}", self.tags)?;
         if self.mandatory {
             write!(w, "{}", MANDATORY_SUFFIX)?;
         }
         Ok(())
     }
 }
+
 impl TagSelector {
-    pub fn push(&mut self, flow: Self) {
-        if flow.append {
-            self.tags.extend(flow.tags.into_iter());
+    pub fn push(&mut self, other: Self) {
+        if other.append {
+            self.tags.0.extend(other.tags.0.into_iter());
         } else {
-            *self = flow
+            *self = other
         }
     }
     pub fn fill_allowed_map<U>(self, set: &mut std::collections::HashSet<Tag, U>)
     where
         U: std::hash::BuildHasher,
     {
-        for control in self.tags.into_iter() {
+        for control in self.tags.0.into_iter() {
             let tag = match control.tag {
                 TagOrType::Type(_) => continue, // 類型篩選，跳過
                 TagOrType::Tag(t) => t,
@@ -209,8 +198,42 @@ impl TagSelector {
         set.into_iter()
     }
     pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> Option<bool> {
+        self.tags.select(tags, ty)
+    }
+}
+
+impl FromStr for TagGroup {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        let mut tags = vec![];
+        for ctrl in s.split(',') {
+            tags.push(ctrl.parse()?);
+        }
+        Ok(TagGroup(tags))
+    }
+}
+
+impl Display for TagGroup {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        let mut first = true;
+        for f in self.0.iter() {
+            if !first {
+                write!(w, ",")?;
+            }
+            first = false;
+            if !f.allow {
+                write!(w, "^")?;
+            }
+            write!(w, "{}", f.tag)?;
+        }
+        Ok(())
+    }
+}
+
+impl TagGroup {
+    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> Option<bool> {
         let mut pass: Option<bool> = None;
-        for ctrl in self.tags.iter() {
+        for ctrl in self.0.iter() {
             let hit = match &ctrl.tag {
                 TagOrType::Type(t) => ty == t,
                 TagOrType::Tag(t) => t.match_all() || tags.contains(t),

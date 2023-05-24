@@ -481,6 +481,10 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 print!("known tags:\n  ");
                 print_iter(known_tags_iter(repo), " ");
                 println!("");
+
+                println!("caution tags:");
+                println!("  {}", conf.caution_tags);
+
                 println!("tag selector:");
                 for selector in conf.tag_selectors.iter() {
                     let content = &selector.content;

@@ -1,4 +1,5 @@
 use crate::args::Subs;
+use crate::color::Stylize;
 use crate::config::Config;
 use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
@@ -258,6 +259,19 @@ pub async fn run_n_times(
     let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
+
+    if Config::get().caution_tags.select(&entry.tags, &entry.ty) == Some(true) {
+        let ty = super::get_display_type(&entry.ty);
+        let name = &entry.name;
+        let msg = format!(
+            "{} requires extra caution. Are you sure?",
+            name.stylize().color(ty.color()).bold()
+        );
+        let yes = super::prompt(msg, false)?;
+        if !yes {
+            return Err(Error::Caution);
+        }
+    }
 
     let mut hs_env_desc = vec![];
     for (need_save, line) in extract_env_from_content_help_aware(&content) {

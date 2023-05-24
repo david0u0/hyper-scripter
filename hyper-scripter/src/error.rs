@@ -88,6 +88,7 @@ pub enum Error {
     DontFuzz,
     NoPreviousArgs,
     Empty,
+    Caution,
 
     Completion,
 }

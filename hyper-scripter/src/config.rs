@@ -3,7 +3,7 @@ use crate::error::{DisplayError, DisplayResult, Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::state::State;
-use crate::tag::{TagSelector, TagSelectorGroup};
+use crate::tag::{TagGroup, TagSelector, TagSelectorGroup};
 use crate::util;
 use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -137,6 +137,8 @@ impl_de_by_from_str!(PromptLevel);
 pub struct Config {
     pub recent: Option<u32>,
     pub main_tag_selector: TagSelector,
+    #[serde(default)]
+    pub caution_tags: TagGroup,
     prompt_level: PromptLevel,
     #[serde(deserialize_with = "de_nonempty_vec")]
     pub editor: Vec<String>,
@@ -180,6 +182,7 @@ impl Default for Config {
                 },
             ],
             main_tag_selector: "+all".parse().unwrap(),
+            caution_tags: "caution".parse().unwrap(),
             types: ScriptTypeConfig::default_script_types(),
             alias: [
                 gen_alias("la", &["ls", "-s", "+all", "--timeless"]), // 不顯示被強制隱藏的腳本，如 hide, remove

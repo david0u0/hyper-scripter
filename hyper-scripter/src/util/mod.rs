@@ -1,4 +1,4 @@
-use crate::color::Color;
+use crate::color::{Color, Stylize};
 use crate::config::Config;
 use crate::error::{Contextable, Error, FormatCode::Template as TemplateCode, Result};
 use crate::path;
@@ -343,7 +343,7 @@ impl<'a> DisplayType<'a> {
         }
     }
 }
-pub fn get_display_type(ty: &ScriptType) -> DisplayType {
+pub fn get_display_type(ty: &ScriptType) -> DisplayType<'_> {
     let conf = Config::get();
     match conf.get_color(ty) {
         Err(e) => {
@@ -383,4 +383,69 @@ pub fn hijack_ctrlc_once() {
             log::warn!("設置 ctrl-c 回調失敗 {:?}", res);
         }
     });
+}
+
+pub fn prompt(msg: impl std::fmt::Display, allow_enter: bool) -> Result<bool> {
+    use console::{Key, Term};
+
+    enum Res {
+        Y,
+        N,
+        Exit,
+    }
+
+    fn inner(term: &Term, msg: &str, allow_enter: bool) -> Result<Res> {
+        term.hide_cursor()?;
+        hijack_ctrlc_once();
+
+        let res = loop {
+            term.write_str(msg)?;
+            match term.read_key() {
+                Ok(Key::Char('Y' | 'y')) => break Res::Y,
+                Ok(Key::Enter) => {
+                    if allow_enter {
+                        break Res::Y;
+                    } else {
+                        term.write_line("")?;
+                    }
+                }
+                Ok(Key::Char('N' | 'n')) => break Res::N,
+                Ok(Key::Char(ch)) => term.write_line(&format!(" Unknown key '{}'", ch))?,
+                Ok(Key::Escape) => {
+                    break Res::Exit;
+                }
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::Interrupted {
+                        break Res::Exit;
+                    } else {
+                        return Err(e.into());
+                    }
+                }
+                _ => term.write_line(" Unknown key")?,
+            }
+        };
+        Ok(res)
+    }
+
+    let term = Term::stderr();
+    let msg = if allow_enter {
+        format!("{} [Y/Enter/N]", msg)
+    } else {
+        format!("{} [Y/N]", msg)
+    };
+    let res = inner(&term, &msg, allow_enter);
+    term.show_cursor()?;
+    match res? {
+        Res::Exit => {
+            std::process::exit(1);
+        }
+        Res::Y => {
+            term.write_line(&" Y".stylize().color(Color::Green).to_string())?;
+            Ok(true)
+        }
+        Res::N => {
+            term.write_line(&" N".stylize().color(Color::Red).to_string())?;
+            Ok(false)
+        }
+    }
 }

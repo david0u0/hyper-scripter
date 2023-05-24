@@ -22,7 +22,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         // LOCALE
         match self {
-            DontFuzz => return Ok(()),
+            DontFuzz | Caution => return Ok(()),
             Empty => write!(f, "No existing script!")?,
             NoPreviousArgs => write!(f, "No previous argument!")?,
             SysPathNotFound(SysPath::Config) => write!(

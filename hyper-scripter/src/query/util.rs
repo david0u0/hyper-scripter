@@ -1,11 +1,11 @@
 use super::the_multifuzz_algo::{the_multifuzz_algo, MultiFuzzObj};
 use super::{ListQuery, ScriptQuery, ScriptQueryInner};
+use crate::color::Stylize;
 use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
-use crate::script::ScriptInfo;
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
-use crate::util::{get_display_type, hijack_ctrlc_once};
+use crate::util::{get_display_type, prompt};
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
 
@@ -137,7 +137,12 @@ pub async fn do_script_query<'b>(
                 }
             };
             if need_prompt {
-                prompt_fuzz_acceptable(&*entry)?;
+                let ty = get_display_type(&entry.ty);
+                let msg = format!("{}({})?", entry.name, ty.display());
+                let yes = prompt(msg.stylize().color(ty.color()).bold(), true)?;
+                if !yes {
+                    return Err(Error::DontFuzz);
+                }
             }
             Ok(Some(entry))
         }
@@ -164,67 +169,4 @@ pub async fn do_script_query_strict<'b>(
     };
 
     Err(Error::ScriptNotFound(script_query.to_string()))
-}
-
-fn prompt_fuzz_acceptable(script: &ScriptInfo) -> Result {
-    use crate::color::{Color, Stylize};
-    use console::{Key, Term};
-
-    enum Res {
-        Y,
-        N,
-        Exit,
-    }
-
-    fn inner(term: &Term, script: &ScriptInfo) -> Result<Res> {
-        let ty = get_display_type(&script.ty);
-        let msg = format!(
-            "{} [Y/N]",
-            format!("{}({})?", script.name, ty.display())
-                .stylize()
-                .color(ty.color())
-                .bold(),
-        );
-
-        term.hide_cursor()?;
-        hijack_ctrlc_once();
-
-        let res = loop {
-            term.write_str(&msg)?;
-            match term.read_key() {
-                Ok(Key::Char('Y' | 'y') | Key::Enter) => break Res::Y,
-                Ok(Key::Char('N' | 'n')) => break Res::N,
-                Ok(Key::Char(ch)) => term.write_line(&format!(" Unknown key '{}'", ch))?,
-                Ok(Key::Escape) => {
-                    break Res::Exit;
-                }
-                Err(e) => {
-                    if e.kind() == std::io::ErrorKind::Interrupted {
-                        break Res::Exit;
-                    } else {
-                        return Err(e.into());
-                    }
-                }
-                _ => term.write_line(" Unknown key")?,
-            }
-        };
-        Ok(res)
-    }
-
-    let term = Term::stderr();
-    let res = inner(&term, script);
-    term.show_cursor()?;
-    match res? {
-        Res::Exit => {
-            std::process::exit(1);
-        }
-        Res::Y => {
-            term.write_line(&" Y".stylize().color(Color::Green).to_string())?;
-            Ok(())
-        }
-        Res::N => {
-            term.write_line(&" N".stylize().color(Color::Red).to_string())?;
-            Err(Error::DontFuzz)
-        }
-    }
 }

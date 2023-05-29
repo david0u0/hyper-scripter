@@ -16,7 +16,12 @@ use std::time::SystemTime;
 const CONFIG_FILE: &str = ".config.toml";
 
 static CONFIG: State<Config> = State::new();
-static PROMPT_LEVEL: State<PromptLevel> = State::new();
+
+struct RuntimeConf {
+    prompt_level: PromptLevel,
+    no_caution: bool,
+}
+static RUNTIME_CONF: State<RuntimeConf> = State::new();
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
 where
@@ -275,13 +280,19 @@ impl Config {
         Ok(())
     }
 
-    pub fn set_prompt_level(l: Option<PromptLevel>) {
+    pub fn set_runtime_conf(prompt_level: Option<PromptLevel>, no_caution: bool) {
         let c = Config::get();
-        let l = l.unwrap_or(c.prompt_level); // TODO: 測試由設定檔設定 prompt-level 的情境？
-        PROMPT_LEVEL.set(l);
+        let prompt_level = prompt_level.unwrap_or(c.prompt_level); // TODO: 測試由設定檔設定 prompt-level 的情境？
+        RUNTIME_CONF.set(RuntimeConf {
+            prompt_level,
+            no_caution,
+        });
     }
     pub fn get_prompt_level() -> PromptLevel {
-        *PROMPT_LEVEL.get()
+        RUNTIME_CONF.get().prompt_level
+    }
+    pub fn get_no_caution() -> bool {
+        RUNTIME_CONF.get().no_caution
     }
 
     #[cfg(not(test))]

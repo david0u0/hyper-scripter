@@ -91,7 +91,7 @@ struct MainReturn<'a> {
 }
 
 async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_>) -> Result {
-    Config::set_prompt_level(root.root_args.prompt_level);
+    Config::set_runtime_conf(root.root_args.prompt_level, root.root_args.no_caution);
     let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();

@@ -76,7 +76,7 @@ pub struct RootArgs {
     pub timeless: bool,
     #[clap(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
-    #[clap(long)]
+    #[clap(long, help = "Run caution scripts without warning")]
     pub no_caution: bool,
 }
 

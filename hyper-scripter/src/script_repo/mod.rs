@@ -148,7 +148,6 @@ impl DBEnv {
             }
         }
 
-        let last_time = info.last_time();
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
         let neglect_time = info.neglect_time.as_ref().map(|t| **t);
@@ -156,11 +155,10 @@ impl DBEnv {
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
-            (script_id, last_time, read, write, miss, exec, exec_done, neglect, humble, exec_count)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (script_id, read, write, miss, exec, exec_done, neglect, humble, exec_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
             ",
             info.id,
-            last_time,
             *info.read_time,
             *info.write_time,
             miss_time,

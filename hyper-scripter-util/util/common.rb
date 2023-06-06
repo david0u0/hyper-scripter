@@ -93,4 +93,8 @@ class HSEnv
   end
 end
 
-HS_ENV = HSEnv.new
+HS_ENV = begin
+           HSEnv.new
+         rescue
+           nil
+         end

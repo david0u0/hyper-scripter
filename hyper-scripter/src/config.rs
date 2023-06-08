@@ -306,12 +306,22 @@ impl Config {
     }
 
     // XXX: extract
-    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>> {
+    pub fn gen_env(
+        &self,
+        info: &crate::util::TmplVal<'_>,
+        strict: bool,
+    ) -> Result<Vec<(String, String)>> {
         let reg = Handlebars::new();
         let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
         for (name, e) in self.env.iter() {
-            let res = reg.render_template(e, &info)?;
-            env.push((name.to_owned(), res));
+            match reg.render_template(e, info) {
+                Ok(res) => env.push((name.to_owned(), res)),
+                Err(err) => {
+                    if strict {
+                        return Err(err.into());
+                    }
+                }
+            }
         }
         Ok(env)
     }

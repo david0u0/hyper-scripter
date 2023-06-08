@@ -277,21 +277,21 @@ pub struct ScriptTypeConfig {
 
 impl ScriptTypeConfig {
     // XXX: extract
-    pub fn args(&self, info: &serde_json::Value) -> Result<Vec<String>, Error> {
+    pub fn args(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<String>, Error> {
         let reg = Handlebars::new();
         let mut args: Vec<String> = Vec::with_capacity(self.args.len());
         for c in self.args.iter() {
-            let res = reg.render_template(c, &info)?;
+            let res = reg.render_template(c, info)?;
             args.push(res);
         }
         Ok(args)
     }
     // XXX: extract
-    pub fn gen_env(&self, info: &serde_json::Value) -> Result<Vec<(String, String)>, Error> {
+    pub fn gen_env(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<(String, String)>, Error> {
         let reg = Handlebars::new();
         let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
         for (name, e) in self.env.iter() {
-            let res = reg.render_template(e, &info)?;
+            let res = reg.render_template(e, info)?;
             env.push((name.to_owned(), res));
         }
         Ok(env)

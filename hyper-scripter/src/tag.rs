@@ -206,8 +206,10 @@ impl FromStr for TagGroup {
     type Err = DisplayError;
     fn from_str(s: &str) -> DisplayResult<Self> {
         let mut tags = vec![];
-        for ctrl in s.split(',') {
-            tags.push(ctrl.parse()?);
+        if !s.is_empty() {
+            for ctrl in s.split(',') {
+                tags.push(ctrl.parse()?);
+            }
         }
         Ok(TagGroup(tags))
     }

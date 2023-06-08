@@ -112,7 +112,7 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     ONCE.call_once(|| {
         hyper_scripter::path::set_home(Some(&home), true).unwrap();
         Config::init().unwrap();
-        Config::set_prompt_level(Some(PromptLevel::Never));
+        Config::set_runtime_conf(Some(PromptLevel::Never), true);
     });
 
     // 避免編輯器堵住整個程式

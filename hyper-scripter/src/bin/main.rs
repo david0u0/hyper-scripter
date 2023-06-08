@@ -1,5 +1,7 @@
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use hyper_scripter::args::{self, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs};
+use hyper_scripter::args::{
+    self, ArgsResult, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
+};
 use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
@@ -18,7 +20,6 @@ use hyper_scripter::util::{
     main_util::{self, EditTagArgs},
     print_iter,
 };
-use hyper_scripter::Either;
 use hyper_scripter::{db, migration};
 use hyper_scripter_historian::{Historian, LastTimeRecord};
 
@@ -40,11 +41,9 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
     let args: Vec<_> = std::env::args().collect();
     let root = args::handle_args(args)?;
     let root = match root {
-        Either::One(Either::One(root)) => root,
-        Either::One(Either::Two(shell)) => {
-            std::process::exit(util::run_shell(&shell)?);
-        }
-        Either::Two(comp) => {
+        ArgsResult::Normal(root) => root,
+        ArgsResult::Shell(shell) => std::process::exit(util::run_shell(&shell)?),
+        ArgsResult::Completion(comp) => {
             let mut repo = None;
             let res = completion_util::handle_completion(comp, &mut repo).await;
             if let Some(repo) = repo {

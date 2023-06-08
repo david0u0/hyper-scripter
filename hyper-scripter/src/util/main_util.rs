@@ -10,6 +10,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
+use fxhash::FxHashSet as HashSet;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -163,7 +164,7 @@ fn run(
     script_path: &Path,
     info: &ScriptInfo,
     remaining: &[String],
-    hs_tmpl_val: &serde_json::Value,
+    hs_tmpl_val: &super::TmplVal<'_>,
     remaining_envs: &[EnvPair],
 ) -> Result<()> {
     let conf = Config::get();
@@ -176,8 +177,8 @@ fn run(
         return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
     };
 
-    let env = conf.gen_env(&hs_tmpl_val)?;
-    let ty_env = script_conf.gen_env(&hs_tmpl_val)?;
+    let env = conf.gen_env(hs_tmpl_val, true)?;
+    let ty_env = script_conf.gen_env(hs_tmpl_val)?;
 
     let pre_run_script = prepare_pre_run(None)?;
     let (cmd, shebang) = super::shebang_handle::handle(&pre_run_script)?;
@@ -204,7 +205,7 @@ fn run(
         return Err(Error::PreRunError(code));
     }
 
-    let args = script_conf.args(&hs_tmpl_val)?;
+    let args = script_conf.args(hs_tmpl_val)?;
     let full_args = args
         .iter()
         .map(|s| s.as_str())
@@ -294,25 +295,18 @@ pub async fn run_n_times(
         return Ok(());
     }
     // Start packing hs tmpl val
-    let hs_home = path::get_home();
-    let hs_tags: Vec<_> = entry.tags.iter().map(|t| t.as_ref()).collect();
-    let hs_cmd = std::env::args().next().unwrap_or_default();
-
-    let hs_exe = std::env::current_exe()?;
-    let hs_exe = hs_exe.to_string_lossy();
-
-    let content = &entry.exec_time.as_ref().unwrap().data().unwrap().0;
-    let hs_tmpl_val = json!({
-        "path": script_path,
-        "home": hs_home,
-        "run_id": run_id,
-        "tags": hs_tags,
-        "cmd": hs_cmd,
-        "exe": hs_exe,
-        "env_desc": hs_env_desc,
-        "name": &entry.name.key(),
-        "content": content,
-    });
+    // SAFETY: 底下所有對 `entry` 的借用，都不會被更後面的 `entry.update` 影響
+    let mut hs_tmpl_val = super::TmplVal::new();
+    let hs_name = entry.name.key();
+    let hs_name = hs_name.as_ref() as *const str;
+    let hs_tags = &entry.tags as *const HashSet<Tag>;
+    let content = entry.exec_time.as_ref().unwrap().data().unwrap().0.as_str() as *const str;
+    hs_tmpl_val.path = Some(&script_path);
+    hs_tmpl_val.run_id = Some(run_id);
+    hs_tmpl_val.tags = unsafe { &*hs_tags }.iter().map(|t| t.as_ref()).collect();
+    hs_tmpl_val.env_desc = hs_env_desc;
+    hs_tmpl_val.name = Some(unsafe { &*hs_name });
+    hs_tmpl_val.content = Some(unsafe { &*content });
     // End packing hs tmpl val
 
     for _ in 0..repeat {

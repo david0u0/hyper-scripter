@@ -473,17 +473,25 @@ impl Root {
     }
 }
 
-pub fn handle_args(args: Vec<String>) -> Result<Either<Either<Root, Vec<String>>, Completion>> {
-    if let Some(completion) = Completion::from_args(&args) {
-        return Ok(Either::Two(completion));
-    }
-    let mut root = handle_alias_args(args)?;
-    if let Either::One(root) = &mut root {
-        log::debug!("命令行物件：{:?}", root);
-        root.sanitize()?;
-    }
+pub enum ArgsResult {
+    Normal(Root),
+    Completion(Completion),
+    Shell(Vec<String>),
+}
 
-    Ok(Either::One(root))
+pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
+    if let Some(completion) = Completion::from_args(&args) {
+        return Ok(ArgsResult::Completion(completion));
+    }
+    let root = handle_alias_args(args)?;
+    Ok(match root {
+        Either::One(mut root) => {
+            log::debug!("命令行物件：{:?}", root);
+            root.sanitize()?;
+            ArgsResult::Normal(root)
+        }
+        Either::Two(v) => ArgsResult::Shell(v),
+    })
 }
 
 #[cfg(test)]
@@ -495,7 +503,7 @@ mod test {
             .map(|s| s.to_owned())
             .collect();
         match handle_args(v).unwrap() {
-            Either::One(Either::One(root)) => root,
+            ArgsResult::Normal(root) => root,
             _ => panic!(),
         }
     }

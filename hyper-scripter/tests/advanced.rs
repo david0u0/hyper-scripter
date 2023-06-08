@@ -213,4 +213,11 @@ fn test_shell_alias() {
 
     run!("alias -u test-alias").unwrap();
     run!("test-alias").expect_err("alias is unset!");
+
+    // env in shell alias
+    const MSG: &'static str = "this is a test";
+    run!("e -T txt this-file | {}", MSG).unwrap();
+    run!("alias readit !cat $HS_HOME/this-file").unwrap();
+    assert_eq!(MSG, run!("cat").unwrap());
+    assert_eq!(MSG, run!("readit").unwrap());
 }

@@ -4,6 +4,7 @@ use crate::error::{Contextable, Error, FormatCode::Template as TemplateCode, Res
 use crate::path;
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, AsScriptFullTypeRef, ScriptType};
+use ::serde::Serialize;
 use chrono::{DateTime, Utc};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -77,7 +78,9 @@ where
 pub fn run_shell(args: &[String]) -> Result<i32> {
     let cmd = args.join(" ");
     log::debug!("shell args = {:?}", cmd);
-    let cmd = create_cmd("sh", ["-c", &cmd]);
+    let mut cmd = create_cmd("sh", ["-c", &cmd]);
+    let env = Config::get().gen_env(&TmplVal::new(), false)?;
+    cmd.envs(env.iter().map(|(a, b)| (a, b)));
     let stat = run_cmd(cmd)?;
     Ok(stat.code().unwrap_or_default())
 }
@@ -446,6 +449,36 @@ pub fn prompt(msg: impl std::fmt::Display, allow_enter: bool) -> Result<bool> {
         Res::N => {
             term.write_line(&" N".stylize().color(Color::Red).to_string())?;
             Ok(false)
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct TmplVal<'a> {
+    home: &'static Path,
+    cmd: String,
+    exe: PathBuf,
+
+    path: Option<&'a Path>,
+    run_id: Option<i64>,
+    tags: Vec<&'a str>,
+    env_desc: Vec<String>,
+    name: Option<&'a str>,
+    content: Option<&'a str>,
+}
+impl<'a> TmplVal<'a> {
+    pub fn new() -> Self {
+        TmplVal {
+            home: path::get_home(),
+            cmd: std::env::args().next().unwrap_or_default(),
+            exe: std::env::current_exe().unwrap_or_default(),
+
+            path: None,
+            run_id: None,
+            tags: vec![],
+            env_desc: vec![],
+            name: None,
+            content: None,
         }
     }
 }

@@ -58,6 +58,7 @@ def extract_name(file)
 end
 
 existing_files = {}
+types = HS_ENV.do_hs("types ls --no-sub", false).split
 
 HS_ENV.do_hs('ls --grouping=none --file --name --plain', true).split.each do |s|
   match = /(?<name>[^(]+)\((?<file>.+)\)/.match(s)
@@ -82,14 +83,15 @@ directory_tree(HOME).each do |full_path|
   name, ty = extract_name(script)
   warn "collecting script #{script}!"
 
+  # TODO: handle the case where type name != ext name
   begin
-    HS_ENV.do_hs("edit =#{name} -T #{ty} --fast", false)
-  rescue StandardError
-    name = "#{name}.#{ty}"
-    warn "try to collect #{name} with type txt"
-    begin
+    if types.include?(ty)
+      HS_ENV.do_hs("edit =#{name} -T #{ty} --fast", false)
+    else
+      name = "#{name}.#{ty}"
+      warn "try to collect #{name} with type txt"
       HS_ENV.do_hs("edit =#{name} -T txt --fast", false)
-    rescue StandardError
     end
+  rescue StandardError
   end
 end

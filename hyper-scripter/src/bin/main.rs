@@ -264,7 +264,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         Subs::Which { queries } => {
             let repo = repo.init().await?;
             let home = path::get_home();
-            let mut scripts = query::do_list_query(repo, &queries).await?;
+            let mut scripts = query::do_list_query(repo, queries).await?;
             scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
             for entry in scripts.into_iter() {
                 log::info!("定位 {:?}", entry.name);
@@ -342,18 +342,17 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 grouping: grouping.into(),
                 plain,
                 limit,
-                queries,
                 display_style,
             };
             let stdout = std::io::stdout();
             let repo = repo.init().await?;
-            fmt_list(&mut stdout.lock(), repo, opt).await?;
+            fmt_list(&mut stdout.lock(), repo, opt, queries).await?;
         }
         Subs::RM { queries, purge } => {
             let repo = repo.init().await?;
             let delete_tag: Option<TagSelector> = Some("+remove".parse().unwrap());
             let mut to_purge = vec![]; // (Option<path>, id)
-            for mut entry in query::do_list_query(repo, &queries).await?.into_iter() {
+            for mut entry in query::do_list_query(repo, queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 let try_open_res = path::open_script(&entry.name, &entry.ty, Some(true));
                 if purge || entry.name.is_anonymous() {
@@ -423,7 +422,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
-                let mut scripts = query::do_list_query(repo, &[origin]).await?;
+                let mut scripts = query::do_list_query(repo, std::iter::once(origin)).await?;
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;
                 }
@@ -539,7 +538,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         } => {
             let repo = repo.init().await?;
             let historian = repo.historian().clone();
-            let mut scripts = query::do_list_query(repo, &queries).await?;
+            let mut scripts = query::do_list_query(repo, queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let res_vec = historian
@@ -622,7 +621,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             subcmd: History::Neglect { queries },
         } => {
             let repo = repo.init().await?;
-            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
+            for entry in query::do_list_query(repo, queries).await?.into_iter() {
                 let id = entry.id;
                 entry.get_env().handle_neglect(id).await?;
             }
@@ -642,7 +641,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let repo = repo.init().await?;
             let historian = repo.historian().clone();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let scripts = query::do_list_query(repo, &queries).await?;
+            let scripts = query::do_list_query(repo, queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
 
             enum ScriptGetter<'a> {
@@ -777,7 +776,7 @@ async fn create_dir_pair(
     og: ListQuery,
     new: EditQuery<ScriptOrDirQuery>,
 ) -> Result<Vec<(ScriptName, ScriptName)>> {
-    let scripts = query::do_list_query(repo, &[og]).await?;
+    let scripts = query::do_list_query(repo, std::iter::once(og)).await?;
     let is_dir = matches!(new, EditQuery::Query(ScriptOrDirQuery::Dir(_)));
     if scripts.len() > 1 && !is_dir {
         log::warn!("試圖把多個腳本移動成同一個");

@@ -13,7 +13,9 @@ mod util;
 pub use util::*;
 mod range_query;
 pub use range_query::*;
+mod list_query_handler;
 mod the_multifuzz_algo;
+pub use list_query_handler::*;
 
 #[derive(Debug, Eq, PartialEq, Display)]
 pub enum EditQuery<Q> {

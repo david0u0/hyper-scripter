@@ -32,6 +32,7 @@ pub fn illegal_name(s: &str) -> bool {
         || s.contains("..")
         || s.contains(' ')
         || s.contains('@')
+        || s.contains('*')
         || s.contains('!')
         || s.contains('?')
         || s.contains('=')

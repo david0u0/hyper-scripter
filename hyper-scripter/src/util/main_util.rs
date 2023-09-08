@@ -5,7 +5,7 @@ use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
-use crate::query::{self, EditQuery, ScriptQuery};
+use crate::query::{self, EditQuery, ListQuery, ListQueryHandler, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
@@ -94,6 +94,63 @@ fn create<F: FnOnce(String) -> Error>(
         }
     }
     Ok((name, p))
+}
+
+#[derive(Default)]
+struct EditListQueryHandler {
+    anonymous_cnt: u32,
+    named: Vec<ScriptName>,
+}
+
+impl EditListQueryHandler {
+    fn has_new_script(&self) -> bool {
+        self.anonymous_cnt > 0 || !self.named.is_empty()
+    }
+}
+
+// SAFETY: 實作永不改動 repo 本身
+unsafe impl ListQueryHandler for EditListQueryHandler {
+    type Item = EditQuery<ListQuery>;
+    async fn handle_query<'a>(
+        &mut self,
+        query: ScriptQuery,
+        repo: &'a mut ScriptRepo,
+    ) -> Result<Option<RepoEntry<'a>>> {
+        match query::do_script_query(&query, repo, false, false).await {
+            Err(Error::DontFuzz) | Ok(None) => {
+                let name = query.into_script_name()?;
+                log::debug!("打開新命名腳本：{:?}", name);
+                if repo.get_mut(&name, Visibility::All).is_some() {
+                    log::error!("與被篩掉的腳本撞名");
+                    return Err(Error::ScriptIsFiltered(name.to_string()));
+                }
+                self.named.push(name);
+                Ok(None)
+            }
+            Ok(Some(entry)) => {
+                log::debug!("打開既有命名腳本：{:?}", entry.name);
+                // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
+                let n = entry.name.clone();
+                return Ok(Some(repo.get_mut(&n, Visibility::All).unwrap()));
+            }
+            Err(e) => Err(e),
+        }
+    }
+    fn handle_item(&mut self, item: Self::Item) -> Option<ListQuery> {
+        match item {
+            EditQuery::Query(query) => Some(query),
+            EditQuery::NewAnonimous => {
+                self.anonymous_cnt += 1;
+                None
+            }
+        }
+    }
+    fn should_raise_dont_fuzz_on_empty() -> bool {
+        false
+    }
+    fn should_return_all_on_empty() -> bool {
+        false
+    }
 }
 
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？

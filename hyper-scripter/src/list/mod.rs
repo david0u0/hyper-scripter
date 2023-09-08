@@ -13,7 +13,6 @@ use crate::color::{Color, StyleObj, Stylize};
 use crate::util::writable::{write_writable, FmtWrite, Writable};
 use crate::{
     error::{DisplayError, DisplayResult, Result},
-    query::ListQuery,
     script::ScriptInfo,
 };
 use serde::Serialize;
@@ -135,7 +134,6 @@ pub struct ListOptions<T = (), U = ()> {
     pub grouping: Grouping,
     pub plain: bool,
     pub limit: Option<NonZeroUsize>,
-    pub queries: Vec<ListQuery>,
     pub display_style: DisplayStyle<T, U>,
 }
 

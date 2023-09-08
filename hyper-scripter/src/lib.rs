@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 #[macro_use]
 extern crate serde_json;
 #[macro_use]

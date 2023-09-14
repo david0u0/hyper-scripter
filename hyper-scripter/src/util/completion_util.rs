@@ -62,7 +62,12 @@ async fn fuzz_arr<'a>(
 
 pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) -> Result {
     match comp {
-        Completion::LS { name, args, limit } => {
+        Completion::LS {
+            name,
+            args,
+            limit,
+            bang,
+        } => {
             let mut new_root = match Root::try_parse_from(args) {
                 Ok(Root {
                     subcmd: Some(Subs::Tags(_) | Subs::Types(_) | Subs::Alias { before: None, .. }),
@@ -80,7 +85,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
             };
             log::info!("補完模式，參數為 {:?}", new_root);
             new_root.set_home_unless_from_alias(false)?;
-            new_root.sanitize_flags();
+            new_root.sanitize_flags(bang);
             *repo = Some(init_repo(new_root.root_args, false).await?);
 
             let iter = repo.as_mut().unwrap().iter_mut(Visibility::Normal);

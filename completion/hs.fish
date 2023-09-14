@@ -78,14 +78,14 @@ function __hs_list_scripts
 
     if echo $name | string match -q -r ".*!\$"
         set bang "!"
-        set filter "-s all --timeless"
+        set bang_arg "--bang"
     end
 
     if echo $name | string match -q -r "^\^.*" || [ $name = "!" ] || [ ! -n $name ]
         # NOTE: Special case. Latest script completion.
         # TODO: Make it support anonymous script
-        set cmd "$cmd_arr[1..-1] $filter trailing"
-        set list (eval "command hs completion ls --limit 10 $name_arg -- $cmd" 2>/dev/null)
+        set cmd "$cmd_arr[1..-1] trailing"
+        set list (eval "command hs completion ls $bang_arg --limit 10 -- $cmd" 2>/dev/null)
         if [ $status -ne 0 ]
             return
         end
@@ -108,9 +108,9 @@ function __hs_list_scripts
     if [ -n $name ]
         set name_arg "--name $name"
     end
-    set cmd "$cmd_arr[1..-2] $filter trailing"
+    set cmd "$cmd_arr[1..-2] trailing"
 
-    set list (eval "command hs completion ls $name_arg -- $cmd" 2>/dev/null)
+    set list (eval "command hs completion ls $bang_arg $name_arg -- $cmd" 2>/dev/null)
     if [ $status -ne 0 ]
         return
     end

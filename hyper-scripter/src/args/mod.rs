@@ -431,8 +431,11 @@ impl Root {
         }
         Ok(())
     }
-    pub fn sanitize_flags(&mut self) {
-        if self.root_args.all {
+    pub fn sanitize_flags(&mut self, bang: bool) {
+        if bang {
+            self.root_args.timeless = true;
+            self.root_args.select = vec!["all".parse().unwrap()];
+        } else if self.root_args.all {
             self.root_args.timeless = true;
             self.root_args.select = vec!["all,^remove".parse().unwrap()];
         }
@@ -468,7 +471,7 @@ impl Root {
             }
             _ => (),
         }
-        self.sanitize_flags();
+        self.sanitize_flags(false);
         Ok(())
     }
 }

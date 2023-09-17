@@ -200,7 +200,11 @@ pub async fn edit_or_create(
         }
         final_ty = ty.unwrap_or_default();
         log::debug!("打開新匿名腳本");
-        path::open_new_anonymous(&final_ty.ty).context("打開新匿名腳本失敗")?
+        path::open_new_anonymous(&final_ty.ty, 1) // TODO: not always 1!
+            .context("打開新匿名腳本失敗")?
+            .next()
+            .unwrap()
+            .unwrap()
     };
 
     log::info!("編輯 {:?}", script_name);

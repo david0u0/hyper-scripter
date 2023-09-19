@@ -206,7 +206,7 @@ mod test {
             .enumerate()
             .map(|(idx, (name, ty))| {
                 let idx = idx as i64;
-                let time = NaiveDateTime::from_timestamp(idx, 0);
+                let time = NaiveDateTime::from_timestamp_opt(idx, 0).unwrap();
                 let mut builder = ScriptInfo::builder(
                     idx,
                     name.to_owned().into_script_name().unwrap(),

@@ -4,7 +4,7 @@ use hyper_scripter::args::{
 };
 use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::env_pair::EnvPair;
-use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
+use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::my_env_logger;
@@ -186,35 +186,71 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     }
                 }
             };
-            let (path, mut entry, sub_type) =
+
+            // TODO: get rid of this
+            let edit_query = vec![match edit_query {
+                EditQuery::NewAnonimous => EditQuery::NewAnonimous,
+                EditQuery::Query(q) => EditQuery::Query(ListQuery::Query(q)),
+            }];
+
+            let (edit_res, create_res) =
                 main_util::edit_or_create(edit_query, repo, ty, edit_tags).await?;
-            let mut prepare_resp = Some(util::prepare_script(
-                &path,
-                &*entry,
-                sub_type.as_ref(),
-                no_template,
-                &content,
-            )?);
-            create_read_event(&mut entry).await?;
+
+            let mut prepare_vec = vec![];
+            for mut entry in edit_res.existing.into_iter() {
+                create_read_event(&mut entry).await?;
+                let p = path::open_script(&entry.name, &entry.ty, Some(true))
+                    .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+                let prepare_resp = util::prepare_script(&p, &*entry, None, true, &content)?;
+                prepare_vec.push((entry.id, p, prepare_resp));
+            }
+            if let Some(create_res) = create_res {
+                for holder in create_res.to_create.into_iter() {
+                    log::info!("創造 {:?}", holder.name);
+                    let entry = repo
+                        .entry(&holder.name)
+                        .or_insert(
+                            ScriptInfo::builder(
+                                0,
+                                holder.name,
+                                create_res.ty.ty.clone(),
+                                create_res.tags.clone().into_iter(),
+                            )
+                            .build(),
+                        )
+                        .await?;
+                    let prepare_resp = util::prepare_script(
+                        &holder.path,
+                        &*entry,
+                        create_res.ty.sub.as_ref(),
+                        no_template,
+                        &content,
+                    )?;
+                    prepare_vec.push((entry.id, holder.path, prepare_resp));
+                }
+            }
+
             if !fast {
-                let res = util::open_editor(&path);
+                let res = util::open_editor(&prepare_vec[0].1); // TODO
                 if let Err(err) = res {
                     ret.errs.push(err);
                 }
-            } else {
-                prepare_resp = None
             }
-            let after_res = main_util::after_script(&mut entry, &path, &prepare_resp).await;
-            if let Err(err) = after_res {
-                match &err {
-                    Error::EmptyCreate => {
+
+            for (id, path, prepare_resp) in prepare_vec.iter() {
+                let prepare_resp = if fast { None } else { Some(prepare_resp) };
+                let mut entry = repo.get_mut_by_id(*id).unwrap();
+                let after_res = main_util::after_script(&mut entry, &path, prepare_resp).await;
+                match after_res {
+                    Ok(_) => (),
+                    Err(err @ Error::EmptyCreate) => {
                         util::remove(&path)?;
                         let id = entry.id;
-                        repo.remove(id).await?
+                        repo.remove(id).await?;
+                        ret.errs.push(err);
                     }
-                    _ => (),
+                    Err(err) => return Err(err),
                 }
-                return Err(err);
             }
         }
         Subs::Help { args } => {

@@ -258,7 +258,7 @@ impl DerefMut for ScriptInfo {
 fn map<T: Deref<Target = NaiveDateTime>>(time: &Option<T>) -> NaiveDateTime {
     match time {
         Some(time) => **time,
-        _ => NaiveDateTime::from_timestamp(1, 0),
+        _ => Default::default(),
     }
 }
 impl ScriptInfo {

@@ -86,9 +86,9 @@ pub fn run_shell(args: &[String]) -> Result<i32> {
     Ok(stat.code().unwrap_or_default())
 }
 
-pub fn open_editor(path: &Path) -> Result {
+pub fn open_editor<'a>(path: impl IntoIterator<Item = &'a Path>) -> Result {
     let conf = Config::get();
-    let cmd = create_concat_cmd(&conf.editor, [&path]);
+    let cmd = create_concat_cmd(&conf.editor, path);
     let stat = run_cmd(cmd)?;
     if !stat.success() {
         let code = stat.code().unwrap_or_default();
@@ -101,8 +101,8 @@ pub fn create_concat_cmd<'a, 'b, I1, S1, I2, S2>(arg1: I1, arg2: I2) -> Command
 where
     I1: IntoIterator<Item = &'a S1>,
     I2: IntoIterator<Item = &'b S2>,
-    S1: AsRef<OsStr> + 'a,
-    S2: AsRef<OsStr> + 'b,
+    S1: AsRef<OsStr> + 'a + ?Sized,
+    S2: AsRef<OsStr> + 'b + ?Sized,
 {
     let mut arg1 = arg1.into_iter();
     let cmd = arg1.next().unwrap();

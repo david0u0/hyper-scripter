@@ -165,6 +165,7 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
         let mut v: Vec<_> = first.split(' ').filter(|s| !s.is_empty()).collect();
         let second = second.trim();
         if second.len() > 0 {
+            v.push("--");
             v.push(second);
         }
         v

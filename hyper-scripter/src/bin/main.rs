@@ -187,12 +187,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             };
 
-            // TODO: get rid of this
-            let edit_query = vec![match edit_query {
-                EditQuery::NewAnonimous => EditQuery::NewAnonimous,
-                EditQuery::Query(q) => EditQuery::Query(ListQuery::Query(q)),
-            }];
-
             let (edit_res, create_res) =
                 main_util::edit_or_create(edit_query, repo, ty, edit_tags).await?;
 
@@ -205,14 +199,14 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 prepare_vec.push((entry.id, p, prepare_resp));
             }
             if let Some(create_res) = create_res {
-                for holder in create_res.to_create.into_iter() {
-                    log::info!("創造 {:?}", holder.name);
+                for (name, path) in create_res.to_create.into_iter() {
+                    log::info!("創造 {:?}", name);
                     let entry = repo
-                        .entry(&holder.name)
+                        .entry(&name)
                         .or_insert(
                             ScriptInfo::builder(
                                 0,
-                                holder.name,
+                                name,
                                 create_res.ty.ty.clone(),
                                 create_res.tags.clone().into_iter(),
                             )
@@ -220,18 +214,18 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                         )
                         .await?;
                     let prepare_resp = util::prepare_script(
-                        &holder.path,
+                        &path,
                         &*entry,
                         create_res.ty.sub.as_ref(),
                         no_template,
                         &content,
                     )?;
-                    prepare_vec.push((entry.id, holder.path, prepare_resp));
+                    prepare_vec.push((entry.id, path, prepare_resp));
                 }
             }
 
             if !fast {
-                let res = util::open_editor(&prepare_vec[0].1); // TODO
+                let res = util::open_editor(prepare_vec.iter().map(|(_, p, _)| p.as_ref()));
                 if let Err(err) = res {
                     ret.errs.push(err);
                 }
@@ -351,7 +345,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         }) => {
             if edit {
                 let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
-                util::open_editor(&tmpl_path)?;
+                util::open_editor([tmpl_path.as_ref()])?;
             } else {
                 let template = util::get_or_create_template(&ty, false, false)?;
                 println!("{}", template);

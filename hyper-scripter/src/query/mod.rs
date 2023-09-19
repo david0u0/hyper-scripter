@@ -35,7 +35,7 @@ impl<Q: FromStr<Err = DisplayError>> FromStr for EditQuery<Q> {
     }
 }
 impl_ser_by_to_string!(EditQuery<ScriptOrDirQuery>);
-impl_ser_by_to_string!(EditQuery<ScriptQuery>);
+impl_ser_by_to_string!(EditQuery<ListQuery>);
 
 #[derive(Debug, Display, Clone)]
 pub enum DirQuery {

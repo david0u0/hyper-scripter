@@ -13,7 +13,7 @@ use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
-use fxhash::FxHashSet as HashSet;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -94,20 +94,9 @@ fn create<F: FnOnce(String) -> Error>(
     Ok((name, p))
 }
 
-#[derive(Debug)]
-pub struct NewScriptHolder {
-    pub path: PathBuf,
-    pub name: ScriptName,
-}
-impl NewScriptHolder {
-    fn new(name: ScriptName, path: PathBuf) -> Self {
-        NewScriptHolder { path, name }
-    }
-}
-
 struct EditListQueryHandler {
     anonymous_cnt: u32,
-    named: Vec<NewScriptHolder>,
+    named: HashMap<ScriptName, PathBuf>,
     ty: Option<ScriptFullType>,
     explicit_type: bool,
 }
@@ -119,7 +108,7 @@ impl EditListQueryHandler {
         EditListQueryHandler {
             explicit_type: ty.is_some(),
             ty,
-            named: vec![],
+            named: Default::default(),
             anonymous_cnt: 0,
         }
     }
@@ -144,7 +133,7 @@ unsafe impl ListQueryHandler for EditListQueryHandler {
                 log::error!("與已存在的腳本撞名");
                 RedundantOpt::Type.into()
             })?;
-            self.named.push(NewScriptHolder::new(name, path));
+            self.named.insert(name, path);
             return Ok(None);
         }
 
@@ -155,7 +144,7 @@ unsafe impl ListQueryHandler for EditListQueryHandler {
                     log::error!("與被篩掉的腳本撞名");
                     Error::ScriptIsFiltered(name.to_string())
                 })?;
-                self.named.push(NewScriptHolder::new(name, path));
+                self.named.insert(name, path);
                 Ok(None)
             }
             Ok(Some(entry)) => {
@@ -193,20 +182,20 @@ pub struct EditResult<'a> {
 pub struct CreateResult {
     pub ty: ScriptFullType,
     pub tags: Vec<Tag>,
-    pub to_create: Vec<NewScriptHolder>,
+    pub to_create: HashMap<ScriptName, PathBuf>,
 }
 impl CreateResult {
     pub fn new(
         ty: ScriptFullType,
         tags: Vec<Tag>,
         anonymous_cnt: u32,
-        named: Vec<NewScriptHolder>,
+        named: HashMap<ScriptName, PathBuf>,
     ) -> Result<CreateResult> {
         let mut to_create = named;
         let iter = path::open_new_anonymous(&ty.ty, anonymous_cnt).context("打開新匿名腳本失敗")?;
         for res in iter {
             let (name, path) = res?;
-            to_create.push(NewScriptHolder::new(name, path));
+            to_create.insert(name, path);
         }
         Ok(CreateResult {
             ty,
@@ -215,7 +204,7 @@ impl CreateResult {
         })
     }
     pub fn iter_path(&self) -> impl Iterator<Item = &Path> {
-        self.to_create.iter().map(|holder| holder.path.as_ref())
+        self.to_create.iter().map(|(_, path)| path.as_ref())
     }
 }
 

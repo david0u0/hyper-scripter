@@ -459,13 +459,11 @@ impl Historian {
             ignore_or_humble_arg!("ignored", pool, "id = ?", event_id);
         }
 
-        if latest_record.id == Some(event_id) {
+        if latest_record.id == event_id {
             // NOTE: 若 event_id 為最新但已被 ignored/humble，仍會被抓成 last_record 並進入這裡
             // 但應該不致於有太大的效能問題
             log::info!("process last args");
-            let ret = self
-                .make_last_time_record(latest_record.script_id.unwrap_or_default())
-                .await?;
+            let ret = self.make_last_time_record(latest_record.script_id).await?;
             return Ok(Some(ret));
         }
         Ok(None)

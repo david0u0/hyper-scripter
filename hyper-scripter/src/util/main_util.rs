@@ -225,6 +225,9 @@ pub async fn edit_or_create(
     if !edit_query_handler.has_new_script() && tags.explicit_tag {
         return Err(RedundantOpt::Tag.into()); // TODO: why not follow `explicit_type` way?
     }
+    if !edit_query_handler.has_new_script() && edit_query_handler.explicit_type {
+        return Err(RedundantOpt::Type.into());
+    }
 
     let edit_result = EditResult { existing };
     if edit_query_handler.has_new_script() {

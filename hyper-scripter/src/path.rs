@@ -195,25 +195,21 @@ impl Iterator for NewAnonymouseIter {
         }
     }
 }
-pub fn new_anonymous_name(amount: u32) -> Result<impl Iterator<Item = ScriptName>> {
-    let existing_ids = get_anonymous_ids()?
+pub fn new_anonymous_name(
+    amount: u32,
+    existing: impl Iterator<Item = u32>,
+) -> Result<NewAnonymouseIter> {
+    let mut all_existing = get_anonymous_ids()?
         .collect::<Result<HashSet<_>>>()
         .context("無法取得匿名腳本編號")?;
+    for id in existing.into_iter() {
+        all_existing.insert(id);
+    }
     Ok(NewAnonymouseIter {
-        existing_ids,
+        existing_ids: all_existing,
         amount,
         cur_id: 0,
     })
-}
-pub fn open_new_anonymous<'a>(
-    ty: &'a ScriptType,
-    amount: u32,
-) -> Result<impl Iterator<Item = Result<(ScriptName, PathBuf)>> + 'a> {
-    let iter = new_anonymous_name(amount)?;
-    Ok(iter.map(|name| {
-        let path = open_script(&name, ty, None)?; // NOTE: new_anonymous_name 的邏輯已足以確保不會產生衝突的檔案，不檢查了！
-        Ok((name, path))
-    }))
 }
 
 /// 若 `check_exist` 有值，則會檢查存在性
@@ -303,16 +299,13 @@ mod test {
     }
     #[test]
     fn test_open_anonymous() {
-        let new_scripts = open_new_anonymous(&"sh".into(), 3)
+        let new_scripts = open_new_anonymous(&"sh".into(), 3, [7])
             .unwrap()
-            .collect::<Result<Vec<_>>>()
+            .collect::<Vec<_>>()
             .unwrap();
-        assert_eq!(new_scripts[0].0, ScriptName::Anonymous(4));
-        assert_eq!(new_scripts[0].1, get_test_home().join(".anonymous/4.sh"));
-        assert_eq!(new_scripts[1].0, ScriptName::Anonymous(6));
-        assert_eq!(new_scripts[1].1, get_test_home().join(".anonymous/6.sh"));
-        assert_eq!(new_scripts[2].0, ScriptName::Anonymous(7));
-        assert_eq!(new_scripts[2].1, get_test_home().join(".anonymous/7.sh"));
+        assert_eq!(new_scripts[0], ScriptName::Anonymous(4));
+        assert_eq!(new_scripts[1], ScriptName::Anonymous(6));
+        assert_eq!(new_scripts[2], ScriptName::Anonymous(8));
 
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(p, get_test_home().join(".anonymous/5.js"));

@@ -191,10 +191,21 @@ impl CreateResult {
         anonymous_cnt: u32,
         named: HashMap<ScriptName, PathBuf>,
     ) -> Result<CreateResult> {
+        let iter = path::new_anonymous_name(
+            anonymous_cnt,
+            named.iter().filter_map(|(name, _)| {
+                if let ScriptName::Anonymous(id) = name {
+                    Some(*id)
+                } else {
+                    None
+                }
+            }),
+        )
+        .context("打開新匿名腳本失敗")?;
+
         let mut to_create = named;
-        let iter = path::open_new_anonymous(&ty.ty, anonymous_cnt).context("打開新匿名腳本失敗")?;
-        for res in iter {
-            let (name, path) = res?;
+        for name in iter {
+            let path = path::open_script(&name, &ty.ty, None)?; // NOTE: new_anonymous_name 的邏輯已足以確保不會產生衝突的檔案，不檢查了！
             to_create.insert(name, path);
         }
         Ok(CreateResult {

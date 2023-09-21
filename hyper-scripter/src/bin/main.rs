@@ -819,7 +819,9 @@ async fn create_dir_pair(
         .into_iter()
         .map(|script| -> Result<_> {
             let new_name = match &new {
-                EditQuery::NewAnonimous => path::new_anonymous_name(1)?.next().unwrap(),
+                EditQuery::NewAnonimous => path::new_anonymous_name(1, std::iter::empty())?
+                    .next()
+                    .unwrap(),
                 EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
                 EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
                     let new = new.clone();

@@ -212,17 +212,21 @@ fn test_edit_without_change() {
     let _g = setup();
 
     const ORPHAN: &str = "orphan";
-    run!(no_touch: true, "e {}", ORPHAN).expect_err("空編輯應該是一個錯誤");
+    run!(only_touch: "", "e {}", ORPHAN).expect_err("空編輯應該是一個錯誤");
     assert_ls_len(0, Some("all"), None);
-    run!(no_touch: true, "e {} | this is a test", ORPHAN).expect_err("帶內容不存檔，仍視為未編輯");
+    run!(only_touch: "", "e {} | this is a test", ORPHAN).expect_err("帶內容不存檔，仍視為未編輯");
     assert_ls_len(0, Some("all"), None);
+
+    run!(only_touch: "yes1;yes2", "e yes1 no1 yes2 no2").unwrap_err();
+    assert_ls_len(2, Some("all"), None);
+    run!("which yes1 yes2").unwrap();
 
     let t = ScriptTest::new("target", None, None);
     let base = ScriptTest::new("baseline", None, None);
     base.can_find("!").unwrap();
     run!("history neglect {}", t.get_name()).unwrap();
     t.can_find_by_name().expect_err("被忽略還找得到？");
-    run!(no_touch: true, "e {}!", t.get_name()).unwrap(); // nothing changed!
+    run!(only_touch: "", "e {}!", t.get_name()).unwrap(); // nothing changed!
     t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
 
     base.can_find("-").unwrap();
@@ -391,4 +395,22 @@ fn test_unknown_type_strange_ext() {
     run!("rm {} --purge", name).unwrap();
     assert_ls_len(0, None, None);
     assert_ls_len(0, Some("all"), None);
+}
+
+#[test]
+fn test_multi_edit_conflict() {
+    const TEST: &str = "this is a multi-edit test";
+    let _g = setup();
+
+    run!("e .1 ? | echo {}", TEST).unwrap();
+    assert_ls_len(2, Some("all"), None);
+    assert_eq!(TEST, run!(".1").unwrap());
+    assert_eq!(TEST, run!(".2").unwrap());
+
+    run!("e a b a .2 | echo {}", TEST).unwrap();
+    assert_ls_len(4, Some("all"), None);
+    assert_eq!(TEST, run!("a").unwrap());
+    assert_eq!(TEST, run!("b").unwrap());
+    assert_eq!(TEST, run!(".1").unwrap());
+    assert_eq!(format!("{}\n{}", TEST, TEST), run!(".2").unwrap());
 }

@@ -30,7 +30,7 @@ fn get_editor_script() -> String {
 pub struct RunEnv {
     pub home: Option<PathBuf>,
     pub dir: Option<PathBuf>,
-    pub no_touch: Option<bool>,
+    pub only_touch: Option<String>,
     pub silent: Option<bool>,
     pub allow_other_error: Option<bool>,
     pub custom_env: Option<Vec<(String, String)>>,
@@ -176,14 +176,14 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
 
     log::info!("開始執行 {:?}", args_vec);
     let mut cmd = Command::new(normalize_path(get_exe()).unwrap());
-    let no_touch = env.no_touch;
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
         cmd.current_dir(&dir);
         // cmd.env("PWD", dir); NOTE: 不應使用 PWD 環境變數
     }
-    if no_touch == Some(true) {
-        cmd.env("NO_TOUCH", "1");
+    if let Some(only_touch) = env.only_touch {
+        log::info!("only touch {}", only_touch);
+        cmd.env("ONLY_TOUCH", only_touch);
     }
     if let Some(custom_env) = env.custom_env {
         for (k, v) in custom_env.iter() {

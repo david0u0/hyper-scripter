@@ -500,11 +500,13 @@ impl Historian {
                     pool,
                     "
                     (? OR dir == ?) AND
+                    (NOT ? OR NOT humble) AND
                     (script_id || args " $(+ "||" + $target)* + ") IN (
                         WITH records AS (
                             SELECT max(time) as time, args, script_id " $(+ "," + $target)* +" FROM events
                             WHERE instr(?, '[' || script_id || ']') > 0
                             AND type = ? AND NOT ignored
+                            AND (? OR dir == ?)
                             AND (NOT ? OR NOT humble)
                             GROUP BY args, script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
                         ) SELECT script_id || args " $(+ "||" + $target)* + " as t FROM records
@@ -512,8 +514,11 @@ impl Historian {
                     ",
                     no_dir,
                     dir,
+                    no_humble,
                     ids_str,
                     EXEC_CODE,
+                    no_dir,
+                    dir,
                     no_humble,
                     limit,
                     offset

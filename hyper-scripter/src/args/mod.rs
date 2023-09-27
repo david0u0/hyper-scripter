@@ -299,6 +299,7 @@ pub enum History {
         no_humble: bool,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
+        #[clap(last = true)]
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...

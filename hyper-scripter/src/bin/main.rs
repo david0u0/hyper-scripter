@@ -1,3 +1,4 @@
+use futures::future::try_join_all;
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{
     self, ArgsResult, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
@@ -613,9 +614,8 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let historian = repo.historian().clone();
 
             let id_vec: Vec<_> = repo.iter_mut(Visibility::All).map(|e| e.id).collect();
-            for &id in id_vec.iter() {
-                historian.tidy(id).await?
-            }
+            let tidy_fut = id_vec.iter().map(|id| historian.tidy(*id));
+            try_join_all(tidy_fut).await?;
             historian.clear_except_script_ids(&id_vec).await?;
         }
         Subs::History {

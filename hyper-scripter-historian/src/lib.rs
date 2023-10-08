@@ -594,32 +594,21 @@ impl Historian {
 
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {
         let pool = self.pool.read().unwrap();
-        // XXX: 笑死這啥鬼
         sqlx::query!(
             "
             DELETE FROM events
             WHERE script_id = ?
               AND id NOT IN (
-                SELECT
+                SELECT id FROM
                   (
-                    SELECT id FROM events
+                    SELECT id, MAX(time) FROM events
                     WHERE script_id = ?
-                      AND args = e.args
-                      AND dir = e.dir
-                    ORDER BY time DESC
-                    LIMIT 1
-                  )
-                FROM
-                  (
-                    SELECT distinct args, dir
-                    FROM events
-                    WHERE script_id = ?
-                      AND NOT ignored
                       AND type = ?
-                  ) e
+                      AND NOT ignored
+                    GROUP BY args, dir
+                  )
               )
             ",
-            script_id,
             script_id,
             script_id,
             EXEC_CODE,

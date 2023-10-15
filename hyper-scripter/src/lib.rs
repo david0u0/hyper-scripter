@@ -15,6 +15,7 @@ pub mod list;
 pub mod migration;
 pub mod my_env_logger;
 pub mod path;
+pub mod process_lock;
 pub mod query;
 pub mod script;
 pub mod script_repo;

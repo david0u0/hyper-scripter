@@ -249,6 +249,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             dir,
         } => {
             let repo = repo.init().await?;
+            let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             main_util::run_n_times(
                 repeat.unwrap_or(1),
@@ -708,6 +709,13 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     let args: Vec<String> = serde_json::from_str(&args)?;
                     print_basic(script_id, args)?;
                 }
+            }
+        }
+        Subs::Top {} => {
+            let v = main_util::get_all_active_process_locks()?;
+            for info in v.into_iter() {
+                // TODO: args
+                println!("{} {} {}", info.pid, info.run_id, info.script_name);
             }
         }
         sub => unimplemented!("{:?}", sub),

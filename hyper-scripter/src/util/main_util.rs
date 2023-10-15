@@ -5,13 +5,14 @@ use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
+use crate::process_lock::{ProcessInfo, ProcessLock};
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
 use fxhash::FxHashSet as HashSet;
-use std::fs::create_dir_all;
+use std::fs::{create_dir_all, read_dir};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -238,7 +239,6 @@ pub async fn run_n_times(
 
     let mut env_vec = vec![];
     if use_previous {
-        let dir = super::option_map_res(dir, |d| path::normalize_path(d))?;
         let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
             None if error_no_previous => {
@@ -299,16 +299,19 @@ pub async fn run_n_times(
     let mut hs_tmpl_val = super::TmplVal::new();
     let hs_name = entry.name.key();
     let hs_name = hs_name.as_ref() as *const str;
+    let hs_name = unsafe { &*hs_name };
     let hs_tags = &entry.tags as *const HashSet<Tag>;
     let content = entry.exec_time.as_ref().unwrap().data().unwrap().0.as_str() as *const str;
     hs_tmpl_val.path = Some(&script_path);
     hs_tmpl_val.run_id = Some(run_id);
     hs_tmpl_val.tags = unsafe { &*hs_tags }.iter().map(|t| t.as_ref()).collect();
     hs_tmpl_val.env_desc = hs_env_desc;
-    hs_tmpl_val.name = Some(unsafe { &*hs_name });
+    hs_tmpl_val.name = Some(hs_name);
     hs_tmpl_val.content = Some(unsafe { &*content });
     // End packing hs tmpl val
 
+    let mut lock = ProcessLock::new(run_id, hs_name, &args)?;
+    let _guard = lock.try_write_info()?;
     for _ in 0..repeat {
         let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
         let ret_code: i32;
@@ -437,4 +440,31 @@ fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {
         }
     }
     Ok(())
+}
+
+pub fn get_all_active_process_locks() -> Result<Vec<ProcessInfo<'static>>> {
+    let dir_path = path::get_process_lock_dir()?;
+    let dir = super::handle_fs_res(&[&dir_path], read_dir(&dir_path))?;
+    let mut ret = vec![];
+    for entry in dir {
+        let file_path = entry?.file_name();
+
+        // TODO: concurrent?
+        let file_path: &Path = file_path
+            .to_str()
+            .ok_or_else(|| Error::msg("檔案實體為空...?"))?
+            .as_ref();
+        let file_path = dir_path.join(file_path);
+        let mut builder = ProcessInfo::builder(file_path)?;
+
+        if builder.get_can_write()? {
+            log::info!("remove inactive file lock {:?}", builder.path);
+            super::remove(&builder.path)?;
+        } else {
+            log::info!("found active file lock {:?}", builder.path);
+            ret.push(builder.build()?);
+        }
+    }
+
+    Ok(ret)
 }

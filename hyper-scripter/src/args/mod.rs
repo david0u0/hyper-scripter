@@ -183,8 +183,6 @@ pub enum Subs {
         fast: bool,
         #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: EditQuery<ScriptQuery>,
-        /// Because the field `content` is rarely used, don't make it allow hyphen value
-        /// Otherwise, options like `-T e` will be absorbed if placed after script query.
         content: Vec<String>,
     },
     #[clap(
@@ -286,6 +284,8 @@ pub enum Subs {
         #[clap(subcommand)]
         subcmd: History,
     },
+    #[clap(about = "Monitor hs process")]
+    Top,
 }
 
 #[derive(Parser, Debug, Serialize)]

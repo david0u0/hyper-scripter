@@ -299,10 +299,9 @@ mod test {
     }
     #[test]
     fn test_open_anonymous() {
-        let new_scripts = open_new_anonymous(&"sh".into(), 3, [7])
+        let new_scripts = new_anonymous_name(3, [7].into_iter())
             .unwrap()
-            .collect::<Vec<_>>()
-            .unwrap();
+            .collect::<Vec<_>>();
         assert_eq!(new_scripts[0], ScriptName::Anonymous(4));
         assert_eq!(new_scripts[1], ScriptName::Anonymous(6));
         assert_eq!(new_scripts[2], ScriptName::Anonymous(8));

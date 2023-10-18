@@ -571,6 +571,40 @@ mod test {
         }
     }
     #[test]
+    fn test_multi_edit() {
+        assert!(is_args_eq(
+            &build_args("edit -- a b c"),
+            &build_args("edit ? -- a b c")
+        ));
+
+        let args = build_args("edit a ? * -- x y z");
+        match args.subcmd {
+            Some(Subs::Edit {
+                edit_query,
+                content,
+                ..
+            }) => {
+                assert_eq!(3, edit_query.len());
+                assert!(matches!(
+                    edit_query[0],
+                    EditQuery::Query(ListQuery::Query(..))
+                ));
+                assert!(matches!(edit_query[1], EditQuery::NewAnonimous));
+                assert!(matches!(
+                    edit_query[2],
+                    EditQuery::Query(ListQuery::Pattern(..))
+                ));
+                assert_eq!(
+                    content,
+                    vec!["x".to_owned(), "y".to_owned(), "z".to_owned()]
+                );
+            }
+            _ => {
+                panic!("{:?} should be edit...", args);
+            }
+        }
+    }
+    #[test]
     fn test_external_run_tags() {
         let args = build_args("-s test --dummy -r 42 =script -a --");
         assert!(is_args_eq(

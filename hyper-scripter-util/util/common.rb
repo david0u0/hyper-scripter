@@ -3,24 +3,25 @@
 def read_char
   require 'io/console'
   $stdin.echo = false
-  $stdin.raw!
-  input = $stdin.getc.chr
-  if input == "\e"
-    begin
-      input << $stdin.read_nonblock(3)
-    rescue StandardError
-      nil
-    end
-    begin
-      input << $stdin.read_nonblock(2)
-    rescue StandardError
-      nil
+  input = ""
+  $stdin.raw do |io|
+    input = io.getc.chr
+    if input == "\e"
+      begin
+        input << io.read_nonblock(3)
+      rescue StandardError
+        nil
+      end
+      begin
+        input << io.read_nonblock(2)
+      rescue StandardError
+        nil
+      end
     end
   end
   input
 ensure
   $stdin.echo = true
-  $stdin.cooked!
   exit 1 if input == "\u0003" # Ctrl-C
 end
 

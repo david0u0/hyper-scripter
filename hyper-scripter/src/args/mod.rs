@@ -285,7 +285,12 @@ pub enum Subs {
         subcmd: History,
     },
     #[clap(about = "Monitor hs process")]
-    Top,
+    Top {
+        #[clap(long, help = "Run event ID")]
+        id: Vec<u64>,
+        #[clap(help = LIST_QUERY_HELP)]
+        queries: Vec<ListQuery>,
+    },
 }
 
 #[derive(Parser, Debug, Serialize)]

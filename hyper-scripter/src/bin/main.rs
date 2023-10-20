@@ -711,11 +711,29 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             }
         }
-        Subs::Top {} => {
-            let v = main_util::get_all_active_process_locks()?;
-            for info in v.into_iter() {
-                // TODO: args
-                println!("{} {} {}", info.pid, info.run_id, info.script_name);
+        Subs::Top { id, queries } => {
+            let repo = repo.init().await?;
+            let scripts = query::do_list_query(repo, &queries).await?;
+            let script_id_set: Option<HashSet<_>> = if queries.is_empty() {
+                None
+            } else {
+                Some(scripts.iter().map(|e| e.id).collect())
+            };
+            let run_id_set: HashSet<_> = id.iter().collect();
+            let processes = main_util::get_all_active_process_locks()?;
+
+            for info in processes.into_iter() {
+                if !run_id_set.is_empty() {
+                    if !run_id_set.contains(&(info.run_id as u64)) {
+                        continue;
+                    }
+                }
+                if let Some(script_id_set) = &script_id_set {
+                    if !script_id_set.contains(&info.script_id) {
+                        continue;
+                    }
+                }
+                println!("{} {} {}", info.pid, info.run_id, info.file_content());
             }
         }
         sub => unimplemented!("{:?}", sub),

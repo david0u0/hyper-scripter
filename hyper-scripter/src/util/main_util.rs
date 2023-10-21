@@ -5,7 +5,7 @@ use crate::env_pair::EnvPair;
 use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
-use crate::process_lock::{ProcessInfoRead, ProcessLock};
+use crate::process_lock::{ProcessLockRead, ProcessLockWrite};
 use crate::query::{self, EditQuery, ScriptQuery};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
@@ -310,7 +310,7 @@ pub async fn run_n_times(
     hs_tmpl_val.content = Some(unsafe { &*content });
     // End packing hs tmpl val
 
-    let mut lock = ProcessLock::new(run_id, entry.id, hs_name, &args)?;
+    let mut lock = ProcessLockWrite::new(run_id, entry.id, hs_name, &args)?;
     let _guard = lock.try_write_info()?;
     for _ in 0..repeat {
         let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
@@ -442,7 +442,7 @@ fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {
     Ok(())
 }
 
-pub fn get_all_active_process_locks() -> Result<Vec<ProcessInfoRead>> {
+pub fn get_all_active_process_locks() -> Result<Vec<ProcessLockRead>> {
     let dir_path = path::get_process_lock_dir()?;
     let dir = super::handle_fs_res(&[&dir_path], read_dir(&dir_path))?;
     let mut ret = vec![];
@@ -455,7 +455,7 @@ pub fn get_all_active_process_locks() -> Result<Vec<ProcessInfoRead>> {
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
 
         let file_path = dir_path.join(file_name);
-        let mut builder = ProcessInfoRead::builder(file_path, file_name)?;
+        let mut builder = ProcessLockRead::builder(file_path, file_name)?;
 
         if builder.get_can_write()? {
             log::info!("remove inactive file lock {:?}", builder.path);

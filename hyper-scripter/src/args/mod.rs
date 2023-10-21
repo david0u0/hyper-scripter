@@ -286,6 +286,8 @@ pub enum Subs {
     },
     #[clap(about = "Monitor hs process")]
     Top {
+        #[clap(long, short, help = "Wait for all involved processes to halt")]
+        wait: bool,
         #[clap(long, help = "Run event ID")]
         id: Vec<u64>,
         #[clap(help = LIST_QUERY_HELP)]

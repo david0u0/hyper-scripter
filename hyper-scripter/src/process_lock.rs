@@ -15,8 +15,6 @@ struct ProcessInfoWrite<'a> {
 
 #[derive(Debug)]
 pub struct ProcessInfoRead {
-    pub run_id: i64,
-
     raw_file_content: String,
     file_content_start: usize,
 
@@ -25,8 +23,8 @@ pub struct ProcessInfoRead {
     pub script_id: i64,
 }
 impl ProcessInfoRead {
-    fn new(run_id: i64, raw_file_content: String) -> Result<ProcessInfoRead> {
-        log::debug!("處理進程資訊：#{} {}", run_id, raw_file_content);
+    fn new(raw_file_content: String) -> Result<ProcessInfoRead> {
+        log::debug!("處理進程資訊： {}", raw_file_content);
         let space1 = raw_file_content
             .find(' ')
             .ok_or_else(|| Error::msg("can't find 1st space"))?;
@@ -40,7 +38,6 @@ impl ProcessInfoRead {
         let script_id = raw_file_content[space1 + 1..space2].parse()?;
 
         Ok(ProcessInfoRead {
-            run_id,
             script_id,
             pid,
             raw_file_content,
@@ -50,19 +47,9 @@ impl ProcessInfoRead {
     pub fn file_content(&self) -> &'_ str {
         &self.raw_file_content[self.file_content_start..]
     }
-    pub fn builder(path: PathBuf, file_name: &str) -> Result<ProcessLockCore> {
-        let file = handle_fs_res(&[&path], File::open(&path))?;
-        let run_id = file_name.parse()?;
-
-        Ok(ProcessLockCore {
-            lock: RwLock::new(file),
-            run_id,
-            path,
-        })
-    }
 }
 
-pub struct ProcessLock<'a> {
+pub struct ProcessLockWrite<'a> {
     core: ProcessLockCore,
     process: ProcessInfoWrite<'a>,
 }
@@ -89,16 +76,21 @@ impl ProcessLockCore {
     pub fn get_can_write(&mut self) -> Result<bool> {
         Ok(try_write(&mut self.lock, &self.path)?.is_some())
     }
-    pub fn build(self) -> Result<ProcessInfoRead> {
+    pub fn build(mut self) -> Result<ProcessLockRead> {
         let mut file = self.lock.into_inner();
         let mut content = String::new();
         handle_fs_res(&[&self.path], file.read_to_string(&mut content)).context("讀取檔案失敗")?;
+        self.lock = RwLock::new(file);
 
-        ProcessInfoRead::new(self.run_id, content)
+        let process = ProcessInfoRead::new(content)?;
+        Ok(ProcessLockRead {
+            core: self,
+            process,
+        })
     }
 }
 
-impl<'a> ProcessLock<'a> {
+impl<'a> ProcessLockWrite<'a> {
     pub fn new(
         run_id: i64,
         script_id: i64,
@@ -115,7 +107,7 @@ impl<'a> ProcessLock<'a> {
             args,
         };
 
-        Ok(ProcessLock {
+        Ok(ProcessLockWrite {
             core: ProcessLockCore {
                 lock: RwLock::new(file),
                 run_id,
@@ -140,5 +132,29 @@ impl<'a> ProcessLock<'a> {
 
         log::warn!("{:?} 竟然被其它人鎖住了…？", self.core.path);
         Ok(None)
+    }
+}
+
+pub struct ProcessLockRead {
+    core: ProcessLockCore,
+    pub process: ProcessInfoRead,
+}
+impl ProcessLockRead {
+    pub fn get_run_id(&self) -> i64 {
+        self.core.run_id
+    }
+    pub fn builder(path: PathBuf, file_name: &str) -> Result<ProcessLockCore> {
+        let file = handle_fs_res(&[&path], File::open(&path))?;
+        let run_id = file_name.parse()?;
+
+        Ok(ProcessLockCore {
+            lock: RwLock::new(file),
+            run_id,
+            path,
+        })
+    }
+    pub fn wait_write(&mut self) -> Result {
+        let _g = self.core.lock.write()?;
+        Ok(())
     }
 }

@@ -1,5 +1,6 @@
 require_relative './common'
 require_relative './selector'
+require 'shellwords'
 
 def escape_wildcard(s)
   s.gsub('*', '\*')
@@ -18,11 +19,16 @@ class Option
   end
 end
 
-def wait_for_run_id(run_id)
-  while true
-    sleep 3
-    result = HS_ENV.do_hs("top --id #{run_id}", false).chop
-    break if result.empty?
+def wait_for_run_id(wait_obj)
+  wait_id = wait_obj.map{ |obj| "--id #{obj.run_id}" }.join(' ')
+  cmd = "#{HS_ENV.env_var(:cmd)} --no-alias top --wait #{wait_id} && "
+  File.open(HS_ENV.env_var(:source), 'w') do |file|
+    case ENV['SHELL'].split('/').last
+    when 'fish'
+      file.write("commandline #{Shellwords.escape(cmd)}")
+    else
+      warn "#{ENV['SHELL']} not supported"
+    end
   end
 end
 
@@ -46,18 +52,19 @@ selector.register_keys(%w[p P], lambda { |_, obj|
   system("pstree -pT #{obj.pid}")
 }, msg: 'print the ps tree')
 
-wait_obj = nil
+wait_obj = []
 selector.register_keys(%w[w W], lambda { |_, obj|
-  wait_obj = obj
+  wait_obj.push(obj)
+}, msg: 'wait for process to end')
+selector.register_keys_virtual(%w[w W], lambda { |_, _, options|
+  wait_obj = options
 }, msg: 'wait for process to end')
 
 begin
   result = selector.run
 
   unless wait_obj.nil?
-    warn "Start waiting for #{wait_obj}"
-    wait_for_run_id(wait_obj.run_id)
-    warn "Process #{wait_obj} ends!"
+    wait_for_run_id(wait_obj)
   end
 rescue Selector::Empty
   warn 'No existing process'

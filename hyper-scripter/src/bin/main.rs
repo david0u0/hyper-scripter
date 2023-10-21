@@ -711,7 +711,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             }
         }
-        Subs::Top { id, queries } => {
+        Subs::Top { id, queries, wait } => {
             let script_id_set: Option<HashSet<_>> = if queries.is_empty() {
                 None
             } else {
@@ -723,18 +723,23 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let run_id_set: HashSet<_> = id.iter().collect();
             let processes = main_util::get_all_active_process_locks()?;
 
-            for info in processes.into_iter() {
+            for mut lock in processes.into_iter() {
                 if !run_id_set.is_empty() {
-                    if !run_id_set.contains(&(info.run_id as u64)) {
+                    if !run_id_set.contains(&(lock.get_run_id() as u64)) {
                         continue;
                     }
                 }
+                let info = &lock.process;
                 if let Some(script_id_set) = &script_id_set {
                     if !script_id_set.contains(&info.script_id) {
                         continue;
                     }
                 }
-                println!("{} {} {}", info.pid, info.run_id, info.file_content());
+                if wait {
+                    lock.wait_write()?;
+                } else {
+                    println!("{} {} {}", info.pid, lock.get_run_id(), info.file_content());
+                }
             }
         }
         sub => unimplemented!("{:?}", sub),

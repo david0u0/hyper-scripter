@@ -26,10 +26,6 @@ pub mod util;
 
 pub const APP_NAME: &str = "hs";
 pub const SEP: &str = "/";
-pub enum Either<T, U> {
-    One(T),
-    Two(U),
-}
 
 #[cfg(not(any(feature = "no-log", feature = "log",)))]
 compile_error!("one of the features [log/no-log] must be enabled");

@@ -53,6 +53,11 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
             res?;
             std::process::exit(0);
         }
+        ArgsResult::Err(err) => {
+            log::warn!("補捉到參數解析錯誤");
+            err.print().unwrap();
+            std::process::exit(1);
+        }
     };
     if root.root_args.dump_args {
         let dumped = serde_json::to_string(&root)?;

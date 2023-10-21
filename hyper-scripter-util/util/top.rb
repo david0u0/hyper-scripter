@@ -64,7 +64,7 @@ begin
   result = selector.run
 
   unless wait_obj.nil?
-    wait_for_run_id(wait_obj)
+    wait_for_run_id(wait_obj) unless wait_obj.empty?
   end
 rescue Selector::Empty
   warn 'No existing process'

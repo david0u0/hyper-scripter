@@ -89,7 +89,7 @@ fn test_remove_history_in_script() {
     let _g = setup();
 
     run!("e test1 | echo 1").unwrap();
-    run!("e test2 | echo 2 && $HS_EXE -H $HS_HOME history rm =${{NAME}}! 1").unwrap();
+    run!("e test2 | echo 2 && $HS_EXE -H $HS_HOME history rm =${{NAME}}! -- 1").unwrap();
 
     assert_eq!(run!("-").unwrap(), "2");
     assert_eq!(run!("-").unwrap(), "2"); // 比較晚創造，所以刪了執行事件還是腳本2先
@@ -301,7 +301,7 @@ fn test_history_rm_range() {
     t1.can_find("-").expect("用最近期詢問找不到？");
     assert_eq!(show_history(&t1), vec!["b", "a", "sep"]);
 
-    run!("history rm {} 1..3", t1.get_name()).unwrap(); // rm b & a
+    run!("history rm {} -- 1..3", t1.get_name()).unwrap(); // rm b & a
     assert_eq!(show_history(&t1), vec!["sep"]);
 
     t2.can_find("-").expect("刪除整段事件未能影響近期詢問");

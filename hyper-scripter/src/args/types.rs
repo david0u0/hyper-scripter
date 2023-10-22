@@ -1,6 +1,6 @@
 use super::help_str::*;
 use crate::script_type::ScriptFullType;
-use clap::Parser;
+use clap::{Error as ClapError, Parser};
 use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize)]
@@ -27,16 +27,17 @@ pub enum TypesSubs {
 }
 
 impl Types {
-    pub fn sanitize(&mut self) {
+    pub fn sanitize(&mut self) -> Result<(), ClapError> {
         match self.subcmd.as_ref() {
             None => self.subcmd = Some(TypesSubs::LS { no_sub: false }),
             Some(TypesSubs::Other(args)) => {
                 let args = ["types", "template"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(TypesSubs::parse_from(args));
+                self.subcmd = Some(TypesSubs::try_parse_from(args)?);
             }
             _ => (),
         }
+        Ok(())
     }
 }

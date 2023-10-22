@@ -1,5 +1,5 @@
 use crate::tag::TagSelector;
-use clap::Parser;
+use clap::{Error as ClapError, Parser};
 use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize)]
@@ -33,7 +33,7 @@ pub enum TagsSubs {
 }
 
 impl Tags {
-    pub fn sanitize(&mut self) {
+    pub fn sanitize(&mut self) -> Result<(), ClapError> {
         match self.subcmd.as_ref() {
             None => {
                 self.subcmd = Some(TagsSubs::LS {
@@ -45,9 +45,10 @@ impl Tags {
                 let args = ["tags", "set"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(TagsSubs::parse_from(args));
+                self.subcmd = Some(TagsSubs::try_parse_from(args)?);
             }
             _ => (),
         }
+        Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use futures::future::try_join_all;
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{
     self, ArgsResult, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
@@ -51,6 +52,11 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
             }
             res?;
             std::process::exit(0);
+        }
+        ArgsResult::Err(err) => {
+            log::warn!("補捉到參數解析錯誤");
+            err.print().unwrap();
+            std::process::exit(1);
         }
     };
     if root.root_args.dump_args {
@@ -278,6 +284,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             dir,
         } => {
             let repo = repo.init().await?;
+            let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             main_util::run_n_times(
                 repeat.unwrap_or(1),
@@ -642,9 +649,8 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let historian = repo.historian().clone();
 
             let id_vec: Vec<_> = repo.iter_mut(Visibility::All).map(|e| e.id).collect();
-            for &id in id_vec.iter() {
-                historian.tidy(id).await?
-            }
+            let tidy_fut = id_vec.iter().map(|id| historian.tidy(*id));
+            try_join_all(tidy_fut).await?;
             historian.clear_except_script_ids(&id_vec).await?;
         }
         Subs::History {
@@ -736,6 +742,37 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     log::debug!("嘗試打印參數 {} {}", script_id, args);
                     let args: Vec<String> = serde_json::from_str(&args)?;
                     print_basic(script_id, args)?;
+                }
+            }
+        }
+        Subs::Top { id, queries, wait } => {
+            let script_id_set: Option<HashSet<_>> = if queries.is_empty() {
+                None
+            } else {
+                let repo = repo.init().await?;
+                let scripts = query::do_list_query(repo, queries).await?;
+                Some(scripts.iter().map(|e| e.id).collect())
+            };
+
+            let run_id_set: HashSet<_> = id.iter().collect();
+            let processes = main_util::get_all_active_process_locks()?;
+
+            for mut lock in processes.into_iter() {
+                if !run_id_set.is_empty() {
+                    if !run_id_set.contains(&(lock.get_run_id() as u64)) {
+                        continue;
+                    }
+                }
+                let info = &lock.process;
+                if let Some(script_id_set) = &script_id_set {
+                    if !script_id_set.contains(&info.script_id) {
+                        continue;
+                    }
+                }
+                if wait {
+                    lock.wait_write()?;
+                } else {
+                    println!("{} {} {}", info.pid, lock.get_run_id(), info.file_content());
                 }
             }
         }

@@ -87,12 +87,14 @@ fn find_max_and_ans_pos<T: MultiFuzzObj>(candidates: &[MultiFuzzTuple<T>]) -> (u
 /// 參數：正解(ans)即分數最高者，其它(others)即其它分數相近的候選人。
 ///       應保證正解的長度不大於所有其它人
 ///
-/// 1. 建立一個有向無環圖，從「最強者」（根據 MultiFuzzObj::beats）出發，找到所有沉沒點
-/// 2. 於所有沉沒點中選出最強者
-/// 3. 若最強者為正解之前綴（重排序），回傳正解
+/// 1. 建立一個有向無環圖，路徑由長節點指向短節點
+/// 2. 從「最強者」（根據 MultiFuzzObj::beats）出發，找到所有沉沒點
+/// 3. 於所有沉沒點中選出最強者
+/// 4. 若最強者為正解之前綴（重排序），回傳正解
 pub(super) fn the_multifuzz_algo<T: MultiFuzzObj>(ans: T, others: Vec<T>) -> T {
     let mut candidates: Vec<_> = others.into_iter().map(|t| MultiFuzzTuple::new(t)).collect();
     candidates.push(MultiFuzzTuple::new_ans(ans));
+    // 由長至短排序
     candidates.sort_by(MultiFuzzTuple::cmp);
     let (max_pos, ans_pos) = find_max_and_ans_pos(&candidates);
     let mut ret_pos = None;

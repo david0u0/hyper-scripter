@@ -157,7 +157,7 @@ class Historian < Selector
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
-      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} -- #{obj.number}", false)
     }, msg: 'replace the argument')
 
     register_keys(%w[c C], lambda { |_, _|
@@ -243,7 +243,7 @@ class Historian < Selector
     }, msg: 'toggle show env mode', recur: true)
 
     register_keys(%w[d D], lambda { |_, obj|
-      HS_ENV.do_hs("history rm #{scripts_str} #{obj.number}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} -- #{obj.number}", false)
       load_history
     }, msg: 'delete the history', recur: true)
 
@@ -258,7 +258,7 @@ class Historian < Selector
 
       min = options[0].number
       max = options[-1].number + 1
-      HS_ENV.do_hs("history rm #{scripts_str} #{min}..#{max}", false)
+      HS_ENV.do_hs("history rm #{scripts_str} -- #{min}..#{max}", false)
       load_history
       exit_virtual
     }, msg: 'delete the history in range', recur: true)

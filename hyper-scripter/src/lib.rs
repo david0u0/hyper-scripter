@@ -17,6 +17,7 @@ pub mod list;
 pub mod migration;
 pub mod my_env_logger;
 pub mod path;
+pub mod process_lock;
 pub mod query;
 pub mod script;
 pub mod script_repo;
@@ -28,11 +29,6 @@ pub mod util;
 
 pub const APP_NAME: &str = "hs";
 pub const SEP: &str = "/";
-#[derive(Debug)]
-pub enum Either<T, U> {
-    One(T),
-    Two(U),
-}
 
 #[cfg(not(any(feature = "no-log", feature = "log",)))]
 compile_error!("one of the features [log/no-log] must be enabled");

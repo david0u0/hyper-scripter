@@ -459,13 +459,11 @@ impl Historian {
             ignore_or_humble_arg!("ignored", pool, "id = ?", event_id);
         }
 
-        if latest_record.id == Some(event_id) {
+        if latest_record.id == event_id {
             // NOTE: 若 event_id 為最新但已被 ignored/humble，仍會被抓成 last_record 並進入這裡
             // 但應該不致於有太大的效能問題
             log::info!("process last args");
-            let ret = self
-                .make_last_time_record(latest_record.script_id.unwrap_or_default())
-                .await?;
+            let ret = self.make_last_time_record(latest_record.script_id).await?;
             return Ok(Some(ret));
         }
         Ok(None)
@@ -502,11 +500,13 @@ impl Historian {
                     pool,
                     "
                     (? OR dir == ?) AND
+                    (NOT ? OR NOT humble) AND
                     (script_id || args " $(+ "||" + $target)* + ") IN (
                         WITH records AS (
                             SELECT max(time) as time, args, script_id " $(+ "," + $target)* +" FROM events
                             WHERE instr(?, '[' || script_id || ']') > 0
                             AND type = ? AND NOT ignored
+                            AND (? OR dir == ?)
                             AND (NOT ? OR NOT humble)
                             GROUP BY args, script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
                         ) SELECT script_id || args " $(+ "||" + $target)* + " as t FROM records
@@ -514,8 +514,11 @@ impl Historian {
                     ",
                     no_dir,
                     dir,
+                    no_humble,
                     ids_str,
                     EXEC_CODE,
+                    no_dir,
+                    dir,
                     no_humble,
                     limit,
                     offset
@@ -591,32 +594,21 @@ impl Historian {
 
     pub async fn tidy(&self, script_id: i64) -> Result<(), DBError> {
         let pool = self.pool.read().unwrap();
-        // XXX: 笑死這啥鬼
         sqlx::query!(
             "
             DELETE FROM events
             WHERE script_id = ?
               AND id NOT IN (
-                SELECT
+                SELECT id FROM
                   (
-                    SELECT id FROM events
+                    SELECT id, MAX(time) FROM events
                     WHERE script_id = ?
-                      AND args = e.args
-                      AND dir = e.dir
-                    ORDER BY time DESC
-                    LIMIT 1
-                  )
-                FROM
-                  (
-                    SELECT distinct args, dir
-                    FROM events
-                    WHERE script_id = ?
-                      AND NOT ignored
                       AND type = ?
-                  ) e
+                      AND NOT ignored
+                    GROUP BY args, dir
+                  )
               )
             ",
-            script_id,
             script_id,
             script_id,
             EXEC_CODE,

@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter"
-version = "0.6.8"
+version = "0.7.1"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2021"
 autotests = false
@@ -55,8 +55,8 @@ fxhash = "0.2.1"
 shlex = "1.1.0"
 futures = "0.3.5"
 chrono = { version = "0.4.31", features = ["serde"] }
-sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate" ] }
-tokio = { version = "1", features = ["rt", "macros"] }
+sqlx = { version = "0.7", default-features = false, features = [ "runtime-tokio", "macros", "sqlite", "chrono", "migrate" ] }
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
 env_logger = { version = "0.6.2", optional = true }
 log = "0.4.8"
 regex = "1"
@@ -69,19 +69,16 @@ fuzzy-matcher = "0.3.5"
 dirs = "3.0.1"
 handlebars = "3.3.0"
 toml = "0.5.6"
-ctrlc = { version = "3.0", features = ["termination"] }
+ctrlc = { version = "3.0" }
 term_grid = "0.1"
 unicode-width = "0.1"
-hyper-scripter-historian = { version = "0.6.8", path = "../hyper-scripter-historian" }
-hyper-scripter-util = { version = "0.6.8", path = "../hyper-scripter-util" }
-
-[dependencies.openssl]
-version = "0.10.29"
-features = [ "vendored" ]
+hyper-scripter-historian = { version = "0.7.1", path = "../hyper-scripter-historian" }
+hyper-scripter-util = { version = "0.7.1", path = "../hyper-scripter-util" }
+fd-lock = "4.0.0"
 
 [build-dependencies]
-sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate" ] }
-tokio = { version = "1", features = ["rt", "macros"] }
+sqlx = { version = "0.7", default-features = false, features = [ "runtime-tokio", "macros", "sqlite", "chrono", "migrate" ] }
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
 log = "0.4.8"
 
 [dev-dependencies]

@@ -6,9 +6,8 @@ use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
-use crate::Either;
 use crate::APP_NAME;
-use clap::{CommandFactory, Parser};
+use clap::{CommandFactory, Error as ClapError, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
@@ -40,7 +39,7 @@ pub struct RootArgs {
     #[clap(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
     pub archaeology: bool,
     #[clap(long)]
-    pub no_alias: bool, // NOTE: no-alias 的判斷其實存在於 clap 之外，寫在這裡只是為了生成幫助訊息
+    pub no_alias: bool,
     #[clap(
         short,
         long,
@@ -183,8 +182,6 @@ pub enum Subs {
         fast: bool,
         #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: Vec<EditQuery<ListQuery>>,
-        /// Because the field `content` is rarely used, don't make it allow hyphen value
-        /// Otherwise, options like `-T e` will be absorbed if placed after script query.
         #[clap(last = true)]
         content: Vec<String>,
     },
@@ -287,6 +284,15 @@ pub enum Subs {
         #[clap(subcommand)]
         subcmd: History,
     },
+    #[clap(about = "Monitor hs process")]
+    Top {
+        #[clap(long, short, help = "Wait for all involved processes to halt")]
+        wait: bool,
+        #[clap(long, help = "Run event ID")]
+        id: Vec<u64>,
+        #[clap(help = LIST_QUERY_HELP)]
+        queries: Vec<ListQuery>,
+    },
 }
 
 #[derive(Parser, Debug, Serialize)]
@@ -300,6 +306,7 @@ pub enum History {
         no_humble: bool,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
+        #[clap(last = true)]
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...
@@ -375,7 +382,7 @@ fn set_home(p: &Option<String>, create_on_missing: bool) -> Result {
     Config::init()
 }
 
-fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
+fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) {
     // 從 clap 的 parse_help_subcommand 函式抄的，不曉得有沒有更好的做法
     let c = Root::command();
     let mut clap = &c;
@@ -387,37 +394,49 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) -> Result {
             clap = c;
             had_found = true;
         } else if !had_found {
-            return Ok(());
+            return;
         }
     }
-    clap.clone().print_help()?;
+    let _ = clap.clone().print_help();
     println!();
     std::process::exit(0);
 }
 
-fn handle_alias_args(args: Vec<String>) -> Result<Either<Root, Vec<String>>> {
-    if args.iter().any(|s| s == "--no-alias") {
-        log::debug!("不使用別名！"); // NOTE: --no-alias 的判斷存在於 clap 之外！
-        let root = Root::parse_from(args);
-        return Ok(Either::One(root));
-    }
+macro_rules! map_clap_res {
+    ($res:expr) => {{
+        match $res {
+            Err(err) => return Ok(ArgsResult::Err(err)),
+            Ok(t) => t,
+        }
+    }};
+}
+
+fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
     match AliasRoot::try_parse_from(&args) {
+        Ok(alias_root) if alias_root.root_args.no_alias => {
+            log::debug!("不使用別名！");
+            let root = map_clap_res!(Root::try_parse_from(args));
+            return Ok(ArgsResult::Normal(root));
+        }
         Ok(alias_root) => {
             log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
                 Some((true, new_args)) => {
-                    return Ok(Either::Two(new_args.map(ToOwned::to_owned).collect()));
+                    return Ok(ArgsResult::Shell(new_args.map(ToOwned::to_owned).collect()));
                 }
-                Some((false, new_args)) => Root::parse_from(new_args),
-                None => Root::parse_from(&args),
+                Some((false, new_args)) => map_clap_res!(Root::try_parse_from(new_args)),
+                None => map_clap_res!(Root::try_parse_from(&args)),
             };
             root.is_from_alias = true;
-            Ok(Either::One(root))
+            Ok(ArgsResult::Normal(root))
         }
         Err(e) => {
-            log::warn!("解析別名參數出錯：{}", e); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::parse_from 中再來報錯
-            Root::parse_from(args);
+            log::warn!(
+                "解析別名參數出錯（應和 root_args 有關，如 --select 無值）：{}",
+                e
+            );
+            map_clap_res!(Root::try_parse_from(args)); // NOTE: 不要讓這個錯誤傳上去，而是讓它掉入 Root::try_parse_from 中再來報錯
             unreachable!()
         }
     }
@@ -432,29 +451,32 @@ impl Root {
         }
         Ok(())
     }
-    pub fn sanitize_flags(&mut self) {
-        if self.root_args.all {
+    pub fn sanitize_flags(&mut self, bang: bool) {
+        if bang {
+            self.root_args.timeless = true;
+            self.root_args.select = vec!["all".parse().unwrap()];
+        } else if self.root_args.all {
             self.root_args.timeless = true;
             self.root_args.select = vec!["all,^remove".parse().unwrap()];
         }
     }
-    pub fn sanitize(&mut self) -> Result {
+    pub fn sanitize(&mut self) -> std::result::Result<(), ClapError> {
         match &mut self.subcmd {
             Some(Subs::Other(args)) => {
                 let args = [APP_NAME, "run"]
                     .into_iter()
                     .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(Subs::parse_from(args));
+                self.subcmd = Some(Subs::try_parse_from(args)?);
                 log::info!("執行模式 {:?}", self.subcmd);
             }
             Some(Subs::Help { args }) => {
-                print_help(args.iter())?;
+                print_help(args.iter());
             }
             Some(Subs::Tags(tags)) => {
-                tags.sanitize();
+                tags.sanitize()?;
             }
             Some(Subs::Types(types)) => {
-                types.sanitize();
+                types.sanitize()?;
             }
             None => {
                 log::info!("無參數模式");
@@ -469,7 +491,7 @@ impl Root {
             }
             _ => (),
         }
-        self.sanitize_flags();
+        self.sanitize_flags(false);
         Ok(())
     }
 }
@@ -478,35 +500,37 @@ pub enum ArgsResult {
     Normal(Root),
     Completion(Completion),
     Shell(Vec<String>),
+    Err(ClapError),
 }
 
 pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
     if let Some(completion) = Completion::from_args(&args) {
         return Ok(ArgsResult::Completion(completion));
     }
-    let root = handle_alias_args(args)?;
-    Ok(match root {
-        Either::One(mut root) => {
-            log::debug!("命令行物件：{:?}", root);
-            root.sanitize()?;
-            ArgsResult::Normal(root)
-        }
-        Either::Two(v) => ArgsResult::Shell(v),
-    })
+    let mut root = handle_alias_args(args)?;
+    if let ArgsResult::Normal(root) = &mut root {
+        log::debug!("命令行物件：{:?}", root);
+        map_clap_res!(root.sanitize());
+    }
+    Ok(root)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    fn build_args<'a>(args: &'a str) -> Root {
+    fn try_build_args(args: &str) -> std::result::Result<Root, ClapError> {
         let v: Vec<_> = std::iter::once(APP_NAME)
             .chain(args.split(' '))
             .map(|s| s.to_owned())
             .collect();
         match handle_args(v).unwrap() {
-            ArgsResult::Normal(root) => root,
+            ArgsResult::Normal(root) => Ok(root),
+            ArgsResult::Err(err) => Err(err),
             _ => panic!(),
         }
+    }
+    fn build_args(args: &str) -> Root {
+        try_build_args(args).unwrap()
     }
     fn is_args_eq(arg1: &Root, arg2: &Root) -> bool {
         let json1 = serde_json::to_value(arg1).unwrap();
@@ -529,6 +553,23 @@ mod test {
             }
             _ => panic!("{:?} should be alias...", args),
         }
+    }
+    #[test]
+    fn test_displaced_no_alias() {
+        let ll = build_args("ll");
+        assert!(!ll.root_args.no_alias);
+        assert!(is_args_eq(&ll, &build_args("ls -l")));
+
+        try_build_args("ll --no-alias").expect_err("ll 即 ls -l，不該有 --no-alias 作參數");
+
+        let run_ll = build_args("--no-alias ll");
+        assert!(run_ll.root_args.no_alias);
+        assert!(is_args_eq(&run_ll, &build_args("--no-alias run ll")));
+
+        let run_some_script = build_args("some-script --no-alias");
+        assert!(!run_some_script.root_args.no_alias);
+        let run_some_script_no_alias = build_args("--no-alias some-script");
+        assert!(run_some_script_no_alias.root_args.no_alias);
     }
     #[test]
     fn test_strange_alias() {

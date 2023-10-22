@@ -10,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 pub const HS_REDIRECT: &str = ".hs_redirect";
 pub const HS_PRE_RUN: &str = ".hs_prerun";
+const PROCESS_LOCK: &str = ".hs_process_lock";
 const TEMPLATE: &str = ".hs_templates";
 const HBS_EXT: &str = ".hbs";
 
@@ -245,6 +246,19 @@ pub fn open_script(
     Ok(script_path)
 }
 
+pub fn get_process_lock_dir() -> Result<PathBuf> {
+    let p = get_home().join(PROCESS_LOCK);
+    if !p.exists() {
+        log::info!("找不到檔案鎖資料夾，創建之");
+        handle_fs_res(&[&p], create_dir_all(&p))?;
+    }
+    Ok(p)
+}
+
+pub fn get_process_lock(run_id: i64) -> Result<PathBuf> {
+    Ok(get_process_lock_dir()?.join(run_id.to_string()))
+}
+
 pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
     let p = get_home()
         .join(TEMPLATE)
@@ -257,6 +271,7 @@ pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
     }
     Ok(p)
 }
+
 pub fn get_sub_types(ty: &ScriptType) -> Result<Vec<ScriptType>> {
     let dir = get_home().join(TEMPLATE).join(ty.as_ref());
     if !dir.exists() {

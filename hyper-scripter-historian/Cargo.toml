@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter-historian"
-version = "0.6.8"
+version = "0.7.1"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -11,13 +11,9 @@ description = "Database tool for hyper-scripter. Not indetended to be used direc
 [dependencies]
 log = "0.4.8"
 chrono = { version = "0.4.7", features = ["serde"] }
-sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate" ] }
-
-[dependencies.openssl]
-version = "0.10.29"
-features = [ "vendored" ]
+sqlx = { version = "0.7", default-features = false, features = [ "runtime-tokio", "macros", "sqlite", "chrono", "migrate" ] }
 
 [build-dependencies]
-sqlx = { version = "0.6.2", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "sqlite", "chrono", "migrate" ] }
+sqlx = { version = "0.7", default-features = false, features = [ "runtime-tokio", "macros", "sqlite", "chrono", "migrate" ] }
 log = "0.4.8"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }

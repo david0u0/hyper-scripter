@@ -254,6 +254,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             dir,
         } => {
             let repo = repo.init().await?;
+            let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let mut entry = query::do_script_query_strict(&script_query, repo).await?;
             main_util::run_n_times(
                 repeat.unwrap_or(1),
@@ -712,6 +713,37 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     log::debug!("嘗試打印參數 {} {}", script_id, args);
                     let args: Vec<String> = serde_json::from_str(&args)?;
                     print_basic(script_id, args)?;
+                }
+            }
+        }
+        Subs::Top { id, queries, wait } => {
+            let script_id_set: Option<HashSet<_>> = if queries.is_empty() {
+                None
+            } else {
+                let repo = repo.init().await?;
+                let scripts = query::do_list_query(repo, &queries).await?;
+                Some(scripts.iter().map(|e| e.id).collect())
+            };
+
+            let run_id_set: HashSet<_> = id.iter().collect();
+            let processes = main_util::get_all_active_process_locks()?;
+
+            for mut lock in processes.into_iter() {
+                if !run_id_set.is_empty() {
+                    if !run_id_set.contains(&(lock.get_run_id() as u64)) {
+                        continue;
+                    }
+                }
+                let info = &lock.process;
+                if let Some(script_id_set) = &script_id_set {
+                    if !script_id_set.contains(&info.script_id) {
+                        continue;
+                    }
+                }
+                if wait {
+                    lock.wait_write()?;
+                } else {
+                    println!("{} {} {}", info.pid, lock.get_run_id(), info.file_content());
                 }
             }
         }

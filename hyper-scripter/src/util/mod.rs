@@ -381,7 +381,7 @@ pub fn hijack_ctrlc_once() {
     static CTRLC_HANDLE: Once = Once::new();
     log::debug!("劫持 ctrl-c 回調");
     CTRLC_HANDLE.call_once(|| {
-        let res = ctrlc::set_handler(|| {});
+        let res = ctrlc::set_handler(|| log::warn!("收到 ctrl-c"));
         if res.is_err() {
             log::warn!("設置 ctrl-c 回調失敗 {:?}", res);
         }

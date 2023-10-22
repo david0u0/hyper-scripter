@@ -92,22 +92,19 @@ impl Alias {
     /// ```
     pub fn args(&self) -> (bool, impl Iterator<Item = &'_ str>) {
         let mut is_shell = false;
-        let first_args = &self.after[0];
+        let mut iter = self.after.iter().map(String::as_str);
+        let mut first_args = iter.next().unwrap();
         let mut chars = first_args.chars();
         if chars.next() == Some('!') {
             if first_args.len() > 1 {
                 if chars.next() != Some(' ') {
                     is_shell = true;
+                    first_args = &first_args[1..];
                 }
             }
         }
 
-        let mut iter = self.after.iter().map(String::as_str);
-        let mut first = iter.next().unwrap();
-        if is_shell {
-            first = &first[1..];
-        }
-        return (is_shell, std::iter::once(first).chain(iter));
+        return (is_shell, std::iter::once(first_args).chain(iter));
     }
 }
 

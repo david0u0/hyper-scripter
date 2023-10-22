@@ -158,3 +158,51 @@ impl ProcessLockRead {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_process_lock() {
+        const RUN_ID: i64 = 1;
+        const SCRIPT_ID: i64 = 2;
+        const SCRIPT_NAME: &str = "this-name";
+        let file_path = crate::path::get_process_lock(RUN_ID).unwrap();
+
+        let mut write_lock = ProcessLockWrite::new(RUN_ID, SCRIPT_ID, SCRIPT_NAME, &[]).unwrap();
+        let mut read_core =
+            ProcessLockRead::builder(file_path.clone(), &RUN_ID.to_string()).unwrap();
+
+        assert!(read_core.get_can_write().unwrap());
+
+        let write_guard = write_lock.try_write_info().unwrap();
+
+        assert!(!read_core.get_can_write().unwrap());
+
+        let mut read_lock = read_core.build().unwrap();
+        let ProcessLockRead {
+            core:
+                ProcessLockCore {
+                    run_id,
+                    path,
+                    lock: _,
+                },
+            process:
+                ProcessInfoRead {
+                    pid,
+                    script_id,
+                    raw_file_content: _,
+                    file_content_start: _,
+                },
+        } = &read_lock;
+        assert_eq!(RUN_ID, *run_id);
+        assert_eq!(&file_path, path);
+        assert_eq!(std::process::id(), *pid);
+        assert_eq!(SCRIPT_ID, *script_id);
+        assert!(read_lock.process.file_content().starts_with(SCRIPT_NAME));
+
+        assert!(!read_lock.core.get_can_write().unwrap());
+        drop(write_guard);
+        assert!(read_lock.core.get_can_write().unwrap());
+    }
+}

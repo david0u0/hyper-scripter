@@ -1,4 +1,4 @@
-use super::{init_repo, print_iter, to_display_args};
+use super::{init_repo, print_iter};
 use crate::args::{AliasRoot, Completion, Root, Subs};
 use crate::config::Config;
 use crate::error::{Error, Result};
@@ -6,6 +6,7 @@ use crate::fuzzy::{fuzz_with_multifuzz_ratio, is_prefix, FuzzResult};
 use crate::path;
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::SEP;
+use crate::{to_display_args, Either};
 use clap::Parser;
 use std::cmp::Reverse;
 
@@ -122,7 +123,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
 
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             let conf = Config::load(&home)?;
-            if let Some((false, new_args)) = root.expand_alias(&args, &conf) {
+            if let Some(Either::One(new_args)) = root.expand_alias(&args, &conf) {
                 print_iter(new_args, " ");
             } else {
                 log::info!("並非別名");
@@ -144,9 +145,10 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
                 Some(Subs::Run {
                     script_query, args, ..
                 }) => {
-                    let iter = std::iter::once(script_query.to_string())
-                        .chain(args.into_iter().map(|s| to_display_args(s)));
-                    print_iter(iter, " ");
+                    print!("{}", script_query);
+                    for arg in args {
+                        print!(" {}", to_display_args(&arg));
+                    }
                 }
                 res @ _ => {
                     log::warn!("非執行指令 {:?}", res);

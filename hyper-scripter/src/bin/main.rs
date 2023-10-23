@@ -15,6 +15,7 @@ use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
 use hyper_scripter::tag::{Tag, TagSelector};
+use hyper_scripter::to_display_args;
 use hyper_scripter::util::{
     self, completion_util,
     holder::{RepoHolder, Resource},
@@ -687,7 +688,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                         print!(" ");
                     }
                 }
-                print_iter(args.into_iter().map(|s| util::to_display_args(s)), " ");
+                print_iter(args.iter().map(|s| to_display_args(s)), " ");
                 println!("");
                 Ok(())
             };

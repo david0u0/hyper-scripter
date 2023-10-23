@@ -7,6 +7,7 @@ use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQue
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::APP_NAME;
+use crate::{to_display_args, Either};
 use clap::{CommandFactory, Error as ClapError, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -129,7 +130,7 @@ impl AliasRoot {
         &'a self,
         args: &'a [T],
         conf: &'a Config,
-    ) -> Option<(bool, impl Iterator<Item = &'a str>)> {
+    ) -> Option<Either<impl Iterator<Item = &'a str>, Vec<String>>> {
         if let Some((alias, remaining_args)) = self.find_alias(conf) {
             let (is_shell, after_args) = alias.args();
 
@@ -140,12 +141,20 @@ impl AliasRoot {
             };
             let base_args = args.iter().take(base_len).map(AsRef::as_ref);
 
-            let remaining_args = remaining_args[1..].iter().map(AsRef::as_ref);
+            let remaining_args = remaining_args[1..].iter().map(String::as_str);
+
+            if is_shell {
+                let mut ret: Vec<_> = base_args.chain(after_args).map(ToOwned::to_owned).collect();
+                for arg in remaining_args {
+                    ret.push(to_display_args(arg).to_string());
+                }
+                return Some(Either::Two(ret));
+            }
 
             let new_args = base_args.chain(after_args).chain(remaining_args);
 
             // log::trace!("新的參數為 {:?}", new_args);
-            Some((is_shell, new_args))
+            Some(Either::One(new_args))
         } else {
             None
         }
@@ -421,10 +430,10 @@ fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
             log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
-                Some((true, new_args)) => {
-                    return Ok(ArgsResult::Shell(new_args.map(ToOwned::to_owned).collect()));
+                Some(Either::One(new_args)) => map_clap_res!(Root::try_parse_from(new_args)),
+                Some(Either::Two(new_args)) => {
+                    return Ok(ArgsResult::Shell(new_args));
                 }
-                Some((false, new_args)) => map_clap_res!(Root::try_parse_from(new_args)),
                 None => map_clap_res!(Root::try_parse_from(&args)),
             };
             root.is_from_alias = true;

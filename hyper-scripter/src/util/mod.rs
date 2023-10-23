@@ -198,7 +198,7 @@ pub fn get_or_create_template<T: AsScriptFullTypeRef>(
 }
 
 /// copied from `shell_escape` crate
-pub fn to_display_args(arg: String) -> String {
+pub fn to_display_args(arg: &str) -> Cow<'_, str> {
     fn non_whitelisted(ch: char) -> bool {
         match ch {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '=' | '/' | ',' | '.' | '+' => false,
@@ -206,7 +206,7 @@ pub fn to_display_args(arg: String) -> String {
         }
     }
     if !arg.is_empty() && !arg.contains(non_whitelisted) {
-        return arg;
+        return Cow::Borrowed(arg);
     }
 
     let mut es = String::with_capacity(arg.len() + 2);
@@ -222,7 +222,7 @@ pub fn to_display_args(arg: String) -> String {
         }
     }
     es.push('\'');
-    es
+    Cow::Owned(es)
 }
 
 fn relative_to_home(p: &Path) -> Option<&Path> {

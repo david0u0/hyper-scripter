@@ -2,8 +2,9 @@ use crate::error::{Contextable, Error, Result};
 use crate::util::{handle_fs_err, handle_fs_res};
 use fd_lock::{RwLock, RwLockWriteGuard};
 use std::fs::File;
+use std::io::Seek;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 struct ProcessInfoWrite<'a> {
@@ -24,24 +25,23 @@ pub struct ProcessInfoRead {
 }
 impl ProcessInfoRead {
     fn new(raw_file_content: String) -> Result<ProcessInfoRead> {
-        log::debug!("處理進程資訊： {}", raw_file_content);
-        let space1 = raw_file_content
-            .find(' ')
-            .ok_or_else(|| Error::msg("can't find 1st space"))?;
-        let space2 = raw_file_content[space1 + 1..]
-            .find(' ')
-            .ok_or_else(|| Error::msg("can't find 2nd space"))?
-            + space1
-            + 1;
+        log::debug!("處理進程資訊：{:?}", raw_file_content);
 
-        let pid = raw_file_content[..space1].parse()?;
-        let script_id = raw_file_content[space1 + 1..space2].parse()?;
+        let new_line = raw_file_content
+            .find('\n')
+            .ok_or_else(|| Error::msg("can't find new line"))?;
+        let (pid, script_id) = raw_file_content[..new_line]
+            .split_once(' ')
+            .ok_or_else(|| Error::msg("can't find space"))?;
+
+        let pid = pid.parse()?;
+        let script_id = script_id.parse()?;
 
         Ok(ProcessInfoRead {
             script_id,
             pid,
             raw_file_content,
-            file_content_start: space2 + 1,
+            file_content_start: new_line + 1,
         })
     }
     pub fn file_content(&self) -> &'_ str {
@@ -121,7 +121,7 @@ impl<'a> ProcessLockWrite<'a> {
         if let Some(guard) = guard_opt.as_mut() {
             write!(
                 guard,
-                "{} {} {}",
+                "{} {}\n{}",
                 self.process.pid, self.process.script_id, self.process.script_name
             )?;
             for arg in self.process.args.iter() {
@@ -132,6 +132,16 @@ impl<'a> ProcessLockWrite<'a> {
 
         log::warn!("{:?} 竟然被其它人鎖住了…？", self.core.path);
         Ok(None)
+    }
+    pub fn mark_sucess(guard: Option<RwLockWriteGuard<'_, File>>) {
+        if let Some(guard) = guard {
+            if let Err(err) = guard.set_len(0) {
+                log::warn!("Failed to mark file lock as success: {}", err)
+            }
+        }
+    }
+    pub fn get_path(&self) -> &Path {
+        &self.core.path
     }
 }
 
@@ -153,20 +163,29 @@ impl ProcessLockRead {
             path,
         })
     }
-    pub fn wait_write(&mut self) -> Result {
-        let _g = self.core.lock.write()?;
-        Ok(())
+    pub fn wait_write(mut self) -> Result {
+        let g = self.core.lock.write()?;
+        drop(g);
+
+        let mut file = self.core.lock.into_inner();
+        file.rewind()?;
+        if file.bytes().next().is_none() {
+            Ok(())
+        } else {
+            log::warn!("檔案鎖內容沒被砍掉代表進程沒有正常結束…");
+            Err(Error::ScriptError(1))
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    const SCRIPT_NAME: &str = "this-name";
     #[test]
     fn test_process_lock() {
         const RUN_ID: i64 = 1;
         const SCRIPT_ID: i64 = 2;
-        const SCRIPT_NAME: &str = "this-name";
         let file_path = crate::path::get_process_lock(RUN_ID).unwrap();
 
         let mut write_lock = ProcessLockWrite::new(RUN_ID, SCRIPT_ID, SCRIPT_NAME, &[]).unwrap();
@@ -204,5 +223,31 @@ mod test {
         assert!(!read_lock.core.get_can_write().unwrap());
         drop(write_guard);
         assert!(read_lock.core.get_can_write().unwrap());
+    }
+    #[test]
+    fn test_process_success() {
+        const RUN_ID: i64 = 11;
+        const SCRIPT_ID: i64 = 22;
+        let file_path = crate::path::get_process_lock(RUN_ID).unwrap();
+
+        let mut write_lock = ProcessLockWrite::new(RUN_ID, SCRIPT_ID, SCRIPT_NAME, &[]).unwrap();
+        let new_read_lock = || {
+            let read_core =
+                ProcessLockRead::builder(file_path.clone(), &RUN_ID.to_string()).unwrap();
+            read_core.build().unwrap()
+        };
+
+        let write_guard = write_lock.try_write_info().unwrap();
+        drop(write_guard);
+
+        let read_lock = new_read_lock();
+        let res = read_lock.wait_write();
+        assert!(matches!(res, Err(Error::ScriptError(_))));
+
+        let read_lock = new_read_lock();
+        let write_guard = write_lock.try_write_info().unwrap();
+        ProcessLockWrite::mark_sucess(write_guard);
+
+        read_lock.wait_write().expect("應該要成功");
     }
 }

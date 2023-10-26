@@ -729,7 +729,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let run_id_set: HashSet<_> = id.iter().collect();
             let processes = main_util::get_all_active_process_locks()?;
 
-            for mut lock in processes.into_iter() {
+            for lock in processes.into_iter() {
                 if !run_id_set.is_empty() {
                     if !run_id_set.contains(&(lock.get_run_id() as u64)) {
                         continue;

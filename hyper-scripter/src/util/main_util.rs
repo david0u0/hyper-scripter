@@ -311,7 +311,7 @@ pub async fn run_n_times(
     // End packing hs tmpl val
 
     let mut lock = ProcessLockWrite::new(run_id, entry.id, hs_name, &args)?;
-    let _guard = lock.try_write_info()?;
+    let guard = lock.try_write_info()?;
     for _ in 0..repeat {
         let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
         let ret_code: i32;
@@ -326,6 +326,9 @@ pub async fn run_n_times(
         entry
             .update(|info| info.exec_done(ret_code, run_id))
             .await?;
+    }
+    if res.is_empty() {
+        ProcessLockWrite::mark_sucess(guard);
     }
     Ok(())
 }

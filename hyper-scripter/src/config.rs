@@ -187,8 +187,7 @@ impl Default for Config {
             caution_tags: "caution".parse().unwrap(),
             types: ScriptTypeConfig::default_script_types(),
             alias: [
-                gen_alias("la", &["ls", "-s", "+all", "--timeless"]), // 不顯示被強制隱藏的腳本，如 hide, remove
-                gen_alias("laa", &["ls", "-a"]),
+                gen_alias("la", &["ls", "-a"]),
                 gen_alias("ll", &["ls", "-l"]),
                 gen_alias("l", &["ls", "--grouping", "none", "--limit", "5"]),
                 gen_alias("e", &["edit"]),

@@ -290,16 +290,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             print!("{}", content);
             create_read_event(&mut entry).await?;
         }
-        Subs::EnvHelp { script_query } => {
-            let repo = repo.init().await?;
-            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
-            log::info!("打印 {:?} 的環境變數", entry.name);
-            create_read_event(&mut entry).await?;
-            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let content = util::read_file(&script_path)?;
-            let envs = extract_env_from_content(&content);
-            print_iter(envs, "\n");
-        }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS { no_sub }),
         }) => {

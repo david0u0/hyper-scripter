@@ -170,11 +170,6 @@ pub enum Subs {
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
     Help { args: Vec<String> },
-    #[clap(hide = true, about = "Print the help message of env variables")]
-    EnvHelp {
-        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
-        script_query: ScriptQuery,
-    },
     #[clap(hide = true)]
     LoadUtils,
     #[clap(about = "Migrate the database")]

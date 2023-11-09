@@ -50,12 +50,11 @@ class Historian < Selector
   attr_reader :script_name
 
   def scripts_str
-    # when there are multiple scripts, showing humble events will be a mess
-    no_humble = @single ? '' : '--no-humble'
+    no_humble_str = @no_humble ? '--no-humble': ''
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    show_env_str = @show_env ? '--show-env' : ''
+    show_env_str = @show_env ? '--display=all' : ''
     script_str = @scripts.map { |s| "=#{s}!" }.join(' ')
-    "#{no_humble} #{show_env_str} #{dir_str} #{script_str}"
+    "#{no_humble_str} #{show_env_str} #{dir_str} #{script_str}"
   end
 
   def history_show
@@ -98,7 +97,8 @@ class Historian < Selector
     @offset = show_obj['offset']
     @limit = show_obj['limit']
     @dir = show_obj['dir']
-    @show_env = show_obj['show_env']
+    @show_env = show_obj['display'] == 'All'
+    @no_humble = show_obj['no_humble']
     query = show_obj['queries']
     @single = query.length == 1 && !query[0].include?('*')
 

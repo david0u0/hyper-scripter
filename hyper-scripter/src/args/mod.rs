@@ -1,6 +1,6 @@
 use crate::config::{Alias, Config, PromptLevel};
 use crate::env_pair::EnvPair;
-use crate::error::Result;
+use crate::error::{DisplayError, DisplayResult, Result};
 use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
@@ -12,6 +12,7 @@ use clap::{CommandFactory, Error as ClapError, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 mod completion;
 pub use completion::*;
@@ -298,13 +299,46 @@ pub enum Subs {
     },
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+pub enum HistoryDisplay {
+    Env,
+    Args,
+    All,
+}
+impl HistoryDisplay {
+    pub fn show_args(&self) -> bool {
+        match self {
+            Self::Args | Self::All => true,
+            Self::Env => false,
+        }
+    }
+    pub fn show_env(&self) -> bool {
+        match self {
+            Self::Env | Self::All => true,
+            Self::Args => false,
+        }
+    }
+}
+impl FromStr for HistoryDisplay {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        let g = match s {
+            "env" => HistoryDisplay::Env,
+            "args" => HistoryDisplay::Args,
+            "all" => HistoryDisplay::All,
+            _ => unreachable!(),
+        };
+        Ok(g)
+    }
+}
+
 #[derive(Parser, Debug, Serialize)]
 pub enum History {
     RM {
         #[clap(short, long)]
         dir: Option<PathBuf>, // FIXME: this flag isn't working...
-        #[clap(long)]
-        show_env: bool,
+        #[clap(long, possible_values(&["all", "env", "args"]), default_value = "args",)]
+        display: HistoryDisplay,
         #[clap(long)]
         no_humble: bool,
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
@@ -337,8 +371,8 @@ pub enum History {
         offset: u32,
         #[clap(short, long)]
         dir: Option<PathBuf>,
-        #[clap(long)]
-        show_env: bool,
+        #[clap(long, possible_values(&["all", "env", "args"]), default_value = "args",)]
+        display: HistoryDisplay,
     },
     Neglect {
         #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
@@ -597,7 +631,7 @@ mod test {
             }
         }
 
-        let args = build_args("laa -l");
+        let args = build_args("la -l");
         assert_eq!(args.root_args.all, true);
         assert_eq!(args.root_args.select, vec!["all,^remove".parse().unwrap()]);
         match &args.subcmd {

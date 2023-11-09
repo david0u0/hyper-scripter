@@ -63,7 +63,7 @@ fn test_humble_amend_rm_id() {
         s.can_find("-").unwrap();
     }
     let assert_history = |list: &[&str]| {
-        let recorded = run!("history show {} --show-env", test.get_name()).unwrap();
+        let recorded = run!("history show {} --display=all", test.get_name()).unwrap();
         assert_list(&recorded, list);
     };
 
@@ -553,7 +553,7 @@ fn test_multi_history() {
         fn show_option_str(show_env: bool, dir: Option<&str>) -> String {
             let mut ret = String::new();
             if show_env {
-                ret += " --show-env";
+                ret += " --display=all";
             }
             if let Some(dir) = dir {
                 ret += " --dir ";

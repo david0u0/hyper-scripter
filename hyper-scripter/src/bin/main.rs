@@ -1,7 +1,7 @@
 use futures::future::try_join_all;
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{
-    self, ArgsResult, History, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
+    self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
 };
 use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::env_pair::EnvPair;
@@ -532,7 +532,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     dir,
                     range,
                     no_humble,
-                    show_env,
+                    display,
                 },
         } => {
             let repo = repo.init().await?;
@@ -540,12 +540,14 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let mut scripts = query::do_list_query(repo, &queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
+
             let res_vec = historian
                 .ignore_args_range(
                     &ids,
                     dir.as_deref(),
                     no_humble,
-                    show_env,
+                    display.show_env(),
+                    display.show_args(),
                     range.get_min(),
                     range.get_max(),
                 )
@@ -632,7 +634,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     with_name,
                     no_humble,
                     offset,
-                    show_env,
+                    display,
                     dir,
                 },
         } => {
@@ -683,27 +685,55 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 Ok(())
             };
 
-            if show_env {
-                let args_list = historian
-                    .previous_args_list_with_envs(&ids, limit, offset, no_humble, dir.as_deref())
-                    .await?;
-                for (script_id, args, envs) in args_list {
-                    log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
-                    let args: Vec<String> = serde_json::from_str(&args)?;
-                    let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
-                    print_basic(script_id, args)?;
-                    for p in envs.into_iter() {
-                        println!("  {}", p);
+            match display {
+                HistoryDisplay::All => {
+                    let args_list = historian
+                        .previous_args_list_with_envs(
+                            &ids,
+                            limit,
+                            offset,
+                            no_humble,
+                            dir.as_deref(),
+                        )
+                        .await?;
+                    for (script_id, args, envs) in args_list {
+                        log::debug!("嘗試打印參數 {} {} {}", script_id, args, envs);
+                        let args: Vec<String> = serde_json::from_str(&args)?;
+                        let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
+                        print_basic(script_id, args)?;
+                        for p in envs.into_iter() {
+                            println!("  {}", p);
+                        }
                     }
                 }
-            } else {
-                let args_list = historian
-                    .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
-                    .await?;
-                for (script_id, args) in args_list {
-                    log::debug!("嘗試打印參數 {} {}", script_id, args);
-                    let args: Vec<String> = serde_json::from_str(&args)?;
-                    print_basic(script_id, args)?;
+                HistoryDisplay::Args => {
+                    let args_list = historian
+                        .previous_args_list(&ids, limit, offset, no_humble, dir.as_deref())
+                        .await?;
+                    for (script_id, args) in args_list {
+                        log::debug!("嘗試打印參數 {} {}", script_id, args);
+                        let args: Vec<String> = serde_json::from_str(&args)?;
+                        print_basic(script_id, args)?;
+                    }
+                }
+                HistoryDisplay::Env => {
+                    let args_list = historian
+                        .previous_args_list_only_envs(
+                            &ids,
+                            limit,
+                            offset,
+                            no_humble,
+                            dir.as_deref(),
+                        )
+                        .await?;
+                    for (script_id, envs) in args_list {
+                        log::debug!("嘗試打印參數 {} {}", script_id, envs);
+                        let envs: Vec<EnvPair> = serde_json::from_str(&envs)?;
+                        print_basic(script_id, vec![])?;
+                        for p in envs.into_iter() {
+                            println!("  {}", p);
+                        }
+                    }
                 }
             }
         }

@@ -194,10 +194,17 @@ impl Default for Config {
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous"]),
-                gen_alias("pc", &["=util/historian!", "--sequence", "c", "--show-env"]),
-                gen_alias("pr", &["=util/historian!", "--sequence", "r", "--show-env"]),
-                gen_alias("h", &["=util/historian!", "--show-env"]),
-                gen_alias("hh", &["=util/historian!", "*", "--show-env"]),
+                gen_alias(
+                    "pc",
+                    &["=util/historian!", "--sequence", "c", "--display=all"],
+                ),
+                gen_alias(
+                    "pr",
+                    &["=util/historian!", "--sequence", "r", "--display=all"],
+                ),
+                gen_alias("h", &["=util/historian!", "--display=all"]),
+                // Showing humble events of all scripts will be a mess
+                gen_alias("hh", &["=util/historian!", "*", "--display=all", "--no-humble"]),
             ]
             .into_iter()
             .collect(),

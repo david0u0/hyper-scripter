@@ -111,7 +111,7 @@ macro_rules! last_arg {
                 $where
                 $(+ $more_where)*
                 +
-                " GROUP BY args, script_id " + $group_by + " ORDER BY time DESC LIMIT ? OFFSET ?
+                " GROUP BY script_id " + $group_by + " ORDER BY time DESC LIMIT ? OFFSET ?
             ) SELECT "
                 + $select
                 + " FROM args
@@ -124,7 +124,7 @@ macro_rules! last_arg {
     }};
 }
 macro_rules! do_last_arg {
-    ($select:literal, $maybe_envs:literal, $ids:expr, $limit:expr, $offset:expr, $no_humble:expr, $dir:expr, $historian:expr) => {{
+    ($select:literal, $group_by:literal, $ids:expr, $limit:expr, $offset:expr, $no_humble:expr, $dir:expr, $historian:expr) => {{
         let ids = join_id_str($ids);
         log::info!("查詢歷史 {}", ids);
         let limit = $limit as i64;
@@ -137,7 +137,7 @@ macro_rules! do_last_arg {
             $select,
             offset,
             limit,
-            $maybe_envs,
+            $group_by,
             "
             AND instr(?, '[' || script_id || ']') > 0 AND (? OR dir = ?)
             AND (NOT ? OR NOT humble)
@@ -344,7 +344,7 @@ impl Historian {
     ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
         let res = do_last_arg!(
             "script_id, args",
-            "",
+            ", args",
             ids,
             limit,
             offset,
@@ -370,7 +370,7 @@ impl Historian {
     ) -> Result<impl ExactSizeIterator<Item = (i64, String, String)>, DBError> {
         let res = do_last_arg!(
             "script_id, args, envs",
-            ", envs",
+            ", args, envs",
             ids,
             limit,
             offset,
@@ -387,6 +387,31 @@ impl Historian {
         }))
     }
 
+    pub async fn previous_args_list_only_envs(
+        &self,
+        ids: &[i64],
+        limit: u32,
+        offset: u32,
+        no_humble: bool,
+        dir: Option<&Path>,
+    ) -> Result<impl ExactSizeIterator<Item = (i64, String)>, DBError> {
+        let res = do_last_arg!(
+            "script_id, envs",
+            ", envs",
+            ids,
+            limit,
+            offset,
+            no_humble,
+            dir,
+            self
+        )?;
+        Ok(res.into_iter().map(|res| {
+            (
+                res.script_id.unwrap_or_default(),
+                res.envs.unwrap_or_default(),
+            )
+        }))
+    }
     async fn make_last_time_record(&self, script_id: i64) -> Result<LastTimeRecord, DBError> {
         let res = sqlx::query_as_unchecked!(
             LastTimeRecord,
@@ -474,6 +499,7 @@ impl Historian {
         dir: Option<&Path>,
         no_humble: bool,
         show_env: bool,
+        show_args: bool,
         min: NonZeroU64,
         max: Option<NonZeroU64>,
     ) -> Result<Vec<LastTimeRecord>, DBError> {
@@ -501,15 +527,15 @@ impl Historian {
                     "
                     (? OR dir == ?) AND
                     (NOT ? OR NOT humble) AND
-                    (script_id || args " $(+ "||" + $target)* + ") IN (
+                    (script_id " $(+ "||" + $target)* + ") IN (
                         WITH records AS (
-                            SELECT max(time) as time, args, script_id " $(+ "," + $target)* +" FROM events
+                            SELECT max(time) as time, script_id " $(+ "," + $target)* +" FROM events
                             WHERE instr(?, '[' || script_id || ']') > 0
                             AND type = ? AND NOT ignored
                             AND (? OR dir == ?)
                             AND (NOT ? OR NOT humble)
-                            GROUP BY args, script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
-                        ) SELECT script_id || args " $(+ "||" + $target)* + " as t FROM records
+                            GROUP BY script_id " $( + "," + $target)* + " ORDER BY time DESC LIMIT ? OFFSET ?
+                        ) SELECT script_id " $(+ "||" + $target)* + " as t FROM records
                     )
                     ",
                     no_dir,
@@ -526,10 +552,11 @@ impl Historian {
             }};
         }
 
-        if show_env {
-            ignore_arg!("envs");
-        } else {
-            ignore_arg!();
+        match (show_env, show_args) {
+            (true, true) => ignore_arg!("args" "envs"),
+            (true, false) => ignore_arg!("envs"),
+            (false, true) => ignore_arg!("args"),
+            (false, false) => unreachable!(),
         }
 
         log::info!("ignore last args");

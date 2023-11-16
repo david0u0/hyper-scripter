@@ -10,7 +10,6 @@ use std::collections::hash_map::Entry::{self, *};
 
 pub mod helper;
 pub use helper::RepoEntry;
-use helper::*;
 
 #[derive(Clone, Debug)]
 pub struct RecentFilter {
@@ -319,7 +318,7 @@ macro_rules! iter_by_vis {
             Visibility::All => ($self.map.iter_mut(), Some($self.hidden_map.iter_mut())),
             Visibility::Inverse => ($self.hidden_map.iter_mut(), None),
         };
-        IterWithoutEnv { iter, iter2 }
+        iter.chain(iter2.into_iter().flatten()).map(|(_, v)| v)
     }};
 }
 
@@ -330,11 +329,8 @@ impl ScriptRepo {
     pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
         self.map.iter().map(|(_, info)| info)
     }
-    pub fn iter_mut(&mut self, visibility: Visibility) -> Iter<'_> {
-        Iter {
-            iter: iter_by_vis!(self, visibility),
-            env: &self.db_env,
-        }
+    pub fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>> {
+        iter_by_vis!(self, visibility).map(|info| RepoEntry::new(info, &self.db_env))
     }
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian

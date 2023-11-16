@@ -204,7 +204,10 @@ impl Default for Config {
                 ),
                 gen_alias("h", &["=util/historian!", "--display=all"]),
                 // Showing humble events of all scripts will be a mess
-                gen_alias("hh", &["=util/historian!", "*", "--display=all", "--no-humble"]),
+                gen_alias(
+                    "hh",
+                    &["=util/historian!", "*", "--display=all", "--no-humble"],
+                ),
             ]
             .into_iter()
             .collect(),

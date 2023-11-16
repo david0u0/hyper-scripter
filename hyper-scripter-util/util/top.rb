@@ -1,3 +1,10 @@
+# frozen_string_literal: true
+
+# [HS_HELP]: Interactively manage all running hs processes.
+# [HS_HELP]:
+# [HS_HELP]: e.g.:
+# [HS_HELP]:     hs top -s hs hs/test --limit 20
+
 require_relative './common'
 require_relative './selector'
 require 'shellwords'

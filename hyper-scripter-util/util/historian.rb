@@ -52,9 +52,9 @@ class Historian < Selector
   def scripts_str
     no_humble_str = @no_humble ? '--no-humble': ''
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    show_env_str = @show_env ? '--display=all' : ''
+    display_str = "--display=#{@display}"
     script_str = @scripts.map { |s| "=#{s}!" }.join(' ')
-    "#{no_humble_str} #{show_env_str} #{dir_str} #{script_str}"
+    "#{no_humble_str} #{display_str} #{dir_str} #{script_str}"
   end
 
   def history_show
@@ -88,7 +88,7 @@ class Historian < Selector
                  ls --grouping none --plain --name #{query_str}", false).split
   end
 
-  def initialize(args)
+  def initialize(args, register = true)
     @raise_err = false
     arg_obj_str = HS_ENV.do_hs("--dump-args history show #{escape_wildcard(args)}", false)
     arg_obj = JSON.parse(arg_obj_str)
@@ -97,7 +97,7 @@ class Historian < Selector
     @offset = show_obj['offset']
     @limit = show_obj['limit']
     @dir = show_obj['dir']
-    @show_env = show_obj['display'] == 'All'
+    @display = show_obj['display'].downcase
     @no_humble = show_obj['no_humble']
     query = show_obj['queries']
     @single = query.length == 1 && !query[0].include?('*')
@@ -108,7 +108,8 @@ class Historian < Selector
 
     load_history
     warn "historian for #{@scripts[0]}" if @single
-    register_all
+
+    register_all if register
   end
 
   def pos_len(pos)
@@ -238,7 +239,11 @@ class Historian < Selector
 
   def register_all
     register_keys(%w[e E], lambda { |_, _|
-      @show_env = !@show_env
+      if @display == 'all'
+        @display = 'args'
+      else
+        @display = 'all'
+      end
       load_history
     }, msg: 'toggle show env mode', recur: true)
 

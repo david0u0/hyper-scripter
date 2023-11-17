@@ -166,18 +166,18 @@ class Historian < Selector
     }, msg: 'set next command')
 
     register_keys_virtual([ENTER], lambda { |_, _, options|
-    }, msg: 'Run the script multiple times with different arguments')
+    }, msg: 'Run the script')
 
     result = run(sequence: sequence)
 
-    if result.is_multi
+    if result.options.length != 1
       result.options.each do |opt|
         HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
       end
       exit
     end
 
-    opt = result.content
+    opt = result.options[0]
     opt.clear if run_empty
     cmd = opt.cmd_body # known issue: \n \t \" will not be handled properly
 
@@ -247,11 +247,6 @@ class Historian < Selector
       load_history
     }, msg: 'toggle show env mode', recur: true)
 
-    register_keys(%w[d D], lambda { |_, obj|
-      HS_ENV.do_hs("history rm #{scripts_str} -- #{obj.number}", false)
-      load_history
-    }, msg: 'delete the history', recur: true)
-
     register_keys_virtual(%w[d D], lambda { |_, _, options|
       last_num = nil
       options.each do |opt|
@@ -266,7 +261,7 @@ class Historian < Selector
       HS_ENV.do_hs("history rm #{scripts_str} -- #{min}..#{max}", false)
       load_history
       exit_virtual
-    }, msg: 'delete the history in range', recur: true)
+    }, msg: 'delete the history', recur: true)
   end
 
   # prevent the call to `util/historian` screw up historical query

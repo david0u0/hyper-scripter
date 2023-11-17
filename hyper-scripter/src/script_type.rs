@@ -120,7 +120,7 @@ selector.register_keys('.', lambda { |_, _|
 }, msg: 'go to \".\"')
 
 dir = begin
-  content = selector.run.content
+  content = selector.run.options[0]
   if is_dot
     '.'
   else

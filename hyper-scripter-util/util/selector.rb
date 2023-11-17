@@ -54,6 +54,15 @@ def search_and_color(s, word, start_color, end_color)
   s
 end
 
+class SelectorResult
+  attr_reader :min, :max, :options
+  def initialize(min, max, options)
+    @min = min
+    @max = max
+    @options = options
+  end
+end
+
 class Selector
   class Empty < StandardError
   end
@@ -70,13 +79,28 @@ class Selector
     @enter_overriden = true if keys.include?(ENTER)
     keys = [keys] unless keys.is_a?(Array)
     keys.each { |k| @callbacks.store(k, self.class.make_callback(callback, recur)) }
-    @helps.push(self.class.make_help(keys, msg, :no, recur))
+    @helps.push(self.class.make_help(keys, msg, :no, recur)) unless msg.nil?
   end
 
   def register_keys_virtual(keys, callback, msg: '', recur: false)
     keys = [keys] unless keys.is_a?(Array)
-    keys.each { |k| @virtual_callbacks.store(k, self.class.make_callback(callback, recur)) }
-    @helps.push(self.class.make_help(keys, msg, :yes, recur))
+    should_register_normal = true
+    keys.each do |k|
+      @virtual_callbacks.store(k, self.class.make_callback(callback, recur))
+
+      # also register single select unless already has been
+      should_register_normal = false if @callbacks.include?(k)
+    end
+
+    if should_register_normal
+      normal_callback = lambda { |pos, opt|
+        callback.call(pos, pos + 1, [opt])
+      }
+      register_keys(keys, normal_callback, msg: nil, recur: recur)
+      @helps.push(self.class.make_help(keys, msg, :both, recur))
+    else
+      @helps.push(self.class.make_help(keys, msg, :yes, recur))
+    end
   end
 
   # Initiate the selector
@@ -260,13 +284,11 @@ class Selector
   end
 
   def self.make_result(pos, content)
-    ret = Struct.new(:is_multi, :pos, :content)
-    ret.new(false, pos, content)
+    SelectorResult.new(pos, pos + 1, [content])
   end
 
   def self.make_multi_result(min, max, options)
-    ret = Struct.new(:is_multi, :min, :max, :options)
-    ret.new(true, min, max, options)
+    SelectorResult.new(min, max, options)
   end
 
   def self.make_callback(cb, recur)
@@ -397,11 +419,5 @@ if __FILE__ == $PROGRAM_NAME
 
   answer = []
   result = selector.run
-  if result.is_multi
-    answer = result.options
-  else
-    answer = [result.content]
-  end
-
-  answer.each { |opt| puts opt }
+  result.options.each { |opt| puts opt }
 end

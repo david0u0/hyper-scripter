@@ -60,9 +60,6 @@ selector.register_keys(%w[p P], lambda { |_, obj|
 }, msg: 'print the ps tree')
 
 wait_obj = []
-selector.register_keys(%w[w W], lambda { |_, obj|
-  wait_obj.push(obj)
-}, msg: 'wait for process to end')
 selector.register_keys_virtual(%w[w W], lambda { |_, _, options|
   wait_obj = options
 }, msg: 'wait for process to end')

@@ -14,18 +14,12 @@ historian.register_keys_virtual([ENTER], lambda { |_, _, options|
 }, msg: 'Apply multiple envs')
 
 clear = false
-historian.register_keys(%w[c C], lambda { |_, _|
+historian.register_keys_virtual(%w[c C], lambda { |_, _|
   clear = true
 }, msg: 'Clear the selected env')
 
 result = historian.run()
-
-options = []
-if result.is_multi
-  options = result.options
-else
-  options = [result.content]
-end
+options = result.options
 
 File.open(HS_ENV.env_var(:source), 'w') do |file|
   options.each do |opt|

@@ -23,7 +23,7 @@ selector.register_keys(%w[A], ->(_, obj) { puts obj }, recur: true)
 selector.register_keys(%w[p], ->(_, obj) { puts obj.content }, recur: true)
 selector.register_keys(%w[P], ->(_, _obj) { mode = :print_all })
 
-selector.register_keys(%w[l], ->(_, _) { puts '====' }, recur: true)
+# selector.register_keys(%w[l], ->(_, _) { puts '====' }, recur: true) # 底下這個 register_keys_virtual 應該就會順便了
 selector.register_keys_virtual(%w[l], ->(_, _, _) { puts '====' }, recur: true)
 
 selector.register_keys_virtual(%w[p], lambda { |_, _, objs|
@@ -59,7 +59,7 @@ end
 
 case mode
 when :normal
-  puts res.content
+  puts res.options
 when :print_all
   opts.each { |obj| puts obj.content }
 when :print_all_virtual

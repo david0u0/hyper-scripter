@@ -7,7 +7,6 @@ pub enum EventType {
     ExecDone,
     Read,
     Write,
-    Miss,
 }
 
 #[derive(Debug)]
@@ -24,7 +23,6 @@ pub enum EventData<'a> {
     },
     Read,
     Write,
-    Miss,
 }
 
 impl EventData<'_> {
@@ -34,7 +32,6 @@ impl EventData<'_> {
             EventData::ExecDone { .. } => EventType::ExecDone,
             EventData::Read => EventType::Read,
             EventData::Write => EventType::Write,
-            EventData::Miss => EventType::Miss,
         }
     }
 }
@@ -45,7 +42,6 @@ impl EventType {
         match self {
             Read => 0,
             Write => 1,
-            Miss => 2,
             Exec => 3,
             ExecDone => 4,
         }

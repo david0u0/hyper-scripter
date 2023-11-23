@@ -82,8 +82,11 @@ impl<'b> RepoEntryOptional<'b> {
 
 impl DBEnv {
     pub async fn close(self) {
-        // FIXME: sqlx bug: 這邊可能不會正確關閉，導致有些記錄遺失，暫時解是關閉後加一個 `sleep`
         futures::join!(self.info_pool.close(), self.historian.close());
+
+        // FIXME: sqlx bug: 這邊可能不會正確關閉，導致有些記錄遺失，暫時解是關閉後加一個 `sleep`
+        #[cfg(debug_assertions)]
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
     pub fn new(info_pool: SqlitePool, historian: Historian, modifies_script: bool) -> Self {
         Self {
@@ -150,17 +153,15 @@ impl DBEnv {
         let exec_time = info.exec_time.as_ref().map(|t| **t);
         let exec_done_time = info.exec_done_time.as_ref().map(|t| **t);
         let neglect_time = info.neglect_time.as_ref().map(|t| **t);
-        let miss_time = info.miss_time.as_ref().map(|t| **t);
         sqlx::query!(
             "
             INSERT OR REPLACE INTO last_events
-            (script_id, read, write, miss, exec, exec_done, neglect, humble, exec_count)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (script_id, read, write, exec, exec_done, neglect, humble, exec_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             ",
             info.id,
             *info.read_time,
             *info.write_time,
-            miss_time,
             exec_time,
             exec_done_time,
             neglect_time,
@@ -272,12 +273,6 @@ impl DBEnv {
             log::debug!("{:?} 的寫入事件", info.name);
             last_event_id = record_event!(*info.write_time, EventData::Write).await?;
         }
-        if let Some(time) = info.miss_time.as_ref() {
-            if time.has_changed() {
-                log::debug!("{:?} 的錯過事件", info.name);
-                last_event_id = record_event!(**time, EventData::Miss).await?;
-            }
-        }
         if let Some(time) = info.exec_time.as_ref() {
             if let Some((content, args, envs, dir)) = time.data() {
                 log::debug!("{:?} 的執行事件", info.name);
@@ -378,9 +373,6 @@ impl ScriptRepo {
             }
             if let Some(time) = record.read {
                 builder.read_time(time);
-            }
-            if let Some(time) = record.miss {
-                builder.miss_time(time);
             }
             if let Some(time) = record.exec {
                 builder.exec_time(time);

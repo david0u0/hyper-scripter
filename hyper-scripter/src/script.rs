@@ -237,7 +237,6 @@ pub struct ScriptInfo {
     pub humble_time: Option<NaiveDateTime>,
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
-    pub miss_time: Option<ScriptTime>,
     pub neglect_time: Option<ScriptTime>,
     /// (content, args, env_record, dir)
     pub exec_time: Option<ScriptTime<(String, String, String, Option<PathBuf>)>>,
@@ -279,7 +278,7 @@ impl ScriptInfo {
         let builder = ScriptInfo::builder(0, new_name, self.ty.clone(), self.tags.iter().cloned());
         builder.build()
     }
-    /// `major time` 即不包含 `read` 和 `miss` 事件的時間，但包含 `humble`
+    /// `major time` 即不包含 `read` 事件的時間，但包含 `humble`
     pub fn last_major_time(&self) -> NaiveDateTime {
         max!(
             *self.write_time,
@@ -293,7 +292,6 @@ impl ScriptInfo {
         max!(
             *self.read_time,
             *self.write_time,
-            map(&self.miss_time),
             map(&self.exec_time),
             map(&self.exec_done_time)
         )
@@ -308,9 +306,6 @@ impl ScriptInfo {
         let now = ScriptTime::now(());
         self.read_time = now.clone();
         self.write_time = now;
-    }
-    pub fn miss(&mut self) {
-        self.miss_time = Some(ScriptTime::now(()));
     }
     pub fn exec(
         &mut self,
@@ -344,7 +339,6 @@ impl ScriptInfo {
             ty,
             tags: tags.collect(),
             read_time: None,
-            miss_time: None,
             created_time: None,
             exec_time: None,
             write_time: None,
@@ -403,7 +397,6 @@ impl IntoScriptName for ScriptName {
 pub struct ScriptBuilder {
     pub name: ScriptName,
     read_time: Option<NaiveDateTime>,
-    miss_time: Option<NaiveDateTime>,
     created_time: Option<NaiveDateTime>,
     write_time: Option<NaiveDateTime>,
     exec_time: Option<NaiveDateTime>,
@@ -433,10 +426,6 @@ impl ScriptBuilder {
         self.read_time = Some(time);
         self
     }
-    pub fn miss_time(&mut self, time: NaiveDateTime) -> &mut Self {
-        self.miss_time = Some(time);
-        self
-    }
     pub fn write_time(&mut self, time: NaiveDateTime) -> &mut Self {
         self.write_time = Some(time);
         self
@@ -458,7 +447,6 @@ impl ScriptBuilder {
         ScriptInfo {
             write_time: ScriptTime::new_or(self.write_time, created_time),
             read_time: ScriptTime::new_or(self.read_time, created_time),
-            miss_time: self.miss_time.map(ScriptTime::new),
             exec_time: self.exec_time.map(ScriptTime::new),
             exec_done_time: self.exec_done_time.map(ScriptTime::new),
             neglect_time: self.neglect_time.map(ScriptTime::new),

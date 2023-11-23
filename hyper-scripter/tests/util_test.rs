@@ -138,7 +138,7 @@ fn test_collect(og_util_cnt: usize) {
 fn test_utils() {
     let _g = setup_with_utils();
     let og_util_cnt = get_ls(Some("all"), None).len();
-    assert_eq!(og_util_cnt, 8, "original # of utils had changed!");
+    assert_eq!(og_util_cnt, 9, "original # of utils had changed!");
     test_import(og_util_cnt);
     test_collect(og_util_cnt);
 }

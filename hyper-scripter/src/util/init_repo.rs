@@ -37,8 +37,8 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
     let recent = if timeless {
         None
     } else {
-        recent.or(conf.recent).map(|recent| RecentFilter {
-            recent,
+        Some(RecentFilter {
+            recent: recent.or(conf.recent),
             archaeology,
         })
     };

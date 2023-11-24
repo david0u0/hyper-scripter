@@ -13,7 +13,7 @@ pub use helper::RepoEntry;
 
 #[derive(Clone, Debug)]
 pub struct RecentFilter {
-    pub recent: u32,
+    pub recent: Option<u32>,
     pub archaeology: bool,
 }
 
@@ -338,9 +338,14 @@ impl ScriptRepo {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         let time_bound = recent.map(|r| {
-            let mut time = Utc::now().naive_utc();
-            time -= Duration::days(r.recent.into());
-            (time, r.archaeology)
+            (
+                r.archaeology,
+                r.recent.map(|r| {
+                    let mut time = Utc::now().naive_utc();
+                    time -= Duration::days(r.into());
+                    time
+                }),
+            )
         });
 
         let scripts = sqlx::query!(
@@ -388,16 +393,21 @@ impl ScriptRepo {
             }
 
             let script = builder.build();
-
             let mut hide = false;
-            if let Some((mut time_bound, archaeology)) = time_bound {
-                if let Some(neglect) = record.neglect {
-                    log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
-                    time_bound = std::cmp::max(neglect, time_bound);
-                }
-                let overtime = time_bound > script.last_major_time();
-                hide = archaeology ^ overtime
+
+            if let Some(neglect) = record.neglect {
+                log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
             }
+            if let Some((archaeology, time_bound)) = time_bound {
+                let time_bound = std::cmp::max(time_bound, record.neglect);
+                let overtime = if let Some(time_bound) = time_bound {
+                    time_bound > script.last_major_time()
+                } else {
+                    false
+                };
+                hide = archaeology ^ overtime;
+            }
+
             if !hide {
                 hide = !selector.select(&script.tags, &script.ty);
             }

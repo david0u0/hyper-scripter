@@ -3,8 +3,6 @@ use hyper_scripter::{
     error::EXIT_KNOWN_ERR,
     my_env_logger,
     path::normalize_path,
-    set_once,
-    state::State,
 };
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -92,9 +90,8 @@ pub fn setup<'a>() -> MutexGuard<'a, ()> {
     g
 }
 pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
-    static LOCK: State<Mutex<()>> = State::new();
-    set_once!(LOCK, || Mutex::new(()));
-    let guard = LOCK.get().lock().unwrap_or_else(|err| err.into_inner());
+    static LOCK: Mutex<()> = Mutex::new(());
+    let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
     let _ = my_env_logger::try_init();
     let home: PathBuf = get_home();
     match std::fs::remove_dir_all(&home) {

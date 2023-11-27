@@ -33,20 +33,17 @@ impl<T: Sized> State<T> {
         }
     }
 
-    /// 不論是否為測試中，強制設定狀態
-    pub fn set_force(&self, data: T) {
-        self.set_inner(data)
-    }
     #[cfg(test)]
     pub fn set(&self, _data: T) {
         log::info!("測試中，不設定狀態");
     }
     #[cfg(not(test))]
     pub fn set(&self, data: T) {
-        self.set_inner(data)
+        self.set_force(data)
     }
 
-    fn set_inner(&self, data: T) {
+    /// 不論是否為測試中，強制設定狀態
+    pub fn set_force(&self, data: T) {
         #[cfg(not(feature = "no-state-check"))]
         {
             let status = self

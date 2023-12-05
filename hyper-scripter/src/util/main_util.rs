@@ -457,16 +457,28 @@ pub fn get_all_active_process_locks() -> Result<Vec<ProcessLockRead>> {
             .to_str()
             .ok_or_else(|| Error::msg("檔案實體為空...?"))?;
 
-        let file_path = dir_path.join(file_name);
-        let mut builder = ProcessLockRead::builder(file_path, file_name)?;
+        let inner = |file_name| -> Result<Option<ProcessLockRead>> {
+            let file_path = dir_path.join(file_name);
+            let mut builder = ProcessLockRead::builder(file_path, file_name)?;
 
-        if builder.get_can_write()? {
-            log::info!("remove inactive file lock {:?}", builder.path);
-            super::remove(&builder.path)?;
-        } else {
-            log::info!("found active file lock {:?}", builder.path);
-            ret.push(builder.build()?);
-        }
+            if builder.get_can_write()? {
+                log::info!("remove inactive file lock {:?}", builder.path);
+                super::remove(&builder.path)?;
+                Ok(None)
+            } else {
+                log::info!("found active file lock {:?}", builder.path);
+                Ok(Some(builder.build()?))
+            }
+        };
+        let lock = match inner(file_name) {
+            Ok(None) => continue,
+            Ok(Some(l)) => l,
+            Err(e) => {
+                log::warn!("error building process lock for {}: {:?}", file_name, e);
+                continue;
+            }
+        };
+        ret.push(lock);
     }
 
     Ok(ret)

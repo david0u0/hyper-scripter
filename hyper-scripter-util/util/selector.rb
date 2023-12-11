@@ -16,8 +16,6 @@ BLUE_BG = "\033[0;44m"
 BLUE_BG_RED = "\033[31;44m\033[1m"
 BLUE_BG_YELLOW = "\033[33;44m"
 NC = "\033[0m"
-ENTER = "\r"
-NL = "\n"
 HELP_MSG = "#{GREEN}press h/H for help#{NC}".freeze
 
 def erase_lines(line_count)
@@ -193,7 +191,7 @@ class Selector
           else
             @search_string = @search_string[0..-2]
           end
-        when ENTER, NL
+        when ENTER
           mode = :normal
         else
           @search_string += resp
@@ -205,7 +203,7 @@ class Selector
         when "\b", "\c?"
           @number /= 10
           mode = :normal if @number.zero?
-        when ENTER, NL
+        when ENTER
           mode = :normal
           pos = [@number, @display_offset].max
           pos -= @display_offset
@@ -243,7 +241,7 @@ class Selector
           if resp =~ /[0-9]/
             mode = :number
             @number = resp.to_i
-          elsif [ENTER, NL].include?(resp) && @virtual_state.nil? && !@enter_overriden
+          elsif ENTER == resp && @virtual_state.nil? && !@enter_overriden
             # default enter behavior, for non-virtual mode
             return self.class.make_result(pos, @options[pos])
           else

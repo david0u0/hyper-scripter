@@ -26,15 +26,20 @@ class Option
   end
 end
 
-def wait_for_run_id(wait_obj)
+def wait_for_run_id(sourcing, wait_obj)
   wait_id = wait_obj.map{ |obj| "--id #{obj.run_id}" }.join(' ')
-  cmd = "#{HS_ENV.env_var(:cmd)} --no-alias top --wait #{wait_id} && "
+  cmd = "top --wait #{wait_id}"
   File.open(HS_ENV.env_var(:source), 'w') do |file|
-    case ENV['SHELL'].split('/').last
-    when 'fish'
-      file.write("commandline #{Shellwords.escape(cmd)}")
+    if sourcing
+      case ENV['SHELL'].split('/').last
+      when 'fish'
+        file.write("commandline #{Shellwords.escape("#{HS_ENV.env_var(:cmd)} --no-alias #{cmd} && ")}")
+      else
+        warn "#{ENV['SHELL']} not supported"
+      end
     else
-      warn "#{ENV['SHELL']} not supported"
+      warn "start waiting!"
+      HS_ENV.exec_hs(cmd, false)
     end
   end
 end
@@ -55,20 +60,29 @@ end
 selector = Selector.new
 selector.load(top_options)
 
+selector.register_keys(ENTER, lambda { |_, options|
+}, msg: 'do nothing', recur: true)
+
 selector.register_keys(%w[p P], lambda { |_, obj|
   system("pstree -pT #{obj.pid}")
 }, msg: 'print the ps tree')
 
 wait_obj = []
+sourcing = false
+
 selector.register_keys_virtual(%w[w W], lambda { |_, _, options|
   wait_obj = options
 }, msg: 'wait for process to end')
+selector.register_keys_virtual(%w[c C], lambda { |_, _, options|
+  wait_obj = options
+  sourcing = true
+}, msg: 'wait for process to end, but in the next commandline')
 
 begin
   result = selector.run
 
   unless wait_obj.nil?
-    wait_for_run_id(wait_obj) unless wait_obj.empty?
+    wait_for_run_id(sourcing, wait_obj) unless wait_obj.empty?
   end
 rescue Selector::Empty
   warn 'No existing process'

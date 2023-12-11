@@ -1,11 +1,14 @@
 # frozen_string_literal: true
 
+ENTER = "\r"
+
 def read_char
   require 'io/console'
-  $stdin.echo = false
-  input = ""
+  require 'io/wait'
+  input = nil
   $stdin.raw do |io|
-    input = io.getc.chr
+    io.wait_readable
+    input = io.read_nonblock(1)
     if input == "\e"
       begin
         input << io.read_nonblock(3)
@@ -19,9 +22,12 @@ def read_char
       end
     end
   end
-  input
+  if input == "\n"
+    ENTER
+  else
+    input
+  end
 ensure
-  $stdin.echo = true
   exit 1 if input == "\u0003" # Ctrl-C
 end
 

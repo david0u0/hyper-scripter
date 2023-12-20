@@ -146,12 +146,7 @@ class Historian < Selector
 
   def run_as_main(sequence: '')
     sourcing = false
-    echoing = false
     run_empty = false
-    register_keys(%w[p P], lambda { |_, _|
-      echoing = true
-    }, msg: 'print the argument to stdout')
-
     register_keys('.', lambda { |_, _|
       run_empty = true
     }, msg: 'run script with empty argument')
@@ -164,6 +159,15 @@ class Historian < Selector
     register_keys(%w[c C], lambda { |_, _|
       sourcing = true
     }, msg: 'set next command')
+
+    register_keys_virtual(%w[p P], lambda { |_, _, options|
+      options.reverse.each do |opt|
+        cmd = "run --dummy #{opt.cmd_body}"
+        HS_ENV.system_hs(cmd, false, opt.envs)
+      end
+      load_history
+      exit_virtual
+    }, msg: 'push the event to top', recur: true)
 
     register_keys_virtual([ENTER], lambda { |_, _, options|
     }, msg: 'Run the script')
@@ -191,8 +195,6 @@ class Historian < Selector
           warn "#{ENV['SHELL']} not supported"
         end
       end
-    elsif echoing
-      puts opt.content
     else
       HS_ENV.exec_hs(cmd, false, opt.envs)
     end
@@ -238,7 +240,7 @@ class Historian < Selector
   end
 
   def register_all
-    register_keys(%w[e E], lambda { |_, _|
+    register_keys_virtual(%w[e E], lambda { |_, _, _|
       if @display == 'all'
         @display = 'args'
       else

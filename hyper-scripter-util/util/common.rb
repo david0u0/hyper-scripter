@@ -31,6 +31,21 @@ ensure
   exit 1 if input == "\u0003" # Ctrl-C
 end
 
+def commandline(args)
+  require 'shellwords'
+  args = "#{Shellwords.escape(args)}"
+  File.open(HS_ENV.env_var(:source), 'w') do |file|
+    case ENV['SHELL'].split('/').last
+    when 'fish'
+      file.write("commandline #{args}")
+    when 'zsh'
+      file.write("print -z #{args}")
+    else
+      warn "#{ENV['SHELL']} not supported"
+    end
+  end
+end
+
 def run_cmd(cmd)
   output = `#{cmd}`
   raise StandardError, "Command `#{cmd}` exit with #{$CHILD_STATUS.exitstatus}" unless $CHILD_STATUS.success?

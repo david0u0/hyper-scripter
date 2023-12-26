@@ -7,7 +7,6 @@
 
 require_relative './common'
 require_relative './selector'
-require 'shellwords'
 
 def escape_wildcard(s)
   s.gsub('*', '\*')
@@ -29,18 +28,11 @@ end
 def wait_for_run_id(sourcing, wait_obj)
   wait_id = wait_obj.map{ |obj| "--id #{obj.run_id}" }.join(' ')
   cmd = "top --wait #{wait_id}"
-  File.open(HS_ENV.env_var(:source), 'w') do |file|
-    if sourcing
-      case ENV['SHELL'].split('/').last
-      when 'fish'
-        file.write("commandline #{Shellwords.escape("#{HS_ENV.env_var(:cmd)} --no-alias #{cmd} && ")}")
-      else
-        warn "#{ENV['SHELL']} not supported"
-      end
-    else
-      warn "start waiting!"
-      HS_ENV.exec_hs(cmd, false)
-    end
+  if sourcing
+    commandline("#{HS_ENV.env_var(:cmd)} --no-alias #{cmd} && ")
+  else
+    warn "start waiting!"
+    HS_ENV.exec_hs(cmd, false)
   end
 end
 

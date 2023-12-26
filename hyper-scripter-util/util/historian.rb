@@ -6,7 +6,6 @@
 # [HS_HELP]:     hs historian -s hs hs/test --limit 20
 
 require 'json'
-require 'shellwords'
 require_relative './common'
 require_relative './selector'
 
@@ -186,15 +185,8 @@ class Historian < Selector
     cmd = opt.cmd_body # known issue: \n \t \" will not be handled properly
 
     if sourcing
-      File.open(HS_ENV.env_var(:source), 'w') do |file|
-        case ENV['SHELL'].split('/').last
-        when 'fish'
-          cmd = "#{opt.envs_str} #{HS_ENV.env_var(:cmd)} #{cmd}"
-          file.write("commandline #{Shellwords.escape(cmd)}")
-        else
-          warn "#{ENV['SHELL']} not supported"
-        end
-      end
+      cmd = "#{opt.envs_str} #{HS_ENV.env_var(:cmd)} #{cmd}"
+      commandline(cmd)
     else
       HS_ENV.exec_hs(cmd, false, opt.envs)
     end

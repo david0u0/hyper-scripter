@@ -109,7 +109,7 @@ fn test_edit_existing_bang() {
     // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        use hyper_scripter::error::Error;
+        use hyper_scripter::error::{Error, RedundantOpt};
         use hyper_scripter::script_repo::ScriptRepo;
         use hyper_scripter::tag::{Tag, TagSelector};
         use hyper_scripter::util::{
@@ -131,7 +131,7 @@ fn test_edit_existing_bang() {
         macro_rules! try_edit {
             ($query:expr, $ty:expr, $tag:expr) => {
                 edit_or_create(
-                    $query.parse().unwrap(),
+                    vec![$query.parse().unwrap()],
                     &mut repo,
                     $ty.map(|s: &str| s.parse().unwrap()),
                     EditTagArgs {
@@ -146,45 +146,61 @@ fn test_edit_existing_bang() {
         let err = try_edit!("test", Some("rb"), "gg")
             .await
             .expect_err("沒有 BANG! 就找到編輯的腳本！？");
-        assert!(matches!(err, Error::ScriptExist(s) if s == "test"));
+        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
         let err = try_edit!("test", None, "gg").await.unwrap_err();
         assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
         let err = try_edit!("test!", Some("rb"), "gg").await.unwrap_err();
-        assert!(matches!(err, Error::ScriptExist(s) if s == "test"));
+        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
         // name different from `test.rb`, so we can create it
-        let (p, e, sub) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
-        assert_eq!(p, get_home().join("tes.rb"));
-        assert!(sub.is_some());
-        assert_tags(&["gg"], e.tags.iter());
+        let (edit, create) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
+        let create = create.unwrap();
+        assert!(edit.existing.is_empty());
+        assert_eq!(
+            vec![get_home().join("tes.rb")],
+            create.iter_path().collect::<Vec<_>>()
+        );
+        assert!(create.ty.sub.is_some());
 
-        let err = try_edit!("tes", Some("rb"), "+gg").await.unwrap_err();
-        assert!(matches!(err, Error::ScriptExist(s) if s == "tes"));
+        // edit_or_create 不會改變 repo 的狀態，所以重複創造也不會報錯
+        let (edit, create) = try_edit!("tes", Some("rb"), "+gg").await.unwrap();
+        assert!(create.is_some());
+        assert!(edit.existing.is_empty());
 
         // simple edit, should find existing script `non-hidden.rb`
-        let (p, e, sub) = try_edit!("non-hi", None, "+zzzz").await.unwrap();
-        assert_eq!(p, get_home().join("non-hidden.rb"));
-        assert!(sub.is_none());
-        assert_tags(&["gg"], e.tags.iter());
+        let (edit, create) = try_edit!("non-hi", None, "+zzzz").await.unwrap();
+        assert!(create.is_none());
+        let entry = &edit.existing[0];
+        assert_tags(&["gg"], entry.tags.iter());
 
         // edit with type, so create new script `non-hi.rb`
-        let (p, e, sub) = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
-        assert_eq!(p, get_home().join("non-hi.rb"));
-        assert!(sub.is_some());
-        assert_tags(&["zzzz"], e.tags.iter());
+        let (edit, create) = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
+        let create = create.unwrap();
+        assert!(edit.existing.is_empty());
+        assert_eq!(
+            vec![get_home().join("non-hi.rb")],
+            create.iter_path().collect::<Vec<_>>()
+        );
+        assert!(create.ty.sub.is_some());
+        assert_tags(&["zzzz"], create.tags.iter());
 
         // simple edit and name is disjoint from others, create script `test2.sh`
-        let (p, e, sub) = try_edit!("test2", None, "+gg").await.unwrap();
-        assert_eq!(p, get_home().join("test2.sh"));
-        assert!(sub.is_none());
-        assert_tags(&["gg"], e.tags.iter());
+        let (edit, create) = try_edit!("test2", None, "+gg").await.unwrap();
+        let create = create.unwrap();
+        assert!(edit.existing.is_empty());
+        assert_eq!(
+            vec![get_home().join("test2.sh")],
+            create.iter_path().collect::<Vec<_>>()
+        );
+        assert!(create.ty.sub.is_none());
+        assert_tags(&["gg"], create.tags.iter());
 
-        let (p, e, sub) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
-        assert_eq!(p, get_home().join("test.sh"));
-        assert!(sub.is_none());
-        assert_tags(&["hide"], e.tags.iter());
+        let (edit, create) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
+        assert!(create.is_none());
+        let entry = &edit.existing[0];
+        assert_tags(&["hide"], entry.tags.iter());
     });
 }
 
@@ -196,17 +212,21 @@ fn test_edit_without_change() {
     let _g = setup();
 
     const ORPHAN: &str = "orphan";
-    run!(no_touch: true, "e {}", ORPHAN).expect_err("空編輯應該是一個錯誤");
+    run!(only_touch: "", "e {}", ORPHAN).expect_err("空編輯應該是一個錯誤");
     assert_ls_len(0, Some("all"), None);
-    run!(no_touch: true, "e {} | this is a test", ORPHAN).expect_err("帶內容不存檔，仍視為未編輯");
+    run!(only_touch: "", "e {} | this is a test", ORPHAN).expect_err("帶內容不存檔，仍視為未編輯");
     assert_ls_len(0, Some("all"), None);
+
+    run!(only_touch: "yes1;yes2", "e yes1 no1 yes2 no2").unwrap_err();
+    assert_ls_len(2, Some("all"), None);
+    run!("which yes1 yes2").unwrap();
 
     let t = ScriptTest::new("target", None, None);
     let base = ScriptTest::new("baseline", None, None);
     base.can_find("!").unwrap();
     run!("history neglect {}", t.get_name()).unwrap();
     t.can_find_by_name().expect_err("被忽略還找得到？");
-    run!(no_touch: true, "e {}!", t.get_name()).unwrap(); // nothing changed!
+    run!(only_touch: "", "e {}!", t.get_name()).unwrap(); // nothing changed!
     t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
 
     base.can_find("-").unwrap();
@@ -375,4 +395,22 @@ fn test_unknown_type_strange_ext() {
     run!("rm {} --purge", name).unwrap();
     assert_ls_len(0, None, None);
     assert_ls_len(0, Some("all"), None);
+}
+
+#[test]
+fn test_multi_edit_conflict() {
+    const TEST: &str = "this is a multi-edit test";
+    let _g = setup();
+
+    run!("e .1 ? | echo {}", TEST).unwrap();
+    assert_ls_len(2, Some("all"), None);
+    assert_eq!(TEST, run!(".1").unwrap());
+    assert_eq!(TEST, run!(".2").unwrap());
+
+    run!("e a b a .2 | echo {}", TEST).unwrap();
+    assert_ls_len(4, Some("all"), None);
+    assert_eq!(TEST, run!("a").unwrap());
+    assert_eq!(TEST, run!("b").unwrap());
+    assert_eq!(TEST, run!(".1").unwrap());
+    assert_eq!(format!("{}\n{}", TEST, TEST), run!(".2").unwrap());
 }

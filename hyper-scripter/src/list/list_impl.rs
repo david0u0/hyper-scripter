@@ -5,7 +5,7 @@ use super::{
     SHORT_LATEST_TXT,
 };
 use crate::error::Result;
-use crate::query::do_list_query;
+use crate::query::{do_list_query, ListQuery};
 use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
@@ -79,7 +79,6 @@ fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
             }
         },
         grouping: opt.grouping,
-        queries: opt.queries,
         plain: opt.plain,
         limit: opt.limit,
     }
@@ -190,12 +189,13 @@ pub async fn fmt_list<W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,
     opt: ListOptions,
+    queries: Vec<ListQuery>,
 ) -> Result<()> {
     let latest_script_id = script_repo
         .latest_mut(1, Visibility::Normal)
         .map_or(-1, |s| s.id);
 
-    let scripts_iter = do_list_query(script_repo, &opt.queries)
+    let scripts_iter = do_list_query(script_repo, queries)
         .await?
         .into_iter()
         .map(|e| &*e.into_inner());

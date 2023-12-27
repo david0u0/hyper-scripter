@@ -1,3 +1,4 @@
+use super::PrepareRespond;
 use crate::args::Subs;
 use crate::color::Stylize;
 use crate::config::Config;
@@ -6,12 +7,14 @@ use crate::error::{Contextable, Error, RedundantOpt, Result};
 use crate::extract_msg::extract_env_from_content_help_aware;
 use crate::path;
 use crate::process_lock::{ProcessLockRead, ProcessLockWrite};
-use crate::query::{self, EditQuery, ScriptQuery};
+use crate::query::{
+    self, do_list_query_with_handler, EditQuery, ListQuery, ListQueryHandler, ScriptQuery,
+};
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector};
-use fxhash::FxHashSet as HashSet;
+use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fs::{create_dir_all, read_dir};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -67,17 +70,12 @@ fn create<F: FnOnce(String) -> Error>(
     query: ScriptQuery,
     script_repo: &mut ScriptRepo,
     ty: &ScriptType,
-    tags: &EditTagArgs,
-    f: F,
+    on_conflict: F,
 ) -> Result<(ScriptName, PathBuf)> {
-    if tags.explicit_select {
-        return Err(RedundantOpt::Selector.into());
-    }
-
     let name = query.into_script_name()?;
     log::debug!("打開新命名腳本：{:?}", name);
     if script_repo.get_mut(&name, Visibility::All).is_some() {
-        return Err(f(name.to_string()));
+        return Err(on_conflict(name.to_string()));
     }
 
     let p =
@@ -97,68 +95,164 @@ fn create<F: FnOnce(String) -> Error>(
     Ok((name, p))
 }
 
+struct EditListQueryHandler {
+    anonymous_cnt: u32,
+    named: HashMap<ScriptName, PathBuf>,
+    ty: Option<ScriptFullType>,
+    explicit_type: bool,
+}
+impl EditListQueryHandler {
+    fn has_new_script(&self) -> bool {
+        self.anonymous_cnt > 0 || !self.named.is_empty()
+    }
+    fn new(ty: Option<ScriptFullType>) -> Self {
+        EditListQueryHandler {
+            explicit_type: ty.is_some(),
+            ty,
+            named: Default::default(),
+            anonymous_cnt: 0,
+        }
+    }
+    fn get_or_default_type(&mut self) -> &ScriptFullType {
+        if self.ty.is_none() {
+            self.ty = Some(Default::default());
+        }
+        self.ty.as_ref().unwrap()
+    }
+}
+// SAFETY: 實作永不改動 repo 本身
+unsafe impl ListQueryHandler for EditListQueryHandler {
+    type Item = EditQuery<ListQuery>;
+    async fn handle_query<'a>(
+        &mut self,
+        query: ScriptQuery,
+        repo: &'a mut ScriptRepo,
+    ) -> Result<Option<RepoEntry<'a>>> {
+        if self.explicit_type {
+            let ty = self.get_or_default_type();
+            let (name, path) = create(query, repo, &ty.ty, |_| {
+                log::error!("與已存在的腳本撞名");
+                RedundantOpt::Type.into()
+            })?;
+            self.named.insert(name, path);
+            return Ok(None);
+        }
+
+        match query::do_script_query(&query, repo, false, false).await {
+            Err(Error::DontFuzz) | Ok(None) => {
+                let ty = self.get_or_default_type();
+                let (name, path) = create(query, repo, &ty.ty, |name| {
+                    log::error!("與被篩掉的腳本撞名");
+                    Error::ScriptIsFiltered(name.to_string())
+                })?;
+                self.named.insert(name, path);
+                Ok(None)
+            }
+            Ok(Some(entry)) => {
+                log::debug!("打開既有命名腳本：{:?}", entry.name);
+                // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
+                let n = entry.name.clone();
+                return Ok(Some(repo.get_mut(&n, Visibility::All).unwrap()));
+            }
+            Err(e) => Err(e),
+        }
+    }
+    fn handle_item(&mut self, item: Self::Item) -> Option<ListQuery> {
+        match item {
+            EditQuery::Query(query) => Some(query),
+            EditQuery::NewAnonimous => {
+                self.get_or_default_type();
+                self.anonymous_cnt += 1;
+                None
+            }
+        }
+    }
+    fn should_raise_dont_fuzz_on_empty() -> bool {
+        false
+    }
+    fn should_return_all_on_empty() -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+pub struct EditResult<'a> {
+    pub existing: Vec<RepoEntry<'a>>,
+}
+#[derive(Debug)]
+pub struct CreateResult {
+    pub ty: ScriptFullType,
+    pub tags: Vec<Tag>,
+    pub to_create: HashMap<ScriptName, PathBuf>,
+}
+impl CreateResult {
+    pub fn new(
+        ty: ScriptFullType,
+        tags: Vec<Tag>,
+        anonymous_cnt: u32,
+        named: HashMap<ScriptName, PathBuf>,
+    ) -> Result<CreateResult> {
+        let iter = path::new_anonymous_name(
+            anonymous_cnt,
+            named.iter().filter_map(|(name, _)| {
+                if let ScriptName::Anonymous(id) = name {
+                    Some(*id)
+                } else {
+                    None
+                }
+            }),
+        )
+        .context("打開新匿名腳本失敗")?;
+
+        let mut to_create = named;
+        for name in iter {
+            let path = path::open_script(&name, &ty.ty, None)?; // NOTE: new_anonymous_name 的邏輯已足以確保不會產生衝突的檔案，不檢查了！
+            to_create.insert(name, path);
+        }
+        Ok(CreateResult {
+            ty,
+            tags,
+            to_create,
+        })
+    }
+    pub fn iter_path(&self) -> impl Iterator<Item = &Path> {
+        self.to_create.iter().map(|(_, path)| path.as_ref())
+    }
+}
+
 // XXX 到底幹嘛把新增和編輯的邏輯攪在一處呢…？
 pub async fn edit_or_create(
-    edit_query: EditQuery<ScriptQuery>,
+    edit_query: Vec<EditQuery<ListQuery>>,
     script_repo: &'_ mut ScriptRepo,
     ty: Option<ScriptFullType>,
     tags: EditTagArgs,
-) -> Result<(PathBuf, RepoEntry<'_>, Option<ScriptType>)> {
-    let final_ty: ScriptFullType;
+) -> Result<(EditResult<'_>, Option<CreateResult>)> {
+    let mut edit_query_handler = EditListQueryHandler::new(ty);
+    let existing =
+        do_list_query_with_handler(script_repo, edit_query, &mut edit_query_handler).await?;
 
-    let (script_name, script_path) = if let EditQuery::Query(query) = edit_query {
-        if let Some(ty) = ty {
-            final_ty = ty;
-            create(query, script_repo, &final_ty.ty, &tags, |name| {
-                log::error!("與已存在的腳本撞名");
-                Error::ScriptExist(name.to_string())
-            })?
-        } else {
-            match query::do_script_query(&query, script_repo, false, false).await {
-                Err(Error::DontFuzz) | Ok(None) => {
-                    final_ty = Default::default();
-                    create(query, script_repo, &final_ty.ty, &tags, |name| {
-                        log::error!("與被篩掉的腳本撞名");
-                        Error::ScriptIsFiltered(name.to_string())
-                    })?
-                }
-                Ok(Some(entry)) => {
-                    if tags.explicit_tag {
-                        return Err(RedundantOpt::Tag.into());
-                    }
-                    log::debug!("打開既有命名腳本：{:?}", entry.name);
-                    let p = path::open_script(&entry.name, &entry.ty, Some(true))
-                        .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-                    // NOTE: 直接返回
-                    // FIXME: 一旦 NLL 進化就修掉這段雙重詢問
-                    // return Ok((p, entry));
-                    let n = entry.name.clone();
-                    return Ok((p, script_repo.get_mut(&n, Visibility::All).unwrap(), None));
-                }
-                Err(e) => return Err(e),
-            }
-        }
+    if existing.is_empty() && tags.explicit_select {
+        return Err(RedundantOpt::Selector.into());
+    }
+    if !edit_query_handler.has_new_script() && tags.explicit_tag {
+        return Err(RedundantOpt::Tag.into()); // TODO: why not follow `explicit_type` way?
+    }
+    if !edit_query_handler.has_new_script() && edit_query_handler.explicit_type {
+        return Err(RedundantOpt::Type.into());
+    }
+
+    let edit_result = EditResult { existing };
+    if edit_query_handler.has_new_script() {
+        let create_result = CreateResult::new(
+            edit_query_handler.ty.unwrap(),
+            tags.content.into_allowed_iter().collect(),
+            edit_query_handler.anonymous_cnt,
+            edit_query_handler.named,
+        )?;
+        Ok((edit_result, Some(create_result)))
     } else {
-        if tags.explicit_select {
-            return Err(RedundantOpt::Selector.into());
-        }
-        final_ty = ty.unwrap_or_default();
-        log::debug!("打開新匿名腳本");
-        path::open_new_anonymous(&final_ty.ty).context("打開新匿名腳本失敗")?
-    };
-
-    log::info!("編輯 {:?}", script_name);
-
-    let ScriptFullType { ty, sub } = final_ty;
-    // 這裡的 or_insert 其實永遠會發生，所以無需用閉包來傳
-    let entry = script_repo
-        .entry(&script_name)
-        .or_insert(
-            ScriptInfo::builder(0, script_name, ty, tags.content.into_allowed_iter()).build(),
-        )
-        .await?;
-
-    Ok((script_path, entry, sub))
+        Ok((edit_result, None))
+    }
 }
 
 fn run(
@@ -405,11 +499,10 @@ pub fn need_write(arg: &Subs) -> bool {
     }
 }
 
-use super::PrepareRespond;
 pub async fn after_script(
     entry: &mut RepoEntry<'_>,
     path: &Path,
-    prepare_resp: &Option<PrepareRespond>,
+    prepare_resp: Option<&PrepareRespond>,
 ) -> Result {
     let mut record_write = true;
     match prepare_resp {

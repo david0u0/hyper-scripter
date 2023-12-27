@@ -5,7 +5,7 @@ use hyper_scripter::args::{
 };
 use hyper_scripter::config::{Config, NamedTagSelector};
 use hyper_scripter::env_pair::EnvPair;
-use hyper_scripter::error::{DisplayError, Error, ExitCode, RedundantOpt, Result};
+use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
 use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
 use hyper_scripter::my_env_logger;
@@ -193,35 +193,65 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     }
                 }
             };
-            let (path, mut entry, sub_type) =
+
+            let (edit_res, create_res) =
                 main_util::edit_or_create(edit_query, repo, ty, edit_tags).await?;
-            let mut prepare_resp = Some(util::prepare_script(
-                &path,
-                &*entry,
-                sub_type.as_ref(),
-                no_template,
-                &content,
-            )?);
-            create_read_event(&mut entry).await?;
+
+            let mut prepare_vec = vec![];
+            for mut entry in edit_res.existing.into_iter() {
+                create_read_event(&mut entry).await?;
+                let p = path::open_script(&entry.name, &entry.ty, Some(true))
+                    .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
+                let prepare_resp = util::prepare_script(&p, &*entry, None, true, &content)?;
+                prepare_vec.push((entry.id, p, prepare_resp));
+            }
+            if let Some(create_res) = create_res {
+                for (name, path) in create_res.to_create.into_iter() {
+                    log::info!("創造 {:?}", name);
+                    let entry = repo
+                        .entry(&name)
+                        .or_insert(
+                            ScriptInfo::builder(
+                                0,
+                                name,
+                                create_res.ty.ty.clone(),
+                                create_res.tags.clone().into_iter(),
+                            )
+                            .build(),
+                        )
+                        .await?;
+                    let prepare_resp = util::prepare_script(
+                        &path,
+                        &*entry,
+                        create_res.ty.sub.as_ref(),
+                        no_template,
+                        &content,
+                    )?;
+                    prepare_vec.push((entry.id, path, prepare_resp));
+                }
+            }
+
             if !fast {
-                let res = util::open_editor(&path);
+                let res = util::open_editor(prepare_vec.iter().map(|(_, p, _)| p.as_ref()));
                 if let Err(err) = res {
                     ret.errs.push(err);
                 }
-            } else {
-                prepare_resp = None
             }
-            let after_res = main_util::after_script(&mut entry, &path, &prepare_resp).await;
-            if let Err(err) = after_res {
-                match &err {
-                    Error::EmptyCreate => {
+
+            for (id, path, prepare_resp) in prepare_vec.iter() {
+                let prepare_resp = if fast { None } else { Some(prepare_resp) };
+                let mut entry = repo.get_mut_by_id(*id).unwrap();
+                let after_res = main_util::after_script(&mut entry, &path, prepare_resp).await;
+                match after_res {
+                    Ok(_) => (),
+                    Err(err @ Error::EmptyCreate) => {
                         util::remove(&path)?;
                         let id = entry.id;
-                        repo.remove(id).await?
+                        repo.remove(id).await?;
+                        ret.errs.push(err);
                     }
-                    _ => (),
+                    Err(err) => return Err(err),
                 }
-                return Err(err);
             }
         }
         Subs::Help { args } => {
@@ -272,7 +302,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         Subs::Which { queries } => {
             let repo = repo.init().await?;
             let home = path::get_home();
-            let mut scripts = query::do_list_query(repo, &queries).await?;
+            let mut scripts = query::do_list_query(repo, queries).await?;
             scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
             for entry in scripts.into_iter() {
                 log::info!("定位 {:?}", entry.name);
@@ -313,7 +343,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         }) => {
             if edit {
                 let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
-                util::open_editor(&tmpl_path)?;
+                util::open_editor([tmpl_path.as_ref()])?;
             } else {
                 let template = util::get_or_create_template(&ty, false, false)?;
                 println!("{}", template);
@@ -340,18 +370,17 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 grouping: grouping.into(),
                 plain,
                 limit,
-                queries,
                 display_style,
             };
             let stdout = std::io::stdout();
             let repo = repo.init().await?;
-            fmt_list(&mut stdout.lock(), repo, opt).await?;
+            fmt_list(&mut stdout.lock(), repo, opt, queries).await?;
         }
         Subs::RM { queries, purge } => {
             let repo = repo.init().await?;
             let delete_tag: Option<TagSelector> = Some("+remove".parse().unwrap());
             let mut to_purge = vec![]; // (Option<path>, id)
-            for mut entry in query::do_list_query(repo, &queries).await?.into_iter() {
+            for mut entry in query::do_list_query(repo, queries).await?.into_iter() {
                 log::info!("刪除 {:?}", *entry);
                 let try_open_res = path::open_script(&entry.name, &entry.ty, Some(true));
                 if purge || entry.name.is_anonymous() {
@@ -421,7 +450,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                     main_util::mv(&mut script, Some(new_name), ty.clone(), tags.clone()).await?;
                 }
             } else {
-                let mut scripts = query::do_list_query(repo, &[origin]).await?;
+                let mut scripts = query::do_list_query(repo, std::iter::once(origin)).await?;
                 for entry in scripts.iter_mut() {
                     main_util::mv(entry, None, ty.clone(), tags.clone()).await?;
                 }
@@ -537,7 +566,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         } => {
             let repo = repo.init().await?;
             let historian = repo.historian().clone();
-            let mut scripts = query::do_list_query(repo, &queries).await?;
+            let mut scripts = query::do_list_query(repo, queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
 
@@ -621,7 +650,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             subcmd: History::Neglect { queries },
         } => {
             let repo = repo.init().await?;
-            for entry in query::do_list_query(repo, &queries).await?.into_iter() {
+            for entry in query::do_list_query(repo, queries).await?.into_iter() {
                 let id = entry.id;
                 entry.get_env().handle_neglect(id).await?;
             }
@@ -641,7 +670,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let repo = repo.init().await?;
             let historian = repo.historian().clone();
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let scripts = query::do_list_query(repo, &queries).await?;
+            let scripts = query::do_list_query(repo, queries).await?;
             let ids: Vec<_> = scripts.iter().map(|s| s.id).collect();
 
             enum ScriptGetter<'a> {
@@ -742,7 +771,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 None
             } else {
                 let repo = repo.init().await?;
-                let scripts = query::do_list_query(repo, &queries).await?;
+                let scripts = query::do_list_query(repo, queries).await?;
                 Some(scripts.iter().map(|e| e.id).collect())
             };
 
@@ -835,7 +864,7 @@ async fn create_dir_pair(
     og: ListQuery,
     new: EditQuery<ScriptOrDirQuery>,
 ) -> Result<Vec<(ScriptName, ScriptName)>> {
-    let scripts = query::do_list_query(repo, &[og]).await?;
+    let scripts = query::do_list_query(repo, std::iter::once(og)).await?;
     let is_dir = matches!(new, EditQuery::Query(ScriptOrDirQuery::Dir(_)));
     if scripts.len() > 1 && !is_dir {
         log::warn!("試圖把多個腳本移動成同一個");
@@ -848,7 +877,9 @@ async fn create_dir_pair(
         .into_iter()
         .map(|script| -> Result<_> {
             let new_name = match &new {
-                EditQuery::NewAnonimous => path::new_anonymous_name()?,
+                EditQuery::NewAnonimous => path::new_anonymous_name(1, std::iter::empty())?
+                    .next()
+                    .unwrap(),
                 EditQuery::Query(ScriptOrDirQuery::Script(new)) => new.clone(),
                 EditQuery::Query(ScriptOrDirQuery::Dir(new)) => {
                     let new = new.clone();

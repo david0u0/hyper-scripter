@@ -19,15 +19,22 @@ fn compute_vis(bang: bool) -> Visibility {
 
 pub async fn do_list_query<'a>(
     repo: &'a mut ScriptRepo,
-    queries: &[ListQuery],
+    queries: impl IntoIterator<Item = ListQuery>,
 ) -> Result<Vec<RepoEntry<'a>>> {
-    if queries.is_empty() {
-        return Ok(repo.iter_mut(Visibility::Normal).collect());
-    }
+    do_list_query_with_handler(repo, queries, &mut super::DefaultListQueryHandler).await
+}
+
+pub async fn do_list_query_with_handler<'a, I, H: super::ListQueryHandler<Item = I>>(
+    repo: &'a mut ScriptRepo,
+    queries: impl IntoIterator<Item = I>,
+    handler: &mut H,
+) -> Result<Vec<RepoEntry<'a>>> {
+    let mut is_empty = true;
     let mut mem = HashSet::<i64>::default();
     let mut ret = vec![];
     let repo_ptr = repo as *mut ScriptRepo;
-    for query in queries.iter() {
+    for query in queries {
+        is_empty = false;
         macro_rules! insert {
             ($script:ident) => {
                 if mem.contains(&$script.id) {
@@ -39,10 +46,12 @@ pub async fn do_list_query<'a>(
         }
         // SAFETY: `mem` 已保證回傳的陣列不可能包含相同的資料
         let repo = unsafe { &mut *repo_ptr };
+        let query = handler.handle_item(query);
         match query {
-            ListQuery::Pattern(re, og, bang) => {
+            None => (),
+            Some(ListQuery::Pattern(re, og, bang)) => {
                 let mut is_empty = true;
-                for script in repo.iter_mut(compute_vis(*bang)) {
+                for script in repo.iter_mut(compute_vis(bang)) {
                     if re.is_match(&script.name.key()) {
                         is_empty = false;
                         insert!(script);
@@ -52,17 +61,20 @@ pub async fn do_list_query<'a>(
                     return Err(Error::ScriptNotFound(og.to_owned()));
                 }
             }
-            ListQuery::Query(query) => {
-                let script = match do_script_query_strict(query, repo).await {
-                    Err(Error::DontFuzz) => continue,
-                    Ok(entry) => entry,
+            Some(ListQuery::Query(query)) => {
+                let script = match handler.handle_query(query, repo).await {
+                    Ok(Some(entry)) => entry,
+                    Ok(None) => continue,
                     Err(e) => return Err(e),
                 };
                 insert!(script);
             }
         }
     }
-    if ret.is_empty() {
+    if is_empty && H::should_return_all_on_empty() {
+        return Ok(repo.iter_mut(Visibility::Normal).collect());
+    }
+    if ret.is_empty() && H::should_raise_dont_fuzz_on_empty() {
         log::debug!("列表查不到東西，卻又不是因為 pattern not match，想必是因為使用者取消了模糊搜");
         Err(Error::DontFuzz)
     } else {

@@ -13,7 +13,9 @@ mod util;
 pub use util::*;
 mod range_query;
 pub use range_query::*;
+mod list_query_handler;
 mod the_multifuzz_algo;
+pub use list_query_handler::*;
 
 #[derive(Debug, Eq, PartialEq, Display)]
 pub enum EditQuery<Q> {
@@ -33,7 +35,7 @@ impl<Q: FromStr<Err = DisplayError>> FromStr for EditQuery<Q> {
     }
 }
 impl_ser_by_to_string!(EditQuery<ScriptOrDirQuery>);
-impl_ser_by_to_string!(EditQuery<ScriptQuery>);
+impl_ser_by_to_string!(EditQuery<ListQuery>);
 
 #[derive(Debug, Display, Clone)]
 pub enum DirQuery {

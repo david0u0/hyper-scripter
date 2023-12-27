@@ -14,7 +14,7 @@ historian.register_keys_virtual([ENTER], lambda { |_, _, options|
 }, msg: 'Apply multiple envs')
 
 clear = false
-historian.register_keys_virtual(%w[c C], lambda { |_, _|
+historian.register_keys_virtual(%w[c C], lambda { |_, _, _|
   clear = true
 }, msg: 'Clear the selected env')
 

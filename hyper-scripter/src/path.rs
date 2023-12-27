@@ -142,7 +142,6 @@ pub fn get_home() -> &'static Path {
 }
 
 fn get_anonymous_ids() -> Result<impl Iterator<Item = Result<u32>>> {
-    // TODO: iterator
     let dir = get_home().join(ANONYMOUS);
     if !dir.exists() {
         log::info!("找不到匿名腳本資料夾，創建之");
@@ -176,22 +175,42 @@ fn get_anonymous_ids() -> Result<impl Iterator<Item = Result<u32>>> {
         });
     Ok(iter)
 }
-pub fn new_anonymous_name() -> Result<ScriptName> {
-    let ids = get_anonymous_ids()?
-        .collect::<Result<HashSet<_>>>()
-        .context("無法取得匿名腳本編號")?;
-    let mut i = 1;
-    loop {
-        if !ids.contains(&i) {
-            return i.into_script_name();
+
+pub struct NewAnonymouseIter {
+    existing_ids: HashSet<u32>,
+    amount: u32,
+    cur_id: u32,
+}
+impl Iterator for NewAnonymouseIter {
+    type Item = ScriptName;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.amount == 0 {
+            return None;
         }
-        i += 1;
+        loop {
+            self.cur_id += 1;
+            if !self.existing_ids.contains(&self.cur_id) {
+                self.amount -= 1;
+                return Some(self.cur_id.into_script_name().unwrap());
+            }
+        }
     }
 }
-pub fn open_new_anonymous(ty: &ScriptType) -> Result<(ScriptName, PathBuf)> {
-    let name = new_anonymous_name()?;
-    let path = open_script(&name, ty, None)?; // NOTE: new_anonymous_name 的邏輯已足以確保不會產生衝突的檔案，不檢查了！
-    Ok((name, path))
+pub fn new_anonymous_name(
+    amount: u32,
+    existing: impl Iterator<Item = u32>,
+) -> Result<NewAnonymouseIter> {
+    let mut all_existing = get_anonymous_ids()?
+        .collect::<Result<HashSet<_>>>()
+        .context("無法取得匿名腳本編號")?;
+    for id in existing.into_iter() {
+        all_existing.insert(id);
+    }
+    Ok(NewAnonymouseIter {
+        existing_ids: all_existing,
+        amount,
+        cur_id: 0,
+    })
 }
 
 /// 若 `check_exist` 有值，則會檢查存在性
@@ -295,9 +314,13 @@ mod test {
     }
     #[test]
     fn test_open_anonymous() {
-        let (name, p) = open_new_anonymous(&"sh".into()).unwrap();
-        assert_eq!(name, ScriptName::Anonymous(4));
-        assert_eq!(p, get_test_home().join(".anonymous/4.sh"));
+        let new_scripts = new_anonymous_name(3, [7].into_iter())
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(new_scripts[0], ScriptName::Anonymous(4));
+        assert_eq!(new_scripts[1], ScriptName::Anonymous(6));
+        assert_eq!(new_scripts[2], ScriptName::Anonymous(8));
+
         let p = open_script(&5.into_script_name().unwrap(), &"js".into(), None).unwrap();
         assert_eq!(p, get_test_home().join(".anonymous/5.js"));
     }

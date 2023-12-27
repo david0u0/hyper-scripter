@@ -148,6 +148,7 @@ impl<T, E: 'static + Send + Sync + std::error::Error> Contextable<T> for std::re
 pub enum RedundantOpt {
     Scripts(Vec<String>),
     Tag,
+    Type,
     Selector,
 }
 

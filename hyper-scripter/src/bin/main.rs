@@ -515,9 +515,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 for selector in conf.tag_selectors.iter() {
                     let content = &selector.content;
                     print!("  {} = {}", selector.name, content);
-                    if content.mandatory {
-                        print!(" (mandatory)")
-                    }
                     if selector.inactivated {
                         print!(" (inactivated)")
                     }
@@ -525,9 +522,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
                 println!("main tag selector:");
                 print!("  {}", conf.main_tag_selector);
-                if conf.main_tag_selector.mandatory {
-                    print!(" (mandatory)")
-                }
                 println!();
             }
         }

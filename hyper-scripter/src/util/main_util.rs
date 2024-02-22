@@ -356,7 +356,10 @@ pub async fn run_n_times(
     let content = super::read_file(&script_path)?;
 
     if !Config::get_no_caution()
-        && Config::get().caution_tags.select(&entry.tags, &entry.ty) == Some(true)
+        && Config::get()
+            .caution_tags
+            .select(&entry.tags, &entry.ty)
+            .is_true()
     {
         let ty = super::get_display_type(&entry.ty);
         let name = &entry.name;

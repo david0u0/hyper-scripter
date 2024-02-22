@@ -34,16 +34,17 @@ function __hs_list_tags
     else if [ "$argv" = "both" ]
         set append 1
         set no_append 1
+        set bang !
     else
         set no_append 1
     end
 
     for tag in (string split ' ' (__hs_extract_home_and_run tags ls --known) remove all)
         if set -q append
-            echo +$tag\t+$tag
+            echo +$tag$bang\t+$tag$bang
         end
         if set -q no_append
-            echo $tag\t$tag
+            echo $tag$bang\t$tag$bang
         end
     end
 end
@@ -56,16 +57,17 @@ function __hs_list_tags_and_types
     else if [ "$argv" = "both" ]
         set append 1
         set no_append 1
+        set bang !
     else
         set no_append 1
     end
 
     for ty in (string split ' ' (__hs_extract_home_and_run types ls --no-sub))
         if set -q append
-            echo +@$ty\t+$ty
+            echo +@$ty$bang\t+$ty$bang
         end
         if set -q no_append
-            echo @$ty\t$ty
+            echo @$ty$bang\t$ty$bang
         end
     end
 end

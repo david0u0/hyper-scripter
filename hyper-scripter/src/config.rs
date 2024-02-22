@@ -173,12 +173,12 @@ impl Default for Config {
                     inactivated: false,
                 },
                 NamedTagSelector {
-                    content: "+all,^hide!".parse().unwrap(),
+                    content: "+^hide!".parse().unwrap(),
                     name: "no-hidden".to_owned(),
                     inactivated: false,
                 },
                 NamedTagSelector {
-                    content: "+all,^remove!".parse().unwrap(),
+                    content: "+^remove!".parse().unwrap(),
                     name: "no-removed".to_owned(),
                     inactivated: false,
                 },

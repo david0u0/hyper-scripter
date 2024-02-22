@@ -22,12 +22,10 @@ impl TagSelectorGroup {
         let mut pass = false;
         for f in self.0.iter() {
             let res = f.select(tags, ty);
-            if f.mandatory {
-                if res != Some(true) {
-                    return false;
-                }
-            } else if let Some(res) = res {
-                pass = res;
+            match res {
+                SelectResult::MandatoryFalse => return false,
+                SelectResult::Normal(res) => pass = res,
+                SelectResult::None => (),
             }
         }
         pass
@@ -43,7 +41,6 @@ impl From<TagSelector> for TagSelectorGroup {
 pub struct TagSelector {
     tags: TagGroup,
     pub append: bool,
-    pub mandatory: bool,
 }
 impl_de_by_from_str!(TagSelector);
 impl_ser_by_to_string!(TagSelector);
@@ -56,6 +53,7 @@ impl_ser_by_to_string!(TagGroup);
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TagControl {
     allow: bool,
+    mandatory: bool,
     tag: TagOrType,
 }
 
@@ -114,9 +112,16 @@ impl FromStr for TagControl {
         } else {
             true
         };
+        let mandatory = if s.ends_with(MANDATORY_SUFFIX) {
+            s = &s[0..(s.len() - MANDATORY_SUFFIX.len())];
+            true
+        } else {
+            false
+        };
         Ok(TagControl {
             tag: s.parse()?,
             allow,
+            mandatory,
         })
     }
 }
@@ -132,17 +137,9 @@ impl FromStr for TagSelector {
             false
         };
 
-        let mandatory = if s.ends_with(MANDATORY_SUFFIX) {
-            s = &s[0..(s.len() - MANDATORY_SUFFIX.len())];
-            true
-        } else {
-            false
-        };
-
         Ok(TagSelector {
             tags: s.parse()?,
             append,
-            mandatory,
         })
     }
 }
@@ -153,9 +150,6 @@ impl Display for TagSelector {
             write!(w, "{}", APPEND_PREFIX)?;
         }
         write!(w, "{}", self.tags)?;
-        if self.mandatory {
-            write!(w, "{}", MANDATORY_SUFFIX)?;
-        }
         Ok(())
     }
 }
@@ -197,7 +191,7 @@ impl TagSelector {
         self.fill_allowed_map(&mut set);
         set.into_iter()
     }
-    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> Option<bool> {
+    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> SelectResult {
         self.tags.select(tags, ty)
     }
 }
@@ -227,21 +221,46 @@ impl Display for TagGroup {
                 write!(w, "^")?;
             }
             write!(w, "{}", f.tag)?;
+            if f.mandatory {
+                write!(w, "{}", MANDATORY_SUFFIX)?;
+            }
         }
         Ok(())
     }
 }
 
+pub enum SelectResult {
+    None,
+    MandatoryFalse,
+    Normal(bool),
+}
+impl SelectResult {
+    pub fn is_true(&self) -> bool {
+        matches!(self, SelectResult::Normal(true))
+    }
+}
+
 impl TagGroup {
-    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> Option<bool> {
-        let mut pass: Option<bool> = None;
+    pub fn select(&self, tags: &TagSet, ty: &ScriptType) -> SelectResult {
+        let mut pass = SelectResult::None;
         for ctrl in self.0.iter() {
             let hit = match &ctrl.tag {
                 TagOrType::Type(t) => ty == t,
                 TagOrType::Tag(t) => t.match_all() || tags.contains(t),
             };
+            if ctrl.mandatory {
+                if ctrl.allow {
+                    if !hit {
+                        return SelectResult::MandatoryFalse;
+                    }
+                } else {
+                    if hit {
+                        return SelectResult::MandatoryFalse;
+                    }
+                }
+            }
             if hit {
-                pass = Some(ctrl.allow);
+                pass = SelectResult::Normal(ctrl.allow);
             }
         }
         pass

@@ -353,20 +353,26 @@ fn test_mandatory_select() {
     let t3 = ScriptTest::new("prj1/src/t", Some("prj1,src"), None);
     let t4 = ScriptTest::new("prj2/src/t", Some("prj2,src"), None);
     let t5 = ScriptTest::new("hide/prj2/src/t", Some("hide,prj2,src"), None);
+    let t6 = ScriptTest::new("remove/prj1/src/t", Some("remove,prj1,src"), None);
 
     assert_ls(vec![&t1, &t2, &t3, &t4], None, None);
-    assert_ls(Vec::<String>::new(), None, Some("-s all!"));
+    assert_ls(vec![&t1, &t2, &t3, &t4, &t5, &t6], None, Some("-s all!"));
     // NOTE: 順便測試在參數上帶多個篩選器
     assert_ls(vec![&t3, &t4], None, Some("-s +src!"));
     assert_ls(vec![&t3, &t4], None, Some("-s +src! -s +prj1")); // +prj1 非強制，不影響
-    assert_ls(vec![&t3], None, Some("-s +src! -s +prj1!")); // +prj1! 為強制，會影響
+    assert_ls(vec![&t3, &t4, &t5, &t6], None, Some("-s src! -s +prj1")); // 同上
+    assert_ls(vec![&t3, &t4, &t5, &t6], None, Some("-s src!,prj1")); // 同上
+    assert_ls(vec![&t3], None, Some("-s +src!,prj1!")); // +prj1! 為強制，會影響
+    assert_ls(vec![&t3], None, Some("-s +src! -s +prj1!")); // 同上
+    assert_ls(vec![&t3, &t6], None, Some("-s src!,prj1!"));
 
     run!("tags +prj1").unwrap();
     assert_ls(vec![&t1, &t3], None, None);
-    assert_ls(vec![&t3, &t4, &t5], Some("src"), None);
+    assert_ls(vec![&t3, &t4, &t5, &t6], Some("src"), None);
     assert_ls(vec![&t1, &t3, &t4], Some("+src"), None);
-    assert_ls(vec![&t3], Some("+src!"), None);
+    assert_ls(vec![&t3, &t4], Some("+src!"), None);
     assert_ls(vec![&t4, &t5], None, Some("-s all -s +src! -s +prj2!"));
+    assert_ls(vec![&t4, &t5], None, Some("-s src!,prj2!"));
 }
 
 #[test]

@@ -362,10 +362,14 @@ pub async fn run_n_times(
             .is_true()
     {
         let ty = super::get_display_type(&entry.ty);
-        let name = &entry.name;
+        let mut first_part = entry.name.to_string();
+        for arg in args.iter() {
+            first_part += " ";
+            first_part += arg;
+        }
         let msg = format!(
             "{} requires extra caution. Are you sure?",
-            name.stylize().color(ty.color()).bold()
+            first_part.stylize().color(ty.color()).bold()
         );
         let yes = super::prompt(msg, false)?;
         if !yes {

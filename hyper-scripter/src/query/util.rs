@@ -136,7 +136,14 @@ pub async fn do_script_query<'b>(
                 #[cfg(not(feature = "benching"))]
                 Some(fuzzy::Multi { ans, others, .. }) => {
                     is_multi_fuzz = true;
-                    the_multifuzz_algo(ans, others)
+                    if check_special_dot_anonymous(name, &ans, &others) {
+                        std::iter::once(ans)
+                            .chain(others)
+                            .max_by_key(|e| e.last_time())
+                            .unwrap()
+                    } else {
+                        the_multifuzz_algo(ans, others)
+                    }
                 }
                 None => return Ok(None),
             };
@@ -180,4 +187,22 @@ pub async fn do_script_query_strict<'b>(
     };
 
     Err(Error::ScriptNotFound(script_query.to_string()))
+}
+
+// 判斷特例：若收到的查詢是單一個 "."，且所有候選人階為匿名，則不再考慮任何前綴問題
+// 舉例：若有兩個腳本 .1 和 .10，用 "." 來查詢不該讓 .1 遮蔽掉 .10
+// （但若是用 "1" 來查就該遮蔽）
+fn check_special_dot_anonymous(
+    pattern: &str,
+    ans: &RepoEntry<'_>,
+    other: &[RepoEntry<'_>],
+) -> bool {
+    if pattern != "." {
+        return false;
+    }
+    // TODO: maybe only check `ans` is enough?
+    if !ans.name.is_anonymous() || other.iter().any(|e| !e.name.is_anonymous()) {
+        return false;
+    }
+    true
 }

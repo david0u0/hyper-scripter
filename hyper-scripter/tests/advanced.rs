@@ -226,3 +226,29 @@ fn test_shell_alias() {
     run!("alias lsit !$HS_EXE -H $HS_HOME ls").unwrap();
     assert_eq!(run!("ls").unwrap(), run!(dir: "/", "lsit *").unwrap());
 }
+
+#[test]
+fn test_special_anonymous_query() {
+    let _g = setup();
+
+    let s1 = ScriptTest::new(".1", None, None);
+    let s2 = ScriptTest::new(".10", None, None);
+    let s3 = ScriptTest::new("1.a", None, None);
+    let s4 = ScriptTest::new("1/a", None, None);
+
+    s1.run("").unwrap();
+    s1.can_find(".").unwrap();
+    s1.can_find("1").unwrap();
+
+    s2.run("").unwrap();
+    s2.can_find(".").unwrap();
+    s1.can_find("1").unwrap();
+
+    s3.run("").unwrap();
+    s2.can_find(".").unwrap();
+    s3.can_find("1").unwrap();
+
+    s4.run("").unwrap();
+    s2.can_find(".").unwrap();
+    s4.can_find("1").unwrap();
+}

@@ -39,6 +39,14 @@ class Option
   def envs_str
     envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
   end
+
+  def envs_str_prefix
+    s = envs_str
+    unless envs_str.empty?
+      s += ' '
+    end
+    s
+  end
 end
 
 def escape_wildcard(s)
@@ -146,6 +154,7 @@ class Historian < Selector
   def run_as_main(sequence: '')
     sourcing = false
     run_empty = false
+    create = false
     register_keys('.', lambda { |_, _|
       run_empty = true
     }, msg: 'run script with empty argument')
@@ -171,24 +180,30 @@ class Historian < Selector
     register_keys_virtual([ENTER], lambda { |_, _, options|
     }, msg: 'Run the script')
 
-    result = run(sequence: sequence)
+    register_keys_virtual(%w[a A], lambda { |_, _, _|
+      create = true
+    }, msg: 'Create new anonymous script')
 
-    if result.options.length != 1
-      result.options.each do |opt|
-        HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
-      end
-      exit
-    end
+    result = run(sequence: sequence)
 
     opt = result.options[0]
     opt.clear if run_empty
-    cmd = opt.cmd_body # known issue: \n \t \" will not be handled properly
 
     if sourcing
-      cmd = "#{opt.envs_str} #{HS_ENV.env_var(:cmd)} #{cmd}"
+      cmd = "#{opt.envs_str_prefix}#{HS_ENV.env_var(:cmd)} #{opt.cmd_body}"
       commandline(cmd)
+    elsif create
+      require 'shellwords'
+      content = "# [#{"HS_HELP"}]: created from history of `#{opt.name}`\n"
+      result.options.each do |opt|
+        content += "\n#{opt.envs_str_prefix}#{HS_ENV.env_var(:cmd)} #{opt.cmd_body}"
+      end
+      content = Shellwords.escape(content)
+      HS_ENV.exec_hs("edit --fast --no-template -t +history -- #{content}", false)
     else
-      HS_ENV.exec_hs(cmd, false, opt.envs)
+      result.options.each do |opt|
+        HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
+      end
     end
   end
 

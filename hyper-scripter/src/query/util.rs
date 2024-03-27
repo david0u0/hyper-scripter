@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 use crate::fuzzy;
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::util::{get_display_type, prompt};
+use crate::Either;
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
 
@@ -136,13 +137,9 @@ pub async fn do_script_query<'b>(
                 #[cfg(not(feature = "benching"))]
                 Some(fuzzy::Multi { ans, others, .. }) => {
                     is_multi_fuzz = true;
-                    if check_special_dot_anonymous(name, &ans, &others) {
-                        std::iter::once(ans)
-                            .chain(others)
-                            .max_by_key(|e| e.last_time())
-                            .unwrap()
-                    } else {
-                        the_multifuzz_algo(ans, others)
+                    match handle_special_dot_anonymous(name, ans, others) {
+                        Either::One(res) => res,
+                        Either::Two((ans, others)) => the_multifuzz_algo(ans, others),
                     }
                 }
                 None => return Ok(None),
@@ -192,17 +189,22 @@ pub async fn do_script_query_strict<'b>(
 // 判斷特例：若收到的查詢是單一個 "."，且所有候選人階為匿名，則不再考慮任何前綴問題
 // 舉例：若有兩個腳本 .1 和 .10，用 "." 來查詢不該讓 .1 遮蔽掉 .10
 // （但若是用 "1" 來查就該遮蔽）
-fn check_special_dot_anonymous(
+fn handle_special_dot_anonymous<'a>(
     pattern: &str,
-    ans: &RepoEntry<'_>,
-    other: &[RepoEntry<'_>],
-) -> bool {
+    ans: RepoEntry<'a>,
+    others: Vec<RepoEntry<'a>>,
+) -> Either<RepoEntry<'a>, (RepoEntry<'a>, Vec<RepoEntry<'a>>)> {
     if pattern != "." {
-        return false;
+        return Either::Two((ans, others));
     }
     // TODO: maybe only check `ans` is enough?
-    if !ans.name.is_anonymous() || other.iter().any(|e| !e.name.is_anonymous()) {
-        return false;
+    if !ans.name.is_anonymous() || others.iter().any(|e| !e.name.is_anonymous()) {
+        return Either::Two((ans, others));
     }
-    true
+
+    let res = std::iter::once(ans)
+        .chain(others.into_iter())
+        .max_by_key(|e| e.last_time())
+        .unwrap();
+    Either::One(res)
 }

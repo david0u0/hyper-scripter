@@ -251,4 +251,14 @@ fn test_special_anonymous_query() {
     s4.run("").unwrap();
     s2.can_find(".").unwrap();
     s4.can_find("1").unwrap();
+
+    run!("rm *").unwrap();
+    let s1 = ScriptTest::new("a.b", None, None);
+    let s2 = ScriptTest::new("a.bc", None, None);
+
+    s1.run("").unwrap();
+    s1.can_find(".").unwrap();
+
+    s2.run("").unwrap();
+    s1.can_find(".").expect("非匿名腳本不應觸發特殊規則");
 }

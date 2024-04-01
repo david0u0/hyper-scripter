@@ -4,6 +4,7 @@ use hyper_scripter::args::{
     self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
 };
 use hyper_scripter::config::{Config, NamedTagSelector};
+use hyper_scripter::db;
 use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
@@ -22,7 +23,6 @@ use hyper_scripter::util::{
     main_util::{self, EditTagArgs},
     print_iter,
 };
-use hyper_scripter::{db, migration};
 use hyper_scripter_historian::{Historian, LastTimeRecord};
 
 #[tokio::main]
@@ -69,7 +69,7 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
     root.set_home_unless_from_alias(true)?;
 
     if matches!(root.subcmd, Some(Subs::Migrate)) {
-        migration::do_migrate(db::get_file()).await?;
+        db::do_migrate(db::get_file()).await?;
         Historian::do_migrate(path::get_home()).await?;
         return Ok(());
     }

@@ -12,8 +12,18 @@
 
 require_relative './common'
 
+def dump_db
+  require 'tempfile'
+  file = Tempfile.new('script_info')
+  system("cp .script_info.db #{file.path}")
+  system("sqlite3 #{file.path} 'DELETE FROM last_events'")
+  system("sqlite3 #{file.path} '.dump' > .script_info.sql")
+end
+
 REAL_HS_HOME = File.realpath(HS_ENV.home)
 Dir.chdir(REAL_HS_HOME)
+dump_db
+
 GIT_HOME = run_cmd('git rev-parse --show-toplevel').chop
 BRANCH = run_cmd('git rev-parse --abbrev-ref HEAD').chop
 REMOTE = 'origin'

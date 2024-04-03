@@ -2,7 +2,6 @@ use crate::color::Color;
 use crate::error::{DisplayError, DisplayResult, Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
-use crate::state::State;
 use crate::tag::{TagGroup, TagSelector, TagSelectorGroup};
 use crate::util;
 use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
@@ -15,13 +14,13 @@ use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
 
-static CONFIG: State<Config> = State::new();
+crate::local_global_state!(config_state, Config, || { Default::default() });
+crate::local_global_state!(runtime_conf_state, RuntimeConf, || { unreachable!() });
 
 struct RuntimeConf {
     prompt_level: PromptLevel,
     no_caution: bool,
 }
-static RUNTIME_CONF: State<RuntimeConf> = State::new();
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
 where
@@ -282,33 +281,27 @@ impl Config {
     }
 
     pub fn init() -> Result {
-        CONFIG.set(Config::load(path::get_home())?);
+        config_state::set(Config::load(path::get_home())?);
         Ok(())
     }
 
     pub fn set_runtime_conf(prompt_level: Option<PromptLevel>, no_caution: bool) {
         let c = Config::get();
         let prompt_level = prompt_level.unwrap_or(c.prompt_level); // TODO: 測試由設定檔設定 prompt-level 的情境？
-        RUNTIME_CONF.set(RuntimeConf {
+        runtime_conf_state::set(RuntimeConf {
             prompt_level,
             no_caution,
         });
     }
     pub fn get_prompt_level() -> PromptLevel {
-        RUNTIME_CONF.get().prompt_level
+        runtime_conf_state::get().prompt_level
     }
     pub fn get_no_caution() -> bool {
-        RUNTIME_CONF.get().no_caution
+        runtime_conf_state::get().no_caution
     }
 
-    #[cfg(not(test))]
     pub fn get() -> &'static Config {
-        CONFIG.get()
-    }
-    #[cfg(test)]
-    pub fn get() -> &'static Config {
-        crate::set_once!(CONFIG, || { Config::default().into() });
-        CONFIG.get()
+        config_state::get()
     }
 
     // XXX: extract

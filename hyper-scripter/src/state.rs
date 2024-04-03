@@ -19,9 +19,50 @@ macro_rules! set_once {
         use std::sync::Once;
         static ONCE: Once = Once::new();
         ONCE.call_once(|| {
-            $state.set_force($f());
+            $state.set($f());
         });
     }};
+}
+
+#[macro_export]
+macro_rules! local_global_state {
+    ($mod_name:ident, $type_name:ident, $test_default:expr) => {
+        mod $mod_name {
+            use super::*;
+            static GLOBAL: $crate::state::State<$type_name> = $crate::state::State::new();
+
+            #[cfg(not(feature = "no-state-check"))]
+            thread_local! {
+                static LOCAL: std::cell::Cell<Option<&'static $type_name>> = std::cell::Cell::new(None);
+            }
+
+            pub fn get() -> &'static $type_name {
+                #[cfg(test)]
+                $crate::set_once!(GLOBAL, $test_default);
+
+                #[cfg(not(feature = "no-state-check"))]
+                if let Some(local) = LOCAL.get() {
+                    return local;
+                }
+
+                GLOBAL.get()
+            }
+
+            pub fn set(data: $type_name) {
+                #[cfg(test)]
+                log::info!("測試中，不設定狀態");
+                #[cfg(not(test))]
+                GLOBAL.set(data);
+            }
+
+            pub fn set_local(data: &'static $type_name) {
+                #[cfg(not(feature = "no-state-check"))]
+                LOCAL.set(Some(data));
+                #[cfg(feature = "no-state-check")]
+                unreachable!();
+            }
+        }
+    };
 }
 
 impl<T: Sized> State<T> {
@@ -33,17 +74,7 @@ impl<T: Sized> State<T> {
         }
     }
 
-    #[cfg(test)]
-    pub fn set(&self, _data: T) {
-        log::info!("測試中，不設定狀態");
-    }
-    #[cfg(not(test))]
     pub fn set(&self, data: T) {
-        self.set_force(data)
-    }
-
-    /// 不論是否為測試中，強制設定狀態
-    pub fn set_force(&self, data: T) {
         #[cfg(not(feature = "no-state-check"))]
         {
             let status = self

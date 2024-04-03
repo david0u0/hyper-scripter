@@ -328,7 +328,7 @@ fn test_bang() {
 fn test_redirect() {
     let _g = setup();
     // NOTE: 重導向若為相對路徑，則其基準是當前的腳本之家
-    let redirected = "../.hyper_scripter_redirect";
+    let redirected = "../../.hyper_scripter_redirect";
     let redirected_abs = normalize_path(get_home().join(redirected)).unwrap();
 
     match std::fs::remove_dir_all(&redirected_abs) {

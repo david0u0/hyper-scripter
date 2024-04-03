@@ -2,7 +2,6 @@ use crate::error::{Contextable, Error, Result};
 use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
 use crate::script_type::{AsScriptFullTypeRef, ScriptType};
-use crate::state::State;
 use crate::util::{handle_fs_res, read_file};
 use fxhash::FxHashSet as HashSet;
 use std::fs::{create_dir, create_dir_all, read_dir};
@@ -20,7 +19,7 @@ macro_rules! hs_home_env {
     };
 }
 
-static PATH: State<PathBuf> = State::new();
+crate::local_global_state!(home_state, PathBuf, || { get_test_home() });
 
 #[cfg(not(feature = "hard-home"))]
 fn get_default_home() -> Result<PathBuf> {
@@ -121,24 +120,20 @@ pub fn compute_home_path_optional<T: AsRef<Path>>(
 }
 pub fn set_home<T: AsRef<Path>>(p: Option<T>, create_on_missing: bool) -> Result {
     let path = compute_home_path_optional(p, create_on_missing)?;
-    PATH.set(path);
+    home_state::set(path);
     Ok(())
 }
+pub fn set_home_thread_local(p: &'static PathBuf) {
+    home_state::set_local(p);
+}
 
-#[cfg(not(test))]
 pub fn get_home() -> &'static Path {
-    PATH.get().as_ref()
+    home_state::get().as_ref()
 }
 #[cfg(test)]
 pub fn get_test_home() -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dir.join(".test_hyper_scripter")
-}
-
-#[cfg(test)]
-pub fn get_home() -> &'static Path {
-    crate::set_once!(PATH, || { get_test_home() });
-    PATH.get().as_ref()
 }
 
 fn get_anonymous_ids() -> Result<impl Iterator<Item = Result<u32>>> {

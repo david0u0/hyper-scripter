@@ -1,13 +1,15 @@
+pub use hyper_scripter::path::get_home;
 use hyper_scripter::{
     config::{Config, PromptLevel},
     error::EXIT_KNOWN_ERR,
     my_env_logger,
     path::normalize_path,
 };
+use shlex::Shlex;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
-use std::sync::{Mutex, MutexGuard, Once};
+use std::sync::Once;
 
 pub const HOME_RELATIVE: &str = "./.hyper_scripter";
 
@@ -78,23 +80,24 @@ impl Error {
 }
 type Result<T = ()> = std::result::Result<T, Error>;
 
-pub fn get_home() -> PathBuf {
-    normalize_path(HOME_RELATIVE).unwrap()
+fn get_test_home() -> &'static PathBuf {
+    let base = normalize_path(HOME_RELATIVE).unwrap();
+    let thread = std::thread::current();
+    let p = Box::new(base.join(thread.name().unwrap_or("unnamed_thread")));
+    Box::leak(p)
 }
 pub fn load_conf() -> Config {
-    Config::load(hyper_scripter::path::get_home()).unwrap()
+    Config::load(get_home()).unwrap()
 }
-pub fn setup<'a>() -> MutexGuard<'a, ()> {
+pub fn setup() -> () {
     let g = setup_with_utils();
     run!("rm --purge * -s all").unwrap();
     g
 }
-pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
-    static LOCK: Mutex<()> = Mutex::new(());
-    let guard = LOCK.lock().unwrap_or_else(|err| err.into_inner());
+pub fn setup_with_utils() -> () {
     let _ = my_env_logger::try_init();
-    let home: PathBuf = get_home();
-    match std::fs::remove_dir_all(&home) {
+    let home = get_test_home();
+    match std::fs::remove_dir_all(&*home) {
         Ok(_) => (),
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -103,11 +106,10 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
         }
     }
 
+    hyper_scripter::path::set_home_thread_local(home);
     run!(silent: true, "ls").unwrap(); // create the home
-
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        hyper_scripter::path::set_home(Some(&home), true).unwrap();
         Config::init().unwrap();
         Config::set_runtime_conf(Some(PromptLevel::Never), true);
     });
@@ -116,11 +118,10 @@ pub fn setup_with_utils<'a>() -> MutexGuard<'a, ()> {
     let mut conf = load_conf();
     conf.editor = vec!["bash".to_owned(), get_editor_script()];
     conf.store().unwrap();
-
-    guard
+    ()
 }
 fn join_path(p: &[&str]) -> PathBuf {
-    let mut file = get_home();
+    let mut file = get_home().to_owned();
     for p in p.iter() {
         file = file.join(p);
     }
@@ -147,31 +148,31 @@ fn fmt_result(res: &Result<String>) -> String {
 }
 
 pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
-    let home = match env.home {
+    let home = match &env.home {
         Some(h) => {
             log::info!("使用腳本之家 {:?}", h);
-            h
+            &*h
         }
         None => get_home(),
     };
     let home = home.to_string_lossy();
-    let mut full_args = vec!["-H", home.as_ref(), "--prompt-level", "never"];
+    let mut full_args: Vec<_> = ["-H", home.as_ref(), "--prompt-level", "never"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let args = args.to_string();
-    let args_vec: Vec<&str> = if args.find('|').is_some() {
-        let (first, second) = args.split_once("|").unwrap();
-        let mut v: Vec<_> = first.split(' ').filter(|s| !s.is_empty()).collect();
+    if let Some((first, second)) = args.split_once("|") {
+        full_args.extend(Shlex::new(&first));
         let second = second.trim();
         if second.len() > 0 {
-            v.push("--");
-            v.push(second);
+            full_args.push("--".to_owned());
+            full_args.push(second.to_owned());
         }
-        v
     } else {
-        args.split_whitespace().collect()
+        full_args.extend(Shlex::new(&args))
     };
-    full_args.extend(&args_vec);
 
-    log::info!("開始執行 {:?}", args_vec);
+    log::info!("開始執行 {:?}", full_args);
     let mut cmd = Command::new(normalize_path(get_exe()).unwrap());
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());
@@ -211,11 +212,11 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
     let res = if status.success() {
         Ok(out_str.join("\n"))
     } else if env.allow_other_error == Some(true) || status.code() == Some(EXIT_KNOWN_ERR.code()) {
-        Err(Error::exit_status(status).context(format!("執行 {:?} 失敗", args_vec)))
+        Err(Error::exit_status(status).context(format!("執行 {:?} 失敗", full_args)))
     } else {
-        panic!("執行 {:?} 遭未知的錯誤！", args_vec);
+        panic!("執行 {:?} 遭未知的錯誤！", full_args);
     };
-    log::info!("執行 {:?} 完畢，結果為 {}", args_vec, fmt_result(&res));
+    log::info!("執行 {:?} 完畢，結果為 {}", full_args, fmt_result(&res));
     res
 }
 

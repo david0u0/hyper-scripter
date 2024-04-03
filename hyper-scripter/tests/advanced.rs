@@ -67,7 +67,6 @@ fn test_sub_tmpl() {
 
     const RB_TRAVERSE: &str = "rb/traverse";
     const JS_SUPER_WEIRD_NAME: &str = "js/suPeR-weIRd_NAme";
-    const WEIRD_JS_STR: &str = "this is a super weird JS string";
 
     run!("e traverse-test -T {} | puts 'test!'", RB_TRAVERSE).unwrap();
 
@@ -75,6 +74,7 @@ fn test_sub_tmpl() {
     let p = get_tmpl_path(RB_TRAVERSE);
     remove(&p).unwrap();
     run!("e ? -T {} | puts 'test!'", RB_TRAVERSE).expect_err("子模版被砍了就不該創新的");
+    assert_ls_len(1, None, None);
 
     assert_ne!(get_types_vec(), types); // rb/traverse 還在向量中
     modify_types_vec(&mut types, &[], &[RB_TRAVERSE]);
@@ -86,7 +86,11 @@ fn test_sub_tmpl() {
         "子模版的預設值應該和父類別相同（除非是寫死的那幾個，如 rb/traverse）"
     );
     let p = get_tmpl_path(JS_SUPER_WEIRD_NAME);
-    write_file(&p, &format!("console.log('{WEIRD_JS_STR}')")).unwrap();
+    write_file(
+        &p,
+        "console.log('hello from {{name}}');{{{content.0}}};console.log({{{content.1}}} + 5);",
+    )
+    .unwrap();
     assert_ne!(
         run!("types js").unwrap(),
         run!("types {}", JS_SUPER_WEIRD_NAME).unwrap(),
@@ -97,8 +101,12 @@ fn test_sub_tmpl() {
     modify_types_vec(&mut types, &[JS_SUPER_WEIRD_NAME], &[]);
     assert_eq!(get_types_vec(), types);
 
-    run!("e weird-test -T {} -f", JS_SUPER_WEIRD_NAME).unwrap();
-    assert_eq!(WEIRD_JS_STR, run!("weird-test").unwrap());
+    run!(
+        "e weird-test -T {} -f -- 'let a = 78' 'a + 4'",
+        JS_SUPER_WEIRD_NAME
+    )
+    .unwrap();
+    assert_eq!("hello from weird-test\n87", run!("weird-test").unwrap());
     run!("traverse-test").expect("刪個子模版不應影響已存在的腳本！");
 }
 

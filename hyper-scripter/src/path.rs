@@ -1,7 +1,7 @@
 use crate::error::{Contextable, Error, Result};
 use crate::script::IntoScriptName;
 use crate::script::{ScriptName, ANONYMOUS};
-use crate::script_type::{AsScriptFullTypeRef, ScriptType};
+use crate::script_type::{ScriptFullType, ScriptType};
 use crate::util::{handle_fs_res, read_file};
 use fxhash::FxHashSet as HashSet;
 use std::fs::{create_dir, create_dir_all, read_dir};
@@ -123,6 +123,7 @@ pub fn set_home<T: AsRef<Path>>(p: Option<T>, create_on_missing: bool) -> Result
     home_state::set(path);
     Ok(())
 }
+#[cfg(not(feature = "no-state-check"))]
 pub fn set_home_thread_local(p: &'static PathBuf) {
     home_state::set_local(p);
 }
@@ -254,10 +255,8 @@ pub fn get_process_lock(run_id: i64) -> Result<PathBuf> {
     Ok(get_process_lock_dir()?.join(run_id.to_string()))
 }
 
-pub fn get_template_path<T: AsScriptFullTypeRef>(ty: &T) -> Result<PathBuf> {
-    let p = get_home()
-        .join(TEMPLATE)
-        .join(format!("{}{}", ty.display(), HBS_EXT));
+pub fn get_template_path(ty: &ScriptFullType) -> Result<PathBuf> {
+    let p = get_home().join(TEMPLATE).join(format!("{}{}", ty, HBS_EXT));
     if let Some(dir) = p.parent() {
         if !dir.exists() {
             log::info!("找不到模板資料夾，創建之");

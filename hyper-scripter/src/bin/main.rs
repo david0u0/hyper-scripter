@@ -202,12 +202,18 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 create_read_event(&mut entry).await?;
                 let p = path::open_script(&entry.name, &entry.ty, Some(true))
                     .context(format!("打開命名腳本失敗：{:?}", entry.name))?;
-                let prepare_resp = util::prepare_script(&p, &*entry, None, true, &content)?;
+                let prepare_resp = util::prepare_script(&p, &*entry, None, &content)?;
                 prepare_vec.push((entry.id, p, prepare_resp));
             }
             if let Some(create_res) = create_res {
                 for (name, path) in create_res.to_create.into_iter() {
                     log::info!("創造 {:?}", name);
+                    let template = if no_template {
+                        None
+                    } else {
+                        // NOTE: 計算 `path` 時早已檢查過腳本類型，這裡直接不檢查了
+                        Some(util::get_or_create_template(&create_res.ty, true, true)?)
+                    };
                     let entry = repo
                         .entry(&name)
                         .or_insert(
@@ -220,13 +226,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                             .build(),
                         )
                         .await?;
-                    let prepare_resp = util::prepare_script(
-                        &path,
-                        &*entry,
-                        create_res.ty.sub.as_ref(),
-                        no_template,
-                        &content,
-                    )?;
+                    let prepare_resp = util::prepare_script(&path, &*entry, template, &content)?;
                     prepare_vec.push((entry.id, path, prepare_resp));
                 }
             }

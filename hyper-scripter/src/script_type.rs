@@ -227,41 +227,13 @@ impl Default for ScriptFullType {
 }
 impl_ser_by_to_string!(ScriptFullType);
 
-pub trait AsScriptFullTypeRef {
-    fn get_ty(&self) -> &ScriptType;
-    fn get_sub(&self) -> Option<&ScriptType>;
-    fn display<'a>(&'a self) -> DisplayTy<'a, Self> {
-        DisplayTy(self)
-    }
-    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
-        if let Some(sub) = &self.get_sub() {
-            write!(w, "{}/{}", self.get_ty(), sub)
-        } else {
-            write!(w, "{}", self.get_ty())
-        }
-    }
-}
 impl Display for ScriptFullType {
     fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
-        AsScriptFullTypeRef::fmt(self, w)
-    }
-}
-
-impl AsScriptFullTypeRef for ScriptFullType {
-    fn get_ty(&self) -> &ScriptType {
-        &self.ty
-    }
-    fn get_sub(&self) -> Option<&ScriptType> {
-        self.sub.as_ref()
-    }
-}
-
-impl<'a> AsScriptFullTypeRef for (&'a ScriptType, Option<&'a ScriptType>) {
-    fn get_ty(&self) -> &ScriptType {
-        self.0
-    }
-    fn get_sub(&self) -> Option<&ScriptType> {
-        self.1
+        if let Some(sub) = &self.sub {
+            write!(w, "{}/{}", self.ty, sub)
+        } else {
+            write!(w, "{}", self.ty)
+        }
     }
 }
 
@@ -307,8 +279,8 @@ impl ScriptTypeConfig {
 
 macro_rules! create_default_types {
     ($(( $name:literal, $tmpl:ident, $conf:expr, [ $($sub:literal: $sub_tmpl:ident),* ] )),*) => {
-        pub fn get_default_template<T: AsScriptFullTypeRef>(ty: &T) -> &'static str {
-            match (ty.get_ty().as_ref(), ty.get_sub().map(|s| s.as_ref())) {
+        pub fn get_default_template(ty: &ScriptFullType) -> &'static str {
+            match (ty.ty.as_ref(), ty.sub.as_ref().map(|s| s.as_ref())) {
                 $(
                     $(
                         ($name, Some($sub)) => $sub_tmpl,
@@ -389,12 +361,4 @@ create_default_types! {
         args: vec!["{{path}}".to_owned()],
         env: Default::default(),
     }, [])
-}
-
-/// 因為沒辦法直接對 AsScriptFullTypeRef 實作 Display 不得不多包一層…
-pub struct DisplayTy<'a, U: ?Sized>(pub &'a U);
-impl<'a, U: AsScriptFullTypeRef> Display for DisplayTy<'a, U> {
-    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
-        self.0.fmt(w)
-    }
 }

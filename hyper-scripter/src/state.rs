@@ -55,11 +55,9 @@ macro_rules! local_global_state {
                 GLOBAL.set(data);
             }
 
+            #[cfg(not(feature = "no-state-check"))]
             pub fn set_local(data: &'static $type_name) {
-                #[cfg(not(feature = "no-state-check"))]
                 LOCAL.set(Some(data));
-                #[cfg(feature = "no-state-check")]
-                unreachable!();
             }
         }
     };

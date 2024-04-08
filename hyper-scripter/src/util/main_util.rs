@@ -99,7 +99,6 @@ struct EditListQueryHandler {
     anonymous_cnt: u32,
     named: HashMap<ScriptName, PathBuf>,
     ty: Option<ScriptFullType>,
-    explicit_type: bool,
 }
 impl EditListQueryHandler {
     fn has_new_script(&self) -> bool {
@@ -107,7 +106,6 @@ impl EditListQueryHandler {
     }
     fn new(ty: Option<ScriptFullType>) -> Self {
         EditListQueryHandler {
-            explicit_type: ty.is_some(),
             ty,
             named: Default::default(),
             anonymous_cnt: 0,
@@ -128,16 +126,6 @@ unsafe impl ListQueryHandler for EditListQueryHandler {
         query: ScriptQuery,
         repo: &'a mut ScriptRepo,
     ) -> Result<Option<RepoEntry<'a>>> {
-        if self.explicit_type {
-            let ty = self.get_or_default_type();
-            let (name, path) = create(query, repo, &ty.ty, |_| {
-                log::error!("與已存在的腳本撞名");
-                RedundantOpt::Type.into()
-            })?;
-            self.named.insert(name, path);
-            return Ok(None);
-        }
-
         match query::do_script_query(&query, repo, false, false).await {
             Err(Error::DontFuzz) | Ok(None) => {
                 let ty = self.get_or_default_type();
@@ -227,6 +215,7 @@ pub async fn edit_or_create(
     ty: Option<ScriptFullType>,
     tags: EditTagArgs,
 ) -> Result<(EditResult<'_>, Option<CreateResult>)> {
+    let explicit_type = ty.is_some();
     let mut edit_query_handler = EditListQueryHandler::new(ty);
     let existing =
         do_list_query_with_handler(script_repo, edit_query, &mut edit_query_handler).await?;
@@ -235,9 +224,9 @@ pub async fn edit_or_create(
         return Err(RedundantOpt::Selector.into());
     }
     if !edit_query_handler.has_new_script() && tags.explicit_tag {
-        return Err(RedundantOpt::Tag.into()); // TODO: why not follow `explicit_type` way?
+        return Err(RedundantOpt::Tag.into());
     }
-    if !edit_query_handler.has_new_script() && edit_query_handler.explicit_type {
+    if !edit_query_handler.has_new_script() && explicit_type {
         return Err(RedundantOpt::Type.into());
     }
 
@@ -459,7 +448,7 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             .entry(&name)
             .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
             .await?;
-        super::prepare_script(&p, &*entry, None, true, &[u.content])?;
+        super::prepare_script(&p, &*entry, None, &[u.content])?;
     }
     Ok(())
 }

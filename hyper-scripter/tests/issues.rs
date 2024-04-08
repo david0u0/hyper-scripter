@@ -146,7 +146,7 @@ fn test_edit_existing_bang() {
         let err = try_edit!("test", Some("rb"), "gg")
             .await
             .expect_err("沒有 BANG! 就找到編輯的腳本！？");
-        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
+        assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
         let err = try_edit!("test", None, "gg").await.unwrap_err();
         assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
@@ -175,8 +175,11 @@ fn test_edit_existing_bang() {
         let entry = &edit.existing[0];
         assert_tags(&["gg"], entry.tags.iter());
 
-        // edit with type, so create new script `non-hi.rb`
-        let (edit, create) = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
+        let err = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap_err();
+        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
+
+        // edit exact name, so create new script `non-hi.rb`
+        let (edit, create) = try_edit!("=non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
         let create = create.unwrap();
         assert!(edit.existing.is_empty());
         assert_eq!(

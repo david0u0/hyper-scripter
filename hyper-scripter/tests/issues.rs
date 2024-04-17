@@ -175,7 +175,9 @@ fn test_edit_existing_bang() {
         let entry = &edit.existing[0];
         assert_tags(&["gg"], entry.tags.iter());
 
-        let err = try_edit!("non-hi", Some("rb/cd"), "+zzzz").await.unwrap_err();
+        let err = try_edit!("non-hi", Some("rb/cd"), "+zzzz")
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
         // edit exact name, so create new script `non-hi.rb`

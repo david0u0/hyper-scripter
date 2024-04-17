@@ -6,8 +6,8 @@ use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
 use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
+use crate::Either;
 use crate::APP_NAME;
-use crate::{to_display_args, Either};
 use clap::{CommandFactory, Error as ClapError, Parser};
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -145,10 +145,11 @@ impl AliasRoot {
             let remaining_args = remaining_args[1..].iter().map(String::as_str);
 
             if is_shell {
-                let mut ret: Vec<_> = base_args.chain(after_args).map(ToOwned::to_owned).collect();
-                for arg in remaining_args {
-                    ret.push(to_display_args(arg).to_string());
-                }
+                let ret: Vec<_> = base_args
+                    .chain(after_args)
+                    .chain(remaining_args)
+                    .map(ToOwned::to_owned)
+                    .collect();
                 return Some(Either::Two(ret));
             }
 

@@ -198,34 +198,6 @@ pub fn get_or_create_template(
     read_file(&tmpl_path)
 }
 
-/// copied from `shell_escape` crate
-pub fn to_display_args(arg: &str) -> Cow<'_, str> {
-    fn non_whitelisted(ch: char) -> bool {
-        match ch {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '=' | '/' | ',' | '.' | '+' => false,
-            _ => true,
-        }
-    }
-    if !arg.is_empty() && !arg.contains(non_whitelisted) {
-        return Cow::Borrowed(arg);
-    }
-
-    let mut es = String::with_capacity(arg.len() + 2);
-    es.push('\'');
-    for ch in arg.chars() {
-        match ch {
-            '\'' | '!' => {
-                es.push_str("'\\");
-                es.push(ch);
-                es.push('\'');
-            }
-            _ => es.push(ch),
-        }
-    }
-    es.push('\'');
-    Cow::Owned(es)
-}
-
 fn relative_to_home(p: &Path) -> Option<&Path> {
     const CUR_DIR: &str = ".";
     let home = dirs::home_dir()?;

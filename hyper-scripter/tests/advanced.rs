@@ -224,15 +224,18 @@ fn test_shell_alias() {
 
     // env in shell alias
     const MSG: &'static str = "this is a test";
+    run!("e -T rb that-file | puts '{}'", MSG).unwrap();
     run!("e -T txt this-file | {}", MSG).unwrap();
-    run!("e -T txt that-file | {}", MSG).unwrap();
     run!("alias readit !cat $HS_HOME/this-file").unwrap();
     assert_eq!(MSG, run!("cat").unwrap());
     assert_eq!(MSG, run!("readit").unwrap());
 
     // escape character e.g. "*"
     run!("alias lsit !$HS_EXE -H $HS_HOME ls").unwrap();
-    assert_eq!(run!("ls").unwrap(), run!(dir: "/", "lsit *").unwrap());
+    assert_eq!(run!("ls").unwrap(), run!(dir: "/", "lsit '\\*'").unwrap());
+
+    run!("alias with '!true;'").unwrap();
+    assert_eq!(MSG, run!("with ruby $HS_HOME/that-file.rb").unwrap());
 }
 
 #[test]

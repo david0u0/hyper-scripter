@@ -11,7 +11,7 @@ use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 
 pub mod completion_util;
 pub mod holder;
@@ -40,11 +40,16 @@ pub fn illegal_name(s: &str) -> bool {
         || s.is_empty()
 }
 
-pub fn run_cmd(mut cmd: Command) -> Result<ExitStatus> {
+pub fn run_cmd(mut cmd: Command) -> Result<Option<i32>> {
     let res = cmd.spawn();
     let program = cmd.get_program();
     let mut child = handle_fs_res(&[program], res)?;
-    handle_fs_res(&[program], child.wait())
+    let stat = handle_fs_res(&[program], child.wait())?;
+    if stat.success() {
+        Ok(None)
+    } else {
+        Ok(Some(stat.code().unwrap_or_default()))
+    }
 }
 #[cfg(not(target_os = "linux"))]
 pub fn create_cmd(cmd_str: &str, args: &[impl AsRef<OsStr>]) -> Command {
@@ -82,16 +87,15 @@ pub fn run_shell(args: &[String]) -> Result<i32> {
     let mut cmd = create_cmd("sh", ["-c", &cmd]);
     let env = Config::get().gen_env(&TmplVal::new(), false)?;
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
-    let stat = run_cmd(cmd)?;
-    Ok(stat.code().unwrap_or_default())
+    let code = run_cmd(cmd)?;
+    Ok(code.unwrap_or_default())
 }
 
 pub fn open_editor<'a>(path: impl IntoIterator<Item = &'a Path>) -> Result {
     let conf = Config::get();
     let cmd = create_concat_cmd(&conf.editor, path);
-    let stat = run_cmd(cmd)?;
-    if !stat.success() {
-        let code = stat.code().unwrap_or_default();
+    let code = run_cmd(cmd)?;
+    if let Some(code) = code {
         return Err(Error::EditorError(code, conf.editor.clone()));
     }
     Ok(())

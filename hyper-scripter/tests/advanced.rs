@@ -273,3 +273,13 @@ fn test_special_anonymous_query() {
     s2.run("").unwrap();
     s1.can_find(".").expect("非匿名腳本不應觸發特殊規則");
 }
+
+#[test]
+fn test_cat_with() {
+    let _g = setup();
+
+    let s = ScriptTest::new("test", None, Some("echo AAA"));
+    assert_ne!(s.run("").unwrap(), run!("cat").unwrap());
+    assert_eq!(s.run("").unwrap(), run!("cat --with=sh").unwrap());
+    run!("cat --with=ruby").expect_err("ruby 不該執行 echo！");
+}

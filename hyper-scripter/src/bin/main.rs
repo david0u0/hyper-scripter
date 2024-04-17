@@ -311,14 +311,28 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 println!("{}", p.to_string_lossy());
             }
         }
-        Subs::Cat { script_query } => {
+        Subs::Cat { queries, with } => {
             let repo = repo.init().await?;
-            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
-            log::info!("打印 {:?}", entry.name);
-            let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let content = util::read_file(&script_path)?;
-            print!("{}", content);
-            create_read_event(&mut entry).await?;
+            let mut scripts = query::do_list_query(repo, queries).await?;
+            scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
+            let mut cmd = with.map(|w| util::create_concat_cmd(&[w], Option::<&str>::None));
+            for entry in scripts.iter_mut() {
+                log::info!("打印 {:?}", entry.name);
+                let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
+                if let Some(cmd) = cmd.as_mut() {
+                    cmd.arg(script_path);
+                } else {
+                    let content = util::read_file(&script_path)?;
+                    print!("{}", content);
+                }
+                create_read_event(entry).await?;
+            }
+            if let Some(cmd) = cmd {
+                let code = util::run_cmd(cmd)?;
+                if let Some(code) = code {
+                    return Err(Error::ScriptError(code));
+                }
+            }
         }
         Subs::Types(Types {
             subcmd: Some(TypesSubs::LS { no_sub }),

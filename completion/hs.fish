@@ -29,6 +29,7 @@ function __hs_list_named_selectors
 end
 
 function __hs_list_tags
+    set bang ""
     if [ "$argv" = "append" ]
         set append 1
     else if [ "$argv" = "both" ]
@@ -287,6 +288,7 @@ complete -c hs -n "__fish_seen_subcommand_from which" -s A -l archaeology -d 'Sh
 complete -c hs -n "__fish_seen_subcommand_from which" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from which" -l timeless -d 'Show scripts of all time.'
 complete -k -c hs -n "__fish_seen_subcommand_from cat" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
+complete -c hs -n "__fish_seen_subcommand_from cat" -l with -d 'Read with other program, e.g. bat'
 complete -c hs -n "__fish_seen_subcommand_from cat" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from cat" -s h -l help -d 'Prints help information'
 complete -c hs -n "__fish_seen_subcommand_from cat" -l no-trace -d 'Do not record history'
@@ -326,7 +328,7 @@ complete -c hs -n "__fish_seen_subcommand_from ls" -l no-caution -d 'Run caution
 complete -c hs -n "__fish_seen_subcommand_from ls" -s A -l archaeology -d 'Show scripts NOT within recent days'
 complete -c hs -n "__fish_seen_subcommand_from ls" -s a -l all -d 'Shorthand for `-s=all,^remove --timeless`'
 complete -c hs -n "__fish_seen_subcommand_from ls" -l timeless -d 'Show scripts of all time.'
-complete -c hs -n "__fish_seen_subcommand_from cp" -s t -l tags
+complete -k -c hs -n "__fish_seen_subcommand_from cp" -s t -l tags -r -f -a "(__hs_list_tags both)"
 complete -k -c hs -n "__fish_seen_subcommand_from cp" -s s -l select -d 'Select by tags, e.g. `all,^mytag`' -r -f -a "(__hs_list_tags_and_types both)"
 complete -c hs -n "__fish_seen_subcommand_from cp" -l recent -d 'Show scripts within recent days.'
 complete -c hs -n "__fish_seen_subcommand_from cp" -s h -l help -d 'Prints help information'

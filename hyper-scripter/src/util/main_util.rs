@@ -281,11 +281,10 @@ fn run(
     let mut cmd = super::create_cmd(cmd, args);
     set_cmd_envs(&mut cmd);
 
-    let stat = super::run_cmd(cmd)?;
-    log::info!("預腳本執行結果：{:?}", stat);
-    if !stat.success() {
+    let code = super::run_cmd(cmd)?;
+    log::info!("預腳本執行結果：{:?}", code);
+    if let Some(code) = code {
         // TODO: 根據返回值做不同表現
-        let code = stat.code().unwrap_or_default();
         return Err(Error::PreRunError(code));
     }
 
@@ -298,10 +297,9 @@ fn run(
     let mut cmd = super::create_cmd(&cmd_str, full_args);
     set_cmd_envs(&mut cmd);
 
-    let stat = super::run_cmd(cmd)?;
-    log::info!("程式執行結果：{:?}", stat);
-    if !stat.success() {
-        let code = stat.code().unwrap_or_default();
+    let code = super::run_cmd(cmd)?;
+    log::info!("程式執行結果：{:?}", code);
+    if let Some(code) = code {
         Err(Error::ScriptError(code))
     } else {
         Ok(())

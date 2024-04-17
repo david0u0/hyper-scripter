@@ -246,8 +246,10 @@ pub enum Subs {
     },
     #[clap(about = "Print the script to standard output")]
     Cat {
-        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
-        script_query: ScriptQuery,
+        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
+        queries: Vec<ListQuery>,
+        #[clap(long, help = "Read with other program, e.g. bat")]
+        with: Option<String>,
     },
     #[clap(about = "Remove the script")]
     RM {

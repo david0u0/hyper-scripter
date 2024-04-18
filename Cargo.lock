@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter"
-version = "0.7.1"
+version = "0.7.5"
 dependencies = [
  "chrono",
  "clap 3.2.25",
@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-historian"
-version = "0.7.1"
+version = "0.7.5"
 dependencies = [
  "chrono",
  "log",
@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-scripter-util"
-version = "0.7.1"
+version = "0.7.5"
 
 [[package]]
 name = "iana-time-zone"

@@ -315,7 +315,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let repo = repo.init().await?;
             let mut scripts = query::do_list_query(repo, queries).await?;
             scripts.sort_by_key(|s| std::cmp::Reverse(s.last_time()));
-            let mut cmd = with.map(|w| util::create_concat_cmd(&[w], Option::<&str>::None));
+            let mut cmd = with.map(|w| util::create_concat_cmd_shlex(&w, Option::<&str>::None));
             for entry in scripts.iter_mut() {
                 log::info!("打印 {:?}", entry.name);
                 let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;

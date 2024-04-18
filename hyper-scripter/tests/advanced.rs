@@ -278,8 +278,21 @@ fn test_special_anonymous_query() {
 fn test_cat_with() {
     let _g = setup();
 
-    let s = ScriptTest::new("test", None, Some("echo AAA"));
-    assert_ne!(s.run("").unwrap(), run!("cat").unwrap());
-    assert_eq!(s.run("").unwrap(), run!("cat --with=sh").unwrap());
-    run!("cat --with=ruby").expect_err("ruby 不該執行 echo！");
+    let content = "# first AAA line\necho AAA";
+    run!("e -T txt | # first\necho BBB").unwrap();
+    run!("e -T txt | {}", content).unwrap();
+
+    assert_ne!("AAA", run!("cat").unwrap());
+    assert_eq!(content, run!("cat").unwrap());
+    assert_eq!("AAA", run!("cat --with=sh").unwrap());
+
+    let simple_grep = run!("cat --with='grep AAA'").unwrap();
+    assert_eq!(content, simple_grep);
+
+    let complex_grep = run!("cat --with='grep \"AAA line\"'").unwrap();
+    assert_ne!(content, complex_grep);
+    assert_eq!("# first AAA line", complex_grep,);
+
+    let multi_grep = run!("cat --with='grep -h echo' *").unwrap();
+    assert_eq!("echo AAA\necho BBB", multi_grep);
 }

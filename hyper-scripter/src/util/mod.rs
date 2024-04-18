@@ -6,6 +6,7 @@ use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptFullType, ScriptType};
 use ::serde::Serialize;
 use chrono::{DateTime, Utc};
+use shlex::Shlex;
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};
@@ -41,6 +42,7 @@ pub fn illegal_name(s: &str) -> bool {
 }
 
 pub fn run_cmd(mut cmd: Command) -> Result<Option<i32>> {
+    log::debug!("執行命令 {:?}", cmd);
     let res = cmd.spawn();
     let program = cmd.get_program();
     let mut child = handle_fs_res(&[program], res)?;
@@ -93,7 +95,8 @@ pub fn run_shell(args: &[String]) -> Result<i32> {
 
 pub fn open_editor<'a>(path: impl IntoIterator<Item = &'a Path>) -> Result {
     let conf = Config::get();
-    let cmd = create_concat_cmd(&conf.editor, path);
+    let editor = conf.editor.iter().map(|s| Cow::Borrowed(s.as_ref()));
+    let cmd = create_concat_cmd(editor, path);
     let code = run_cmd(cmd)?;
     if let Some(code) = code {
         return Err(Error::EditorError(code, conf.editor.clone()));
@@ -101,18 +104,24 @@ pub fn open_editor<'a>(path: impl IntoIterator<Item = &'a Path>) -> Result {
     Ok(())
 }
 
-pub fn create_concat_cmd<'a, 'b, I1, S1, I2, S2>(arg1: I1, arg2: I2) -> Command
+pub fn create_concat_cmd_shlex<'b, I2, S2>(arg1: &str, arg2: I2) -> Command
 where
-    I1: IntoIterator<Item = &'a S1>,
     I2: IntoIterator<Item = &'b S2>,
-    S1: AsRef<OsStr> + 'a + ?Sized,
     S2: AsRef<OsStr> + 'b + ?Sized,
+{
+    let arg1 = Shlex::new(arg1).map(|s| Cow::Owned(s.into()));
+    create_concat_cmd(arg1, arg2)
+}
+
+pub fn create_concat_cmd<'a, I1, I2, S2>(arg1: I1, arg2: I2) -> Command
+where
+    I1: IntoIterator<Item = Cow<'a, OsStr>>,
+    I2: IntoIterator<Item = &'a S2>,
+    S2: AsRef<OsStr> + 'a + ?Sized,
 {
     let mut arg1 = arg1.into_iter();
     let cmd = arg1.next().unwrap();
-    let remaining = arg1
-        .map(|s| s.as_ref())
-        .chain(arg2.into_iter().map(|s| s.as_ref()));
+    let remaining = arg1.chain(arg2.into_iter().map(|s| Cow::Borrowed(s.as_ref())));
     create_cmd(cmd, remaining)
 }
 

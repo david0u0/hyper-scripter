@@ -330,6 +330,7 @@ impl ScriptRepo {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
+    pub fn re_filter(&mut self) {}
     pub async fn new(
         recent: Option<RecentFilter>,
         db_env: DBEnv,
@@ -492,8 +493,14 @@ impl ScriptRepo {
         Ok(())
     }
     pub fn entry(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
-        // TODO: 決定要插 hidden 與否
         let entry = self.map.entry(name.key().into_owned());
+        RepoEntryOptional {
+            entry,
+            env: &self.db_env,
+        }
+    }
+    pub fn entry_hidden(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
+        let entry = self.hidden_map.entry(name.key().into_owned());
         RepoEntryOptional {
             entry,
             env: &self.db_env,

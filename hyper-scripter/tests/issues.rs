@@ -419,3 +419,25 @@ fn test_multi_edit_conflict() {
     assert_eq!(TEST, run!(".1").unwrap());
     assert_eq!(format!("{}\n{}", TEST, TEST), run!(".2").unwrap());
 }
+
+#[test]
+fn test_first_command() {
+    println!("第一次執行總是比較少見的案例，其它測項沒碰到它，就在這裡測吧！");
+
+    fn run_first_cmd(cmd: &str) -> String {
+        let _g = clean_and_set_home();
+        run!("{}", cmd).unwrap()
+    }
+    fn assert_first_cmd(cmd: &str) {
+        let first = run_first_cmd(cmd);
+        run!("ls").unwrap(); // NOTE: call something that's very well tested
+        let second = run!("{}", cmd).unwrap();
+        assert_eq!(first, second);
+    }
+
+    assert_first_cmd("ls");
+    // assert_first_cmd("types"); FIXME
+
+    run_first_cmd("t gg");
+    assert_eq!("", run!("ls").unwrap());
+}

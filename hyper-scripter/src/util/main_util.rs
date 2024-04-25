@@ -13,7 +13,7 @@ use crate::query::{
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
-use crate::tag::{Tag, TagSelector};
+use crate::tag::{Tag, TagSelector, TagSelectorGroup};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fs::{create_dir_all, read_dir};
 use std::path::{Path, PathBuf};
@@ -421,7 +421,10 @@ pub async fn run_n_times(
     Ok(())
 }
 
-pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
+pub async fn load_utils(
+    script_repo: &mut ScriptRepo,
+    selector: Option<&TagSelectorGroup>,
+) -> Result {
     for u in hyper_scripter_util::get_all().iter() {
         log::info!("載入小工具 {}", u.name);
         let name = u.name.to_owned().into_script_name()?;
@@ -442,10 +445,21 @@ pub async fn load_utils(script_repo: &mut ScriptRepo) -> Result {
             super::handle_fs_res(&[&p], create_dir_all(parent))?;
         }
 
-        let entry = script_repo
-            .entry(&name)
-            .or_insert(ScriptInfo::builder(0, name, ty, tags.into_iter()).build())
-            .await?;
+        let script = ScriptInfo::builder(0, name, ty, tags.into_iter()).build();
+        let hide = if let Some(selector) = selector {
+            !selector.select(&script.tags, &script.ty)
+        } else {
+            false
+        };
+
+        let entry = if hide {
+            script_repo
+                .entry_hidden(&script.name)
+                .or_insert(script)
+                .await?
+        } else {
+            script_repo.entry(&script.name).or_insert(script).await?
+        };
         super::prepare_script(&p, &*entry, None, &[u.content])?;
     }
     Ok(())

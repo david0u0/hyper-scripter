@@ -94,7 +94,7 @@ pub fn setup() -> () {
     run!("rm --purge * -s all").unwrap();
     g
 }
-pub fn setup_with_utils() -> () {
+pub fn clean_and_set_home() {
     let _ = my_env_logger::try_init();
     let home = get_test_home();
     match std::fs::remove_dir_all(&*home) {
@@ -107,6 +107,9 @@ pub fn setup_with_utils() -> () {
     }
 
     hyper_scripter::path::set_home_thread_local(home);
+}
+pub fn setup_with_utils() -> () {
+    clean_and_set_home();
     run!(silent: true, "ls").unwrap(); // create the home
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {

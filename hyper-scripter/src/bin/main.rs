@@ -119,7 +119,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
     match root.subcmd.unwrap() {
         Subs::LoadUtils => {
             let repo = repo.init().await?;
-            main_util::load_utils(repo).await?;
+            main_util::load_utils(repo, None).await?;
         }
         Subs::Alias {
             unset: false,
@@ -445,8 +445,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 if let Some(tags) = &tags {
                     new_info.append_tags(tags.clone());
                 }
-                let mut entry = repo.entry(&new_info.name).or_insert(new_info).await?;
-                create_read_event(&mut entry).await?; //FIXME: 一旦可以 left join 就省掉這個
+                repo.entry(&new_info.name).or_insert(new_info).await?;
             }
         }
         Subs::MV {

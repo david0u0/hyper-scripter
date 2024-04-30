@@ -124,7 +124,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             let conf = Config::load(&home)?;
             if let Some(Either::One(new_args)) = root.expand_alias(&args, &conf) {
-                print_iter(new_args, " ");
+                print_iter(new_args.map(to_display_args), " ");
             } else {
                 log::info!("並非別名");
                 return Err(Error::Completion);

@@ -1,6 +1,6 @@
 use super::main_util;
 use crate::args::RootArgs;
-use crate::config::Config;
+use crate::config::{Config, Recent};
 use crate::error::{Contextable, Error, Result};
 use crate::path;
 use crate::script_repo::{DBEnv, RecentFilter, ScriptRepo};
@@ -35,12 +35,11 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
     let conf = Config::get();
 
     let recent = if timeless {
-        None
+        Recent::Timeless
+    } else if let Some(recent) = recent {
+        Recent::Days(recent)
     } else {
-        Some(RecentFilter {
-            recent: recent.or(conf.recent),
-            archaeology,
-        })
+        conf.recent
     };
 
     // TODO: 測試 toggle 功能，以及名字不存在的錯誤
@@ -57,9 +56,16 @@ pub async fn init_repo(args: RootArgs, need_journal: bool) -> Result<ScriptRepo>
     };
 
     let (env, init) = init_env(need_journal).await?;
-    let mut repo = ScriptRepo::new(recent, env, &tag_group)
-        .await
-        .context("載入腳本倉庫失敗")?;
+    let mut repo = ScriptRepo::new(
+        RecentFilter {
+            recent,
+            archaeology,
+        },
+        env,
+        &tag_group,
+    )
+    .await
+    .context("載入腳本倉庫失敗")?;
     if no_trace {
         repo.no_trace();
     } else if humble {

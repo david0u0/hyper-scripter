@@ -1,8 +1,9 @@
+use crate::config::Recent;
 use crate::error::Result;
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelectorGroup};
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
@@ -11,10 +12,27 @@ use std::collections::hash_map::Entry::{self, *};
 pub mod helper;
 pub use helper::RepoEntry;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct RecentFilter {
-    pub recent: Option<u32>,
+    pub recent: Recent,
     pub archaeology: bool,
+}
+enum TimeBound {
+    Timeless,
+    Bound(Option<NaiveDateTime>),
+}
+impl TimeBound {
+    fn new(recent: Recent) -> Self {
+        match recent {
+            Recent::Timeless => TimeBound::Timeless,
+            Recent::NoNeglect => TimeBound::Bound(None),
+            Recent::Days(d) => {
+                let mut time = Utc::now().naive_utc();
+                time -= Duration::days(d.into());
+                TimeBound::Bound(Some(time))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -330,24 +348,14 @@ impl ScriptRepo {
     pub fn historian(&self) -> &Historian {
         &self.db_env.historian
     }
-    pub fn re_filter(&mut self) {}
     pub async fn new(
-        recent: Option<RecentFilter>,
+        recent: RecentFilter,
         db_env: DBEnv,
         selector: &TagSelectorGroup,
     ) -> Result<ScriptRepo> {
         let mut hidden_map = HashMap::<String, ScriptInfo>::default();
         let mut map: HashMap<String, ScriptInfo> = Default::default();
-        let time_bound = recent.map(|r| {
-            (
-                r.archaeology,
-                r.recent.map(|r| {
-                    let mut time = Utc::now().naive_utc();
-                    time -= Duration::days(r.into());
-                    time
-                }),
-            )
-        });
+        let time_bound = TimeBound::new(recent.recent);
 
         let scripts = sqlx::query!(
             "SELECT * FROM script_infos si LEFT JOIN last_events le ON si.id = le.script_id"
@@ -394,20 +402,22 @@ impl ScriptRepo {
             }
 
             let script = builder.build();
-            let mut hide = false;
-
             if let Some(neglect) = record.neglect {
                 log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
             }
-            if let Some((archaeology, time_bound)) = time_bound {
-                let time_bound = std::cmp::max(time_bound, record.neglect);
-                let overtime = if let Some(time_bound) = time_bound {
-                    time_bound > script.last_major_time()
-                } else {
-                    false
-                };
-                hide = archaeology ^ overtime;
-            }
+
+            let overtime = match time_bound {
+                TimeBound::Timeless => false,
+                TimeBound::Bound(time_bound) => {
+                    let time_bound = std::cmp::max(time_bound, record.neglect);
+                    if let Some(time_bound) = time_bound {
+                        time_bound > script.last_major_time()
+                    } else {
+                        false
+                    }
+                }
+            };
+            let mut hide = recent.archaeology ^ overtime;
 
             if !hide {
                 hide = !selector.select(&script.tags, &script.ty);

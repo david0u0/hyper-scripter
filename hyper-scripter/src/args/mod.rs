@@ -1,4 +1,4 @@
-use crate::config::{Alias, Config, PromptLevel};
+use crate::config::{Alias, Config, PromptLevel, Recent};
 use crate::env_pair::EnvPair;
 use crate::error::{DisplayError, DisplayResult, Result};
 use crate::list::Grouping;
@@ -38,7 +38,7 @@ pub struct RootArgs {
         help = "Don't affect script time order (but still record history and affect time filter)"
     )]
     pub humble: bool,
-    #[clap(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all", "timeless"])]
+    #[clap(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all"])]
     pub archaeology: bool,
     #[clap(long)]
     pub no_alias: bool,
@@ -261,6 +261,8 @@ pub enum Subs {
         )]
         purge: bool,
     },
+    #[clap(about = "Set recent filter")]
+    Recent { recent_filter: Option<Recent> },
     #[clap(about = "List hyper scripts")]
     LS(List),
     #[clap(about = "Manage script types")]

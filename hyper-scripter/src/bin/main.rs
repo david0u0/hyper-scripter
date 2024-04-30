@@ -363,6 +363,14 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 println!("{}", template);
             }
         }
+        Subs::Recent { recent_filter } => {
+            let conf = conf_mut!();
+            if let Some(recent) = recent_filter {
+                conf.recent = recent;
+            } else {
+                println!("{}", conf.recent);
+            }
+        }
         Subs::LS(List {
             long,
             grouping,

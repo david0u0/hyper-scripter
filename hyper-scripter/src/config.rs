@@ -134,9 +134,66 @@ impl FromStr for PromptLevel {
 impl_ser_by_to_string!(PromptLevel);
 impl_de_by_from_str!(PromptLevel);
 
+#[derive(Display, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Recent {
+    #[display(fmt = "timeless")]
+    Timeless,
+    #[display(fmt = "no-neglect")]
+    NoNeglect,
+    #[display(fmt = "{}", _0)]
+    Days(u32),
+}
+impl Default for Recent {
+    fn default() -> Self {
+        Recent::NoNeglect
+    }
+}
+impl FromStr for Recent {
+    type Err = std::num::ParseIntError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let r = match s {
+            "timeless" => Recent::Timeless,
+            "no-neglect" => Recent::NoNeglect,
+            _ => Recent::Days(s.parse()?),
+        };
+        Ok(r)
+    }
+}
+impl serde::Serialize for Recent {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Recent::Days(d) = self {
+            serializer.serialize_u32(*d)
+        } else {
+            serializer.serialize_str(&self.to_string())
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for Recent {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrInt {
+            String(String),
+            Int(u32),
+        }
+
+        let t: StringOrInt = serde::Deserialize::deserialize(deserializer)?;
+        match t {
+            StringOrInt::String(s) => s.parse().map_err(serde::de::Error::custom),
+            StringOrInt::Int(d) => Ok(Recent::Days(d)),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Config {
-    pub recent: Option<u32>,
+    pub recent: Recent,
     pub main_tag_selector: TagSelector,
     #[serde(default)]
     pub caution_tags: TagGroup,
@@ -162,7 +219,7 @@ impl Default for Config {
         }
         Config {
             last_modified: None,
-            recent: Some(999999), // NOTE: 顯示兩千多年份的資料！
+            recent: Default::default(),
             editor: vec!["vim".to_string()],
             prompt_level: PromptLevel::Smart,
             tag_selectors: vec![

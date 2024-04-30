@@ -227,6 +227,8 @@ complete -c hs -n "__hs_use_subcommand" -f -a "which" -d 'Execute the script que
 complete -c hs -n "__hs_use_subcommand" -f -a "cat" -d 'Print the script to standard output'
 complete -c hs -n "__hs_use_subcommand" -f -a "rm" -d 'Remove the script'
 complete -c hs -n "__hs_use_subcommand" -f -a "ls" -d 'List hyper scripts'
+complete -c hs -n "__hs_use_subcommand" -f -a "recent" -d 'Set recent filter'
+complete -c hs -n "__fish_seen_subcommand_from recent" -f -a "timeless no-neglect"
 complete -c hs -n "__hs_use_subcommand" -f -a "cp" -d 'Copy the script to another one'
 complete -c hs -n "__hs_use_subcommand" -f -a "mv" -d 'Move the script to another one'
 complete -c hs -n "__hs_use_subcommand" -f -a "types" -d 'Manage script types'

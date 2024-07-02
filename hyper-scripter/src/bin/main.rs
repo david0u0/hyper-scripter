@@ -492,18 +492,20 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             conf.tag_selectors.remove(pos);
         }
         Subs::Tags(Tags {
-            subcmd: Some(TagsSubs::Toggle { name }),
+            subcmd: Some(TagsSubs::Toggle { names }),
         }) => {
             let conf = conf_mut!();
-            let selector = conf
-                .tag_selectors
-                .iter_mut()
-                .find(|f| f.name == name)
-                .ok_or_else(|| {
-                    log::error!("試著切換不存在的選擇器 {:?}", name);
-                    Error::TagSelectorNotFound(name)
-                })?;
-            selector.inactivated = !selector.inactivated;
+            for name in names.into_iter() {
+                let selector = conf
+                    .tag_selectors
+                    .iter_mut()
+                    .find(|f| f.name == name)
+                    .ok_or_else(|| {
+                        log::error!("試著切換不存在的選擇器 {:?}", name);
+                        Error::TagSelectorNotFound(name)
+                    })?;
+                selector.inactivated = !selector.inactivated;
+            }
         }
         Subs::Tags(Tags {
             subcmd:

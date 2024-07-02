@@ -28,7 +28,7 @@ pub enum TagsSubs {
         named: bool,
     },
     Toggle {
-        name: String,
+        names: Vec<String>,
     },
 }
 

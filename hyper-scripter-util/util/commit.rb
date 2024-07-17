@@ -8,21 +8,36 @@
 # [HS_HELP]: Consecutive auto-generated commit with same message will be merged (using --amend)
 # [HS_HELP]:
 # [HS_HELP]: USAGE:
-# [HS_HELP]:     hs commit
+# [HS_HELP]:     hs commit [-d, --dump_history]
+
 
 require_relative './common'
+require 'optparse'
 
-def dump_db
+dump_history = false
+opt = OptionParser.new do |opts|
+  opts.on('-d', '--dump-history', 'dump history to sql file') do |arg|
+    dump_history = arg
+    warn "dump history to sql file"
+  end
+end
+opt.parse!
+
+def dump_db(dump_history)
   require 'tempfile'
   file = Tempfile.new('script_info')
   system("cp .script_info.db #{file.path}")
   system("sqlite3 #{file.path} 'DELETE FROM last_events'")
   system("sqlite3 #{file.path} '.dump' > .script_info.sql")
+
+  if dump_history
+    system("sqlite3 .script_history.db '.dump' > .script_history.sql")
+  end
 end
 
 REAL_HS_HOME = File.realpath(HS_ENV.home)
 Dir.chdir(REAL_HS_HOME)
-dump_db
+dump_db(dump_history)
 
 GIT_HOME = run_cmd('git rev-parse --show-toplevel').chop
 BRANCH = run_cmd('git rev-parse --abbrev-ref HEAD').chop

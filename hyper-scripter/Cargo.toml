@@ -41,6 +41,11 @@ path = "tests/advanced.rs"
 name = "fuzzy"
 path = "tests/fuzzy.rs"
 
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+harness = false
+
 [features]
 default = ["log"]
 hard-home = []
@@ -83,5 +88,4 @@ log = "0.4.8"
 
 [dev-dependencies]
 rand = "0.8.3"
-criterion = "0.3"
-criterion-macro = "0.3"
+criterion = { version = "0.5", features = ["html_reports"] }

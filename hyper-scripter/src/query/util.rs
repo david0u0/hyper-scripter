@@ -186,7 +186,7 @@ pub async fn do_script_query_strict<'b>(
     Err(Error::ScriptNotFound(script_query.to_string()))
 }
 
-// 判斷特例：若收到的查詢是單一個 "."，且所有候選人階為匿名，則不再考慮任何前綴問題
+// 判斷特例：若收到的查詢是單一個 "."，且所有候選人皆為匿名，則不再考慮任何前綴問題
 // 舉例：若有兩個腳本 .1 和 .10，用 "." 來查詢不該讓 .1 遮蔽掉 .10
 // （但若是用 "1" 來查就該遮蔽）
 fn handle_special_dot_anonymous<'a>(

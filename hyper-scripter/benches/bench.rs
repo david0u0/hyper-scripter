@@ -1,12 +1,12 @@
-#![feature(custom_test_frameworks)]
-#![test_runner(criterion::runner)]
+#[cfg(not(feature = "benching"))]
+compile_error!("should run benchmark with feature `benching`");
 
-use criterion::{black_box, Bencher, Criterion};
-use criterion_macro::criterion;
+use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 use hyper_scripter::{
     fuzzy::*, my_env_logger, script::ScriptName, util::main_util::prepare_pre_run,
 };
 use rand::{rngs::StdRng, seq::index::sample, Rng, SeedableRng};
+use std::hint::black_box;
 
 #[allow(dead_code)]
 #[path = "../tests/tool.rs"]
@@ -52,7 +52,6 @@ fn sample_name(rng: &mut StdRng, name: &str) -> String {
     }
 }
 
-#[criterion]
 fn bench_fuzz(c: &mut Criterion) {
     let _ = my_env_logger::try_init();
 
@@ -296,64 +295,70 @@ fn run_criterion(c: &mut Criterion, name: &str, script_count: usize, epoch: usiz
     }
 }
 
-#[criterion]
 fn bench_massive_fuzzy(c: &mut Criterion) {
     // run with random tag, with random fuzzy name
     run_criterion(c, "massive_fuzzy", 200, 400);
 }
-#[criterion]
 fn bench_massive_exact(c: &mut Criterion) {
     // run with random tag, with random exact name
     run_criterion(c, "massive_exact", 200, 400);
 }
-#[criterion]
 fn bench_massive_prev(c: &mut Criterion) {
     run_criterion(c, "massive_prev", 200, 400);
 }
-#[criterion]
 fn bench_massive_ls(c: &mut Criterion) {
     run_criterion(c, "massive_ls", 200, 400);
 }
-#[criterion]
 fn bench_massive_history(c: &mut Criterion) {
     // run random history show with exact name and bang!
     run_criterion(c, "massive_history", 200, 400);
 }
-#[criterion]
 fn bench_massive_rmid(c: &mut Criterion) {
     run_criterion(c, "massive_rmid", 200, 400);
 }
 
-#[criterion]
 fn bench_small_fuzzy(c: &mut Criterion) {
     // run with random tag, with random fuzzy name
     run_criterion(c, "small_fuzzy", 40, 80);
 }
-#[criterion]
 fn bench_small_exact(c: &mut Criterion) {
     // run with random tag, with random exact name
     run_criterion(c, "small_exact", 40, 80);
 }
-#[criterion]
 fn bench_small_prev(c: &mut Criterion) {
     run_criterion(c, "small_prev", 40, 80);
 }
-#[criterion]
 fn bench_small_ls(c: &mut Criterion) {
     run_criterion(c, "small_ls", 40, 80);
 }
-#[criterion]
 fn bench_small_history(c: &mut Criterion) {
     // run random history show with exact name and bang!
     run_criterion(c, "small_history", 40, 80);
 }
-#[criterion]
 fn bench_small_rmid(c: &mut Criterion) {
     run_criterion(c, "small_rmid", 40, 80);
 }
 
-#[criterion]
 fn bench_small_exact_alias(c: &mut Criterion) {
     // run with random tag, with random exact name
     run_criterion(c, "small_exact_alias", 40, 80);
 }
+
+criterion_group!(
+    benches,
+    bench_fuzz,
+    bench_massive_fuzzy,
+    bench_massive_exact,
+    bench_massive_prev,
+    bench_massive_ls,
+    bench_massive_history,
+    bench_massive_rmid,
+    bench_small_fuzzy,
+    bench_small_exact,
+    bench_small_prev,
+    bench_small_ls,
+    bench_small_history,
+    bench_small_rmid,
+    bench_small_exact_alias
+);
+criterion_main!(benches);

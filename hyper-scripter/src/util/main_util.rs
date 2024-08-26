@@ -9,6 +9,7 @@ use crate::path;
 use crate::process_lock::{ProcessLockRead, ProcessLockWrite};
 use crate::query::{
     self, do_list_query_with_handler, EditQuery, ListQuery, ListQueryHandler, ScriptQuery,
+    StableRepo,
 };
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
@@ -66,9 +67,9 @@ pub async fn mv(
     Ok(())
 }
 
-fn create<F: FnOnce(String) -> Error>(
+fn create<F: FnOnce(String) -> Error, R: StableRepo>(
     query: ScriptQuery,
-    script_repo: &mut ScriptRepo,
+    script_repo: &mut R,
     ty: &ScriptType,
     on_conflict: F,
 ) -> Result<(ScriptName, PathBuf)> {
@@ -118,13 +119,12 @@ impl EditListQueryHandler {
         self.ty.as_ref().unwrap()
     }
 }
-// SAFETY: 實作永不改動 repo 本身
-unsafe impl ListQueryHandler for EditListQueryHandler {
+impl ListQueryHandler for EditListQueryHandler {
     type Item = EditQuery<ListQuery>;
-    async fn handle_query<'a>(
+    async fn handle_query<'a, R: StableRepo>(
         &mut self,
         query: ScriptQuery,
-        repo: &'a mut ScriptRepo,
+        repo: &'a mut R,
     ) -> Result<Option<RepoEntry<'a>>> {
         match query::do_script_query(&query, repo, false, false).await {
             Err(Error::DontFuzz) | Ok(None) => {
@@ -536,7 +536,7 @@ pub async fn after_script(
     Ok(())
 }
 
-fn check_path_collision(p: &Path, script_repo: &mut ScriptRepo) -> Result {
+fn check_path_collision<R: StableRepo>(p: &Path, script_repo: &mut R) -> Result {
     for script in script_repo.iter_mut(Visibility::All) {
         let script_p = path::open_script(&script.name, &script.ty, None)?;
         if &script_p == p {

@@ -1,14 +1,14 @@
 use super::{do_script_query_strict, ListQuery, ScriptQuery};
 use crate::error::{Error, Result};
-use crate::script_repo::{RepoEntry, ScriptRepo};
+use crate::script::ScriptName;
+use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 
-// SAFETY: 此特徵的實作應保證永遠不改動 repo 本身（只可回傳其可變參照），否則先前存下的參照可能會無效化
-pub unsafe trait ListQueryHandler {
+pub trait ListQueryHandler {
     type Item;
-    async fn handle_query<'a>(
+    async fn handle_query<'a, T: StableRepo>(
         &mut self,
         query: ScriptQuery,
-        repo: &'a mut ScriptRepo,
+        repo: &'a mut T,
     ) -> Result<Option<RepoEntry<'a>>>;
     fn handle_item(&mut self, item: Self::Item) -> Option<ListQuery>;
     fn should_raise_dont_fuzz_on_empty() -> bool;
@@ -17,13 +17,12 @@ pub unsafe trait ListQueryHandler {
 
 pub struct DefaultListQueryHandler;
 
-// SAFETY: 實作永不改動 repo 本身
-unsafe impl ListQueryHandler for DefaultListQueryHandler {
+impl ListQueryHandler for DefaultListQueryHandler {
     type Item = ListQuery;
-    async fn handle_query<'a>(
+    async fn handle_query<'a, T: StableRepo>(
         &mut self,
         query: ScriptQuery,
-        repo: &'a mut ScriptRepo,
+        repo: &'a mut T,
     ) -> Result<Option<RepoEntry<'a>>> {
         match do_script_query_strict(&query, repo).await {
             Ok(script) => Ok(Some(script)),
@@ -39,5 +38,24 @@ unsafe impl ListQueryHandler for DefaultListQueryHandler {
     }
     fn should_return_all_on_empty() -> bool {
         true
+    }
+}
+
+/// A repo without insert & delete
+pub trait StableRepo {
+    fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>>;
+    fn latest_mut(&mut self, n: usize, visibility: Visibility) -> Option<RepoEntry<'_>>;
+    fn get_mut(&mut self, name: &ScriptName, visibility: Visibility) -> Option<RepoEntry<'_>>;
+}
+
+impl StableRepo for ScriptRepo {
+    fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>> {
+        self.iter_mut(visibility)
+    }
+    fn latest_mut(&mut self, n: usize, visibility: Visibility) -> Option<RepoEntry<'_>> {
+        self.latest_mut(n, visibility)
+    }
+    fn get_mut(&mut self, name: &ScriptName, visibility: Visibility) -> Option<RepoEntry<'_>> {
+        self.get_mut(name, visibility)
     }
 }

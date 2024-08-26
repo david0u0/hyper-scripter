@@ -98,13 +98,25 @@ pub(super) fn the_multifuzz_algo<T: MultiFuzzObj>(ans: T, others: Vec<T>) -> T {
     candidates.sort_by(MultiFuzzTuple::cmp);
     let (max_pos, ans_pos) = find_max_and_ans_pos(&candidates);
     let mut ret_pos = None;
+    log::warn!(
+        "multifuzz algo 2: ans = {}, best = {}",
+        candidates[ans_pos].fuzz_key(),
+        candidates[max_pos].fuzz_key()
+    );
     find_dag_sink(max_pos, &mut candidates, &mut ret_pos);
     let mut ret_pos = ret_pos.unwrap();
-    if is_prefix(
-        &candidates[ret_pos].fuzz_key(),
-        &candidates[ans_pos].fuzz_key(),
-        SEP,
-    ) {
+    log::warn!(
+        "multifuzz algo 3: best_sink = {}",
+        candidates[ret_pos].fuzz_key()
+    );
+    if ret_pos != ans_pos
+        && is_prefix(
+            &candidates[ret_pos].fuzz_key(),
+            &candidates[ans_pos].fuzz_key(),
+            SEP,
+        )
+    {
+        log::warn!("multifuzz algo 4, return answer instead");
         ret_pos = ans_pos;
     }
     candidates.into_iter().skip(ret_pos).next().unwrap().obj

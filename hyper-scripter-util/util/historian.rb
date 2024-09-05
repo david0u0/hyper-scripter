@@ -49,10 +49,6 @@ class Option
   end
 end
 
-def escape_wildcard(s)
-  s.gsub('*', '\*')
-end
-
 class Historian < Selector
   attr_reader :script_name
 
@@ -157,16 +153,16 @@ class Historian < Selector
     create = false
     register_keys('.', lambda { |_, _|
       run_empty = true
-    }, msg: 'run script with empty argument')
+    }, msg: 'Run script with empty argument')
 
     register_keys(%w[r R], lambda { |_, obj|
       sourcing = true
       HS_ENV.do_hs("history rm #{scripts_str} -- #{obj.number}", false)
-    }, msg: 'replace the argument')
+    }, msg: 'Replace the argument')
 
     register_keys(%w[c C], lambda { |_, _|
       sourcing = true
-    }, msg: 'set next command')
+    }, msg: 'Set next command')
 
     register_keys_virtual(%w[p P], lambda { |_, _, options|
       options.reverse.each do |opt|
@@ -175,9 +171,9 @@ class Historian < Selector
       end
       load_history
       exit_virtual
-    }, msg: 'push the event to top', recur: true)
+    }, msg: 'Push the event to top', recur: true)
 
-    register_keys_virtual([ENTER], lambda { |_, _, options|
+    register_keys_virtual([ENTER], lambda { |_, _, _|
     }, msg: 'Run the script')
 
     register_keys_virtual(%w[a A], lambda { |_, _, _|
@@ -199,7 +195,7 @@ class Historian < Selector
         content += "\n#{opt.envs_str_prefix}#{HS_ENV.env_var(:cmd)} #{opt.cmd_body}"
       end
       content = Shellwords.escape(content)
-      HS_ENV.exec_hs("edit --fast --no-template -t +history -- #{content}", false)
+      HS_ENV.exec_hs("edit --no-template -t +history -- #{content}", false)
     else
       result.options.each do |opt|
         HS_ENV.system_hs(opt.cmd_body, false, opt.envs)
@@ -276,7 +272,8 @@ class Historian < Selector
   # prevent the call to `util/historian` screw up historical query
   # e.g. hs util/historian !
   def self.humble_run_id
-    HS_ENV.do_hs("history humble #{HS_ENV.env_var(:run_id)}", false)
+    run_id = HS_ENV.env_var(:run_id)
+    HS_ENV.do_hs("history humble #{run_id}", false) if run_id != ""
   end
 
   def self.rm_run_id
@@ -296,6 +293,7 @@ if __FILE__ == $PROGRAM_NAME
       first = ARGV[...idx]
       second = ARGV[(idx + 2)..] || []
       args = "#{first.join(' ')} #{second.join(' ')}"
+      seq = seq.gsub("\n", ENTER)
       [seq, args]
     end
   end

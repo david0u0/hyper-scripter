@@ -18,8 +18,7 @@ historian.register_keys_virtual(%w[c C], lambda { |_, _, _|
   clear = true
 }, msg: 'Clear the selected env')
 
-result = historian.run()
-options = result.options
+options = historian.run().options
 
 File.open(HS_ENV.env_var(:source), 'w') do |file|
   options.each do |opt|

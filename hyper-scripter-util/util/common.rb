@@ -33,7 +33,7 @@ end
 
 def commandline(args)
   require 'shellwords'
-  args = "#{Shellwords.escape(args)}"
+  args = Shellwords.escape(args)
   File.open(HS_ENV.env_var(:source), 'w') do |file|
     case ENV['SHELL'].split('/').last
     when 'fish'
@@ -117,6 +117,7 @@ end
 
 HS_ENV = begin
            HSEnv.new
-         rescue
+         rescue => err
+           warn "Error initializing hs env: #{err}"
            nil
          end

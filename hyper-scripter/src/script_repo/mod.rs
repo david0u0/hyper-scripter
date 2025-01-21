@@ -322,6 +322,7 @@ pub struct ScriptRepo {
     hidden_map: HashMap<String, ScriptInfo>,
     latest_name: Option<String>,
     db_env: DBEnv,
+    pub time_hidden_count: u32
 }
 
 macro_rules! iter_by_vis {
@@ -362,6 +363,7 @@ impl ScriptRepo {
         )
         .fetch_all(&db_env.info_pool)
         .await?;
+        let mut time_hidden_count = 0;
         for record in scripts.into_iter() {
             let name = record.name;
             log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
@@ -400,27 +402,29 @@ impl ScriptRepo {
             if let Some(time) = record.humble {
                 builder.humble_time(time);
             }
-
             let script = builder.build();
-            if let Some(neglect) = record.neglect {
-                log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
-            }
 
-            let overtime = match time_bound {
-                TimeBound::Timeless => false,
-                TimeBound::Bound(time_bound) => {
-                    let time_bound = std::cmp::max(time_bound, record.neglect);
-                    if let Some(time_bound) = time_bound {
-                        time_bound > script.last_major_time()
-                    } else {
-                        false
-                    }
-                }
-            };
-            let mut hide = recent.archaeology ^ overtime;
-
+            let mut hide = !selector.select(&script.tags, &script.ty);
             if !hide {
-                hide = !selector.select(&script.tags, &script.ty);
+                if let Some(neglect) = record.neglect {
+                    log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
+                }
+
+                let overtime = match time_bound {
+                    TimeBound::Timeless => false,
+                    TimeBound::Bound(time_bound) => {
+                        let time_bound = std::cmp::max(time_bound, record.neglect);
+                        if let Some(time_bound) = time_bound {
+                            time_bound > script.last_major_time()
+                        } else {
+                            false
+                        }
+                    }
+                };
+                hide = recent.archaeology ^ overtime;
+                if hide {
+                    time_hidden_count += 1;
+                }
             }
 
             if hide {
@@ -434,6 +438,7 @@ impl ScriptRepo {
             map,
             hidden_map,
             latest_name: None,
+            time_hidden_count,
             db_env,
         })
     }

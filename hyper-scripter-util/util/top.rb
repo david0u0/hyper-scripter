@@ -5,7 +5,11 @@
 # [HS_HELP]: e.g.:
 # [HS_HELP]:     hs top -s hs hs/test --limit 20
 # [HS_HELP]: or:
-# [HS_HELP]:     hs top --wait-for 'some pattern' # This will wait until 'some pattern' is found in the running process, and wait for it
+# [HS_HELP]:     hs top --wait-for 'some pattern'
+# [HS_HELP]:         # This will wait until 'some pattern' is found in the running process, and wait for it
+# [HS_HELP]:     hs top --wait-for-success 'some pattern'
+# [HS_HELP]:         # Similar to `wait-for`, but if the target process fails,
+# [HS_HELP]:         # this util won't error out but will begin to wait for another match
 
 require_relative './common'
 require_relative './selector'
@@ -39,7 +43,7 @@ def wait_for_run_id(action, wait_obj_arr)
   cmd = "top --wait #{wait_id}"
   if action == :wait
     warn "start waiting!"
-    HS_ENV.exec_hs(cmd, false)
+    HS_ENV.system_hs(cmd, false)
   elsif action == :source
     commandline("#{HS_ENV.env_var(:cmd)} --no-alias #{cmd} && ")
   elsif action == :create
@@ -72,36 +76,58 @@ def get_top_options(args)
 end
 
 def split_args()
-  idx = ARGV.find_index('--wait-for')
+  idx_wait_for = ARGV.find_index('--wait-for')
+  idx_wait_for_success = ARGV.find_index('--wait-for-success')
+  ignore_wait_err, idx = if !idx_wait_for.nil? && !idx_wait_for_success.nil?
+          raise "--wait-for and --wait-for-sucess are conflicting options"
+        elsif !idx_wait_for_success.nil?
+          [true, idx_wait_for_success]
+        elsif !idx_wait_for.nil?
+          [false, idx_wait_for]
+        else
+          [false, nil]
+        end
+
   if idx.nil?
-    [nil, ARGV.join(' ')]
+    [ignore_wait_err, nil, ARGV.join(' ')]
   else
     wait_for = ARGV[idx + 1] || nil
     first = ARGV[...idx]
     second = ARGV[(idx + 2)..] || []
     args = "#{first.join(' ')} #{second.join(' ')}"
-    [wait_for, args]
+    [ignore_wait_err, wait_for, args]
   end
 end
 
-wait_for, args = split_args()
+ignore_wait_err, wait_for, args = split_args()
 unless wait_for.nil?
-  first = true
-  wait_obj_arr = while true
-                   top_options = get_top_options(args)
-                   top_options = top_options.filter { |opt| opt.to_s.include?(wait_for) }
-                   if top_options.empty?
-                     if first
-                       first = false
-                       warn "No running process found, waiting for it..."
+  while true
+    first = true
+    wait_obj_arr = while true
+                     top_options = get_top_options(args)
+                     top_options = top_options.filter { |opt| opt.to_s.include?(wait_for) }
+                     if top_options.empty?
+                       if first
+                         first = false
+                         warn "No running process found, waiting for it..."
+                       end
+                       sleep 3
+                     else
+                       break top_options
                      end
-                     sleep 3
-                   else
-                     break top_options
                    end
-                 end
-  warn "Found running process:\n#{wait_obj_arr.map { |o| "- #{o}" }.join("\n") }"
-  wait_for_run_id(:wait, wait_obj_arr)
+    warn "Found running process:\n#{wait_obj_arr.map { |o| "- #{o}" }.join("\n") }"
+    begin
+      wait_for_run_id(:wait, wait_obj_arr)
+      break
+    rescue StandardError => e
+      if ignore_wait_err
+        warn "Process failed, wait for the next one"
+      else
+        raise e
+      end
+    end
+  end
 else
   top_options = get_top_options(args)
   selector = Selector.new

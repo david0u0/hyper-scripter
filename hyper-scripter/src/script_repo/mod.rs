@@ -322,7 +322,7 @@ pub struct ScriptRepo {
     hidden_map: HashMap<String, ScriptInfo>,
     latest_name: Option<String>,
     db_env: DBEnv,
-    pub time_hidden_count: u32
+    pub time_hidden_count: u32,
 }
 
 macro_rules! iter_by_vis {

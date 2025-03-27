@@ -19,7 +19,6 @@ crate::local_global_state!(runtime_conf_state, RuntimeConf, || { unreachable!() 
 
 struct RuntimeConf {
     prompt_level: PromptLevel,
-    no_caution: bool,
 }
 
 fn de_nonempty_vec<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
@@ -342,19 +341,13 @@ impl Config {
         Ok(())
     }
 
-    pub fn set_runtime_conf(prompt_level: Option<PromptLevel>, no_caution: bool) {
+    pub fn set_runtime_conf(prompt_level: Option<PromptLevel>) {
         let c = Config::get();
         let prompt_level = prompt_level.unwrap_or(c.prompt_level); // TODO: 測試由設定檔設定 prompt-level 的情境？
-        runtime_conf_state::set(RuntimeConf {
-            prompt_level,
-            no_caution,
-        });
+        runtime_conf_state::set(RuntimeConf { prompt_level });
     }
     pub fn get_prompt_level() -> PromptLevel {
         runtime_conf_state::get().prompt_level
-    }
-    pub fn get_no_caution() -> bool {
-        runtime_conf_state::get().no_caution
     }
 
     pub fn get() -> &'static Config {

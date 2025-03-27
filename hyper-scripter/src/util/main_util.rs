@@ -313,6 +313,7 @@ pub async fn run_n_times(
     res: &mut Vec<Error>,
     use_previous: bool,
     error_no_previous: bool,
+    caution: bool,
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
@@ -342,7 +343,7 @@ pub async fn run_n_times(
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file(&script_path)?;
 
-    if !Config::get_no_caution()
+    if caution
         && Config::get()
             .caution_tags
             .select(&entry.tags, &entry.ty)

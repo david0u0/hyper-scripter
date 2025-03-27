@@ -192,7 +192,11 @@ pub async fn fmt_list<W: Write>(
     queries: Vec<ListQuery>,
 ) -> Result<()> {
     if !opt.plain {
-        write!(w, "{} scripts ignored due to time filter\n", script_repo.time_hidden_count)?;
+        write!(
+            w,
+            "{} scripts ignored due to time filter\n",
+            script_repo.time_hidden_count
+        )?;
     }
 
     let latest_script_id = script_repo

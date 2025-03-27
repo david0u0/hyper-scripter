@@ -276,6 +276,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             }
         }
         Subs::Run {
+            no_caution,
             script_query,
             dummy,
             args,
@@ -295,6 +296,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 &mut ret.errs,
                 previous,
                 error_no_previous,
+                !no_caution,
                 dir,
             )
             .await?;

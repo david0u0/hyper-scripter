@@ -166,7 +166,7 @@ class Historian < Selector
 
     register_keys_virtual(%w[p P], lambda { |_, _, options|
       options.reverse.each do |opt|
-        cmd = "run --dummy #{opt.cmd_body}"
+        cmd = "run --no-caution --dummy #{opt.cmd_body}"
         HS_ENV.system_hs(cmd, false, opt.envs)
       end
       load_history

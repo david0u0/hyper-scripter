@@ -441,7 +441,7 @@ fn test_first_command() {
     // assert_first_cmd("types"); FIXME
 
     run_first_cmd("t gg");
-    assert_eq!("", run!("ls").unwrap());
+    assert_eq!("", run!("ls --plain").unwrap());
 }
 
 #[test]

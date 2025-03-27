@@ -78,8 +78,6 @@ pub struct RootArgs {
     pub timeless: bool,
     #[clap(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
-    #[clap(long, help = "Run caution scripts without warning")]
-    pub no_caution: bool,
 }
 
 #[derive(Parser, Debug, Serialize)]
@@ -212,6 +210,8 @@ pub enum Subs {
         allow_hyphen_values = true
     )]
     Run {
+        #[clap(long, help = "Run caution scripts without warning")]
+        no_caution: bool,
         #[clap(long, help = "Add a dummy run history instead of actually running it")]
         dummy: bool,
         #[clap(long, short)]
@@ -700,6 +700,7 @@ mod test {
                 error_no_previous: false,
                 repeat: Some(42),
                 dir: None,
+                no_caution: false,
                 script_query,
                 args,
             }) => {

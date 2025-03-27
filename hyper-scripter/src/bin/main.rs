@@ -97,7 +97,7 @@ struct MainReturn<'a> {
 }
 
 async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_>) -> Result {
-    Config::set_runtime_conf(root.root_args.prompt_level, root.root_args.no_caution);
+    Config::set_runtime_conf(root.root_args.prompt_level);
     let explicit_select = !root.root_args.select.is_empty();
 
     let conf = Config::get();
@@ -276,6 +276,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             }
         }
         Subs::Run {
+            no_caution,
             script_query,
             dummy,
             args,
@@ -295,6 +296,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 &mut ret.errs,
                 previous,
                 error_no_previous,
+                !no_caution,
                 dir,
             )
             .await?;

@@ -133,7 +133,7 @@ pub fn setup_with_utils() -> () {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
         Config::init().unwrap();
-        Config::set_runtime_conf(Some(PromptLevel::Never), true);
+        Config::set_runtime_conf(Some(PromptLevel::Never));
     });
 
     // 避免編輯器堵住整個程式

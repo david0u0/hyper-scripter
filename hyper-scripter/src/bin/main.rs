@@ -3,7 +3,7 @@ use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use hyper_scripter::args::{
     self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
 };
-use hyper_scripter::config::{Config, NamedTagSelector};
+use hyper_scripter::config::{config_file, Config, NamedTagSelector};
 use hyper_scripter::db;
 use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
@@ -274,6 +274,10 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
                 print_iter(envs, "\n");
             }
+        }
+        Subs::Config => {
+            let file = config_file(path::get_home());
+            print!("{}", file.to_string_lossy());
         }
         Subs::Run {
             no_caution,

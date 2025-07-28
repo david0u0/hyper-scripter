@@ -204,6 +204,8 @@ pub enum Subs {
         after: Vec<String>,
     },
 
+    #[clap(about = "Print the path to script")]
+    Config,
     #[clap(
         about = "Run the script",
         disable_help_flag = true,

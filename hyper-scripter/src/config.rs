@@ -13,6 +13,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
+const CONFIG_FILE_ENV: &str = "HYPER_SCRIPTER_CONFIG";
 
 crate::local_global_state!(config_state, Config, || { Default::default() });
 crate::local_global_state!(runtime_conf_state, RuntimeConf, || { unreachable!() });
@@ -35,8 +36,14 @@ where
     Ok(v)
 }
 
-fn config_file(home: &Path) -> PathBuf {
-    home.join(CONFIG_FILE)
+pub fn config_file(home: &Path) -> PathBuf {
+    match std::env::var(CONFIG_FILE_ENV) {
+        Ok(p) => {
+            log::debug!("使用環境變數設定檔：{}", p);
+            p.into()
+        }
+        Err(_) => home.join(CONFIG_FILE),
+    }
 }
 
 fn is_false(b: &bool) -> bool {
@@ -290,8 +297,8 @@ impl Default for Config {
     }
 }
 impl Config {
-    pub fn load(p: &Path) -> Result<Self> {
-        let path = config_file(p);
+    pub fn load(home: &Path) -> Result<Self> {
+        let path = config_file(home);
         log::info!("載入設定檔：{:?}", path);
         match util::read_file(&path) {
             Ok(s) => {

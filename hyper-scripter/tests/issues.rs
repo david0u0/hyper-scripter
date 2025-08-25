@@ -233,16 +233,29 @@ fn test_edit_without_change() {
     base.can_find("!").unwrap();
     run!("history neglect {}", t.get_name()).unwrap();
     t.can_find_by_name().expect_err("被忽略還找得到？");
-    run!(only_touch: "", "e {}!", t.get_name()).unwrap(); // nothing changed!
+    run!("e {}!", t.get_name()).unwrap(); // nothing changed!
     t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
 
     base.can_find("-").unwrap();
     t.can_find("!").unwrap();
 
-    run!("e {}! | echo $NAME", t.get_name()).unwrap(); // changed!
+    run!("e {}! | echo 2 $NAME", t.get_name()).unwrap(); // changed!
     t.can_find_by_name().unwrap();
     assert_eq!(
-        format!("{}\n{}", t.get_name(), t.get_name()),
+        format!("{}\n2 {}", t.get_name(), t.get_name()),
+        run!("-").unwrap(),
+        "帶內容編輯應打破時間篩選"
+    );
+
+    // 再編輯一次！
+    run!("history neglect {}", t.get_name()).unwrap();
+    t.can_find_by_name().expect_err("被忽略還找得到？");
+    run!("e {}!", t.get_name()).unwrap(); // nothing changed!
+    t.can_find_by_name().expect_err("空編輯不應打破時間篩選");
+    run!("e {}! | echo 3 $NAME", t.get_name()).unwrap(); // changed!
+    t.can_find_by_name().unwrap();
+    assert_eq!(
+        format!("{}\n2 {}\n3 {}", t.get_name(), t.get_name(), t.get_name()),
         run!("-").unwrap(),
         "帶內容編輯應打破時間篩選"
     );

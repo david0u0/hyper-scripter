@@ -219,6 +219,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                         .or_insert(
                             ScriptInfo::builder(
                                 0,
+                                0,
                                 name,
                                 create_res.ty.ty.clone(),
                                 create_res.tags.clone().into_iter(),
@@ -239,7 +240,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             }
 
             for (id, path, prepare_resp) in prepare_vec.iter() {
-                let prepare_resp = if fast { None } else { Some(prepare_resp) };
+                let prepare_resp = if fast { None } else { Some(*prepare_resp) };
                 let mut entry = repo.get_mut_by_id(*id).unwrap();
                 let after_res = main_util::after_script(&mut entry, &path, prepare_resp).await;
                 match after_res {

@@ -7,12 +7,10 @@ use std::path::Path;
 async fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let file = Path::new(&out_dir).join(".script_info.db");
+    let file_str = file.to_string_lossy();
 
     migration::do_migrate_with_pre_sql(&file, None)
         .await
-        .unwrap();
-    println!(
-        "cargo:rustc-env=DATABASE_URL=sqlite:{}",
-        file.to_string_lossy()
-    );
+        .expect(&format!("error creating db file {file_str}"));
+    println!("cargo:rustc-env=DATABASE_URL=sqlite:{}", file_str);
 }

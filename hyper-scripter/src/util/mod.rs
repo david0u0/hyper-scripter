@@ -227,10 +227,21 @@ fn get_birthplace() -> Result<PathBuf> {
     Ok(here.into())
 }
 
-#[derive(Debug)]
-pub struct PrepareRespond {
-    pub is_new: bool,
-    pub time: DateTime<Utc>,
+pub fn compute_hash(msg: &str) -> i64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new(); // TODO: other hash function maybe?
+    msg.hash(&mut hasher);
+    let hash = hasher.finish();
+    i64::from_ne_bytes(hash.to_ne_bytes())
+}
+pub fn compute_file_hash(path: &Path) -> Result<i64> {
+    read_file(path).map(|c| compute_hash(&c))
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PrepareRespond {
+    New { create_time: DateTime<Utc> },
+    Old { last_hash: i64 },
 }
 pub fn prepare_script<T: AsRef<str>>(
     path: &Path,
@@ -269,6 +280,10 @@ pub fn prepare_script<T: AsRef<str>>(
                 write!(file, "{}", line)?;
             }
         }
+
+        Ok(PrepareRespond::New {
+            create_time: file_modify_time(path)?,
+        })
     } else {
         if has_content {
             log::debug!("腳本已存在，往後接上給定的訊息");
@@ -283,12 +298,10 @@ pub fn prepare_script<T: AsRef<str>>(
                 handle_fs_res(&[path], writeln!(&mut file, "{}", content.as_ref()))?;
             }
         }
+        Ok(PrepareRespond::Old {
+            last_hash: script.hash,
+        })
     }
-
-    Ok(PrepareRespond {
-        is_new,
-        time: file_modify_time(path)?,
-    })
 }
 fn write_prepare_script<W: Write>(
     w: W,

@@ -209,6 +209,7 @@ mod test {
                 let time = NaiveDateTime::from_timestamp_opt(idx, 0).unwrap();
                 let mut builder = ScriptInfo::builder(
                     idx,
+                    0,
                     name.to_owned().into_script_name().unwrap(),
                     ty.into(),
                     vec![].into_iter(),

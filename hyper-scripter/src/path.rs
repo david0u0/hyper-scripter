@@ -119,8 +119,10 @@ pub fn compute_home_path_optional<T: AsRef<Path>>(
     }
 }
 pub fn set_home<T: AsRef<Path>>(p: Option<T>, create_on_missing: bool) -> Result {
-    let path = compute_home_path_optional(p, create_on_missing)?;
-    home_state::set(path);
+    if !cfg!(test) {
+        let path = compute_home_path_optional(p, create_on_missing)?;
+        home_state::set(path);
+    }
     Ok(())
 }
 #[cfg(not(feature = "no-state-check"))]

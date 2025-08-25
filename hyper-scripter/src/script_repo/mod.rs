@@ -212,13 +212,14 @@ impl DBEnv {
         let tags = join_tags(info.tags.iter());
         let res = sqlx::query!(
             "
-            INSERT INTO script_infos (name, ty, tags)
-            VALUES(?, ?, ?)
+            INSERT INTO script_infos (name, ty, tags, hash)
+            VALUES(?, ?, ?, ?)
             RETURNING id
             ",
             name,
             ty,
             tags,
+            info.hash,
         )
         .fetch_one(&self.info_pool)
         .await?;
@@ -234,10 +235,11 @@ impl DBEnv {
             let tags = join_tags(info.tags.iter());
             let ty = info.ty.as_ref();
             sqlx::query!(
-                "UPDATE script_infos SET name = ?, tags = ?, ty = ? where id = ?",
+                "UPDATE script_infos SET name = ?, tags = ?, ty = ?, hash = ? where id = ?",
                 name,
                 tags,
                 ty,
+                info.hash,
                 info.id,
             )
             .execute(&self.info_pool)
@@ -371,6 +373,7 @@ impl ScriptRepo {
 
             let mut builder = ScriptInfo::builder(
                 record.id,
+                record.hash,
                 script_name,
                 ScriptType::new_unchecked(record.ty),
                 record.tags.split(',').filter_map(|s| {

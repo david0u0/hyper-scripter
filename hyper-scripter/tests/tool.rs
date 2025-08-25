@@ -82,16 +82,12 @@ impl Error {
 }
 type Result<T = ()> = std::result::Result<T, Error>;
 
-fn get_test_home() -> PathBuf {
+fn get_test_home() -> (PathBuf, PathBuf) {
     let base = normalize_path(HOME_RELATIVE).unwrap();
 
-    #[cfg(feature = "benching")]
-    {
-        return base;
-    }
-
     let thread = std::thread::current();
-    base.join(thread.name().unwrap_or("unnamed_thread"))
+    let home = base.join(thread.name().unwrap_or("unnamed_thread"));
+    (base, home)
 }
 pub fn load_conf() -> Config {
     Config::load(get_home()).unwrap()
@@ -103,22 +99,26 @@ pub fn setup() -> () {
 }
 pub fn clean_and_set_home() {
     let _ = my_env_logger::try_init();
-    let home = get_test_home();
-    match std::fs::remove_dir_all(&home) {
-        Ok(_) => (),
-        Err(e) => {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                panic!("重整測試用資料夾 {:?} 失敗了……", home);
+    let (base, home) = get_test_home();
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        match std::fs::remove_dir_all(&base) {
+            Ok(_) => (),
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    panic!("重整測試用資料夾 {:?} 失敗了……", base);
+                }
             }
         }
-    }
+        std::fs::create_dir(base).unwrap();
+    });
 
     // benchmark 時為了最佳效能，通常不會有 thread local home，故只在其它時候設定之
     #[cfg(feature = "benching")]
     {
         static ONCE: Once = Once::new();
         ONCE.call_once(|| {
-            hyper_scripter::path::set_home(Some(home), true).unwrap();
+            hyper_scripter::path::set_home(Some(base), true).unwrap();
         });
     }
     #[cfg(not(feature = "benching"))]

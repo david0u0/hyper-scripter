@@ -227,6 +227,7 @@ impl std::fmt::Display for ScriptName {
 pub struct TimelessScriptInfo {
     pub changed: bool,
     pub id: i64,
+    pub hash: i64,
     pub name: ScriptName,
     pub tags: HashSet<Tag>,
     pub ty: ScriptType,
@@ -275,7 +276,13 @@ impl ScriptInfo {
         }
     }
     pub fn cp(&self, new_name: ScriptName) -> Self {
-        let builder = ScriptInfo::builder(0, new_name, self.ty.clone(), self.tags.iter().cloned());
+        let builder = ScriptInfo::builder(
+            0,
+            self.hash,
+            new_name,
+            self.ty.clone(),
+            self.tags.iter().cloned(),
+        );
         builder.build()
     }
     /// `major time` 即不包含 `read` 事件的時間，但包含 `humble`
@@ -329,12 +336,14 @@ impl ScriptInfo {
     }
     pub fn builder(
         id: i64,
+        hash: i64,
         name: ScriptName,
         ty: ScriptType,
         tags: impl Iterator<Item = Tag>,
     ) -> ScriptBuilder {
         ScriptBuilder {
             id,
+            hash,
             name,
             ty,
             tags: tags.collect(),
@@ -404,6 +413,8 @@ pub struct ScriptBuilder {
     humble_time: Option<NaiveDateTime>,
     exec_done_time: Option<NaiveDateTime>,
     exec_count: u64,
+
+    hash: i64,
     id: i64,
     tags: HashSet<Tag>,
     ty: ScriptType,
@@ -455,6 +466,7 @@ impl ScriptBuilder {
             timeless_info: TimelessScriptInfo {
                 changed: false,
                 id: self.id,
+                hash: self.hash,
                 name: self.name,
                 ty: self.ty,
                 tags: self.tags,

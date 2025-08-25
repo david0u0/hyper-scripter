@@ -446,7 +446,14 @@ pub async fn load_utils(
             super::handle_fs_res(&[&p], create_dir_all(parent))?;
         }
 
-        let script = ScriptInfo::builder(0, name, ty, tags.into_iter()).build();
+        let script = ScriptInfo::builder(
+            0,
+            super::compute_hash(&u.content),
+            name,
+            ty,
+            tags.into_iter(),
+        )
+        .build();
         let hide = if let Some(selector) = selector {
             !selector.select(&script.tags, &script.ty)
         } else {
@@ -511,28 +518,35 @@ pub fn need_write(arg: &Subs) -> bool {
 pub async fn after_script(
     entry: &mut RepoEntry<'_>,
     path: &Path,
-    prepare_resp: Option<&PrepareRespond>,
+    prepare_resp: Option<PrepareRespond>,
 ) -> Result {
     let mut record_write = true;
+    let new_hash = super::compute_file_hash(path)?;
     match prepare_resp {
         None => {
             log::debug!("不執行後處理");
         }
-        Some(PrepareRespond { is_new, time }) => {
+        Some(PrepareRespond::New { create_time }) => {
             let modified = super::file_modify_time(path)?;
-            if time >= &modified {
-                if *is_new {
-                    log::info!("新腳本未變動，應刪除之");
-                    return Err(Error::EmptyCreate);
-                } else {
-                    log::info!("舊腳本未變動，不記錄寫事件（只記讀事件）");
-                    record_write = false;
-                }
+            if create_time >= modified {
+                log::info!("新腳本未變動，應刪除之");
+                return Err(Error::EmptyCreate);
+            }
+        }
+        Some(PrepareRespond::Old { last_hash }) => {
+            if last_hash == new_hash {
+                log::info!("舊腳本未變動，不記錄寫事件（只記讀事件）");
+                record_write = false;
             }
         }
     }
     if record_write {
-        entry.update(|info| info.write()).await?;
+        entry
+            .update(|info| {
+                info.write();
+                info.hash = new_hash;
+            })
+            .await?;
     }
     Ok(())
 }

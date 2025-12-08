@@ -63,7 +63,8 @@ def get_top_options(args)
     arr = l.chop.split
     pid = arr[0].to_i
     run_id = arr[1].to_i
-    msg = arr[2..].join(' ')
+    # NOTE: arr[2] is script id, which we don't need here
+    msg = arr[3..].join(' ')
     if run_id == SELF_RUN_ID
       nil
     elsif should_ignore(msg)

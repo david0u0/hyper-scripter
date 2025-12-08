@@ -138,7 +138,29 @@ fn test_collect(og_util_cnt: usize) {
 fn test_utils() {
     let _g = setup_with_utils();
     let og_util_cnt = get_ls(Some("all"), None).len();
-    assert_eq!(og_util_cnt, 10, "original # of utils had changed!");
+    assert_eq!(og_util_cnt, 11, "original # of utils had changed!");
     test_import(og_util_cnt);
     test_collect(og_util_cnt);
+}
+
+#[test]
+fn test_resource() {
+    let _g = setup_with_utils();
+
+    run!("e og/test1 | echo $(ruby $HS_HOME/util/resource.rb -- res)").unwrap();
+    run!("e og/test2 | echo $($HS_EXE -H $HS_HOME =util/resource -- -- res)").unwrap();
+
+    let test1_res = run!("og/test1").unwrap();
+    let test2_res = run!("og/test2").unwrap();
+    assert_ne!(test1_res, test2_res);
+    assert_eq!(test1_res, run!("util/resource og/t1 -- res").unwrap());
+    assert_eq!(test2_res, run!("util/resource og/t2 -- res").unwrap());
+
+    run!("mv og/test1 new/test1").unwrap();
+    run!("mv og/test2 new/test2").unwrap();
+
+    assert_eq!(test1_res, run!("new/test1").unwrap());
+    assert_eq!(test2_res, run!("new/test2").unwrap());
+    assert_eq!(test1_res, run!("util/resource new/t1 -- res").unwrap());
+    assert_eq!(test2_res, run!("util/resource new/t2 -- res").unwrap());
 }

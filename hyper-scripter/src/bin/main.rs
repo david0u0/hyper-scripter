@@ -813,7 +813,13 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 if wait {
                     lock.wait_write()?;
                 } else {
-                    println!("{} {} {}", info.pid, lock.get_run_id(), info.file_content());
+                    println!(
+                        "{} {} {} {}",
+                        info.pid,
+                        lock.get_run_id(),
+                        info.script_id,
+                        info.file_content()
+                    );
                 }
             }
         }

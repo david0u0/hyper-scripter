@@ -88,7 +88,7 @@ class Historian < Selector
                end
     query_str = query.map { |s| escape_wildcard(s) }.join(' ')
     @scripts = HS_ENV.do_hs("#{time_str} #{select_str} \
-                 ls --grouping none --plain --name #{query_str}", false).split
+                 ls --grouping=none --plain --format='{{name}}' #{query_str}", false).split
   end
 
   def initialize(args, register = true)

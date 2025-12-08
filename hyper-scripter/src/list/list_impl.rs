@@ -1,33 +1,47 @@
 use super::{
     exec_time_str, extract_help, get_screen_width, style, style_name,
     table_lib::{Cell, Collumn, Table},
-    time_fmt, tree, DisplayIdentStyle, DisplayStyle, Grid, Grouping, ListOptions, LONG_LATEST_TXT,
-    SHORT_LATEST_TXT,
+    time_fmt, tree, DisplayStyle, Grid, Grouping, ListOptions, LONG_LATEST_TXT, SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::query::{do_list_query, ListQuery};
 use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
-use crate::util::get_display_type;
+use crate::util::{get_display_type, DisplayType};
 use fxhash::FxHashMap as HashMap;
+use handlebars::Handlebars;
+use serde::Serialize;
+use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::hash::Hash;
 use std::io::Write;
 
 type ListOptionWithOutput = ListOptions<Table, Grid>;
 
-fn ident_string(style: &DisplayIdentStyle, ty: &str, script: &ScriptInfo) -> String {
-    match style {
-        DisplayIdentStyle::Normal => format!("{}({})", script.name, ty),
-        DisplayIdentStyle::File => script.file_path_fallback().to_string_lossy().to_string(),
-        DisplayIdentStyle::Name => script.name.to_string(),
-        DisplayIdentStyle::NameAndFile => format!(
-            "{}({})",
-            script.name.to_string(),
-            script.file_path_fallback().to_string_lossy().to_string()
-        ),
+pub fn ident_string(
+    format: &str,
+    name: &str,
+    ty: &DisplayType,
+    script: &ScriptInfo,
+) -> Result<String> {
+    #[derive(Serialize)]
+    pub struct TmplVal<'a> {
+        id: i64,
+        name: &'a str,
+        file: Cow<'a, str>,
+        ty: Cow<'a, str>,
     }
+    let file = script.file_path_fallback();
+    let tmpl_val = TmplVal {
+        id: script.id,
+        file: file.to_string_lossy(),
+        ty: ty.display(),
+        name,
+    };
+
+    let reg = Handlebars::new();
+    Ok(reg.render_template(format, &tmpl_val)?)
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -69,7 +83,7 @@ fn sort_scripts(v: &mut Vec<&ScriptInfo>) {
 fn convert_opt<T>(opt: ListOptions, t: T) -> ListOptions<Table, T> {
     ListOptions {
         display_style: match opt.display_style {
-            DisplayStyle::Short(style, _) => DisplayStyle::Short(style, t),
+            DisplayStyle::Short(format, _) => DisplayStyle::Short(format, t),
             DisplayStyle::Long(_) => {
                 time_fmt::init();
                 let mut table = Table::new(gen_title());
@@ -120,8 +134,8 @@ pub fn fmt_meta(
             ];
             table.add_row(row);
         }
-        DisplayStyle::Short(ident_style, grid) => {
-            let ident = ident_string(ident_style, &*ty.display(), script);
+        DisplayStyle::Short(format, grid) => {
+            let ident = ident_string(format, &script.name.to_string(), &ty, script)?;
             let (ident, width) = style_name(opt.plain, is_latest, SHORT_LATEST_TXT, color, &ident)?;
             grid.add(ident, width);
         }

@@ -1,14 +1,14 @@
 use super::{
-    exec_time_str, extract_help, style, style_name_w,
+    exec_time_str, extract_help, ident_string, style, style_name_w,
     table_lib::{Cell, Table},
     time_fmt,
     tree_lib::{self, LeadingDisplay, TreeFormatter},
-    DisplayIdentStyle, DisplayStyle, ListOptions, SHORT_LATEST_TXT,
+    DisplayStyle, ListOptions, SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::script::ScriptInfo;
-use crate::util::get_display_type;
 use crate::util::writable::{FmtWrite, IoWrite};
+use crate::util::{get_display_type, DisplayType};
 use fxhash::FxHashMap as HashMap;
 use std::borrow::Cow;
 use std::fmt::Write as FmtWriteTrait;
@@ -17,7 +17,7 @@ use std::io::Write;
 struct ShortFormatter<W: Write> {
     w: W,
     plain: bool,
-    ident_style: DisplayIdentStyle,
+    format: String,
     latest_script_id: i64,
 }
 struct LongFormatter<'a> {
@@ -27,18 +27,9 @@ struct LongFormatter<'a> {
 }
 struct TrimmedScriptInfo<'b>(Cow<'b, str>, &'b ScriptInfo);
 
-fn ident_string(style: DisplayIdentStyle, ty: &str, t: &TrimmedScriptInfo<'_>) -> String {
+fn ident_string_tree(format: &str, ty: &DisplayType, t: &TrimmedScriptInfo<'_>) -> Result<String> {
     let TrimmedScriptInfo(name, script) = t;
-    match style {
-        DisplayIdentStyle::Normal => format!("{}({})", name, ty),
-        DisplayIdentStyle::File => script.file_path_fallback().to_string_lossy().to_string(),
-        DisplayIdentStyle::Name => name.to_string(),
-        DisplayIdentStyle::NameAndFile => format!(
-            "{}({})",
-            name.to_string(),
-            script.file_path_fallback().to_string_lossy().to_string()
-        ),
-    }
+    ident_string(format, &*name, ty, script)
 }
 
 impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
@@ -62,7 +53,7 @@ impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for ShortFormat
     fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
-        let ident = ident_string(self.ident_style, &*ty.display(), t);
+        let ident = ident_string_tree(&self.format, &ty, t)?;
         let l = style(self.plain, l, |s| s.dimmed().done());
         write!(self.w, "{}", l)?;
         style_name_w(
@@ -182,11 +173,11 @@ pub fn fmt<W: Write>(
             };
             fmter.fmt(&mut root)?;
         }
-        DisplayStyle::Short(ident_style, w) => {
+        DisplayStyle::Short(format, w) => {
             let mut fmter = ShortFormatter {
                 w,
                 plain: opt.plain,
-                ident_style: *ident_style,
+                format: format.clone(),
                 latest_script_id,
             };
             fmter.fmt(&mut root)?;
@@ -241,7 +232,7 @@ mod test {
         let mut fmter = ShortFormatter {
             w: Vec::<u8>::new(),
             plain: true,
-            ident_style: DisplayIdentStyle::Normal,
+            format: "{{name}}({{ty}})".to_owned(),
             latest_script_id: 1,
         };
         let ans = "

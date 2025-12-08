@@ -252,7 +252,7 @@ pub fn run_cmd(
 
 pub fn get_ls(select: Option<&str>, query: Option<&str>) -> Vec<String> {
     let ls_res = run!(
-        "ls {} --grouping none --plain --name {}",
+        "ls {} --grouping none --plain --format={{{{name}}}} {}",
         select.map(|f| format!("-s {}", f)).unwrap_or_default(),
         query.unwrap_or_default()
     )
@@ -360,7 +360,7 @@ impl<'a> ScriptTestWithSelect<'a> {
     pub fn can_find(&self, command: &str) -> Result {
         let res = run!(
             allow_other_error: self.allow_other_error,
-            "{} ls --plain --grouping=none --name {}",
+            "{} ls --plain --grouping=none --format={{{{name}}}} {}",
             self.select,
             command
         )?;

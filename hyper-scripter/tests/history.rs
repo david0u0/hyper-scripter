@@ -625,7 +625,7 @@ fn test_multi_history() {
         }
         fn ls(&self) {
             let expected = self.get_order();
-            let actual: Vec<_> = run_silent!("ls --grouping none --name --plain")
+            let actual: Vec<_> = run_silent!("ls --grouping none --format={{{{name}}}} --plain")
                 .split_whitespace()
                 .map(|s| s.to_owned())
                 .collect();

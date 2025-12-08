@@ -410,10 +410,13 @@ pub struct List {
     pub limit: Option<NonZeroUsize>,
     #[clap(long, help = "No color and other decoration.")]
     pub plain: bool,
-    #[clap(long, help = "Show file path to the script.", conflicts_with = "long")]
-    pub file: bool,
-    #[clap(long, help = "Show name of the script.", conflicts_with = "long")]
-    pub name: bool,
+    #[clap(
+        long,
+        help = "Define the formatting for each script.",
+        conflicts_with = "long",
+        default_value = "{{name}}({{ty}})"
+    )]
+    pub format: String,
     #[clap(help = LIST_QUERY_HELP)]
     pub queries: Vec<ListQuery>,
 }

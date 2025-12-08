@@ -8,7 +8,7 @@ use hyper_scripter::db;
 use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
 use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
-use hyper_scripter::list::{fmt_list, DisplayIdentStyle, DisplayStyle, ListOptions};
+use hyper_scripter::list::{fmt_list, DisplayStyle, ListOptions};
 use hyper_scripter::my_env_logger;
 use hyper_scripter::path;
 use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, ScriptQuery};
@@ -384,16 +384,12 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             limit,
             queries,
             plain,
-            name,
-            file,
+            format,
         }) => {
-            let display_style = match (long, file, name) {
-                (false, true, false) => DisplayStyle::Short(DisplayIdentStyle::File, ()),
-                (false, false, true) => DisplayStyle::Short(DisplayIdentStyle::Name, ()),
-                (false, false, false) => DisplayStyle::Short(DisplayIdentStyle::Normal, ()),
-                (false, true, true) => DisplayStyle::Short(DisplayIdentStyle::NameAndFile, ()),
-                (true, false, false) => DisplayStyle::Long(()),
-                _ => unreachable!(),
+            let display_style = if long {
+                DisplayStyle::Long(())
+            } else {
+                DisplayStyle::Short(format, ())
             };
             let opt = ListOptions {
                 grouping: grouping.into(),

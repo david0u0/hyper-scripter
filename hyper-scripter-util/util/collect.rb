@@ -60,7 +60,7 @@ end
 existing_files = {}
 types = HS_ENV.do_hs("types ls --no-sub", false).split
 
-HS_ENV.do_hs('ls --grouping=none --file --name --plain', true).split.each do |s|
+HS_ENV.do_hs('ls --grouping=none --format="{{name}}({{file}})" --plain', true).split.each do |s|
   match = /(?<name>[^(]+)\((?<file>.+)\)/.match(s)
   name = match[:name]
   file = match[:file]

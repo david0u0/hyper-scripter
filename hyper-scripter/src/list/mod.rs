@@ -88,16 +88,9 @@ fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum DisplayIdentStyle {
-    File,
-    Name,
-    Normal,
-    NameAndFile,
-}
 #[derive(Debug, Eq, PartialEq)]
 pub enum DisplayStyle<T, U> {
-    Short(DisplayIdentStyle, U),
+    Short(String, U),
     Long(T),
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -123,6 +116,31 @@ impl FromStr for Grouping {
             "tag" => Grouping::Tag,
             "tree" => Grouping::Tree,
             "none" => Grouping::None,
+            _ => unreachable!(),
+        };
+        Ok(g)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+pub enum Note {
+    File,
+    ID,
+    Type,
+    None,
+}
+impl Default for Note {
+    fn default() -> Self {
+        Note::Type
+    }
+}
+impl FromStr for Note {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        let g = match s {
+            "file" => Note::File,
+            "id" => Note::ID,
+            "none" => Note::None,
             _ => unreachable!(),
         };
         Ok(g)

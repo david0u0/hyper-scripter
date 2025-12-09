@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter-historian"
-version = "0.7.5"
+version = "0.7.8"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"

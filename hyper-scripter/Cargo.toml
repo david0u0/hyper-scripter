@@ -1,6 +1,6 @@
 [package]
 name = "hyper-scripter"
-version = "0.7.5"
+version = "0.7.8"
 authors = ["why8ther <lturtsamuel@gmail.com>"]
 edition = "2021"
 autotests = false
@@ -77,8 +77,8 @@ toml = "0.5.6"
 ctrlc = { version = "3.0" }
 term_grid = "0.1"
 unicode-width = "0.1"
-hyper-scripter-historian = { version = "0.7.5", path = "../hyper-scripter-historian" }
-hyper-scripter-util = { version = "0.7.5", path = "../hyper-scripter-util" }
+hyper-scripter-historian = { version = "0.7.8", path = "../hyper-scripter-historian" }
+hyper-scripter-util = { version = "0.7.8", path = "../hyper-scripter-util" }
 fd-lock = "4.0.0"
 
 [build-dependencies]

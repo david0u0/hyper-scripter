@@ -1,7 +1,8 @@
 use super::{
     exec_time_str, extract_help, get_screen_width, style, style_name,
     table_lib::{Cell, Collumn, Table},
-    time_fmt, tree, DisplayStyle, Grid, Grouping, ListOptions, LONG_LATEST_TXT, SHORT_LATEST_TXT,
+    time_fmt, tree, DisplayStyle, Grid, Grouping, IdentTemplate, ListOptions, LONG_LATEST_TXT,
+    SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::query::{do_list_query, ListQuery};
@@ -10,7 +11,7 @@ use crate::script_repo::{ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::{get_display_type, DisplayType};
 use fxhash::FxHashMap as HashMap;
-use handlebars::Handlebars;
+use handlebars::{Context, Handlebars, RenderContext, Renderable, Template};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::cmp::Reverse;
@@ -19,8 +20,8 @@ use std::io::Write;
 
 type ListOptionWithOutput = ListOptions<Table, Grid>;
 
-pub fn ident_string(
-    format: &str,
+fn render_general_ident(
+    format: &Template,
     name: &str,
     ty: &DisplayType,
     script: &ScriptInfo,
@@ -41,7 +42,28 @@ pub fn ident_string(
     };
 
     let reg = Handlebars::new();
-    Ok(reg.render_template(format, &tmpl_val)?)
+    let res = format.renders(
+        &reg,
+        &Context::wraps(tmpl_val)?,
+        &mut RenderContext::new(None),
+    )?;
+    Ok(res)
+}
+
+pub fn ident_string(
+    format: &IdentTemplate,
+    name: &str,
+    ty: &DisplayType,
+    script: &ScriptInfo,
+) -> Result<String> {
+    let res = match format {
+        IdentTemplate::General(t) => return render_general_ident(t, name, ty, script),
+        IdentTemplate::Classic => format!("{}({})", name, ty.display()),
+        IdentTemplate::Name => name.to_owned(),
+        IdentTemplate::File => script.file_path_fallback().to_string_lossy().to_string(),
+        IdentTemplate::ID => script.id.to_string(),
+    };
+    Ok(res)
 }
 
 #[derive(PartialEq, Eq, Hash)]

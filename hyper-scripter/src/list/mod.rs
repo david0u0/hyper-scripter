@@ -12,9 +12,10 @@ mod tree_lib;
 use crate::color::{Color, StyleObj, Stylize};
 use crate::util::writable::{write_writable, FmtWrite, Writable};
 use crate::{
-    error::{DisplayError, DisplayResult, Result},
+    error::{DisplayError, DisplayResult, FormatCode::Template as TemplateCode, Result},
     script::ScriptInfo,
 };
+use handlebars::Template;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
@@ -88,9 +89,9 @@ fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum DisplayStyle<T, U> {
-    Short(String, U),
+    Short(IdentTemplate, U),
     Long(T),
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -122,31 +123,6 @@ impl FromStr for Grouping {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-pub enum Note {
-    File,
-    ID,
-    Type,
-    None,
-}
-impl Default for Note {
-    fn default() -> Self {
-        Note::Type
-    }
-}
-impl FromStr for Note {
-    type Err = DisplayError;
-    fn from_str(s: &str) -> DisplayResult<Self> {
-        let g = match s {
-            "file" => Note::File,
-            "id" => Note::ID,
-            "none" => Note::None,
-            _ => unreachable!(),
-        };
-        Ok(g)
-    }
-}
-
 #[derive(Debug)]
 pub struct ListOptions<T = (), U = ()> {
     pub grouping: Grouping,
@@ -170,4 +146,29 @@ fn style<T: std::fmt::Display, F: for<'a> FnOnce(&'a mut StyleObj<T>)>(
 
 pub fn get_screen_width() -> u16 {
     console::Term::stdout().size_checked().map_or(0, |s| s.1)
+}
+
+#[derive(Debug)]
+pub enum IdentTemplate {
+    Classic,
+    Name,
+    File,
+    ID,
+    General(Template),
+}
+impl FromStr for IdentTemplate {
+    type Err = DisplayError;
+    fn from_str(s: &str) -> DisplayResult<Self> {
+        let t = match s {
+            "{{name}}({{ty}})" => IdentTemplate::Classic,
+            "{{file}}" => IdentTemplate::File,
+            "{{name}}" => IdentTemplate::Name,
+            "{{id}}" => IdentTemplate::ID,
+            _ => match Template::compile(s) {
+                Err(_) => return TemplateCode.to_display_res(s.to_owned()),
+                Ok(t) => IdentTemplate::General(t),
+            },
+        };
+        Ok(t)
+    }
 }

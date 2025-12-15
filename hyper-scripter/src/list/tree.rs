@@ -3,7 +3,7 @@ use super::{
     table_lib::{Cell, Table},
     time_fmt,
     tree_lib::{self, LeadingDisplay, TreeFormatter},
-    DisplayStyle, ListOptions, SHORT_LATEST_TXT,
+    DisplayStyle, IdentTemplate, ListOptions, SHORT_LATEST_TXT,
 };
 use crate::error::Result;
 use crate::script::ScriptInfo;
@@ -14,10 +14,10 @@ use std::borrow::Cow;
 use std::fmt::Write as FmtWriteTrait;
 use std::io::Write;
 
-struct ShortFormatter<W: Write> {
+struct ShortFormatter<'a, W: Write> {
     w: W,
     plain: bool,
-    format: String,
+    format: &'a IdentTemplate,
     latest_script_id: i64,
 }
 struct LongFormatter<'a> {
@@ -27,7 +27,11 @@ struct LongFormatter<'a> {
 }
 struct TrimmedScriptInfo<'b>(Cow<'b, str>, &'b ScriptInfo);
 
-fn ident_string_tree(format: &str, ty: &DisplayType, t: &TrimmedScriptInfo<'_>) -> Result<String> {
+fn ident_string_tree(
+    format: &IdentTemplate,
+    ty: &DisplayType,
+    t: &TrimmedScriptInfo<'_>,
+) -> Result<String> {
     let TrimmedScriptInfo(name, script) = t;
     ident_string(format, &*name, ty, script)
 }
@@ -49,7 +53,7 @@ impl<'b> tree_lib::TreeValue<'b> for TrimmedScriptInfo<'b> {
         }
     }
 }
-impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for ShortFormatter<W> {
+impl<'b, W: Write> TreeFormatter<'b, TrimmedScriptInfo<'b>, u64> for ShortFormatter<'b, W> {
     fn fmt_leaf(&mut self, l: LeadingDisplay, t: &TrimmedScriptInfo<'b>) -> Result {
         let TrimmedScriptInfo(_, script) = t;
         let ty = get_display_type(&script.ty);
@@ -177,7 +181,7 @@ pub fn fmt<W: Write>(
             let mut fmter = ShortFormatter {
                 w,
                 plain: opt.plain,
-                format: format.clone(),
+                format,
                 latest_script_id,
             };
             fmter.fmt(&mut root)?;
@@ -232,27 +236,27 @@ mod test {
         let mut fmter = ShortFormatter {
             w: Vec::<u8>::new(),
             plain: true,
-            format: "{{name}}({{ty}})".to_owned(),
+            format: &"{{name}}_{{ty}}".parse().unwrap(),
             latest_script_id: 1,
         };
         let ans = "
 .
-├── aaa(sh)
-├── .2(txt)
+├── aaa_sh
+├── .2_txt
 ├── bbb
-│  ├── ddd(tmux)
+│  ├── ddd_tmux
 │  └── ccc
-│     ├── ddd(tmux)
-│     ├── yyy(js)
+│     ├── ddd_tmux
+│     ├── yyy_js
 │     ├── ddd
-│     │  ├── eee(tmux)
-│     │  └── www(rb)
+│     │  ├── eee_tmux
+│     │  └── www_rb
 │     └── ggg
-│        ├── rrr(tmux)
-│        ├── fff(tmux)
-│        └── xxx(tmux)
+│        ├── rrr_tmux
+│        ├── fff_tmux
+│        └── xxx_tmux
 └── aaa
-   └── bbb(rb)
+   └── bbb_rb
 "
         .trim();
         fmter.fmt(&mut root).unwrap();

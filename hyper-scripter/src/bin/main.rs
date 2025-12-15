@@ -389,7 +389,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let display_style = if long {
                 DisplayStyle::Long(())
             } else {
-                DisplayStyle::Short(format, ())
+                DisplayStyle::Short(format.parse().map_err(|e: DisplayError| e.into_err())?, ())
             };
             let opt = ListOptions {
                 grouping: grouping.into(),

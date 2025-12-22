@@ -18,7 +18,7 @@ end
 function __hs_expand_alias
     set cmd (eval "command hs completion alias -- $argv" 2>/dev/null)
     if [ $status -eq 0 ]
-        echo $cmd
+        echo $cmd | string unescape
     else
         echo $argv
     end

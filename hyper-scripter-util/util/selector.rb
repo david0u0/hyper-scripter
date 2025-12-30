@@ -8,6 +8,7 @@
 require_relative './common'
 require 'io/console'
 
+WHITE = "\033[1;37m"
 RED = "\033[1;31m"
 GREEN = "\033[1;32m"
 YELLOW = "\033[1;33m"
@@ -134,6 +135,9 @@ class Selector
     lines + 1
   end
 
+  def before_each_render(has_sequence)
+  end
+
   def run(sequence: '')
     pos = 0
     mode = :normal
@@ -144,6 +148,8 @@ class Selector
         warn HELP_MSG.to_s if sequence.empty?
         help_printed = true
       end
+
+      before_each_render(!sequence.empty?)
 
       option_count = @options.length
       raise Empty if option_count.zero?

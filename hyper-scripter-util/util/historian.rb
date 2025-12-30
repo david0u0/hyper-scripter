@@ -9,6 +9,18 @@ require 'json'
 require_relative './common'
 require_relative './selector'
 
+DISPLAY_MODE_MAP = {
+  0 => 'all',
+  1 => 'args',
+  2 => 'env',
+}
+
+def get_display_mode_int(mode_str)
+  for k, v in DISPLAY_MODE_MAP
+    return k if v == mode_str
+  end
+end
+
 class Option
   def initialize(name, content, number)
     @content = content
@@ -55,7 +67,7 @@ class Historian < Selector
   def scripts_str
     no_humble_str = @no_humble ? '--no-humble': ''
     dir_str = @dir.nil? ? '' : "--dir #{@dir}"
-    display_str = "--display=#{@display}"
+    display_str = "--display=#{DISPLAY_MODE_MAP[@display]}"
     script_str = @scripts.map { |s| "=#{s}!" }.join(' ')
     "#{no_humble_str} #{display_str} #{dir_str} #{script_str}"
   end
@@ -97,10 +109,11 @@ class Historian < Selector
     arg_obj = JSON.parse(arg_obj_str)
 
     show_obj = arg_obj['subcmd']['History']['subcmd']['Show']
+    @display_mode_bar_printed = false
     @offset = show_obj['offset']
     @limit = show_obj['limit']
     @dir = show_obj['dir']
-    @display = show_obj['display'].downcase
+    @display = get_display_mode_int(show_obj['display'].downcase)
     @no_humble = show_obj['no_humble']
     query = show_obj['queries']
     @single = query.length == 1 && !query[0].include?('*')
@@ -242,15 +255,35 @@ class Historian < Selector
     end.max
   end
 
-  def register_all
-    register_keys_virtual(%w[e E], lambda { |_, _, _|
-      if @display == 'all'
-        @display = 'args'
+  def before_each_render(has_sequence)
+    return if has_sequence
+
+    if @display_mode_bar_printed
+      erase_lines 1
+    end
+    @display_mode_bar_printed = true
+
+    display_mode_bar_msg = DISPLAY_MODE_MAP.map do |mode_int, mode_str|
+      if mode_int == @display
+        "#{RED}#{mode_str}#{WHITE}"
       else
-        @display = 'all'
+        mode_str
       end
+    end.join(' -> ')
+
+    warn "#{WHITE}Display mode: #{display_mode_bar_msg}#{NC}"
+  end
+
+  def register_all
+    register_keys_virtual(%w[e], lambda { |_, _, _|
+      @display = (@display + 1) % DISPLAY_MODE_MAP.length
       load_history
     }, msg: 'toggle show env mode', recur: true)
+
+    register_keys_virtual(%w[E], lambda { |_, _, _|
+      @display = (@display - 1) % DISPLAY_MODE_MAP.length
+      load_history
+    }, msg: 'toggle show env mode (backwards)', recur: true)
 
     register_keys_virtual(%w[d D], lambda { |_, _, options|
       last_num = nil

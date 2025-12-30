@@ -43,16 +43,24 @@ writeFile('/dev/null', 'some content');
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const TMUX_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
-# [HS_ENV]: VAR -> Description for env var `VAR` goes here
-# [HS_ENV_HELP]: VAR2 -> Description for `VAR2` goes here, BUT won't be recorded
+const TMUX_WELCOME_MSG: &str = r#"# [HS_HELP]: Help message goes here...
+# [HS_ENV]: TMUX_NAME
 
-NAME=${NAME/./_}
-tmux has-session -t=$NAME
+TMUX_NAME=${TMUX_NAME:-${NAME/./_}}
+tmux has-session -t=$TMUX_NAME
 if [ $? = 0 ]; then
-    echo attach to existing session
-    tmux -2 attach-session -t $NAME
-    exit
+    echo session $TMUX_NAME already exist! Please select:
+    ACTION=$(ruby $HS_HOME/util/selector.rb Restart Attach Kill "Do Nothing")
+    if [ "$ACTION" = "Restart" ]; then
+        tmux kill-session -t $TMUX_NAME
+    else
+        if [ "$ACTION" = "Attach" ]; then
+            echo tmux -2 attach-session -t $TMUX_NAME > $HS_SOURCE
+        elif [ "$ACTION" = "Kill" ]; then
+            tmux kill-session -t $TMUX_NAME
+        fi
+        exit
+    fi
 fi
 
 set -eux
@@ -61,11 +69,17 @@ cd ~/{{birthplace_rel}}
 {{else}}
 cd {{birthplace}}
 {{/if}}
-tmux new-session -s $NAME -d \"{{{content.0}}}; $SHELL\" || exit 1
-tmux split-window -h \"{{{content.1}}}; $SHELL\"
-{{#if content.2}}tmux split-window -v \"{{{content.2}}}; $SHELL\"
+tmux new-session -s $TMUX_NAME -d "{{{content.0}}}; $SHELL" || exit 1
+tmux split-window -h "{{{content.1}}}; $SHELL"
+{{#if content.2}}tmux split-window -v "{{{content.2}}}; $SHELL"
 {{/if}}
-tmux -2 attach-session -d";
+
+set +x
+echo Do you want to attach to tmux session?
+ACTION=$(ruby $HS_HOME/util/selector.rb Attach "Don't attach")
+if [ "$ACTION" = "Attach" ]; then
+    echo tmux -2 attach-session -t $TMUX_NAME > $HS_SOURCE
+fi"#;
 
 const RB_WELCOME_MSG: &str = "# [HS_HELP]: Help message goes here...
 # [HS_ENV]: VAR -> Description for env var `VAR` goes here

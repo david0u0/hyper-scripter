@@ -10,9 +10,9 @@ require_relative './common'
 require_relative './selector'
 
 DISPLAY_MODE_MAP = {
-  0 => 'all',
-  1 => 'args',
-  2 => 'env',
+  0 => 'env',
+  1 => 'all',
+  2 => 'args',
 }
 
 def get_display_mode_int(mode_str)
@@ -48,15 +48,9 @@ class Option
     @envs = []
   end
 
-  def envs_str
-    envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
-  end
-
   def envs_str_prefix
-    s = envs_str
-    unless envs_str.empty?
-      s += ' '
-    end
+    s = @envs.map { |e| "#{e[0]}=#{e[1]}" }.join(' ')
+    s += ' ' unless s.empty?
     s
   end
 end
@@ -133,16 +127,30 @@ class Historian < Selector
   end
 
   def format_option(pos)
+    emphasize = []
     opt = @options[pos]
     just = @max_name_len - pos_len(pos)
-    name = if @single
-             ' ' * (just - opt.name.length)
-           else
-             "(#{opt.name}) ".rjust(just + 3)
-           end
-    envs_str = opt.envs_str
-    envs_str = "(#{envs_str}) " unless envs_str.empty?
-    "#{name}#{envs_str}#{opt.content}"
+    if @single
+      ret = ' ' * (just - opt.name.length)
+    else
+      ret = "#{opt.name} ".rjust(just + 1)
+      len = ret.length
+      emphasize.push([len - 1 - opt.name.length, len - 1])
+    end
+    unless opt.envs.empty?
+      first = true
+      ret += '('
+      opt.envs.each do |e|
+        k, v = e
+        ret += ' ' unless first
+        first = false
+        emphasize.push([ret.length, ret.length + k.length])
+        ret += "#{k}=#{v}"
+      end
+      ret += ') '
+    end
+
+    OptionFormatResult.new(ret + opt.content, emphasize)
   end
 
   def run(sequence: '')
@@ -265,13 +273,13 @@ class Historian < Selector
 
     display_mode_bar_msg = DISPLAY_MODE_MAP.map do |mode_int, mode_str|
       if mode_int == @display
-        "#{RED}#{mode_str}#{WHITE}"
+        "#{RED}#{mode_str}#{CYAN}"
       else
         mode_str
       end
     end.join(' -> ')
 
-    warn "#{WHITE}Display mode: #{display_mode_bar_msg}#{NC}"
+    warn "#{CYAN}Display mode: #{display_mode_bar_msg}#{NC}"
   end
 
   def register_all

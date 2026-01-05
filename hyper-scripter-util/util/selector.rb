@@ -14,9 +14,11 @@ GREEN = "\033[1;32m"
 YELLOW = "\033[1;33m"
 BLUE = "\033[1;34m"
 BLUE_BG = "\033[0;44m"
-BLUE_BG_RED = "\033[31;44m\033[1m"
-BLUE_BG_YELLOW = "\033[33;44m"
+BLUE_BG_RED = "\033[1;31;44m"
+BLUE_BG_WHITE = "\033[1;37;44m"
+CYAN = "\033[0;36m"
 NC = "\033[0m"
+
 HELP_MSG = "#{GREEN}press h/H for help#{NC}".freeze
 
 def erase_lines(line_count)
@@ -36,21 +38,23 @@ def compute_lines(len, win_width)
   lines
 end
 
-def search_and_color(s, word, start_color, end_color)
-  target_s = s.dup
-  target_s.downcase! unless word =~ /[A-Z]/
+def compute_search_ranges(s, word)
+  return [] if word.empty?
 
-  extended = 0
-  target_s.to_enum(:scan, word).each do
-    s = s.dup if extended.zero? # first modify, must copy the string
-    start_pos = Regexp.last_match.pre_match.size + extended
-    end_pos = start_pos + word.length
-    s.insert(end_pos, end_color)
-    s.insert(start_pos, start_color)
-
-    extended += start_color.length + end_color.length
+  unless word =~ /[A-Z]/
+    s = s.dup
+    s.downcase!
   end
-  s
+
+  s.to_enum(:scan, word).map do
+    start_pos = Regexp.last_match.pre_match.size
+    end_pos = start_pos + word.length
+    [start_pos, end_pos]
+  end
+end
+
+def get_containing_range(target, ranges)
+  ranges.find { |r| r[0] <= target && r[1] > target }
 end
 
 class SelectorResult
@@ -59,6 +63,14 @@ class SelectorResult
     @min = min
     @max = max
     @options = options
+  end
+end
+
+class OptionFormatResult
+  attr_reader :content, :emphasize
+  def initialize(content, emphasize)
+    @content = content
+    @emphasize = emphasize
   end
 end
 
@@ -160,10 +172,11 @@ class Selector
       if sequence.empty?
         @options.each_with_index do |_, i|
           leading = pos == i ? '>' : ' '
-          option = format_option(i)
+          opt_fmt = format_option(i)
+          option = opt_fmt.content
           gen_line = ->(s) { "#{leading} #{i + @display_offset}. #{s}" }
-          line_count += compute_lines(gen_line.call(option).length, win_width) # calculate line height without color, since colr will mess up char count
-          option = color_line(i, option)
+          line_count += compute_lines(gen_line.call(opt_fmt.content).length, win_width) # calculate line height without color, since color will mess up char count
+          option = color_line(i, opt_fmt)
           option = gen_line.call(option)
 
           option = "#{BLUE_BG}#{option}#{NC}" if is_virtual_selected(i)
@@ -314,17 +327,55 @@ class Selector
   end
 
   def format_option(pos)
-    @options[pos].to_s
+    OptionFormatResult.new(@options[pos].to_s, [])
   end
 
-  def color_line(pos, option_str)
-    return option_str if @search_string.empty?
-
-    if is_virtual_selected(pos)
-      search_and_color(option_str, @search_string, BLUE_BG_RED, BLUE_BG)
+  def color_line(pos, opt_fmt)
+    option_str = opt_fmt.content
+    emphasize = opt_fmt.emphasize
+    search_ranges = []
+    search_start_color, em_start_color, end_color = if is_virtual_selected(pos)
+      [BLUE_BG_RED, BLUE_BG_WHITE, BLUE_BG]
     else
-      search_and_color(option_str, @search_string, RED, NC)
+      [RED, WHITE, NC]
     end
+
+    search_ranges = compute_search_ranges(option_str, @search_string)
+    ctrl_chars = []
+
+    search_ranges.each do |r|
+      r1, r2 = r
+      another_r = get_containing_range(r1, emphasize)
+      ctrl_chars.push([r1, search_start_color])
+
+      another_r = get_containing_range(r2, emphasize)
+      if another_r.nil?
+        ctrl_chars.push([r2, end_color])
+      else
+        ctrl_chars.push([r2, em_start_color])
+      end
+    end
+
+    emphasize.each do |r|
+      r1, r2 = r
+      another_r = get_containing_range(r1, search_ranges)
+      if another_r.nil?
+        ctrl_chars.push([r1, em_start_color])
+      end
+
+      another_r = get_containing_range(r2, search_ranges)
+      if another_r.nil?
+        ctrl_chars.push([r2, end_color])
+      end
+    end
+
+    ctrl_chars = ctrl_chars.sort_by { |c| -c[0] }
+    ctrl_chars.each do |c|
+      pos, ctrl = c
+      option_str.insert(pos, ctrl)
+    end
+
+    option_str
   end
 
   private
@@ -337,7 +388,7 @@ class Selector
           else
             (i + pos) % len
           end
-      s = format_option(i)
+      s = format_option(i).content
       s = s.downcase unless @search_string =~ /[A-Z]/
       return i if s.include?(@search_string)
     end

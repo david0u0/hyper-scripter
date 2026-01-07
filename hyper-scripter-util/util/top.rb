@@ -18,7 +18,7 @@ IGNORE_LIST = ['util/top'] # Add script name here to ignore it in the list
 
 def should_ignore(msg)
   IGNORE_LIST.each do |name|
-    re = Regexp.compile("^#{name}\\b")
+    re = Regexp.compile("^#{name}(\\s|$)")
     return true if !(msg =~ re).nil?
   end
   false
@@ -33,6 +33,12 @@ class Option
   end
   def to_s
     "#{@pid} #{@msg}"
+  end
+  def to_fmt_result
+    content = to_s
+    name_start = content.index(' ')
+    name_len = content[(name_start + 1)..].index(' ') || msg.length
+    OptionFormatResult.new(content, [[name_start, name_start + name_len + 1, WHITE]])
   end
 end
 

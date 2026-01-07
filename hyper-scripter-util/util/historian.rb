@@ -135,7 +135,7 @@ class Historian < Selector
     else
       ret = "#{opt.name} ".rjust(just + 1)
       len = ret.length
-      emphasize.push([len - 1 - opt.name.length, len - 1])
+      emphasize.push([len - 1 - opt.name.length, len - 1, WHITE])
     end
     unless opt.envs.empty?
       first = true
@@ -144,7 +144,8 @@ class Historian < Selector
         k, v = e
         ret += ' ' unless first
         first = false
-        emphasize.push([ret.length, ret.length + k.length])
+        emphasize.push([ret.length, ret.length + k.length, WHITE])
+        emphasize.push([ret.length + k.length + 1, ret.length + k.length + 1 + v.length, GREEN_NON_BOLD])
         ret += "#{k}=#{v}"
       end
       ret += ') '

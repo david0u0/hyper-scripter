@@ -11,11 +11,10 @@ require 'io/console'
 WHITE = "\033[1;37m"
 RED = "\033[1;31m"
 GREEN = "\033[1;32m"
+GREEN_NON_BOLD = "\033[0;32m"
 YELLOW = "\033[1;33m"
 BLUE = "\033[1;34m"
 BLUE_BG = "\033[0;44m"
-BLUE_BG_RED = "\033[1;31;44m"
-BLUE_BG_WHITE = "\033[1;37;44m"
 CYAN = "\033[0;36m"
 NC = "\033[0m"
 
@@ -56,6 +55,15 @@ end
 def get_containing_range(target, ranges)
   ranges.find { |r| r[0] <= target && r[1] > target }
 end
+
+def add_blue_bg(color, needed)
+  if needed
+    color.sub('m', ';44m')
+  else
+    color
+  end
+end
+
 
 class SelectorResult
   attr_reader :min, :max, :options
@@ -327,18 +335,24 @@ class Selector
   end
 
   def format_option(pos)
-    OptionFormatResult.new(@options[pos].to_s, [])
+    option = @options[pos]
+    if option.is_a? String
+      OptionFormatResult.new(@options[pos], [])
+    else
+      @options[pos].to_fmt_result
+    end
   end
 
   def color_line(pos, opt_fmt)
     option_str = opt_fmt.content
     emphasize = opt_fmt.emphasize
     search_ranges = []
-    search_start_color, em_start_color, end_color = if is_virtual_selected(pos)
-      [BLUE_BG_RED, BLUE_BG_WHITE, BLUE_BG]
-    else
-      [RED, WHITE, NC]
-    end
+    blue_bg = is_virtual_selected(pos)
+    end_color = if is_virtual_selected(pos)
+                  BLUE_BG
+                else
+                  NC
+                end
 
     search_ranges = compute_search_ranges(option_str, @search_string)
     ctrl_chars = []
@@ -346,21 +360,24 @@ class Selector
     search_ranges.each do |r|
       r1, r2 = r
       another_r = get_containing_range(r1, emphasize)
-      ctrl_chars.push([r1, search_start_color])
+      ctrl_chars.push([r1, RED])
 
       another_r = get_containing_range(r2, emphasize)
       if another_r.nil?
         ctrl_chars.push([r2, end_color])
       else
-        ctrl_chars.push([r2, em_start_color])
+        color = another_r[2]
+        color = add_blue_bg(color, blue_bg)
+        ctrl_chars.push([r2, color])
       end
     end
 
     emphasize.each do |r|
-      r1, r2 = r
+      r1, r2, color = r
+      color = add_blue_bg(color, blue_bg)
       another_r = get_containing_range(r1, search_ranges)
       if another_r.nil?
-        ctrl_chars.push([r1, em_start_color])
+        ctrl_chars.push([r1, color])
       end
 
       another_r = get_containing_range(r2, search_ranges)
@@ -368,6 +385,8 @@ class Selector
         ctrl_chars.push([r2, end_color])
       end
     end
+
+    option_str = option_str.dup unless ctrl_chars.empty?
 
     ctrl_chars = ctrl_chars.sort_by { |c| -c[0] }
     ctrl_chars.each do |c|

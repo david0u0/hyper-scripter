@@ -10,6 +10,8 @@ use crate::Either;
 use crate::SEP;
 use fxhash::FxHashSet as HashSet;
 
+type FuzzResultRepo<'a> = fuzzy::SingleFuzzResult<RepoEntry<'a>>;
+
 fn compute_vis(bang: bool) -> Visibility {
     if bang {
         Visibility::All
@@ -88,9 +90,9 @@ pub async fn do_list_query_with_handler<
     }
 }
 
-impl<'a> MultiFuzzObj for RepoEntry<'a> {
+impl<'a> MultiFuzzObj for FuzzResultRepo<'a> {
     fn beats(&self, other: &Self) -> bool {
-        self.last_time() > other.last_time()
+        self.obj.last_time() > other.obj.last_time()
     }
 }
 
@@ -126,29 +128,32 @@ pub async fn do_script_query<'b, R: StableRepo>(
 
             let iter = script_repo.iter_mut(visibility);
             let fuzz_res = fuzzy::fuzz(name, iter, SEP).await?;
-            let mut is_low = false;
             let mut is_multi_fuzz = false;
-            let entry = match fuzz_res {
-                Some(fuzzy::High(entry)) => entry,
-                Some(fuzzy::Low(entry)) => {
-                    is_low = true;
-                    entry
-                }
+            let res = match fuzz_res {
+                Some(fuzzy::FuzzResult::Single(res)) => res,
                 #[cfg(feature = "benching")]
-                Some(fuzzy::Multi { ans, .. }) => {
+                Some(fuzzy::FuzzResult::Multi { ans, .. }) => {
                     is_multi_fuzz = true;
                     ans
                 }
                 #[cfg(not(feature = "benching"))]
-                Some(fuzzy::Multi { ans, others, .. }) => {
+                Some(fuzzy::FuzzResult::Multi { ans, others, .. }) => {
                     is_multi_fuzz = true;
                     match handle_special_dot_anonymous(name, ans, others) {
                         Either::One(res) => res,
-                        Either::Two((ans, others)) => the_multifuzz_algo(ans, others),
+                        Either::Two((ans, others)) => {
+                            let (res, is_single_sink) = the_multifuzz_algo(ans, others);
+                            if is_single_sink {
+                                is_multi_fuzz = false;
+                            }
+                            res
+                        }
                     }
                 }
                 None => return Ok(None),
             };
+            let is_low = res.is_low;
+            let entry = res.obj;
             let need_prompt = {
                 match level {
                     PromptLevel::Always => true,
@@ -196,20 +201,20 @@ pub async fn do_script_query_strict<'b, R: StableRepo>(
 // （但若是用 "1" 來查就該遮蔽）
 fn handle_special_dot_anonymous<'a>(
     pattern: &str,
-    ans: RepoEntry<'a>,
-    others: Vec<RepoEntry<'a>>,
-) -> Either<RepoEntry<'a>, (RepoEntry<'a>, Vec<RepoEntry<'a>>)> {
+    ans: FuzzResultRepo<'a>,
+    others: Vec<FuzzResultRepo<'a>>,
+) -> Either<FuzzResultRepo<'a>, (FuzzResultRepo<'a>, Vec<FuzzResultRepo<'a>>)> {
     if pattern != "." {
         return Either::Two((ans, others));
     }
     // TODO: maybe only check `ans` is enough?
-    if !ans.name.is_anonymous() || others.iter().any(|e| !e.name.is_anonymous()) {
+    if !ans.obj.name.is_anonymous() || others.iter().any(|e| !e.obj.name.is_anonymous()) {
         return Either::Two((ans, others));
     }
 
     let res = std::iter::once(ans)
         .chain(others.into_iter())
-        .max_by_key(|e| e.last_time())
+        .max_by_key(|e| e.obj.last_time())
         .unwrap();
     Either::One(res)
 }

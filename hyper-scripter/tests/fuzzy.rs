@@ -12,18 +12,11 @@ fn unwrap_fuzz(target: Str, candidate: &[Str]) -> Vec<Str> {
             .unwrap()
     });
     match res {
-        Multi {
-            ans, mut others, ..
-        } => {
-            others.push(ans);
+        FuzzResult::Single(t) => vec![t.obj],
+        FuzzResult::Multi { ans, others, .. } => {
+            let mut others: Vec<Str> = others.into_iter().map(|t| t.obj).collect();
+            others.push(ans.obj);
             others
-        }
-        High(s) => {
-            vec![s]
-        }
-        Low(s) => {
-            // NOTE: 先不管這個 high 或 low 的問題
-            vec![s]
         }
     }
 }

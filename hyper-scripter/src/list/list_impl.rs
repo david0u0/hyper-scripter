@@ -227,11 +227,11 @@ pub async fn fmt_list<W: Write>(
     opt: ListOptions,
     queries: Vec<ListQuery>,
 ) -> Result<()> {
-    if !opt.plain {
+    if !opt.plain && script_repo.time_hidden_count > 0 {
         write!(
             w,
-            "{} scripts ignored due to time filter\n",
-            script_repo.time_hidden_count
+            "{} scripts ignored due to time filter: {}\n",
+            script_repo.time_hidden_count, script_repo.recent_filter
         )?;
     }
 

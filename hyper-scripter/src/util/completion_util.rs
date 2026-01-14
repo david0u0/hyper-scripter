@@ -33,26 +33,27 @@ async fn fuzz_arr<'a>(
     let res = fuzz_with_multifuzz_ratio(name, iter, SEP, Some(60)).await?;
     Ok(match res {
         None => vec![],
-        Some(FuzzResult::High(t) | FuzzResult::Low(t)) => vec![t],
+        Some(FuzzResult::Single(t)) => vec![t.obj],
         Some(FuzzResult::Multi {
             ans,
             others,
-            mut still_others,
+            still_others,
         }) => {
-            let prefix = ans.name.key();
+            let prefix = ans.obj.name.key();
             let mut first_others = vec![];
             let mut prefixed_others = vec![];
             for candidate in others.into_iter() {
-                if is_prefix(&*prefix, &*candidate.name.key(), SEP) {
-                    prefixed_others.push(candidate);
+                if is_prefix(&*prefix, &*candidate.obj.name.key(), SEP) {
+                    prefixed_others.push(candidate.obj);
                 } else {
-                    first_others.push(candidate);
+                    first_others.push(candidate.obj);
                 }
             }
-            first_others.push(ans);
+            first_others.push(ans.obj);
 
             sort(&mut first_others);
             sort(&mut prefixed_others);
+            let mut still_others = still_others.into_iter().map(|t| t.obj).collect();
             sort(&mut still_others);
             first_others.append(&mut prefixed_others);
             first_others.append(&mut still_others);

@@ -18,38 +18,32 @@ fn is_multifuzz(score: i64, best_score: i64) -> bool {
 }
 
 #[derive(Debug)]
-pub enum FuzzResult<T> {
-    High(T),
-    Low(T),
-    Multi {
-        ans: T,
-        others: Vec<T>,
-        still_others: Vec<T>,
-    },
+pub struct SingleFuzzResult<T> {
+    pub obj: T,
+    pub is_low: bool,
 }
-pub use FuzzResult::*;
-impl<T> FuzzResult<T> {
-    fn new_single(ans: T, score: FuzzScore) -> Self {
-        let score = score.score * 100 / score.len as i64;
-        match score {
-            0..=MID_SCORE => Low(ans),
-            _ => High(ans),
+impl<T> SingleFuzzResult<T> {
+    fn new(ans: T, score: FuzzScore) -> Self {
+        SingleFuzzResult {
+            obj: ans,
+            is_low: score.is_low(),
         }
     }
-    fn new_multi(ans: T, others: Vec<T>, still_others: Vec<T>) -> Self {
-        Multi {
-            ans,
-            others,
-            still_others,
-        }
+}
+impl<T: FuzzKey> FuzzKey for SingleFuzzResult<T> {
+    fn fuzz_key(&self) -> Cow<'_, str> {
+        self.obj.fuzz_key()
     }
-    pub fn get_ans(self) -> T {
-        match self {
-            High(t) => t,
-            Low(t) => t,
-            Multi { ans, .. } => ans,
-        }
-    }
+}
+
+#[derive(Debug)]
+pub enum FuzzResult<T> {
+    Single(SingleFuzzResult<T>),
+    Multi {
+        ans: SingleFuzzResult<T>,
+        others: Vec<SingleFuzzResult<T>>,
+        still_others: Vec<SingleFuzzResult<T>>,
+    },
 }
 
 static MATCHER: State<SkimMatcherV2> = State::new();
@@ -107,6 +101,10 @@ pub struct FuzzScore {
 impl FuzzScore {
     fn is_default(&self) -> bool {
         self.len == 0
+    }
+    fn is_low(self) -> bool {
+        let score = self.score * 100 / self.len as i64;
+        score < MID_SCORE
     }
 }
 impl PartialOrd for FuzzScore {
@@ -200,31 +198,31 @@ pub async fn fuzz_with_multifuzz_ratio<'a, T: FuzzKey + Send + 'a>(
     for (score, data) in data_vec.into_iter() {
         let score = score.into_inner();
         if score == best_score && ans.is_none() {
-            ans = Some(data);
+            ans = Some(SingleFuzzResult::new(data, score));
         } else if is_multifuzz(score.score, best_score.score) {
             log::warn!("找到一個分數相近者：{} {:?}", data.fuzz_key(), score);
-            multifuzz_vec.push(data);
+            multifuzz_vec.push(SingleFuzzResult::new(data, score));
         } else if is_multifuzz(score.score, best_score_normalized) {
             log::warn!("找到一個分數稍微相近者：{} {:?}", data.fuzz_key(), score);
-            secondary_multifuzz_vec.push(data);
+            secondary_multifuzz_vec.push(SingleFuzzResult::new(data, score));
         }
     }
 
     let ans = ans.unwrap();
     if multifuzz_vec.is_empty() && secondary_multifuzz_vec.is_empty() {
         log::info!("模糊搜到一個東西 {}", ans.fuzz_key());
-        Ok(Some(FuzzResult::new_single(ans, best_score)))
+        Ok(Some(FuzzResult::Single(ans)))
     } else {
         log::warn!(
             "模糊搜到太多東西，主要為結果為 {} {:?}",
             ans.fuzz_key(),
             best_score
         );
-        Ok(Some(FuzzResult::new_multi(
+        Ok(Some(FuzzResult::Multi {
             ans,
-            multifuzz_vec,
-            secondary_multifuzz_vec,
-        )))
+            others: multifuzz_vec,
+            still_others: secondary_multifuzz_vec,
+        }))
     }
 }
 
@@ -350,21 +348,24 @@ mod test {
 
     fn extract_multifuzz<'a>(res: FuzzResult<&'a str>) -> (&'a str, Vec<&'a str>) {
         match res {
-            Multi { ans, others, .. } => {
+            FuzzResult::Multi { ans, others, .. } => {
                 let mut ret = vec![];
-                ret.push(ans);
+                ret.push(ans.obj);
                 for data in others.into_iter() {
-                    ret.push(data);
+                    ret.push(data.obj);
                 }
                 ret.sort();
-                (ans, ret)
+                (ans.obj, ret)
             }
             _ => unreachable!("{:?}", res),
         }
     }
     fn extract_high<'a>(res: FuzzResult<&'a str>) -> &'a str {
         match res {
-            High(t) => t,
+            FuzzResult::Single(t) => {
+                assert_eq!(t.is_low, false);
+                t.obj
+            }
             _ => unreachable!("{:?}", res),
         }
     }

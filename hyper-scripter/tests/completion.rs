@@ -82,6 +82,11 @@ fn test_bang() {
     // test when alias
     assert_eq!(PARTIAL, run_completion("e tes").unwrap());
     assert_eq!(ALL, run_completion("e tes!").unwrap());
+
+    // test when complex alias
+    run!("alias c cat --with 'bat --paging=always'").unwrap();
+    assert_eq!(PARTIAL, run_completion("c tes").unwrap());
+    assert_eq!(ALL, run_completion("c tes!").unwrap());
 }
 
 #[test]

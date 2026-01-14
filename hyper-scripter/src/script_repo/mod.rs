@@ -8,6 +8,7 @@ use fxhash::FxHashMap as HashMap;
 use hyper_scripter_historian::{Event, EventData, Historian, LastTimeRecord};
 use sqlx::SqlitePool;
 use std::collections::hash_map::Entry::{self, *};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 pub mod helper;
 pub use helper::RepoEntry;
@@ -17,6 +18,16 @@ pub struct RecentFilter {
     pub recent: Recent,
     pub archaeology: bool,
 }
+impl Display for RecentFilter {
+    fn fmt(&self, w: &mut Formatter<'_>) -> FmtResult {
+        write!(w, "{}", self.recent)?;
+        if self.archaeology {
+            write!(w, " (archaeology)")?;
+        }
+        Ok(())
+    }
+}
+
 enum TimeBound {
     Timeless,
     Bound(Option<NaiveDateTime>),
@@ -325,6 +336,7 @@ pub struct ScriptRepo {
     latest_name: Option<String>,
     db_env: DBEnv,
     pub time_hidden_count: u32,
+    pub recent_filter: RecentFilter,
 }
 
 macro_rules! iter_by_vis {
@@ -441,6 +453,7 @@ impl ScriptRepo {
             map,
             hidden_map,
             latest_name: None,
+            recent_filter: recent,
             time_hidden_count,
             db_env,
         })

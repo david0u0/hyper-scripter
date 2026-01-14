@@ -337,9 +337,9 @@ class Selector
   def format_option(pos)
     option = @options[pos]
     if option.is_a? String
-      OptionFormatResult.new(@options[pos], [])
+      OptionFormatResult.new(option, [])
     else
-      @options[pos].to_fmt_result
+      option.to_fmt_result
     end
   end
 

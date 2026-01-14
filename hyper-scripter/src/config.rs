@@ -146,7 +146,7 @@ pub enum Recent {
     Timeless,
     #[display(fmt = "no-neglect")]
     NoNeglect,
-    #[display(fmt = "{}", _0)]
+    #[display(fmt = "{} days", _0)]
     Days(u32),
 }
 impl Default for Recent {

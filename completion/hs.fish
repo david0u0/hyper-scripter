@@ -18,7 +18,7 @@ end
 function __hs_expand_alias
     set cmd (eval "command hs completion alias -- $argv" 2>/dev/null)
     if [ $status -eq 0 ]
-        echo $cmd | string unescape
+        echo $cmd
     else
         echo $argv
     end
@@ -77,7 +77,7 @@ function __hs_list_scripts
     set orig_cmd (commandline -j)
     set cmd_arr (string split ' ' $orig_cmd)
 
-    set name $cmd_arr[-1]
+    set name (echo $cmd_arr[-1] | string unescape)
 
     if echo $name | string match -q -r ".*!\$"
         set bang "!"

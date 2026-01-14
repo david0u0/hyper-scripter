@@ -9,6 +9,10 @@ class Option
   def to_s
     "#{@number}-#{@content}"
   end
+
+  def to_fmt_result
+    OptionFormatResult.new(to_s, [])
+  end
   attr_reader :number, :content
 end
 

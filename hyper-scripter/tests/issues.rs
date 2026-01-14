@@ -280,8 +280,7 @@ fn test_multifuzz() {
             .unwrap()
     });
     {
-        let is_match =
-            matches!(&res, Multi{ans, others, ..} if *ans == pref.get_name() && others.len() == 2);
+        let is_match = matches!(&res, FuzzResult::Multi{ans, others, ..} if ans.obj == pref.get_name() && others.len() == 2);
         assert!(is_match, "{:?} 並非預期中結果，應更新測資", res);
     }
 

@@ -89,6 +89,10 @@ class Selector
   class Quit < StandardError
   end
 
+  def pos_len(pos)
+    Math.log(pos + @display_offset + 1, 10).floor
+  end
+
   def load(options)
     @options = options
   end

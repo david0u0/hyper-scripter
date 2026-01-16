@@ -14,6 +14,30 @@
 
 require_relative './common'
 
+BASE = "#{HS_ENV.env_var(:home)}/.resource"
+
+class Script
+  attr_reader :id, :name
+  def initialize(id, name)
+    @id = id
+    @name = name
+  end
+end
+
+class Option
+  attr_reader :script, :resource_name
+  def initialize(script, resource_name)
+    @script = script
+    @resource_name = resource_name
+  end
+  def get_path()
+    "#{get_base_path}/#{@resource_name}"
+  end
+  def get_base_path()
+    "#{BASE}/#{@script.id}"
+  end
+end
+
 def split_args
   idx = ARGV.find_index('--')
   if idx.nil?
@@ -30,18 +54,24 @@ end
 
 ls_args, rsc_names = split_args
 
-def get_script(ls_args)
+def get_scripts_from_ls_args(ls_args)
+  query_str = ls_args.map { |s| escape_wildcard(s) }.join(' ')
+  lines = HS_ENV.do_hs("ls --grouping=none --plain --format '{{id}} {{name}}' #{query_str}", false).lines
+  lines.map do |l|
+    id, name = l.split
+    Script.new(id.to_i, name)
+  end
+end
+
+def get_scripts(ls_args)
   if ls_args.length != 0
-    query_str = ls_args.map { |s| escape_wildcard(s) }.join(' ')
-    lines = HS_ENV.do_hs("ls --grouping=none --plain --format {{id}} #{query_str}", false).lines
-    raise "Got multiple scripts: #{lines}" if lines.length != 1
-    return lines[0].strip
+    return get_scripts_from_ls_args(ls_args)
   end
 
   hs_top = {}
   HS_ENV.do_hs("top", false).lines do |l|
-    pid, _, script_id, _ = l.split(' ')
-    hs_top[pid] = script_id
+    pid, _, script_id, script_name = l.split(' ')
+    hs_top[pid] = Script.new(script_id, script_name)
   end
 
   def get_parent_pid(pid)
@@ -58,23 +88,57 @@ def get_script(ls_args)
   end
 
   start = get_parent_pid(get_parent_pid(Process.pid)) # use grand-parent in case it's called with `hs`
-  return find_parent_script_id(start, hs_top)
+  script = find_parent_script_id(start, hs_top)
+  unless script.nil?
+    return [script]
+  end
+
+  warn "Can't find script with top. List all resources for active scripts"
+  get_scripts_from_ls_args([])
 end
 
-SCRIPT = get_script(ls_args)
-raise "Can't find script!" if SCRIPT.nil?
-
-warn "Getting resource for script #{SCRIPT}"
-
-DIR = "#{HS_ENV.env_var(:home)}/.resource/#{SCRIPT}"
-system("mkdir #{DIR} -p")
+SCRIPTS = get_scripts(ls_args)
+raise "Can't find script!" if SCRIPTS.empty?
+SINGLE = SCRIPTS.length == 1
 
 edit = false
-if rsc_names.length == 0
+if rsc_names.length > 0
+  raise "Should have exactly one script, got #{SCRIPTS.length}" unless SINGLE
+  options = rsc_names.map do |rsc_name|
+    Option.new(SCRIPTS[0], rsc_name)
+  end
+else
   require_relative 'selector'
+  class ResourceSelector < Selector
+    def load_resources()
+      options = []
+      SCRIPTS.each do |script|
+        dir = "#{BASE}/#{script.id}"
+        next unless Dir.exist?(dir)
+        ls_res = `ls -t #{dir}` # TODO: nested?
+        ls_res.lines do |l|
+          options.push(Option.new(script, l.strip))
+        end
+      end
+      load(options)
 
-  selector = Selector.new
-  selector.load(`ls -t #{DIR}`.lines.map{ |l| l.strip }) # TODO: nested?
+      @max_name_len = @options.each_with_index.map do |opt, i|
+        opt.script.name.length + pos_len(i)
+      end.max
+    end
+    def format_option(pos)
+      emphasize = []
+      opt = @options[pos]
+      just = @max_name_len - pos_len(pos)
+      ret = "#{opt.script.name} ".rjust(just + 1)
+      len = ret.length
+      emphasize.push([len - 1 - opt.script.name.length, len - 1, WHITE])
+      OptionFormatResult.new(ret + opt.resource_name, emphasize)
+    end
+  end
+
+  selector = ResourceSelector.new
+  selector.load_resources
 
   selector.register_keys_virtual(%w[e E], lambda { |_, _, _|
     edit = true
@@ -85,7 +149,7 @@ if rsc_names.length == 0
   }, msg: 'do nothing', recur: true)
 
   begin
-    rsc_names = selector.run().options
+    options = selector.run().options
   rescue Selector::Empty
     warn 'No existing resource'
     exit
@@ -94,12 +158,11 @@ if rsc_names.length == 0
   end
 end
 
-rsc_files = rsc_names.map { |n| "#{DIR}/#{n}" }
-
 if edit
-  exec("vim #{rsc_files.join(' ')}")
+  exec("vim #{options.map { |opt| opt.get_path } .join(' ')}")
 else
-  rsc_files.each do |n|
-    puts n
+  options.each do |opt|
+    system("mkdir #{opt.get_base_path} -p")
+    puts opt.get_path
   end
 end

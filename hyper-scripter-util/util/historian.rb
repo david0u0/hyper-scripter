@@ -122,10 +122,6 @@ class Historian < Selector
     register_all if register
   end
 
-  def pos_len(pos)
-    Math.log(pos + @offset + 1, 10).floor
-  end
-
   def format_option(pos)
     emphasize = []
     opt = @options[pos]

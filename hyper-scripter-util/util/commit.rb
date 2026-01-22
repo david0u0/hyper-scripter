@@ -27,12 +27,14 @@ def dump_db(dump_history)
   require 'tempfile'
   file = Tempfile.new('script_info')
   system("cp .script_info.db #{file.path}")
-  system("sqlite3 #{file.path} 'DELETE FROM last_events'")
-  system("sqlite3 #{file.path} '.dump' > .script_info.sql")
 
   if dump_history
     system("sqlite3 .script_history.db '.dump' > .script_history.sql")
+  else
+    system("sqlite3 #{file.path} 'DELETE FROM last_events'")
   end
+
+  system("sqlite3 #{file.path} '.dump' > .script_info.sql")
 end
 
 REAL_HS_HOME = File.realpath(HS_ENV.home)

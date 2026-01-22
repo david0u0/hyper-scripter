@@ -369,7 +369,7 @@ pub async fn run_n_times(
     for (need_save, line) in extract_env_from_content_help_aware(&content) {
         hs_env_desc.push(line.to_owned());
         if need_save {
-            EnvPair::process_line(line, &mut env_vec);
+            EnvPair::process_line(line, &mut env_vec, |e| std::env::var(e).ok());
         }
     }
     EnvPair::sort(&mut env_vec);

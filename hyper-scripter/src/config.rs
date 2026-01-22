@@ -226,7 +226,7 @@ impl Default for Config {
         Config {
             last_modified: None,
             recent: Default::default(),
-            editor: vec!["vim".to_string()],
+            editor: vec!["vim".to_string(), "-p".to_string()],
             prompt_level: PromptLevel::Smart,
             tag_selectors: vec![
                 NamedTagSelector {
@@ -256,6 +256,7 @@ impl Default for Config {
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous"]),
+                gen_alias("conf", &["!$HS_EDITOR $HS_HOME/.config.toml"]),
                 gen_alias(
                     "pc",
                     &["=util/historian!", "--sequence", "c", "--display=all"],
@@ -278,6 +279,10 @@ impl Default for Config {
                 ("HS_HOME", "{{home}}"),
                 ("HS_CMD", "{{cmd}}"),
                 ("HS_RUN_ID", "{{run_id}}"),
+                (
+                    "HS_EDITOR",
+                    "{{#each editor}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",
+                ),
                 (
                     "HS_TAGS",
                     "{{#each tags}}{{{this}}}{{#unless @last}} {{/unless}}{{/each}}",

@@ -454,6 +454,7 @@ pub struct TmplVal<'a> {
     home: &'static Path,
     cmd: String,
     exe: PathBuf,
+    editor: &'static [String],
 
     path: Option<&'a Path>,
     run_id: Option<i64>,
@@ -468,6 +469,7 @@ impl<'a> TmplVal<'a> {
             home: path::get_home(),
             cmd: std::env::args().next().unwrap_or_default(),
             exe: std::env::current_exe().unwrap_or_default(),
+            editor: &Config::get().editor,
 
             path: None,
             run_id: None,

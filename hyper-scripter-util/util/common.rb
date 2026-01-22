@@ -59,7 +59,7 @@ end
 
 require 'English'
 class HSEnv
-  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID',
+  ENV_MAP = { name: 'NAME', cmd: 'HS_CMD', run_id: 'HS_RUN_ID', editor: 'HS_EDITOR',
               source: 'HS_SOURCE', home: 'HS_HOME', exe: 'HS_EXE' }.freeze
 
   def initialize(script_dir = nil)

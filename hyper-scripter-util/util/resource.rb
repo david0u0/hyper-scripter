@@ -159,7 +159,7 @@ else
 end
 
 if edit
-  exec("vim #{options.map { |opt| opt.get_path } .join(' ')}")
+  exec("#{HS_ENV.env_var(:editor)} #{options.map { |opt| opt.get_path } .join(' ')}")
 else
   options.each do |opt|
     system("mkdir #{opt.get_base_path} -p")

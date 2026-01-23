@@ -1,6 +1,6 @@
 pub use hyper_scripter::path::get_home;
 use hyper_scripter::{
-    config::{Config, PromptLevel},
+    config::{Config, PromptLevel, CONFIG_FILE_ENV},
     error::EXIT_KNOWN_ERR,
     my_env_logger,
     path::normalize_path,
@@ -132,6 +132,10 @@ pub fn setup_with_utils() -> () {
     run!(silent: true, "ls").unwrap(); // create the home
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
+        // SAFETY: This is in a ONCE cell
+        unsafe {
+            std::env::remove_var(CONFIG_FILE_ENV);
+        }
         Config::init().unwrap();
         Config::set_runtime_conf(Some(PromptLevel::Never));
     });
@@ -294,10 +298,16 @@ impl ScriptTest {
     pub fn get_name(&self) -> &str {
         &self.name
     }
-    pub fn new_regardless(name: &str, tags: Option<&str>, content: Option<&str>) -> (Self, Result) {
+    fn new_regardless(
+        name: &str,
+        tags: Option<&str>,
+        content: Option<&str>,
+        no_template: bool,
+    ) -> (Self, Result) {
         let tags_str = tags.map(|s| format!("-t {}", s)).unwrap_or_default();
         let content = content.unwrap_or("echo $NAME");
-        let res = run!("e {} ={} | {}", tags_str, name, content).map(|_| ());
+        let no_template = if no_template { "--no-template" } else { "" };
+        let res = run!("e {} {} ={} | {}", no_template, tags_str, name, content).map(|_| ());
         (
             ScriptTest {
                 name: name.to_owned(),
@@ -305,8 +315,13 @@ impl ScriptTest {
             res,
         )
     }
+    pub fn new_without_template(name: &str, tags: Option<&str>, content: &str) -> Self {
+        let (t, res) = Self::new_regardless(name, tags, Some(content), true);
+        res.unwrap();
+        t
+    }
     pub fn new(name: &str, tags: Option<&str>, content: Option<&str>) -> Self {
-        let (t, res) = Self::new_regardless(name, tags, content);
+        let (t, res) = Self::new_regardless(name, tags, content, false);
         res.unwrap();
         t
     }

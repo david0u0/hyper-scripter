@@ -65,21 +65,20 @@ fn style_name(
 }
 
 fn extract_help(script: &ScriptInfo) -> String {
-    let mut buff = String::new();
-    fn inner(buff: &mut String, script: &ScriptInfo) -> Result {
+    fn inner(script: &ScriptInfo) -> Result<impl Iterator<Item = String>> {
         let script_path = crate::path::open_script(&script.name, &script.ty, Some(true))?;
-        *buff = crate::util::read_file(&script_path)?;
-        Ok(())
+        let content = crate::util::read_file_lines(&script_path)?;
+        Ok(content)
     }
-    match inner(&mut buff, script) {
+    let content = match inner(script) {
         Err(e) => {
             log::warn!("讀取腳本失敗{}，直接回空的幫助字串", e);
             return String::new();
         }
-        Ok(()) => (),
+        Ok(c) => c,
     };
-    let mut helps = crate::extract_msg::extract_help_from_content(&buff);
-    helps.next().unwrap_or_default().to_owned()
+    let mut helps = crate::extract_msg::extract_help_from_content(content);
+    helps.next().map(|x| x.to_string()).unwrap_or_default()
 }
 
 fn exec_time_str(script: &ScriptInfo) -> Cow<'static, str> {

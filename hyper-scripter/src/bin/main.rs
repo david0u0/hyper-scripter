@@ -7,7 +7,7 @@ use hyper_scripter::config::{config_file, Config, NamedTagSelector};
 use hyper_scripter::db;
 use hyper_scripter::env_pair::EnvPair;
 use hyper_scripter::error::{Contextable, DisplayError, Error, ExitCode, RedundantOpt, Result};
-use hyper_scripter::extract_msg::{extract_env_from_content, extract_help_from_content};
+use hyper_scripter::extract_msg::extract_all_help_from_content;
 use hyper_scripter::list::{fmt_list, DisplayStyle, ListOptions};
 use hyper_scripter::my_env_logger;
 use hyper_scripter::path;
@@ -263,12 +263,18 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             log::info!("檢視用法： {:?}", entry.name);
             create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-            let content = util::read_file(&script_path)?;
+            let content = util::read_file_lines(&script_path)?;
 
-            let helps = extract_help_from_content(&content);
+            let all_helps: Vec<_> = extract_all_help_from_content(content).collect();
+            let helps = all_helps
+                .iter()
+                .filter_map(|(i, s)| if *i == 0 { Some(s) } else { None });
+            let mut envs = all_helps
+                .iter()
+                .filter_map(|(i, s)| if *i != 0 { Some(s) } else { None })
+                .peekable();
+
             let has_help = print_iter(helps, "\n");
-
-            let mut envs = extract_env_from_content(&content).peekable();
             if envs.peek().is_some() {
                 if has_help {
                     println!("\n");

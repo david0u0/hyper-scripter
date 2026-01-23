@@ -639,7 +639,7 @@ fn test_multi_history() {
         for env in [name, "VAR"] {
             content += &format!("# [HS_ENV]: {}\n", env);
         }
-        let s = ScriptTest::new(name, None, Some(&content));
+        let s = ScriptTest::new_without_template(name, None, &content);
         run!("history neglect {}", name).unwrap();
         s
     }
@@ -717,14 +717,14 @@ fn test_multi_history() {
             h.run(&script, arg, env, dir);
         }
 
-        {
-            let show_env = rng.gen_range(0..2) == 0;
-            let dir_idx: usize = rng.gen_range(0..1 + dirs.len());
-            let mut dir = None;
-            if dir_idx < dirs.len() {
-                dir = Some(&*dirs[dir_idx]);
+        for show_env in [true, false] {
+            let dirs = dirs
+                .iter()
+                .map(|d| Some(d.as_str()))
+                .chain(std::iter::once(None));
+            for dir in dirs {
+                h.show(show_env, dir);
             }
-            h.show(show_env, dir);
         }
 
         h.ls();

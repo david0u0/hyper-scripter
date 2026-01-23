@@ -237,31 +237,7 @@ impl Historian {
         let mut db_event = DBEvent::new(event.script_id, event.time, ty, &cmd, event.humble);
         let id = match &event.data {
             EventData::Write | EventData::Read => self.raw_record(db_event).await?,
-            EventData::Exec {
-                content,
-                args,
-                envs,
-                dir,
-            } => {
-                let mut content = Some(*content);
-                let last_event = sqlx::query!(
-                    "
-                    SELECT content FROM events
-                    WHERE type = ? AND script_id = ? AND NOT content IS NULL
-                    ORDER BY time DESC LIMIT 1
-                    ",
-                    ty,
-                    event.script_id
-                )
-                .fetch_optional(&*self.pool.read().unwrap())
-                .await?;
-                if let Some(last_event) = last_event {
-                    if last_event.content.as_deref() == content {
-                        log::debug!("上次執行內容相同，不重複記錄");
-                        content = None;
-                    }
-                }
-                db_event.content = content;
+            EventData::Exec { args, envs, dir } => {
                 let dir = dir.map(|p| p.to_string_lossy()).unwrap_or_default();
                 self.raw_record(db_event.envs(envs).dir(dir.as_ref()).args(args))
                     .await?

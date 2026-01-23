@@ -1,6 +1,7 @@
 use crate::color::{Color, Stylize};
 use crate::config::Config;
 use crate::error::{Contextable, Error, FormatCode::Template as TemplateCode, Result};
+use crate::extract_msg::Message;
 use crate::path;
 use crate::script::ScriptInfo;
 use crate::script_type::{get_default_template, ScriptFullType, ScriptType};
@@ -10,6 +11,7 @@ use shlex::Shlex;
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, remove_file, rename, File};
+use std::io::{self, BufRead};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,6 +27,7 @@ pub use init_repo::*;
 
 pub mod serde;
 pub(crate) use self::serde::impl_de_by_from_str;
+pub(crate) use self::serde::impl_ser_and_display_by_as_ref;
 pub(crate) use self::serde::impl_ser_by_to_string;
 
 pub fn illegal_name(s: &str) -> bool {
@@ -129,6 +132,13 @@ pub fn file_modify_time(path: &Path) -> Result<DateTime<Utc>> {
     let meta = handle_fs_res(&[path], std::fs::metadata(path))?;
     let modified = handle_fs_res(&[path], meta.modified())?;
     Ok(modified.into())
+}
+
+pub fn read_file_lines(path: &Path) -> Result<impl Iterator<Item = String>> {
+    let file = handle_fs_res(&[path], File::open(path)).context("唯讀開啟檔案失敗")?;
+    Ok(io::BufReader::new(file)
+        .lines()
+        .map(|s| s.unwrap_or_default()))
 }
 
 pub fn read_file(path: &Path) -> Result<String> {
@@ -459,9 +469,8 @@ pub struct TmplVal<'a> {
     path: Option<&'a Path>,
     run_id: Option<i64>,
     tags: Vec<&'a str>,
-    env_desc: Vec<String>,
+    env_desc: Vec<Message>,
     name: Option<&'a str>,
-    content: Option<&'a str>,
 }
 impl<'a> TmplVal<'a> {
     pub fn new() -> Self {
@@ -476,7 +485,6 @@ impl<'a> TmplVal<'a> {
             tags: vec![],
             env_desc: vec![],
             name: None,
-            content: None,
         }
     }
 }

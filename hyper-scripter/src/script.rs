@@ -144,7 +144,7 @@ impl ScriptName {
     }
     pub fn key(&self) -> Cow<'_, str> {
         match self {
-            ScriptName::Anonymous(id) => Cow::Owned(format!(".{}", id)),
+            ScriptName::Anonymous(_) => Cow::Owned(self.to_string()),
             ScriptName::Named(s) => Cow::Borrowed(s),
         }
     }
@@ -219,7 +219,10 @@ impl Ord for ScriptName {
 }
 impl std::fmt::Display for ScriptName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.key())
+        match self {
+            ScriptName::Anonymous(id) => write!(f, ".{}", id),
+            ScriptName::Named(s) => write!(f, "{}", s),
+        }
     }
 }
 
@@ -239,8 +242,8 @@ pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
     pub neglect_time: Option<ScriptTime>,
-    /// (content, args, env_record, dir)
-    pub exec_time: Option<ScriptTime<(String, String, String, Option<PathBuf>)>>,
+    /// (args, env_record, dir)
+    pub exec_time: Option<ScriptTime<(String, String, Option<PathBuf>)>>,
     /// (return code, main event id)
     pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
     pub exec_count: u64,
@@ -314,16 +317,9 @@ impl ScriptInfo {
         self.read_time = now.clone();
         self.write_time = now;
     }
-    pub fn exec(
-        &mut self,
-        content: String,
-        args: &[String],
-        env_record: String,
-        dir: Option<PathBuf>,
-    ) {
-        log::trace!("{:?} 執行內容為 {}", self, content);
+    pub fn exec(&mut self, args: &[String], env_record: String, dir: Option<PathBuf>) {
         let args_ser = serde_json::to_string(args).unwrap();
-        self.exec_time = Some(ScriptTime::now((content, args_ser, env_record, dir)));
+        self.exec_time = Some(ScriptTime::now((args_ser, env_record, dir)));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
         self.exec_count += 1;
     }

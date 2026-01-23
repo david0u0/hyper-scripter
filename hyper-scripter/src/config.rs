@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 
 const CONFIG_FILE: &str = ".config.toml";
-const CONFIG_FILE_ENV: &str = "HYPER_SCRIPTER_CONFIG";
+pub const CONFIG_FILE_ENV: &str = "HYPER_SCRIPTER_CONFIG";
 
 crate::local_global_state!(config_state, Config, || { Default::default() });
 crate::local_global_state!(runtime_conf_state, RuntimeConf, || { unreachable!() });

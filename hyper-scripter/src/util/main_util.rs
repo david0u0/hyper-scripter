@@ -341,7 +341,7 @@ pub async fn run_n_times(
 
     let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
-    let content = super::read_file(&script_path)?;
+    let content = super::read_file_lines(&script_path)?;
 
     if caution
         && Config::get()
@@ -366,17 +366,17 @@ pub async fn run_n_times(
     }
 
     let mut hs_env_desc = vec![];
-    for (need_save, line) in extract_env_from_content_help_aware(&content) {
-        hs_env_desc.push(line.to_owned());
+    for (need_save, line) in extract_env_from_content_help_aware(content) {
         if need_save {
-            EnvPair::process_line(line, &mut env_vec, |e| std::env::var(e).ok());
+            EnvPair::process_line(line.as_ref(), &mut env_vec, |e| std::env::var(e).ok());
         }
+        hs_env_desc.push(line);
     }
     EnvPair::sort(&mut env_vec);
     let env_record = serde_json::to_string(&env_vec)?;
 
     let run_id = entry
-        .update(|info| info.exec(content, &args, env_record, here))
+        .update(|info| info.exec(&args, env_record, here))
         .await?;
 
     if dummy {
@@ -390,13 +390,11 @@ pub async fn run_n_times(
     let hs_name = hs_name.as_ref() as *const str;
     let hs_name = unsafe { &*hs_name };
     let hs_tags = &entry.tags as *const HashSet<Tag>;
-    let content = entry.exec_time.as_ref().unwrap().data().unwrap().0.as_str() as *const str;
     hs_tmpl_val.path = Some(&script_path);
     hs_tmpl_val.run_id = Some(run_id);
     hs_tmpl_val.tags = unsafe { &*hs_tags }.iter().map(|t| t.as_ref()).collect();
     hs_tmpl_val.env_desc = hs_env_desc;
     hs_tmpl_val.name = Some(hs_name);
-    hs_tmpl_val.content = Some(unsafe { &*content });
     // End packing hs tmpl val
 
     let mut lock = ProcessLockWrite::new(run_id, entry.id, hs_name, &args)?;

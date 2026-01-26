@@ -207,6 +207,7 @@ pub fn run_cmd(
     env: RunEnv,
 ) -> Result<String> {
     log::info!("開始執行 {:?}", args);
+    log::debug!("執行設定: {:?}", env);
     let mut cmd = Command::new(exe);
     if let Some(dir) = env.dir {
         log::info!("使用路徑 {}", dir.to_string_lossy());

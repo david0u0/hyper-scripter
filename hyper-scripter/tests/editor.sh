@@ -19,3 +19,5 @@ else
     sleep 0.01
     touch $@
 fi
+
+echo $@

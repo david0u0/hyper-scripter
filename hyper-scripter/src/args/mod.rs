@@ -421,9 +421,12 @@ pub struct List {
     pub queries: Vec<ListQuery>,
 }
 
-fn set_home(p: &Option<String>, create_on_missing: bool) -> Result {
+fn set_home(p: &Option<String>, create_on_missing: bool, init_conf: bool) -> Result {
     path::set_home(p.as_ref(), create_on_missing)?;
-    Config::init()
+    if init_conf {
+        Config::init()?;
+    }
+    Ok(())
 }
 
 fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) {
@@ -464,7 +467,7 @@ fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
         }
         Ok(alias_root) => {
             log::info!("別名命令行物件 {:?}", alias_root);
-            set_home(&alias_root.root_args.hs_home, true)?;
+            set_home(&alias_root.root_args.hs_home, true, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
                 Some(Either::One(new_args)) => map_clap_res!(Root::try_parse_from(new_args)),
                 Some(Either::Two(new_args)) => {
@@ -489,9 +492,9 @@ fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
 impl Root {
     /// 若帶了 --no-alias 選項，或是補全模式，我們可以把設定腳本之家（以及載入設定檔）的時間再推遲
     /// 在補全模式中意義重大，因為使用者可能會用 -H 指定別的腳本之家
-    pub fn set_home_unless_from_alias(&self, create_on_missing: bool) -> Result {
+    pub fn set_home_unless_from_alias(&self, create_on_missing: bool, init_conf: bool) -> Result {
         if !self.is_from_alias {
-            set_home(&self.root_args.hs_home, create_on_missing)?;
+            set_home(&self.root_args.hs_home, create_on_missing, init_conf)?;
         }
         Ok(())
     }

@@ -65,8 +65,14 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
         print!("{}", dumped);
         return Ok(());
     }
+    if matches!(root.subcmd, Some(Subs::Config)) {
+        root.set_home_unless_from_alias(true, false)?;
+        let file = config_file(path::get_home());
+        print!("{}", file.to_string_lossy());
+        return Ok(());
+    }
 
-    root.set_home_unless_from_alias(true)?;
+    root.set_home_unless_from_alias(true, true)?;
 
     if matches!(root.subcmd, Some(Subs::Migrate)) {
         db::do_migrate(db::get_file()).await?;
@@ -281,10 +287,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
                 print_iter(envs, "\n");
             }
-        }
-        Subs::Config => {
-            let file = config_file(path::get_home());
-            print!("{}", file.to_string_lossy());
         }
         Subs::Run {
             no_caution,

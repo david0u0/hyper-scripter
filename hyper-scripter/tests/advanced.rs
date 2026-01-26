@@ -4,10 +4,11 @@ mod tool;
 pub use tool::*;
 
 use hyper_scripter::{
+    config::CONFIG_FILE_ENV,
     script_type::ScriptFullType,
-    util::{remove, write_file},
+    util::{cp, remove, write_file},
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn test_mv_dir() {
@@ -299,8 +300,32 @@ fn test_cat_with() {
 
     let complex_grep = run!("cat --with='grep \"AAA line\"'").unwrap();
     assert_ne!(content, complex_grep);
-    assert_eq!("# first AAA line", complex_grep,);
+    assert_eq!("# first AAA line", complex_grep);
 
     let multi_grep = run!("cat --with='grep -h echo' *").unwrap();
     assert_eq!("echo AAA\necho BBB", multi_grep);
+}
+
+#[test]
+fn test_conf_alias() {
+    setup();
+
+    let home = get_home().to_string_lossy();
+    let normal_conf_path = format!("{}/.config.toml", home);
+    assert_eq!(run!("conf").unwrap(), normal_conf_path);
+
+    let tmp_conf_path = format!("{}/.another_config.toml", home);
+    let env = vec![(CONFIG_FILE_ENV.to_owned(), tmp_conf_path.clone())];
+    assert_eq!(
+        run!(custom_env: env.clone(), "--no-alias config").unwrap(),
+        tmp_conf_path
+    );
+    assert!(
+        !Path::new(&tmp_conf_path).exists(),
+        "`config` command with --no-alias shouldn't touch the actual config"
+    );
+
+    cp(Path::new(&normal_conf_path), Path::new(&tmp_conf_path)).unwrap();
+
+    assert_eq!(run!(custom_env: env, "conf").unwrap(), tmp_conf_path);
 }

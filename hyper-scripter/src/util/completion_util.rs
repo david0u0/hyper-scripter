@@ -86,7 +86,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
                 }
             };
             log::info!("補完模式，參數為 {:?}", new_root);
-            new_root.set_home_unless_from_alias(false)?;
+            new_root.set_home_unless_from_alias(false, true)?;
             new_root.sanitize_flags(bang);
             *repo = Some(init_repo(new_root.root_args, false).await?);
 

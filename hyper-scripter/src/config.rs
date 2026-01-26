@@ -256,7 +256,10 @@ impl Default for Config {
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
                 gen_alias("p", &["run", "--previous"]),
-                gen_alias("conf", &["!$HS_EDITOR $HS_HOME/.config.toml"]),
+                gen_alias(
+                    "conf",
+                    &["!$HS_EDITOR $($HS_EXE --no-alias -H $HS_HOME config)"],
+                ),
                 gen_alias(
                     "pc",
                     &["=util/historian!", "--sequence", "c", "--display=all"],

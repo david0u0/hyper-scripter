@@ -1,10 +1,10 @@
 use super::the_multifuzz_algo::{the_multifuzz_algo, MultiFuzzObj};
-use super::{ListQuery, ScriptQuery, ScriptQueryInner, StableRepo};
+use super::{ListQuery, ScriptQuery, ScriptQueryInner};
 use crate::color::Stylize;
 use crate::config::{Config, PromptLevel};
 use crate::error::{Error, Result};
 use crate::fuzzy;
-use crate::script_repo::{RepoEntry, Visibility};
+use crate::script_repo::{RepoEntry, ScriptRepo, StableRepo, Visibility};
 use crate::util::{get_display_type, prompt};
 use crate::Either;
 use crate::SEP;
@@ -20,27 +20,23 @@ fn compute_vis(bang: bool) -> Visibility {
     }
 }
 
-pub async fn do_list_query<'a, R: StableRepo>(
-    repo: &'a mut R,
+pub async fn do_list_query<'a>(
+    repo: &'a mut ScriptRepo,
     queries: impl IntoIterator<Item = ListQuery>,
 ) -> Result<Vec<RepoEntry<'a>>> {
+    let repo = repo.stable();
     do_list_query_with_handler(repo, queries, &mut super::DefaultListQueryHandler).await
 }
 
-pub async fn do_list_query_with_handler<
-    'a,
-    R: StableRepo,
-    I,
-    H: super::ListQueryHandler<Item = I>,
->(
-    repo: &'a mut R,
+pub(crate) async fn do_list_query_with_handler<'a, I, H: super::ListQueryHandler<Item = I>>(
+    repo: &'a mut StableRepo,
     queries: impl IntoIterator<Item = I>,
     handler: &mut H,
 ) -> Result<Vec<RepoEntry<'a>>> {
     let mut is_empty = true;
     let mut mem = HashSet::<i64>::default();
     let mut ret = vec![];
-    let repo_ptr = repo as *mut R;
+    let repo_ptr = repo as *mut StableRepo;
     for query in queries {
         is_empty = false;
         macro_rules! insert {
@@ -96,9 +92,9 @@ impl<'a> MultiFuzzObj for FuzzResultRepo<'a> {
     }
 }
 
-pub async fn do_script_query<'b, R: StableRepo>(
+pub async fn do_script_query<'b>(
     script_query: &ScriptQuery,
-    script_repo: &'b mut R,
+    script_repo: &'b mut StableRepo,
     finding_filtered: bool,
     forbid_prompt: bool,
 ) -> Result<Option<RepoEntry<'b>>> {
@@ -174,12 +170,12 @@ pub async fn do_script_query<'b, R: StableRepo>(
         }
     }
 }
-pub async fn do_script_query_strict<'b, R: StableRepo>(
+pub async fn do_script_query_strict<'b>(
     script_query: &ScriptQuery,
-    script_repo: &'b mut R,
+    script_repo: &'b mut StableRepo,
 ) -> Result<RepoEntry<'b>> {
     // FIXME: 一旦 NLL 進化就修掉這段 unsafe
-    let ptr = script_repo as *mut R;
+    let ptr = script_repo as *mut _;
     if let Some(info) = do_script_query(script_query, script_repo, false, false).await? {
         return Ok(info);
     }

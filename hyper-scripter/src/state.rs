@@ -2,9 +2,14 @@ use std::cell::UnsafeCell;
 #[cfg(not(feature = "no-state-check"))]
 use std::sync::atomic::{AtomicU8, Ordering::SeqCst};
 
-const UNINITIALIZED: u8 = 0;
-const INITIALIZING: u8 = 1;
-const INITIALIZED: u8 = 2;
+#[cfg(not(feature = "no-state-check"))]
+mod consts {
+    pub const UNINITIALIZED: u8 = 0;
+    pub const INITIALIZING: u8 = 1;
+    pub const INITIALIZED: u8 = 2;
+}
+#[cfg(not(feature = "no-state-check"))]
+use consts::*;
 
 pub struct State<T> {
     data: UnsafeCell<Option<T>>,
@@ -50,14 +55,18 @@ macro_rules! local_global_state {
 
             pub fn set(data: $type_name) {
                 #[cfg(test)]
+                {
+                let _ = data;
                 log::info!("測試中，不設定狀態");
+                }
                 #[cfg(not(test))]
                 GLOBAL.set(data);
             }
 
+            #[allow(dead_code)]
             #[cfg(not(feature = "no-state-check"))]
-            pub fn set_local(data: &'static $type_name) {
-                LOCAL.set(Some(data));
+            pub fn set_local(_data: &'static $type_name) {
+                LOCAL.set(Some(_data));
             }
         }
     };

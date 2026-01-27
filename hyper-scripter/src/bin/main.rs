@@ -265,7 +265,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let repo = repo.init().await?;
             let script_query: ScriptQuery =
                 args[0].parse().map_err(|e: DisplayError| e.into_err())?;
-            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo.stable()).await?;
             log::info!("檢視用法： {:?}", entry.name);
             create_read_event(&mut entry).await?;
             let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
@@ -300,7 +300,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         } => {
             let repo = repo.init().await?;
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
-            let mut entry = query::do_script_query_strict(&script_query, repo).await?;
+            let mut entry = query::do_script_query_strict(&script_query, repo.stable()).await?;
             main_util::run_n_times(
                 repeat.unwrap_or(1),
                 dummy,

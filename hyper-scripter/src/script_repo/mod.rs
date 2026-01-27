@@ -329,13 +329,12 @@ fn join_tags<'a, I: Iterator<Item = &'a Tag>>(tags: I) -> String {
 }
 
 #[derive(Debug)]
-pub struct ScriptRepo {
+pub struct StableRepo {
     map: HashMap<String, ScriptInfo>,
     hidden_map: HashMap<String, ScriptInfo>,
-    latest_name: Option<String>,
     db_env: DBEnv,
-    pub time_hidden_count: u32,
-    pub recent_filter: RecentFilter,
+    time_hidden_count: u32,
+    recent_filter: RecentFilter,
 }
 
 macro_rules! iter_by_vis {
@@ -348,19 +347,58 @@ macro_rules! iter_by_vis {
         iter.chain(iter2.into_iter().flatten()).map(|(_, v)| v)
     }};
 }
-
-impl ScriptRepo {
-    pub async fn close(self) {
-        self.db_env.close().await;
-    }
-    pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
-        self.map.iter().map(|(_, info)| info)
-    }
+impl StableRepo {
     pub fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>> {
         iter_by_vis!(self, visibility).map(|info| RepoEntry::new(info, &self.db_env))
     }
+    pub fn latest_mut(&mut self, n: usize, visibility: Visibility) -> Option<RepoEntry<'_>> {
+        let mut v: Vec<_> = iter_by_vis!(self, visibility).collect();
+        v.sort_by_key(|s| s.last_time());
+        if v.len() >= n {
+            let t = v.remove(v.len() - n);
+            Some(RepoEntry::new(t, &self.db_env))
+        } else {
+            None
+        }
+    }
+    pub fn get_mut(&mut self, name: &ScriptName, visibility: Visibility) -> Option<RepoEntry<'_>> {
+        // FIXME: 一旦 NLL 進化就修掉這個 unsafe
+        let map = &mut self.map as *mut HashMap<String, ScriptInfo>;
+        let map = unsafe { &mut *map };
+        let key = name.key();
+        let info = match visibility {
+            Visibility::Normal => map.get_mut(&*key),
+            Visibility::Inverse => self.hidden_map.get_mut(&*key),
+            Visibility::All => {
+                let info = map.get_mut(&*key);
+                // 用 Option::or 有一些生命週期的怪問題…
+                if info.is_some() {
+                    info
+                } else {
+                    self.hidden_map.get_mut(&*key)
+                }
+            }
+        };
+        let env = &self.db_env;
+        info.map(move |info| RepoEntry::new(info, env))
+    }
+}
+
+/// A repo without insert & delete
+pub struct ScriptRepo(StableRepo);
+
+impl ScriptRepo {
+    pub async fn close(self) {
+        self.0.db_env.close().await;
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &ScriptInfo> {
+        self.0.map.iter().map(|(_, info)| info)
+    }
+    pub fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>> {
+        self.0.iter_mut(visibility)
+    }
     pub fn historian(&self) -> &Historian {
-        &self.db_env.historian
+        &self.0.db_env.historian
     }
     pub async fn new(
         recent: RecentFilter,
@@ -448,92 +486,55 @@ impl ScriptRepo {
                 map.insert(name, script);
             }
         }
-        Ok(ScriptRepo {
+        Ok(ScriptRepo(StableRepo {
             map,
             hidden_map,
-            latest_name: None,
             recent_filter: recent,
             time_hidden_count,
             db_env,
-        })
+        }))
+    }
+    pub fn time_hidden_info(&self) -> (u32, &RecentFilter) {
+        (self.0.time_hidden_count, &self.0.recent_filter)
     }
     pub fn no_trace(&mut self) {
-        self.db_env.trace_opt = TraceOption::NoTrace;
+        self.0.db_env.trace_opt = TraceOption::NoTrace;
     }
     pub fn humble(&mut self) {
-        self.db_env.trace_opt = TraceOption::Humble;
+        self.0.db_env.trace_opt = TraceOption::Humble;
     }
-    // fn latest_mut_no_cache(&mut self) -> Option<&mut ScriptInfo<'a>> {
-    //     let latest = self.map.iter_mut().max_by_key(|(_, info)| info.last_time());
-    //     if let Some((name, info)) = latest {
-    //         self.latest_name = Some(name.clone());
-    //         Some(info)
-    //     } else {
-    //         None
-    //     }
-    // }
     pub fn latest_mut(&mut self, n: usize, visibility: Visibility) -> Option<RepoEntry<'_>> {
-        // if let Some(name) = &self.latest_name {
-        //     // FIXME: 一旦 rust nll 進化就修掉這段
-        //     if self.map.contains_key(name) {
-        //         return self.map.get_mut(name);
-        //     }
-        //     log::warn!("快取住的最新資訊已經不見了…？重找一次");
-        // }
-        // self.latest_mut_no_cache()
-        let mut v: Vec<_> = iter_by_vis!(self, visibility).collect();
-        v.sort_by_key(|s| s.last_time());
-        if v.len() >= n {
-            let t = v.remove(v.len() - n);
-            Some(RepoEntry::new(t, &self.db_env))
-        } else {
-            None
-        }
+        self.0.latest_mut(n, visibility)
     }
     pub fn get_mut(&mut self, name: &ScriptName, visibility: Visibility) -> Option<RepoEntry<'_>> {
-        // FIXME: 一旦 NLL 進化就修掉這個 unsafe
-        let map = &mut self.map as *mut HashMap<String, ScriptInfo>;
-        let map = unsafe { &mut *map };
-        let key = name.key();
-        let info = match visibility {
-            Visibility::Normal => map.get_mut(&*key),
-            Visibility::Inverse => self.hidden_map.get_mut(&*key),
-            Visibility::All => {
-                let info = map.get_mut(&*key);
-                // 用 Option::or 有一些生命週期的怪問題…
-                if info.is_some() {
-                    info
-                } else {
-                    self.hidden_map.get_mut(&*key)
-                }
-            }
-        };
-        let env = &self.db_env;
-        info.map(move |info| RepoEntry::new(info, env))
+        self.0.get_mut(name, visibility)
     }
     pub fn get_mut_by_id(&mut self, id: i64) -> Option<RepoEntry<'_>> {
         // XXX: 複雜度很瞎
-        self.iter_mut(Visibility::All).find(|e| e.id == id)
+        self.0.iter_mut(Visibility::All).find(|e| e.id == id)
     }
 
     pub async fn remove(&mut self, id: i64) -> Result {
         // TODO: 從 map 中刪掉？但如果之後沒其它用途似乎也未必需要...
         log::debug!("從資料庫刪除腳本 {:?}", id);
-        self.db_env.handle_delete(id).await?;
+        self.0.db_env.handle_delete(id).await?;
         Ok(())
     }
     pub fn entry(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
-        let entry = self.map.entry(name.key().into_owned());
+        let entry = self.0.map.entry(name.key().into_owned());
         RepoEntryOptional {
             entry,
-            env: &self.db_env,
+            env: &self.0.db_env,
         }
     }
     pub fn entry_hidden(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
-        let entry = self.hidden_map.entry(name.key().into_owned());
+        let entry = self.0.hidden_map.entry(name.key().into_owned());
         RepoEntryOptional {
             entry,
-            env: &self.db_env,
+            env: &self.0.db_env,
         }
+    }
+    pub fn stable(&mut self) -> &mut StableRepo {
+        &mut self.0
     }
 }

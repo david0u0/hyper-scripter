@@ -9,10 +9,9 @@ use crate::path;
 use crate::process_lock::{ProcessLockRead, ProcessLockWrite};
 use crate::query::{
     self, do_list_query_with_handler, EditQuery, ListQuery, ListQueryHandler, ScriptQuery,
-    StableRepo,
 };
 use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
-use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
+use crate::script_repo::{RepoEntry, ScriptRepo, StableRepo, Visibility};
 use crate::script_type::{iter_default_templates, ScriptFullType, ScriptType};
 use crate::tag::{Tag, TagSelector, TagSelectorGroup};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -67,9 +66,9 @@ pub async fn mv(
     Ok(())
 }
 
-fn create<F: FnOnce(String) -> Error, R: StableRepo>(
+fn create<F: FnOnce(String) -> Error>(
     query: ScriptQuery,
-    script_repo: &mut R,
+    script_repo: &mut StableRepo,
     ty: &ScriptType,
     on_conflict: F,
 ) -> Result<(ScriptName, PathBuf)> {
@@ -121,10 +120,10 @@ impl EditListQueryHandler {
 }
 impl ListQueryHandler for EditListQueryHandler {
     type Item = EditQuery<ListQuery>;
-    async fn handle_query<'a, R: StableRepo>(
+    async fn handle_query<'a>(
         &mut self,
         query: ScriptQuery,
-        repo: &'a mut R,
+        repo: &'a mut StableRepo,
     ) -> Result<Option<RepoEntry<'a>>> {
         match query::do_script_query(&query, repo, false, false).await {
             Err(Error::DontFuzz) | Ok(None) => {
@@ -218,7 +217,8 @@ pub async fn edit_or_create(
     let explicit_type = ty.is_some();
     let mut edit_query_handler = EditListQueryHandler::new(ty);
     let existing =
-        do_list_query_with_handler(script_repo, edit_query, &mut edit_query_handler).await?;
+        do_list_query_with_handler(script_repo.stable(), edit_query, &mut edit_query_handler)
+            .await?;
 
     if existing.is_empty() && tags.explicit_select {
         return Err(RedundantOpt::Selector.into());
@@ -549,7 +549,7 @@ pub async fn after_script(
     Ok(())
 }
 
-fn check_path_collision<R: StableRepo>(p: &Path, script_repo: &mut R) -> Result {
+fn check_path_collision(p: &Path, script_repo: &mut StableRepo) -> Result {
     for script in script_repo.iter_mut(Visibility::All) {
         let script_p = path::open_script(&script.name, &script.ty, None)?;
         if &script_p == p {

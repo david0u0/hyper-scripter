@@ -184,26 +184,26 @@ fn test_prev_env() {
     ];
 
     assert_eq!(run!("-").unwrap(), "::");
-    assert_eq!(run!("run -p").unwrap(), "::");
+    assert_eq!(run!("run -p all").unwrap(), "::");
 
-    assert_eq!(run!(custom_env: env, "run -p").unwrap(), "A::C");
-    assert_eq!(run!("run -p").unwrap(), "A::");
-    assert_eq!(run!("run -p").unwrap(), "A::");
-    assert_eq!(run!("run -p").unwrap(), "A::");
+    assert_eq!(run!(custom_env: env, "run -p all").unwrap(), "A::C");
+    assert_eq!(run!("run -p all").unwrap(), "A::");
+    assert_eq!(run!("run -p all").unwrap(), "A::");
+    assert_eq!(run!("run -p all").unwrap(), "A::");
 
     let env = vec![
         (MY_ENV.to_owned(), "X".to_owned()),
         (MY_OTHER_ENV.to_owned(), "B".to_owned()),
     ];
     // -p is stronger than normal env var
-    assert_eq!(run!(custom_env: env.clone(), "run -p").unwrap(), "A:B:");
-    assert_eq!(run!("run -p").unwrap(), "A:B:");
+    assert_eq!(run!(custom_env: env.clone(), "run -p all").unwrap(), "A:B:");
+    assert_eq!(run!("run -p all").unwrap(), "A:B:");
 
     assert_eq!(run!(custom_env: env, "run -").unwrap(), "X:B:");
-    assert_eq!(run!("run -p").unwrap(), "X:B:");
+    assert_eq!(run!("run -p all").unwrap(), "X:B:");
 
     assert_eq!(run!("-").unwrap(), "::");
-    assert_eq!(run!("run -p").unwrap(), "::");
+    assert_eq!(run!("run -p all").unwrap(), "::");
 }
 
 #[test]

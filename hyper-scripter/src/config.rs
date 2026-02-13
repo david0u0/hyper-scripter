@@ -255,7 +255,7 @@ impl Default for Config {
                 gen_alias("e", &["edit"]),
                 gen_alias("gc", &["rm", "--timeless", "--purge", "-s", "remove", "*"]),
                 gen_alias("t", &["tags"]),
-                gen_alias("p", &["run", "--previous"]),
+                gen_alias("p", &["run", "--previous", "all"]),
                 gen_alias(
                     "conf",
                     &["!$HS_EDITOR $($HS_EXE --no-alias -H $HS_HOME config)"],

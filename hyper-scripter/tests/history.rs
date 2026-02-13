@@ -193,9 +193,9 @@ fn test_history_args_rm() {
     let recorded = run!("history show receiver").unwrap();
     assert_list(&recorded, &["second", "third"]);
 
-    assert_eq!(run!("run -p").unwrap(), "second", "沒有刪成功？");
+    assert_eq!(run!("run -p all").unwrap(), "second", "沒有刪成功？");
     assert_eq!(
-        run!("run -p - trailing").unwrap(),
+        run!("run -p all - trailing").unwrap(),
         "second trailing",
         "沒有把參數往後接？"
     );
@@ -241,35 +241,35 @@ fn test_history_args_rm_last() {
 
     run!("history rm A -- 2").unwrap(); // Ax
 
-    assert_eq!(run!("run -pE -").unwrap(), "Bzz");
+    assert_eq!(run!("run -Ep all -").unwrap(), "Bzz");
     run!("history rm - -- 1").unwrap(); // Bzz
     run!("history rm - -- 1").unwrap(); // Bz
-    assert_eq!(run!("run -pE").unwrap(), "Az");
+    assert_eq!(run!("run -Ep all").unwrap(), "Az");
     run!("history rm - -- 1").unwrap(); // Az
-    assert_eq!(run!("run -pE -").unwrap(), "By");
+    assert_eq!(run!("run -Ep all -").unwrap(), "By");
 
     // Make some noise HAHA
     {
         maybe_dummy("B", "w");
         maybe_dummy("A", "w");
 
-        assert_eq!(run!("run -pE -").unwrap(), "Aw");
+        assert_eq!(run!("run -Ep all -").unwrap(), "Aw");
         run!("history rm B -- 1").unwrap(); // Bw
-        assert_eq!(run!("run -pE -").unwrap(), "Aw");
+        assert_eq!(run!("run -Ep all -").unwrap(), "Aw");
         run!("history rm A -- 1").unwrap(); // Aw
     }
 
-    assert_eq!(run!("run -pE -").unwrap(), "By"); // Ax already removed
+    assert_eq!(run!("run -Ep all -").unwrap(), "By"); // Ax already removed
     run!("history rm - -- 1").unwrap(); // By
-    assert_eq!(run!("run -pE -").unwrap(), "Ay");
+    assert_eq!(run!("run -Ep all -").unwrap(), "Ay");
     run!("history rm - -- 1").unwrap(); // Ay
-    run!("run -pE A").expect_err("沒有先前參數");
-    assert_eq!(run!("--no-trace -p A").expect("空的"), "A"); // no-trace, won't effect order
+    run!("run -Ep all A").expect_err("沒有先前參數");
+    assert_eq!(run!("--no-trace -p all A").expect("空的"), "A"); // no-trace, won't effect order
 
-    assert_eq!(run!("run -pE B").unwrap(), "Bx");
+    assert_eq!(run!("run -Ep all B").unwrap(), "Bx");
     run!("history rm - -- 1").unwrap(); // Bx
-    run!("run -pE B").expect_err("沒有先前參數");
-    assert_eq!(run!("--no-trace -p B").expect("空的"), "B"); // no-trace, won't effect order
+    run!("run -Ep all B").expect_err("沒有先前參數");
+    assert_eq!(run!("--no-trace -p all B").expect("空的"), "B"); // no-trace, won't effect order
 
     assert_eq!(run!("run -").unwrap(), "A"); // read time
     assert_eq!(run!("run ^^").unwrap(), "C"); // create time
@@ -357,8 +357,8 @@ fn test_event_path() {
         assert_list(&recorded, &["c", "a"]);
 
         // NOTE: 沒有 --no-trace 的話，下一次執行的順序會跑掉
-        let output =
-            run!(dir: &tmp_dir, "--no-trace run -p --dir {}", dir_b).expect("執行前一次參數壞了？");
+        let output = run!(dir: &tmp_dir, "--no-trace run -p all --dir {}", dir_b)
+            .expect("執行前一次參數壞了？");
         assert_eq!(output, "b");
 
         let recorded = run!("{} --dir a/b/c/d", SHOW).expect("路徑不存在就壞了？");

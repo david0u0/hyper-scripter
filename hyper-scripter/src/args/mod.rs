@@ -218,8 +218,8 @@ pub enum Subs {
         dummy: bool,
         #[clap(long, short)]
         repeat: Option<u64>,
-        #[clap(long, short, help = "Use arguments from last run")]
-        previous: bool,
+        #[clap(long, short, possible_values(&["all", "env", "args"]), help = "Use arguments from last run")]
+        previous: Option<HistoryDisplay>,
         #[clap(
             long,
             short = 'E',
@@ -704,7 +704,7 @@ mod test {
         match args.subcmd {
             Some(Subs::Run {
                 dummy: true,
-                previous: false,
+                previous: None,
                 error_no_previous: false,
                 repeat: Some(42),
                 dir: None,

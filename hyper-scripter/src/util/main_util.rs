@@ -1,5 +1,5 @@
 use super::PrepareRespond;
-use crate::args::Subs;
+use crate::args::{HistoryDisplay, Subs};
 use crate::color::Stylize;
 use crate::config::Config;
 use crate::env_pair::EnvPair;
@@ -311,7 +311,7 @@ pub async fn run_n_times(
     entry: &mut RepoEntry<'_>,
     mut args: Vec<String>,
     res: &mut Vec<Error>,
-    use_previous: bool,
+    previous: Option<HistoryDisplay>,
     error_no_previous: bool,
     caution: bool,
     dir: Option<PathBuf>,
@@ -320,7 +320,7 @@ pub async fn run_n_times(
     super::hijack_ctrlc_once();
 
     let mut env_vec = vec![];
-    if use_previous {
+    if let Some(previous) = previous {
         let historian = &entry.get_env().historian;
         match historian.previous_args(entry.id, dir.as_deref()).await? {
             None if error_no_previous => {
@@ -328,13 +328,17 @@ pub async fn run_n_times(
             }
             None => log::warn!("無前一次參數，當作空的"),
             Some((arg_str, envs_str)) => {
-                log::debug!("撈到前一次呼叫的參數 {}", arg_str);
-                let mut prev_arg_vec: Vec<String> =
-                    serde_json::from_str(&arg_str).context(format!("反序列失敗 {}", arg_str))?;
-                env_vec =
-                    serde_json::from_str(&envs_str).context(format!("反序列失敗 {}", envs_str))?;
-                prev_arg_vec.extend(args.into_iter());
-                args = prev_arg_vec;
+                log::debug!("撈到前一次呼叫的參數 {} 及環境 {}", arg_str, envs_str);
+                if previous.show_args() {
+                    let mut prev_arg_vec: Vec<String> = serde_json::from_str(&arg_str)
+                        .context(format!("反序列失敗 {}", arg_str))?;
+                    prev_arg_vec.extend(args.into_iter());
+                    args = prev_arg_vec;
+                }
+                if previous.show_env() {
+                    env_vec = serde_json::from_str(&envs_str)
+                        .context(format!("反序列失敗 {}", envs_str))?;
+                }
             }
         }
     }

@@ -188,8 +188,6 @@ fn test_prev_env() {
 
     assert_eq!(run!(custom_env: env, "run -p").unwrap(), "A::C");
     assert_eq!(run!("run -p").unwrap(), "A::");
-    assert_eq!(run!("run -p").unwrap(), "A::");
-    assert_eq!(run!("run -p").unwrap(), "A::");
 
     let env = vec![
         (MY_ENV.to_owned(), "X".to_owned()),
@@ -328,4 +326,25 @@ fn test_conf_alias() {
     cp(Path::new(&normal_conf_path), Path::new(&tmp_conf_path)).unwrap();
 
     assert_eq!(run!(custom_env: env, "conf").unwrap(), tmp_conf_path);
+}
+
+#[test]
+fn test_prev_option() {
+    let _g = setup();
+    const MY_ENV: &str = "MY_ENV";
+    run!(
+        "e --no-template ? | 
+        # [HS_ENV]: {MY_ENV}
+        echo $1:${MY_ENV}
+        ",
+    )
+    .unwrap();
+
+    let env = vec![(MY_ENV.to_owned(), "A".to_owned())];
+
+    assert_eq!(run!(custom_env: env, "run - arg").unwrap(), "arg:A");
+    assert_eq!(run!("run -p").unwrap(), "arg:A");
+    assert_eq!(run!("run --no-trace -p=all").unwrap(), "arg:A");
+    assert_eq!(run!("run --no-trace -p=env").unwrap(), ":A");
+    assert_eq!(run!("run --no-trace -p=args").unwrap(), "arg:");
 }

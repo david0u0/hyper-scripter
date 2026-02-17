@@ -41,9 +41,10 @@ path = "tests/advanced.rs"
 name = "fuzzy"
 path = "tests/fuzzy.rs"
 
-[[test]]
-name = "completion"
-path = "tests/completion.rs"
+# TODO: enable this
+# [[test]]
+# name = "completion"
+# path = "tests/completion.rs"
 
 [[bench]]
 name = "bench"

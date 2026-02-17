@@ -1,10 +1,10 @@
 use crate::color::Color;
-use crate::error::{DisplayError, DisplayResult, Error, FormatCode, Result};
+use crate::error::{Error, FormatCode, Result};
 use crate::path;
 use crate::script_type::{ScriptType, ScriptTypeConfig};
 use crate::tag::{TagGroup, TagSelector, TagSelectorGroup};
-use crate::util;
-use crate::util::{impl_de_by_from_str, impl_ser_by_to_string};
+use crate::util::{self, impl_de_by_value_enum, impl_ser_by_to_string};
+use clap::ValueEnum;
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
@@ -113,7 +113,7 @@ impl Alias {
     }
 }
 
-#[derive(Display, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(Display, PartialEq, Eq, Debug, Clone, Copy, ValueEnum)]
 pub enum PromptLevel {
     #[display(fmt = "always")]
     Always,
@@ -122,23 +122,11 @@ pub enum PromptLevel {
     #[display(fmt = "smart")]
     Smart,
     #[display(fmt = "on_multi_fuzz")]
+    #[value(alias = "on-multi-fuzz")]
     OnMultiFuzz,
 }
-impl FromStr for PromptLevel {
-    type Err = DisplayError;
-    fn from_str(s: &str) -> DisplayResult<Self> {
-        let l = match s {
-            "always" => PromptLevel::Always,
-            "never" => PromptLevel::Never,
-            "smart" => PromptLevel::Smart,
-            "on-multi-fuzz" => PromptLevel::OnMultiFuzz,
-            _ => return FormatCode::PromptLevel.to_display_res(s.to_owned()),
-        };
-        Ok(l)
-    }
-}
 impl_ser_by_to_string!(PromptLevel);
-impl_de_by_from_str!(PromptLevel);
+impl_de_by_value_enum!(PromptLevel);
 
 #[derive(Display, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Recent {

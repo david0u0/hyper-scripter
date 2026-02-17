@@ -29,10 +29,10 @@ fn test_tags() {
     assert_eq!(MSG, run!(".1").expect("標籤篩選把舊的腳本搞爛了！"));
 
     run!("tesjs").expect_err("標籤沒有篩選掉不該出現的腳本！可能是上上個操作把設定檔寫爛了");
-    run!("tags --name no-hidden all").unwrap();
+    run!("tags all --name no-hidden").unwrap();
     run!("tesjs").expect("沒吃到設定檔的標籤？");
 
-    run!("tags --name no-hidden all,^hide!").unwrap();
+    run!("tags all,^hide! --name no-hidden").unwrap();
     run!("tesjs").expect_err("沒吃到設定檔的標籤？");
 
     run!("tags all").unwrap();

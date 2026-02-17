@@ -15,6 +15,7 @@ use crate::{
     error::{DisplayError, DisplayResult, FormatCode::Template as TemplateCode, Result},
     script::ScriptInfo,
 };
+use clap::ValueEnum;
 use handlebars::Template;
 use serde::Serialize;
 use std::borrow::Cow;
@@ -93,7 +94,7 @@ pub enum DisplayStyle<T, U> {
     Short(IdentTemplate, U),
     Long(T),
 }
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, ValueEnum)]
 pub enum Grouping {
     Tag,
     Tree,
@@ -107,18 +108,6 @@ impl Grouping {
 impl Default for Grouping {
     fn default() -> Self {
         Grouping::None
-    }
-}
-impl FromStr for Grouping {
-    type Err = DisplayError;
-    fn from_str(s: &str) -> DisplayResult<Self> {
-        let g = match s {
-            "tag" => Grouping::Tag,
-            "tree" => Grouping::Tree,
-            "none" => Grouping::None,
-            _ => unreachable!(),
-        };
-        Ok(g)
     }
 }
 

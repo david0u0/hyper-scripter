@@ -1,6 +1,6 @@
 use crate::config::{Alias, Config, PromptLevel, Recent};
 use crate::env_pair::EnvPair;
-use crate::error::{DisplayError, DisplayResult, Result};
+use crate::error::Result;
 use crate::list::Grouping;
 use crate::path;
 use crate::query::{EditQuery, ListQuery, RangeQuery, ScriptOrDirQuery, ScriptQuery};
@@ -9,11 +9,10 @@ use crate::tag::TagSelector;
 use crate::to_display_args;
 use crate::Either;
 use crate::APP_NAME;
-use clap::{CommandFactory, Error as ClapError, Parser};
+use clap::{CommandFactory, Error as ClapError, Parser, ValueEnum};
 use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 mod completion;
 pub use completion::*;
@@ -26,40 +25,39 @@ pub use types::*;
 
 #[derive(Parser, Debug, Serialize)]
 pub struct RootArgs {
-    #[clap(short = 'H', long, help = "Path to hyper script home")]
+    #[arg(short = 'H', long, help = "Path to hyper script home")]
     pub hs_home: Option<String>,
-    #[clap(long, hide = true)]
+    #[arg(long, hide = true)]
     pub dump_args: bool,
-    #[clap(long, global = true, help = "Don't record history")]
+    #[arg(long, global = true, help = "Don't record history")]
     pub no_trace: bool,
-    #[clap(
+    #[arg(
         long,
         global = true,
-        conflicts_with = "no-trace",
+        conflicts_with = "no_trace",
         help = "Don't affect script time order (but still record history and affect time filter)"
     )]
     pub humble: bool,
-    #[clap(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = &["all"])]
+    #[arg(short = 'A', long, global = true, help = "Show scripts NOT within recent days", conflicts_with_all = ["all"])]
     pub archaeology: bool,
-    #[clap(long)]
+    #[arg(long)]
     pub no_alias: bool,
-    #[clap(
+    #[arg(
         short,
         long,
         global = true,
         conflicts_with = "all",
-        number_of_values = 1,
         help = "Select by tags, e.g. `all,^remove`"
     )]
     pub select: Vec<TagSelector>,
-    #[clap(
+    #[arg(
         long,
         conflicts_with = "all",
-        number_of_values = 1,
+        num_args = 1,
         help = "Toggle named selector temporarily"
     )]
     pub toggle: Vec<String>, // TODO: new type?
-    #[clap(
+    #[arg(
         short,
         long,
         global = true,
@@ -67,59 +65,48 @@ pub struct RootArgs {
         help = "Shorthand for `-s=all,^remove --timeless`"
     )]
     all: bool,
-    #[clap(long, global = true, help = "Show scripts within recent days.")]
+    #[arg(long, global = true, help = "Show scripts within recent days.")]
     pub recent: Option<u32>,
-    #[clap(
+    #[arg(
         long,
         global = true,
         help = "Show scripts of all time.",
         conflicts_with = "recent"
     )]
     pub timeless: bool,
-    #[clap(long, possible_values(&["never", "always", "smart", "on-multi-fuzz"]), help = "Prompt level of fuzzy finder.")]
+    #[arg(long, help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
 }
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(about, author, version)]
-#[clap(allow_hyphen_values = true, args_override_self = true)] // NOTE: 我們需要那個 `allow_hyphen_values` 來允許 hs --dummy 這樣的命令
+#[command(about, author, version)]
 pub struct Root {
-    #[clap(skip)]
+    #[arg(skip)]
     #[serde(skip)]
     is_from_alias: bool,
-    #[clap(flatten)]
+    #[command(flatten)]
     pub root_args: RootArgs,
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub subcmd: Option<Subs>,
 }
 
 #[derive(Parser, Debug, Serialize)]
-pub enum AliasSubs {
-    #[clap(external_subcommand)]
-    Other(Vec<String>),
-}
-#[derive(Parser, Debug, Serialize)]
-#[clap(
-    args_override_self = true,
-    allow_hyphen_values = true,
-    disable_help_flag = true,
-    disable_help_subcommand = true
-)]
+#[command(disable_help_flag = true, disable_help_subcommand = true)]
 pub struct AliasRoot {
-    #[clap(flatten)]
+    #[command(flatten)]
     pub root_args: RootArgs,
-    #[clap(subcommand)]
-    pub subcmd: Option<AliasSubs>,
+
+    #[arg(allow_hyphen_values = true)]
+    pub subcmd: Vec<String>,
 }
 impl AliasRoot {
     fn find_alias<'a>(&'a self, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
-        match &self.subcmd {
+        match self.subcmd.first() {
             None => None,
-            Some(AliasSubs::Other(v)) => {
-                let first = v.first().unwrap().as_str();
+            Some(first) => {
                 if let Some(alias) = conf.alias.get(first) {
                     log::info!("別名 {} => {:?}", first, alias);
-                    Some((alias, v))
+                    Some((alias, &self.subcmd[1..]))
                 } else {
                     None
                 }
@@ -133,7 +120,7 @@ impl AliasRoot {
     ) -> Option<Either<impl Iterator<Item = &'a str>, Vec<String>>> {
         if let Some((alias, remaining_args)) = self.find_alias(conf) {
             let (is_shell, after_args) = alias.args();
-            let remaining_args = remaining_args[1..].iter().map(String::as_str);
+            let remaining_args = remaining_args.iter().map(String::as_str);
 
             if is_shell {
                 // shell 別名，完全無視開頭的參數（例如 `hs -s tag -H path/to/home`）
@@ -158,40 +145,36 @@ impl AliasRoot {
 }
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(disable_help_subcommand = true, args_override_self = true)]
+#[command(disable_help_subcommand = true, args_override_self = true)]
 pub enum Subs {
-    #[clap(external_subcommand)]
+    #[command(external_subcommand)]
     Other(Vec<String>),
-    #[clap(
+    #[command(
         about = "Prints this message, the help of the given subcommand(s), or a script's help message."
     )]
     Help { args: Vec<String> },
-    #[clap(hide = true)]
+    #[command(hide = true)]
     LoadUtils,
-    #[clap(about = "Migrate the database")]
+    #[command(about = "Migrate the database")]
     Migrate,
-    #[clap(about = "Edit hyper script", trailing_var_arg = true)]
+    #[command(about = "Edit hyper script")]
     Edit {
-        #[clap(long, short = 'T', help = TYPE_HELP)]
+        #[arg(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptFullType>,
-        #[clap(long, short)]
+        #[arg(long, short)]
         no_template: bool,
-        #[clap(long, short, help = TAGS_HELP)]
+        #[arg(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[clap(long, short, help = "Create script without invoking the editor")]
+        #[arg(long, short, help = "Create script without invoking the editor")]
         fast: bool,
-        #[clap(default_value = "?", help = EDIT_QUERY_HELP)]
+        #[arg(default_value = "?", help = EDIT_QUERY_HELP)]
         edit_query: Vec<EditQuery<ListQuery>>,
-        #[clap(last = true)]
+        #[arg(last = true)]
         content: Vec<String>,
     },
-    #[clap(
-        about = "Manage alias",
-        disable_help_flag = true,
-        allow_hyphen_values = true
-    )]
+    #[command(about = "Manage alias", disable_help_flag = true)]
     Alias {
-        #[clap(
+        #[arg(
             long,
             short,
             requires = "before",
@@ -200,110 +183,106 @@ pub enum Subs {
         )]
         unset: bool,
         before: Option<String>,
-        #[clap(allow_hyphen_values = true)]
+        #[arg(allow_hyphen_values = true)]
         after: Vec<String>,
     },
 
-    #[clap(about = "Print the path to script")]
+    #[command(about = "Print the path to script")]
     Config,
-    #[clap(
-        about = "Run the script",
-        disable_help_flag = true,
-        allow_hyphen_values = true
-    )]
+    #[command(about = "Run the script", disable_help_flag = true)]
     Run {
-        #[clap(long, help = "Run caution scripts without warning")]
+        #[arg(long, help = "Run caution scripts without warning")]
         no_caution: bool,
-        #[clap(long, help = "Add a dummy run history instead of actually running it")]
+        #[arg(long, help = "Add a dummy run history instead of actually running it")]
         dummy: bool,
-        #[clap(long, short)]
+        #[arg(long, short)]
         repeat: Option<u64>,
-        #[clap(long, short, help = "Use arguments from last run")]
+        #[arg(long, short, help = "Use arguments from last run")]
         previous: bool,
-        #[clap(
+        #[arg(
             long,
             short = 'E',
             requires = "previous",
             help = "Raise an error if --previous is given but there is no previous run"
         )]
         error_no_previous: bool,
-        #[clap(long, short, requires = "previous", help = "")]
+        #[arg(long, short, requires = "previous", help = "")]
         dir: Option<PathBuf>,
-        #[clap(default_value = "-", help = SCRIPT_QUERY_HELP)]
+        #[arg(default_value = "-", help = SCRIPT_QUERY_HELP)]
         script_query: ScriptQuery,
-        #[clap(
+        #[arg(
             help = "Command line args to pass to the script",
             allow_hyphen_values = true
         )]
         args: Vec<String>,
     },
-    #[clap(about = "Execute the script query and get the exact file")]
+    #[command(about = "Execute the script query and get the exact file")]
     Which {
-        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
+        #[arg(default_value = "-", help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
-    #[clap(about = "Print the script to standard output")]
+    #[command(about = "Print the script to standard output")]
     Cat {
-        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
+        #[arg(default_value = "-", help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[clap(long, help = "Read with other program, e.g. bat")]
+        #[arg(long, help = "Read with other program, e.g. bat")]
         with: Option<String>,
     },
-    #[clap(about = "Remove the script")]
+    #[command(about = "Remove the script")]
     RM {
-        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[arg(required = true, help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[clap(
+        #[arg(
             long,
             help = "Actually remove scripts, rather than hiding them with tag."
         )]
         purge: bool,
     },
-    #[clap(about = "Set recent filter")]
+    #[command(about = "Set recent filter")]
     Recent { recent_filter: Option<Recent> },
-    #[clap(about = "List hyper scripts")]
+    #[command(about = "List hyper scripts")]
     LS(List),
-    #[clap(about = "Manage script types")]
+    #[command(about = "Manage script types")]
     Types(Types),
-    #[clap(about = "Copy the script to another one")]
+    #[command(about = "Copy the script to another one")]
     CP {
-        #[clap(long, short, help = TAGS_HELP)]
+        #[arg(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[clap(help = SCRIPT_QUERY_HELP)]
+        #[arg(help = SCRIPT_QUERY_HELP)]
         origin: ListQuery,
-        #[clap(help = EDIT_CONCRETE_QUERY_HELP)]
+        #[arg(help = EDIT_CONCRETE_QUERY_HELP)]
         new: EditQuery<ScriptOrDirQuery>,
     },
-    #[clap(about = "Move the script to another one")]
+    #[command(about = "Move the script to another one")]
     MV {
-        #[clap(long, short = 'T', help = TYPE_HELP)]
+        #[arg(long, short = 'T', help = TYPE_HELP)]
         ty: Option<ScriptType>,
-        #[clap(long, short, help = TAGS_HELP)]
+        #[arg(long, short, help = TAGS_HELP)]
         tags: Option<TagSelector>,
-        #[clap(help = LIST_QUERY_HELP)]
+        #[arg(help = LIST_QUERY_HELP)]
         origin: ListQuery,
-        #[clap(help = EDIT_CONCRETE_QUERY_HELP)]
+        #[arg(help = EDIT_CONCRETE_QUERY_HELP)]
         new: Option<EditQuery<ScriptOrDirQuery>>,
     },
-    #[clap(about = "Manage script tags")]
+    #[command(about = "Manage script tags")]
     Tags(Tags),
-    #[clap(about = "Manage script history")]
+    #[command(about = "Manage script history")]
     History {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         subcmd: History,
     },
-    #[clap(about = "Monitor hs process")]
+    #[command(about = "Monitor hs process")]
     Top {
-        #[clap(long, short, help = "Wait for all involved processes to halt")]
+        #[arg(long, short, help = "Wait for all involved processes to halt")]
         wait: bool,
-        #[clap(long, help = "Run event ID")]
+        #[arg(long, help = "Run event ID")]
         id: Vec<u64>,
-        #[clap(help = LIST_QUERY_HELP)]
+        #[arg(help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, ValueEnum)]
 pub enum HistoryDisplay {
     Env,
     Args,
@@ -323,73 +302,61 @@ impl HistoryDisplay {
         }
     }
 }
-impl FromStr for HistoryDisplay {
-    type Err = DisplayError;
-    fn from_str(s: &str) -> DisplayResult<Self> {
-        let g = match s {
-            "env" => HistoryDisplay::Env,
-            "args" => HistoryDisplay::Args,
-            "all" => HistoryDisplay::All,
-            _ => unreachable!(),
-        };
-        Ok(g)
-    }
-}
 
 #[derive(Parser, Debug, Serialize)]
 pub enum History {
     RM {
-        #[clap(short, long)]
+        #[arg(short, long)]
         dir: Option<PathBuf>, // FIXME: this flag isn't working...
-        #[clap(long, possible_values(&["all", "env", "args"]), default_value = "args",)]
+        #[arg(long, default_value = "args")]
         display: HistoryDisplay,
-        #[clap(long)]
+        #[arg(long)]
         no_humble: bool,
-        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[arg(required = true,  help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[clap(last = true)]
+        #[arg(last = true)]
         range: RangeQuery,
     },
     // TODO: 好想把它寫在 history rm 裡面...
-    #[clap(
+    #[command(
         name = "rm-id",
         about = "Remove an event by it's id.\nUseful if you want to keep those illegal arguments from polluting the history."
     )]
     RMID {
         event_id: u64,
     },
-    #[clap(about = "Humble an event by it's id")]
+    #[command(about = "Humble an event by it's id")]
     Humble {
         event_id: u64,
     },
     Show {
-        #[clap(default_value = "-", help = LIST_QUERY_HELP)]
+        #[arg(default_value = "-", help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
-        #[clap(short, long, default_value = "10")]
+        #[arg(short, long, default_value = "10")]
         limit: u32,
-        #[clap(long)]
+        #[arg(long)]
         with_name: bool,
-        #[clap(long)]
+        #[arg(long)]
         no_humble: bool,
-        #[clap(short, long, default_value = "0")]
+        #[arg(short, long, default_value = "0")]
         offset: u32,
-        #[clap(short, long)]
+        #[arg(short, long)]
         dir: Option<PathBuf>,
-        #[clap(long, possible_values(&["all", "env", "args"]), default_value = "args",)]
+        #[arg(long, default_value = "args")]
         display: HistoryDisplay,
     },
     Neglect {
-        #[clap(required = true, min_values = 1, help = LIST_QUERY_HELP)]
+        #[arg(required = true,  help = LIST_QUERY_HELP)]
         queries: Vec<ListQuery>,
     },
-    #[clap(disable_help_flag = true, allow_hyphen_values = true)]
+    #[command(disable_help_flag = true)]
     Amend {
         event_id: u64,
-        #[clap(short, long)]
+        #[arg(short, long)]
         env: Vec<EnvPair>,
-        #[clap(long, conflicts_with = "env")]
+        #[arg(long, conflicts_with = "env")]
         no_env: bool,
-        #[clap(
+        #[arg(
             help = "Command line args to pass to the script",
             allow_hyphen_values = true
         )]
@@ -399,25 +366,25 @@ pub enum History {
 }
 
 #[derive(Parser, Debug, Serialize, Default)]
-#[clap(args_override_self = true)]
+#[command(args_override_self = true)]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項
-    #[clap(short, long, help = "Show verbose information.")]
+    #[arg(short, long, help = "Show verbose information.")]
     pub long: bool,
-    #[clap(long, possible_values(&["tag", "tree", "none"]), default_value = "tag", help = "Grouping style.")]
+    #[arg(long, default_value = "tag", help = "Grouping style.")]
     pub grouping: Grouping,
-    #[clap(long, help = "Limit the amount of scripts found.")]
+    #[arg(long, help = "Limit the amount of scripts found.")]
     pub limit: Option<NonZeroUsize>,
-    #[clap(long, help = "No color and other decoration.")]
+    #[arg(long, help = "No color and other decoration.")]
     pub plain: bool,
-    #[clap(
+    #[arg(
         long,
         help = "Define the formatting for each script.",
         conflicts_with = "long",
         default_value = "{{name}}({{ty}})"
     )]
     pub format: String,
-    #[clap(help = LIST_QUERY_HELP)]
+    #[arg(help = LIST_QUERY_HELP)]
     pub queries: Vec<ListQuery>,
 }
 
@@ -436,15 +403,15 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) {
     let mut had_found = false;
     for cmd in cmds {
         let cmd = cmd.as_ref();
-        clap.find_subcommand(cmd);
-        if let Some(c) = clap.find_subcommand(cmd) {
-            clap = c;
+        if let Some(sub) = clap.find_subcommand(cmd) {
+            clap = sub;
             had_found = true;
         } else if !had_found {
             return;
         }
     }
-    let _ = clap.clone().print_help();
+    let mut clap = clap.clone();
+    let _ = clap.print_help();
     println!();
     std::process::exit(0);
 }
@@ -587,6 +554,9 @@ mod test {
     #[test]
     fn test_strange_set_alias() {
         let args = build_args("alias trash -s remove");
+        assert_eq!(args.root_args.select, vec!["remove".parse().unwrap()]);
+
+        let args = build_args("alias trash -- -s remove");
         assert_eq!(args.root_args.select, vec![]);
         match &args.subcmd {
             Some(Subs::Alias {
@@ -694,10 +664,10 @@ mod test {
     }
     #[test]
     fn test_external_run_tags() {
-        let args = build_args("-s test --dummy -r 42 =script -a --");
+        let args = build_args("-s test -- --dummy -r 42 =script -- -a --"); // TODO: `--dummy -a =script`
         assert!(is_args_eq(
             &args,
-            &build_args("-s test run --dummy -r 42 =script -a --")
+            &build_args("-s test run --dummy -r 42 =script -- -a --")
         ));
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
@@ -720,7 +690,7 @@ mod test {
             }
         }
 
-        let args = build_args("-s test --dump-args tags --name myname +mytag");
+        let args = build_args("-s test --dump-args tags -- --name myname +mytag");
         assert!(is_args_eq(
             &args,
             &build_args("-s test --dump-args tags set --name myname +mytag")
@@ -795,15 +765,32 @@ mod test {
         }
     }
     #[test]
-    #[ignore = "clap bug"]
     fn test_allow_hyphen() {
-        assert!(is_args_eq(
+        assert!(!is_args_eq(
             &build_args("alias a -u"),
             &build_args("alias a -- -u")
         ));
         assert!(is_args_eq(
+            &build_args("alias a b -u"),
+            &build_args("alias a -- b -u")
+        ));
+
+        assert!(!is_args_eq(
             &build_args("run s --repeat 1"),
             &build_args("run s -- --repeat 1")
+        ));
+        assert!(is_args_eq(
+            &build_args("run s b --repeat 1"),
+            &build_args("run s -- b --repeat 1"),
+        ));
+
+        assert!(!is_args_eq(
+            &build_args("history amend 0 --no-env"),
+            &build_args("history amend 0 -- --no-env"),
+        ));
+        assert!(is_args_eq(
+            &build_args("history amend 0 b --no-env"),
+            &build_args("history amend 0 -- b --no-env"),
         ));
     }
 }

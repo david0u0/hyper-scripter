@@ -17,7 +17,7 @@ mod list_query_handler;
 mod the_multifuzz_algo;
 pub use list_query_handler::*;
 
-#[derive(Debug, Eq, PartialEq, Display)]
+#[derive(Debug, Eq, PartialEq, Display, Clone)]
 pub enum EditQuery<Q> {
     #[display(fmt = "?")]
     NewAnonimous,
@@ -81,7 +81,7 @@ impl DirQuery {
     }
 }
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum ScriptOrDirQuery {
     #[display(fmt = "{}", _0)]
     Script(ScriptName),
@@ -103,7 +103,7 @@ impl FromStr for ScriptOrDirQuery {
 }
 impl_ser_by_to_string!(ScriptOrDirQuery);
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum ListQuery {
     #[display(fmt = "{}", _1)]
     Pattern(Regex, String, bool),

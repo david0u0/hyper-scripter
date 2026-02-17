@@ -108,7 +108,7 @@ pub async fn handle_completion(comp: Completion, repo: &mut Option<ScriptRepo>) 
         }
         Completion::NoSubcommand { args } => {
             if let Ok(root) = parse_alias_root(&args) {
-                if root.subcmd.is_some() {
+                if !root.subcmd.is_empty() {
                     log::debug!("子命令 = {:?}", root.subcmd);
                     return Err(Error::Completion);
                 }

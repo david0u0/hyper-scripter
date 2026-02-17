@@ -367,7 +367,7 @@ impl<'a> ScriptTestWithSelect<'a> {
     pub fn run(&self, args: &str) -> Result<String> {
         run!(
             allow_other_error: self.allow_other_error,
-            "{} ={} {}",
+            "run {} ={} {}",
             self.select,
             self.script.name,
             args

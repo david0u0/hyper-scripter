@@ -4,27 +4,27 @@ use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize)]
 pub struct Tags {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub subcmd: Option<TagsSubs>,
 }
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(allow_hyphen_values = true)]
+#[command(allow_hyphen_values = true)]
 pub enum TagsSubs {
-    #[clap(external_subcommand)]
+    #[command(external_subcommand)]
     Other(Vec<String>),
     Unset {
         name: String,
     }, // TODO: new type?
     Set {
-        #[clap(long, short)]
+        #[arg(long, short)]
         name: Option<String>,
         content: TagSelector,
     },
     LS {
-        #[clap(long, short)]
+        #[arg(long, short)]
         known: bool,
-        #[clap(long, short, conflicts_with = "known")]
+        #[arg(long, short, conflicts_with = "known")]
         named: bool,
     },
     Toggle {

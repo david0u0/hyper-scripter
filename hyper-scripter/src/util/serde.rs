@@ -42,6 +42,21 @@ macro_rules! impl_de_by_from_str {
     };
 }
 
+macro_rules! impl_de_by_value_enum {
+    ($target:ty) => {
+        impl<'de> serde::Deserialize<'de> for $target {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let s: &str = serde::Deserialize::deserialize(deserializer)?;
+                clap::ValueEnum::from_str(s, false).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
 pub(crate) use impl_de_by_from_str;
+pub(crate) use impl_de_by_value_enum;
 pub(crate) use impl_ser_and_display_by_as_ref;
 pub(crate) use impl_ser_by_to_string;

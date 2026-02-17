@@ -27,6 +27,7 @@ pub use init_repo::*;
 
 pub mod serde;
 pub(crate) use self::serde::impl_de_by_from_str;
+pub(crate) use self::serde::impl_de_by_value_enum;
 pub(crate) use self::serde::impl_ser_and_display_by_as_ref;
 pub(crate) use self::serde::impl_ser_by_to_string;
 

@@ -5,23 +5,23 @@ use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize)]
 pub struct Types {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub subcmd: Option<TypesSubs>,
 }
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(allow_hyphen_values = true)] // 為了允許 hs types --edit sh 這樣的命令
+#[command(allow_hyphen_values = true)] // 為了允許 hs types --edit sh 這樣的命令
 pub enum TypesSubs {
-    #[clap(external_subcommand)]
+    #[command(external_subcommand)]
     Other(Vec<String>),
     LS {
-        #[clap(long)]
+        #[arg(long)]
         no_sub: bool,
     },
     Template {
-        #[clap(long, short)]
+        #[arg(long, short)]
         edit: bool,
-        #[clap(help = TYPE_HELP)]
+        #[arg(help = TYPE_HELP)]
         ty: ScriptFullType,
     },
 }

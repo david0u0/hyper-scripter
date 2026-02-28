@@ -540,6 +540,14 @@ pub mod types {
     use super::GlobalID as GlobalID;
     use supplement::core::*;
 
+    pub const ID_VAL_NO_SUB: id::NoVal = id::NoVal::new_certain(line!());
+    const VAL_NO_SUB: Flag<GlobalID> = Flag {
+        short: &[],
+        long: &["no-sub"],
+        description: "",
+        once: true,
+        ty: flag_type::Type::new_bool(ID_VAL_NO_SUB),
+    };
     pub const ID_VAL_EDIT: id::NoVal = id::NoVal::new_certain(line!());
     const VAL_EDIT: Flag<GlobalID> = Flag {
         short: &['e'],
@@ -561,7 +569,7 @@ pub mod types {
     pub(super) const CMD: Command<GlobalID> = Command {
         name: "types",
         description: "Manage script types",
-        all_flags: &[VAL_EDIT, super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
+        all_flags: &[VAL_NO_SUB, VAL_EDIT, super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
         args: &[VAL_TY],
         commands: &[],
     };

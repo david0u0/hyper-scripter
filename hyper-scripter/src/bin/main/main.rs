@@ -352,11 +352,19 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             }
         }
-        Subs::Types(Types { ty: None, .. }) => {
-            let types = util::get_types(true)?;
+        Subs::Types(Types {
+            ty: None,
+            no_sub,
+            edit: _,
+        }) => {
+            let types = util::get_types(!no_sub)?;
             print_iter(types.iter(), " ");
         }
-        Subs::Types(Types { ty: Some(ty), edit }) => {
+        Subs::Types(Types {
+            ty: Some(ty),
+            edit,
+            no_sub: _,
+        }) => {
             if edit {
                 let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
                 util::open_editor([tmpl_path.as_ref()])?;

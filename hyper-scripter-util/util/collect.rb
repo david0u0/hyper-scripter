@@ -58,7 +58,7 @@ def extract_name(file)
 end
 
 existing_files = {}
-types = HS_ENV.do_hs("types ls --no-sub", false).split
+types = HS_ENV.do_hs("types --no-sub", false).split
 
 HS_ENV.do_hs('ls --grouping=none --format="{{name}}({{file}})" --plain', true).split.each do |s|
   match = /(?<name>[^(]+)\((?<file>.+)\)/.match(s)

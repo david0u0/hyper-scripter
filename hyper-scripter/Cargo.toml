@@ -84,7 +84,7 @@ unicode-width = "0.1"
 hyper-scripter-historian = { version = "0.7.8", path = "../hyper-scripter-historian" }
 hyper-scripter-util = { version = "0.7.8", path = "../hyper-scripter-util" }
 fd-lock = "4.0.0"
-supplement = "0.1"
+supplement = { version = "0.1", path = "../../supplement" }
 
 [build-dependencies]
 sqlx = { version = "0.7", default-features = false, features = [ "runtime-tokio", "macros", "sqlite", "chrono", "migrate" ] }

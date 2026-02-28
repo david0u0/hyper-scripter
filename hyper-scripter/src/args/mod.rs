@@ -528,7 +528,7 @@ pub enum ArgsResult {
 }
 
 pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
-    if args.get(1).map(String::as_str) == Some("completion-subcommand") {
+    if args.get(1).map(String::as_str) == Some("completion-subsystem") {
         return Ok(ArgsResult::Completion(args));
     }
     let mut root = handle_alias_args(args)?;

@@ -1999,9 +1999,7 @@ checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
 
 [[package]]
 name = "supplement"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3549dc42161e18fbff77c526ef6c192c3b1284c895eb9131789608c7ba421c25"
+version = "0.1.10"
 dependencies = [
  "clap",
  "log",
@@ -2011,8 +2009,6 @@ dependencies = [
 [[package]]
 name = "supplement-proc-macro"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4fb717ad850999c10c6f60860bb4a3057f0c97c502ef2c23a8025695a62d469"
 dependencies = [
  "proc-macro2",
  "quote",

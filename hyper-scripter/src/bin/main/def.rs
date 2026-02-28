@@ -112,7 +112,6 @@ pub enum ID {
     ValToggle,
     ValRecent,
     CMDHelp(help::ID),
-    CMDLoadUtils(load_utils::ID),
     CMDMigrate(migrate::ID),
     CMDEdit(edit::ID),
     CMDAlias(alias::ID),
@@ -135,7 +134,7 @@ pub const CMD: Command<GlobalID> = Command {
     description: "The script managing tool for script lovers",
     all_flags: &[VAL_HS_HOME, VAL_NO_TRACE, VAL_HUMBLE, VAL_ARCHAEOLOGY, VAL_NO_ALIAS, VAL_SELECT, VAL_TOGGLE, VAL_ALL, VAL_RECENT, VAL_TIMELESS, VAL_PROMPT_LEVEL, VAL_VERSION],
     args: &[EXTERNAL],
-    commands: &[help::CMD, load_utils::CMD, migrate::CMD, edit::CMD, alias::CMD, config::CMD, run::CMD, which::CMD, cat::CMD, rm::CMD, recent::CMD, ls::CMD, types::CMD, cp::CMD, mv::CMD, tags::CMD, history::CMD, top::CMD],
+    commands: &[help::CMD, migrate::CMD, edit::CMD, alias::CMD, config::CMD, run::CMD, which::CMD, cat::CMD, rm::CMD, recent::CMD, ls::CMD, types::CMD, cp::CMD, mv::CMD, tags::CMD, history::CMD, top::CMD],
 };
 pub mod help {
     use super::GlobalID as GlobalID;
@@ -156,21 +155,6 @@ pub mod help {
         description: "Prints this message, the help of the given subcommand(s), or a script's help message.",
         all_flags: &[super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
         args: &[VAL_ARGS],
-        commands: &[],
-    };
-}
-pub mod load_utils {
-    use super::GlobalID as GlobalID;
-    use supplement::core::*;
-
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub enum ID {
-    }
-    pub(super) const CMD: Command<GlobalID> = Command {
-        name: "load-utils",
-        description: "",
-        all_flags: &[super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
-        args: &[],
         commands: &[],
     };
 }

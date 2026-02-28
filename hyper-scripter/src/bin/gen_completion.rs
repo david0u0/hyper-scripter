@@ -5,7 +5,7 @@ use supplement::{generate, Config};
 
 fn my_generate(w: &mut impl Write) {
     let mut cmd = Root::command();
-    let config = Config::new().ignore(&["dump_args"]);
+    let config = Config::new().ignore(&["dump_args"]).ignore(&["load-utils"]);
     writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]").unwrap();
     generate(&mut cmd, config, w).unwrap();
 }

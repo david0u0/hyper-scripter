@@ -16,7 +16,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub mod completion_util;
 pub mod holder;
 pub mod main_util;
 pub mod shebang_handle;
@@ -458,6 +457,26 @@ pub fn prompt(msg: impl std::fmt::Display, allow_enter: bool) -> Result<bool> {
             Ok(false)
         }
     }
+}
+
+pub fn get_types(sub_type: bool) -> Result<Vec<ScriptFullType>> {
+    let mut ret = vec![];
+    for ty in Config::get().types.keys() {
+        ret.push(ScriptFullType {
+            ty: ty.clone(),
+            sub: None,
+        });
+        if sub_type {
+            let subs = path::get_sub_types(ty)?;
+            for sub in subs.into_iter() {
+                ret.push(ScriptFullType {
+                    ty: ty.clone(),
+                    sub: Some(sub),
+                });
+            }
+        }
+    }
+    Ok(ret)
 }
 
 #[derive(Serialize)]

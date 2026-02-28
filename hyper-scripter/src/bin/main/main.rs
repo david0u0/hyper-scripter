@@ -1,7 +1,7 @@
 use futures::future::try_join_all;
-use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use fxhash::FxHashSet as HashSet;
 use hyper_scripter::args::{
-    self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types, TypesSubs,
+    self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types,
 };
 use hyper_scripter::config::{config_file, Config, NamedTagSelector};
 use hyper_scripter::db;
@@ -15,15 +15,18 @@ use hyper_scripter::query::{self, EditQuery, ListQuery, ScriptOrDirQuery, Script
 use hyper_scripter::script::{IntoScriptName, ScriptInfo, ScriptName};
 use hyper_scripter::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use hyper_scripter::script_time::ScriptTime;
-use hyper_scripter::tag::{Tag, TagSelector};
+use hyper_scripter::tag::TagSelector;
 use hyper_scripter::to_display_args;
 use hyper_scripter::util::{
-    self, completion_util,
+    self,
     holder::{RepoHolder, Resource},
     main_util::{self, EditTagArgs},
     print_iter,
 };
 use hyper_scripter_historian::{Historian, LastTimeRecord};
+
+mod completion;
+mod def;
 
 #[tokio::main]
 async fn main() {
@@ -47,7 +50,7 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
         ArgsResult::Shell(shell) => std::process::exit(util::run_shell(&shell)?),
         ArgsResult::Completion(comp) => {
             let mut repo = None;
-            let res = completion_util::handle_completion(comp, &mut repo).await;
+            let res = completion::handle_completion(comp, &mut repo).await;
             if let Some(repo) = repo {
                 repo.close().await;
             }
@@ -349,27 +352,11 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             }
         }
-        Subs::Types(Types {
-            subcmd: Some(TypesSubs::LS { no_sub }),
-        }) => {
-            let mut first = true;
-            for ty in conf.types.keys() {
-                if !first {
-                    print!(" ");
-                }
-                first = false;
-                print!("{}", ty);
-                if !no_sub {
-                    let subs = path::get_sub_types(ty)?;
-                    for sub in subs.into_iter() {
-                        print!(" {}/{}", ty, sub);
-                    }
-                }
-            }
+        Subs::Types(Types { ty: None, .. }) => {
+            let types = util::get_types(true)?;
+            print_iter(types.iter(), " ");
         }
-        Subs::Types(Types {
-            subcmd: Some(TypesSubs::Template { ty, edit }),
-        }) => {
+        Subs::Types(Types { ty: Some(ty), edit }) => {
             if edit {
                 let (tmpl_path, _) = util::get_or_create_template_path(&ty, false, false)?;
                 util::open_editor([tmpl_path.as_ref()])?;
@@ -518,46 +505,27 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 selector.inactivated = !selector.inactivated;
             }
         }
-        Subs::Tags(Tags {
-            subcmd:
-                Some(TagsSubs::LS {
-                    named: true,
-                    known: false,
-                }),
-        }) => {
-            print_iter(conf.tag_selectors.iter().map(|f| &f.name), " ");
-        }
-        Subs::Tags(Tags {
-            subcmd:
-                Some(TagsSubs::LS {
-                    named: false,
-                    known,
-                }),
-        }) => {
+        Subs::Tags(Tags { subcmd: None }) => {
             let repo = repo.init().await?;
-            if known {
-                print_iter(known_tags_iter(repo), " ");
-            } else {
-                print!("known tags:\n  ");
-                print_iter(known_tags_iter(repo), " ");
-                println!("");
+            print!("known tags:\n  ");
+            print_iter(main_util::known_tags_iter(repo), " ");
+            println!("");
 
-                println!("caution tags:");
-                println!("  {}", conf.caution_tags);
+            println!("caution tags:");
+            println!("  {}", conf.caution_tags);
 
-                println!("tag selector:");
-                for selector in conf.tag_selectors.iter() {
-                    let content = &selector.content;
-                    print!("  {} = {}", selector.name, content);
-                    if selector.inactivated {
-                        print!(" (inactivated)")
-                    }
-                    println!()
+            println!("tag selector:");
+            for selector in conf.tag_selectors.iter() {
+                let content = &selector.content;
+                print!("  {} = {}", selector.name, content);
+                if selector.inactivated {
+                    print!(" (inactivated)")
                 }
-                println!("main tag selector:");
-                print!("  {}", conf.main_tag_selector);
-                println!();
+                println!()
             }
+            println!("main tag selector:");
+            print!("  {}", conf.main_tag_selector);
+            println!();
         }
         Subs::Tags(Tags {
             subcmd: Some(TagsSubs::Set { content, name }),
@@ -838,30 +806,6 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
 
 async fn create_read_event(entry: &mut RepoEntry<'_>) -> Result<i64> {
     entry.update(|info| info.read()).await
-}
-
-fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag> {
-    use std::collections::hash_map::Entry::*;
-
-    let mut map: HashMap<&Tag, _> = Default::default();
-    for script in repo.iter_mut(Visibility::All) {
-        let script = script.into_inner();
-        let date = script.last_major_time();
-        for tag in script.tags.iter() {
-            match map.entry(tag) {
-                Occupied(entry) => {
-                    let date_mut = entry.into_mut();
-                    *date_mut = std::cmp::max(date, *date_mut);
-                }
-                Vacant(entry) => {
-                    entry.insert(date);
-                }
-            }
-        }
-    }
-    let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k, v)).collect();
-    v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
-    v.into_iter().map(|(k, _)| k)
 }
 
 async fn process_event_by_id<'a>(is_humble: bool, repo: RepoHolder<'a>, event_id: u64) -> Result {

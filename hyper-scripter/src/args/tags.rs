@@ -21,12 +21,6 @@ pub enum TagsSubs {
         name: Option<String>,
         content: TagSelector,
     },
-    LS {
-        #[arg(long, short)]
-        known: bool,
-        #[arg(long, short, conflicts_with = "known")]
-        named: bool,
-    },
     Toggle {
         names: Vec<String>,
     },
@@ -35,12 +29,6 @@ pub enum TagsSubs {
 impl Tags {
     pub fn sanitize(&mut self) -> Result<(), ClapError> {
         match self.subcmd.as_ref() {
-            None => {
-                self.subcmd = Some(TagsSubs::LS {
-                    named: false,
-                    known: false,
-                })
-            }
             Some(TagsSubs::Other(args)) => {
                 let args = ["tags", "set"]
                     .into_iter()

@@ -14,8 +14,6 @@ use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
-mod completion;
-pub use completion::*;
 mod tags;
 pub use tags::*;
 mod help_str;
@@ -64,7 +62,7 @@ pub struct RootArgs {
         conflicts_with = "recent",
         help = "Shorthand for `-s=all,^remove --timeless`"
     )]
-    all: bool,
+    pub all: bool,
     #[arg(long, global = true, help = "Show scripts within recent days.")]
     pub recent: Option<u32>,
     #[arg(
@@ -473,6 +471,13 @@ impl Root {
         }
         Ok(())
     }
+    pub fn from_args(root_args: RootArgs) -> Self {
+        Root {
+            is_from_alias: false,
+            subcmd: None,
+            root_args,
+        }
+    }
     pub fn sanitize_flags(&mut self, bang: bool) {
         if bang {
             self.root_args.timeless = true;
@@ -497,9 +502,6 @@ impl Root {
             Some(Subs::Tags(tags)) => {
                 tags.sanitize()?;
             }
-            Some(Subs::Types(types)) => {
-                types.sanitize()?;
-            }
             None => {
                 log::info!("無參數模式");
                 self.subcmd = Some(Subs::Edit {
@@ -520,14 +522,14 @@ impl Root {
 
 pub enum ArgsResult {
     Normal(Root),
-    Completion(Completion),
+    Completion(Vec<String>),
     Shell(Vec<String>),
     Err(ClapError),
 }
 
 pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
-    if let Some(completion) = Completion::from_args(&args) {
-        return Ok(ArgsResult::Completion(completion));
+    if args.get(1).map(String::as_str) == Some("completion-subcommand") {
+        return Ok(ArgsResult::Completion(args));
     }
     let mut root = handle_alias_args(args)?;
     if let ArgsResult::Normal(root) = &mut root {
@@ -722,7 +724,6 @@ mod test {
             &build_args("--humble"),
             &build_args("--humble edit -")
         ));
-        assert!(is_args_eq(&build_args("tags"), &build_args("tags ls")));
     }
     #[test]
     fn test_disable_help() {

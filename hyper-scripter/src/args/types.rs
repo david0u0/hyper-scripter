@@ -5,7 +5,7 @@ use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize)]
 pub struct Types {
-    #[arg(long, conflicts_with = "ty")]
+    #[arg(long, conflicts_with_all = &["ty", "edit"])]
     pub no_sub: bool,
     #[arg(long, short, requires = "ty")]
     pub edit: bool,

@@ -531,7 +531,7 @@ pub mod ls {
     pub(super) const CMD: Command<GlobalID> = Command {
         name: "ls",
         description: "List hyper scripts",
-        all_flags: &[VAL_LONG, VAL_GROUPING, VAL_LIMIT, VAL_PLAIN, VAL_FORMAT, super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
+        all_flags: &[VAL_LONG, VAL_GROUPING, VAL_LIMIT, VAL_PLAIN, VAL_FORMAT, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
         args: &[VAL_QUERIES],
         commands: &[],
     };
@@ -569,7 +569,7 @@ pub mod types {
     pub(super) const CMD: Command<GlobalID> = Command {
         name: "types",
         description: "Manage script types",
-        all_flags: &[VAL_NO_SUB, VAL_EDIT, super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
+        all_flags: &[VAL_NO_SUB, VAL_EDIT],
         args: &[VAL_TY],
         commands: &[],
     };
@@ -679,7 +679,7 @@ pub mod tags {
     pub(super) const CMD: Command<GlobalID> = Command {
         name: "tags",
         description: "Manage script tags",
-        all_flags: &[super::VAL_NO_TRACE, super::VAL_HUMBLE, super::VAL_ARCHAEOLOGY, super::VAL_SELECT, super::VAL_ALL, super::VAL_RECENT, super::VAL_TIMELESS],
+        all_flags: &[],
         args: &[EXTERNAL],
         commands: &[unset::CMD, set::CMD, toggle::CMD],
     };
@@ -700,7 +700,7 @@ pub mod tags {
         pub(super) const CMD: Command<GlobalID> = Command {
             name: "unset",
             description: "",
-            all_flags: &[super::super::VAL_NO_TRACE, super::super::VAL_HUMBLE, super::super::VAL_ARCHAEOLOGY, super::super::VAL_SELECT, super::super::VAL_ALL, super::super::VAL_RECENT, super::super::VAL_TIMELESS],
+            all_flags: &[],
             args: &[VAL_NAME],
             commands: &[],
         };
@@ -731,7 +731,7 @@ pub mod tags {
         pub(super) const CMD: Command<GlobalID> = Command {
             name: "set",
             description: "",
-            all_flags: &[VAL_NAME, super::super::VAL_NO_TRACE, super::super::VAL_HUMBLE, super::super::VAL_ARCHAEOLOGY, super::super::VAL_SELECT, super::super::VAL_ALL, super::super::VAL_RECENT, super::super::VAL_TIMELESS],
+            all_flags: &[VAL_NAME],
             args: &[VAL_CONTENT],
             commands: &[],
         };
@@ -753,7 +753,7 @@ pub mod tags {
         pub(super) const CMD: Command<GlobalID> = Command {
             name: "toggle",
             description: "",
-            all_flags: &[super::super::VAL_NO_TRACE, super::super::VAL_HUMBLE, super::super::VAL_ARCHAEOLOGY, super::super::VAL_SELECT, super::super::VAL_ALL, super::super::VAL_RECENT, super::super::VAL_TIMELESS],
+            all_flags: &[],
             args: &[VAL_NAMES],
             commands: &[],
         };

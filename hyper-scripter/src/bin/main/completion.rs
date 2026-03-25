@@ -1,6 +1,5 @@
-use crate::def::{self, ID};
 use clap::Parser;
-use hyper_scripter::args::{AliasRoot, Root, RootArgs};
+use hyper_scripter::args::{AliasRoot, History, List, Root, RootArgs, Subs, Tags, Types};
 use hyper_scripter::config::Config;
 use hyper_scripter::error::Error;
 use hyper_scripter::error::Result;
@@ -11,7 +10,7 @@ use hyper_scripter::util::{get_types, init_repo, main_util};
 use hyper_scripter::{Either, SEP};
 use std::cmp::Reverse;
 use std::io::stdout;
-use supplement::{Completion, CompletionGroup, History, Shell};
+use supplement::{Completion, CompletionGroup, Seen, Shell, Supplement};
 
 // FIXME: Every `init_repo` here may create DB file if there isn't one. Shouldn't do that.
 
@@ -94,7 +93,7 @@ pub async fn handle_completion_no_alias(
     args: impl Iterator<Item = String>,
     repo: &mut Option<ScriptRepo>,
 ) -> Result {
-    let (history, grp) = def::CMD.supplement(args)?;
+    let (history, grp) = Root::supplement(args)?;
     let ready = match grp {
         CompletionGroup::Ready(r) => r,
         CompletionGroup::Unready { unready, id, value } => {
@@ -106,13 +105,10 @@ pub async fn handle_completion_no_alias(
     Ok(())
 }
 
-fn get_root(history: &History<ID>) -> Result<Root> {
-    let select = history.find(def::ID_VAL_SELECT).map(|h| &h.values);
-    let select: Vec<_> = select
-        .iter()
-        .flat_map(|v| v.iter())
-        .map(|s| s.parse().unwrap())
-        .collect();
+type ID = <Root as Supplement>::ID;
+fn get_root(ctx: ID, seen: &Seen) -> Result<Root> {
+    let ctx = ctx.root_args;
+    let select = ctx.select(seen).map(|s| s.unwrap()).collect();
 
     let root_args = RootArgs {
         select,
@@ -120,18 +116,13 @@ fn get_root(history: &History<ID>) -> Result<Root> {
         no_trace: false,
         humble: false,
         prompt_level: None,
-        no_alias: history.find(def::ID_VAL_NO_ALIAS).is_some(),
-        hs_home: history.find(def::ID_VAL_HS_HOME).map(|h| h.value.clone()),
-        archaeology: history.find(def::ID_VAL_ARCHAEOLOGY).is_some(),
-        all: history.find(def::ID_VAL_ALL).is_some(),
-        timeless: history.find(def::ID_VAL_TIMELESS).is_some(),
-        toggle: history
-            .find(def::ID_VAL_TOGGLE)
-            .map(|h| h.values.clone())
-            .unwrap_or_default(),
-        recent: history
-            .find(def::ID_VAL_RECENT)
-            .map(|r| r.value.parse().unwrap()),
+        no_alias: ctx.no_alias(seen) != 0,
+        hs_home: ctx.hs_home(seen).map(str::to_string),
+        archaeology: ctx.archaeology(seen) != 0,
+        all: ctx.all(seen) != 0,
+        timeless: ctx.timeless(seen) != 0,
+        toggle: ctx.toggle(seen).map(str::to_string).collect(),
+        recent: ctx.recent(seen).map(|x| x.unwrap()),
     };
 
     log::info!("parsed root args: {root_args:?}");
@@ -186,9 +177,7 @@ async fn complete_script_with_root(
             .map(|s| {
                 let name = format!("{}{}{}", exact_str, s.name.key(), bang_str);
                 // `always_match` to mimic the "reorder fuzzy" behavior
-                Completion::new(name.clone(), name)
-                    .group("scripts")
-                    .always_match()
+                Completion::new(name, value).group("scripts").always_match()
             })
             .collect()
     };
@@ -197,10 +186,11 @@ async fn complete_script_with_root(
 
 async fn complete_script(
     value: &str,
-    history: &History<ID>,
+    ctx: ID,
+    seen: &Seen,
     repo: &mut Option<ScriptRepo>,
 ) -> Result<Vec<Completion>> {
-    let root = get_root(history)?;
+    let root = get_root(ctx, seen)?;
     complete_script_with_root(value, root, repo).await
 }
 
@@ -208,15 +198,9 @@ fn list_types_with_root(sub_types: bool) -> Result<impl Iterator<Item = Completi
     let types = get_types(sub_types)?;
     Ok(types.into_iter().map(|ty| empty(ty).group("types")))
 }
-fn list_types(history: &History<ID>, sub_types: bool) -> Result<impl Iterator<Item = Completion>> {
-    get_root(history)?;
+fn list_types(ctx: ID, seen: &Seen, sub_types: bool) -> Result<impl Iterator<Item = Completion>> {
+    get_root(ctx, seen)?;
     list_types_with_root(sub_types)
-}
-
-macro_rules! id {
-    ($($id:tt)+) => {
-        supplement::helper::id!(def $($id )+)
-    };
 }
 
 fn complete_alias() -> impl Iterator<Item = Completion> {
@@ -226,46 +210,65 @@ fn complete_alias() -> impl Iterator<Item = Completion> {
     })
 }
 
+fn prefix_plus(value: &str, mut comps: Vec<Completion>) -> Vec<Completion> {
+    if !value.starts_with('+') && !value.is_empty() {
+        return comps;
+    }
+    comps.extend(
+        comps
+            .clone()
+            .into_iter()
+            .map(|c| c.value(|v| format!("+{v}"))),
+    );
+    comps
+}
+
+macro_rules! id {
+    ($($id:tt)+) => {
+        supplement::helper::id!(Root . $($id )+)
+    };
+}
+
 async fn handle_comp(
     id: ID,
-    history: History<ID>,
+    history: Seen,
     value: &str,
     repo: &mut Option<ScriptRepo>,
 ) -> Result<Vec<Completion>> {
     log::info!("handle completion for {id:?}");
     let v = match id {
-        id!(recent)
-        | id!(top id)
-        | id!(ls limit)
-        | id!(ls format)
-        | id!(run repeat)
-        | id!(cat with)
-        | id!(edit content)
-        | id!(alias after)
-        | id!(history show offset)
-        | id!(history show limit)
-        | id!(history rm range)
-        | id!(history amend event_id)
-        | id!(history rm_id event_id)
-        | id!(history amend env)
-        | id!(history humble event_id) => vec![],
+        id!(root_args RootArgs.recent)
+        | id!(subcmd Subs.Top.id)
+        | id!(subcmd Subs.LS List.limit)
+        | id!(subcmd Subs.LS List.format)
+        | id!(subcmd Subs.Run.repeat)
+        | id!(subcmd Subs.Cat.with)
+        | id!(subcmd Subs.Edit.content)
+        | id!(subcmd Subs.Alias.after)
+        | id!(subcmd Subs.History.subcmd History.Show.offset)
+        | id!(subcmd Subs.History.subcmd History.Show.limit)
+        | id!(subcmd Subs.History.subcmd History.RM.range)
+        | id!(subcmd Subs.History.subcmd History.Amend.event_id)
+        | id!(subcmd Subs.History.subcmd History.Amend.env)
+        | id!(subcmd Subs.History.subcmd History.RMID.event_id)
+        | id!(subcmd Subs.History.subcmd History.Humble.event_id) => vec![],
 
-        id!(hs_home)
-        | id!(run dir)
-        | id!(history show dir)
-        | id!(history rm dir)
-        | id!(history amend args)
-        | id!(run args) => Completion::files(value).collect(),
+        id!(root_args RootArgs.hs_home)
+        | id!(subcmd Subs.Run.dir)
+        | id!(subcmd Subs.Run.args)
+        | id!(subcmd Subs.History.subcmd History.Show.dir)
+        | id!(subcmd Subs.History.subcmd History.Amend.args) => std::process::exit(1),
 
-        id!(recent recent_filter) => {
+        id!(subcmd Subs.Recent.recent_filter) => {
             vec![empty("no-neglect"), empty("timeless")]
         }
-        id!(@ext) if history.find(def::ID_EXTERNAL).is_some() => {
+
+        id!(subcmd Subs.Other(ctx)) if ctx.values(&history).len() > 0 => {
             // Not the first position
-            Completion::files(value).collect()
+            std::process::exit(1)
         }
-        id!(@ext) => {
-            let root = get_root(&history)?;
+        id!(subcmd Subs.Other(ctx)) => {
+            let root = get_root(id, &history)?;
             let no_alias = root.root_args.no_alias;
             let mut comps = complete_script_with_root(value, root, repo).await?;
             if !no_alias {
@@ -274,76 +277,72 @@ async fn handle_comp(
             }
             comps
         }
-        id!(alias before) => {
-            get_root(&history)?;
+        id!(subcmd Subs.Alias.before) => {
+            get_root(id, &history)?;
             complete_alias().collect()
         }
-        id!(toggle) | id!(tags toggle names) | id!(tags set name) | id!(tags unset name) => {
-            get_root(&history)?;
+        id!(root_args RootArgs.toggle)
+        | id!(subcmd Subs.Tags.subcmd Tags.Toggle.names)
+        | id!(subcmd Subs.Tags.subcmd Tags.Set.name)
+        | id!(subcmd Subs.Tags.subcmd Tags.Unset.name) => {
+            get_root(id, &history)?;
             Config::get()
                 .tag_selectors
                 .iter()
                 .map(|s| empty(&s.name))
                 .collect()
         }
-        id!(select) => {
-            let root = get_root(&history)?;
+        id!(root_args RootArgs.select) => {
+            let root = get_root(id, &history)?;
             *repo = Some(init_repo(root.root_args, false).await?);
 
             let types = list_types_with_root(false)?.map(|c| c.value(|v| format!("@{v}!")));
             let tags = main_util::known_tags_iter(repo.as_mut().unwrap())
                 .map(|ty| empty(format!("{ty}!")).group("tags"));
-            let mut comps: Vec<_> = types.chain(tags).collect();
-            comps.extend(
-                comps
-                    .clone()
-                    .into_iter()
-                    .map(|c| c.value(|v| format!("+{v}"))),
-            );
-            comps
+            let comps: Vec<_> = types.chain(tags).collect();
+            prefix_plus(value, comps)
         }
-        id!(tags @ext) if history.find(def::tags::ID_EXTERNAL).is_some() => {
+        id!(subcmd Subs.Other(ctx)) if ctx.values(&history).len() > 0 => {
             // Not the first position
             vec![]
         }
-        id!(tags @ext) | id!(tags set content) => {
-            let root = get_root(&history)?;
+        id!(subcmd Subs.Other) => {
+            let root = get_root(id, &history)?;
             *repo = Some(init_repo(root.root_args, false).await?);
             let tags = main_util::known_tags_iter(repo.as_mut().unwrap())
                 .map(|ty| empty(format!("+{ty}")).group("tags"));
             tags.collect()
         }
-        id!(edit tags) | id!(mv tags) | id!(cp tags) => {
-            let root = get_root(&history)?;
+        id!(subcmd Subs.Edit.tags) | id!(subcmd Subs.MV.tags) | id!(subcmd Subs.CP.tags) => {
+            let root = get_root(id, &history)?;
             *repo = Some(init_repo(root.root_args, false).await?);
             let tags = main_util::known_tags_iter(repo.as_mut().unwrap())
                 .map(|ty| empty(ty).group("tags"));
-            let mut tags: Vec<_> = tags.collect();
-            tags.extend(
-                tags.clone()
-                    .into_iter()
-                    .map(|c| c.value(|v| format!("+{v}"))),
-            );
-            tags
+            let tags: Vec<_> = tags.collect();
+            prefix_plus(value, tags)
         }
-        id!(cat queries)
-        | id!(which queries)
-        | id!(edit edit_query)
-        | id!(help args)
-        | id!(mv origin)
-        | id!(cp origin)
-        | id!(mv new)
-        | id!(cp new)
-        | id!(ls queries)
-        | id!(rm queries)
-        | id!(run script_query)
-        | id!(top queries)
-        | id!(history neglect queries)
-        | id!(history show queries)
-        | id!(history rm queries) => complete_script(value, &history, repo).await?,
+        id!(subcmd Subs.Cat.queries)
+        | id!(subcmd Subs.Which.queries)
+        | id!(subcmd Subs.Edit.edit_query)
+        | id!(subcmd Subs.Help.args)
+        | id!(subcmd Subs.MV.origin)
+        | id!(subcmd Subs.CP.origin)
+        | id!(subcmd Subs.MV.new)
+        | id!(subcmd Subs.CP.new)
+        | id!(subcmd Subs.LS List.queries)
+        | id!(subcmd Subs.RM.queries)
+        | id!(subcmd Subs.Run.script_query)
+        | id!(subcmd Subs.History.subcmd History.Neglect.queries)
+        | id!(subcmd Subs.History.subcmd History.Show.queries)
+        | id!(subcmd Subs.History.subcmd History.RM.queries)
+        | id!(subcmd Subs.Top.queries) => complete_script(value, id, &history, repo).await?,
 
-        id!(mv ty) => list_types(&history, false)?.collect(),
-        id!(edit ty) | id!(types ty) => list_types(&history, true)?.collect(),
+        id!(subcmd Subs.MV.ty) => list_types(id, &history, false)?.collect(),
+        id!(subcmd Subs.Edit.ty) | id!(subcmd Subs.Types Types.ty) => {
+            list_types(id, &history, true)?.collect()
+        }
+
+        _ => todo!(),
     };
 
     Ok(v)

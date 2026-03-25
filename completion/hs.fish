@@ -1,11 +1,16 @@
 function __do_completion
     set cmd (commandline -c)
     set cmd_arr (string split ' ' $cmd)
-    if [ -z "$cmd_arr[-1]" ]
+    set cur "$cmd_arr[-1]"
+    if [ -z "$cur" ]
         # preserve the last white space
         echo completion-subsystem fish $cmd "''" | xargs hs
     else
         echo completion-subsystem fish $cmd | xargs hs
+    end
+
+    if [ "$status" != "0" ]
+        complete -C "'' $cur"
     end
 end
 

@@ -1,7 +1,9 @@
+#![feature(more_qualified_paths)]
+
 use futures::future::try_join_all;
 use fxhash::FxHashSet as HashSet;
 use hyper_scripter::args::{
-    self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, TagsSubs, Types,
+    self, ArgsResult, History, HistoryDisplay, List, Root, Subs, Tags, Types,
 };
 use hyper_scripter::config::{config_file, Config, NamedTagSelector};
 use hyper_scripter::db;
@@ -26,7 +28,6 @@ use hyper_scripter::util::{
 use hyper_scripter_historian::{Historian, LastTimeRecord};
 
 mod completion;
-mod def;
 
 #[tokio::main]
 async fn main() {
@@ -483,9 +484,9 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
             }
         }
-        Subs::Tags(Tags {
-            subcmd: Some(TagsSubs::Unset { name }),
-        }) => {
+        Subs::Tags {
+            subcmd: Some(Tags::Unset { name }),
+        } => {
             let conf = conf_mut!();
             let pos = conf
                 .tag_selectors
@@ -497,9 +498,9 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 })?;
             conf.tag_selectors.remove(pos);
         }
-        Subs::Tags(Tags {
-            subcmd: Some(TagsSubs::Toggle { names }),
-        }) => {
+        Subs::Tags {
+            subcmd: Some(Tags::Toggle { names }),
+        } => {
             let conf = conf_mut!();
             for name in names.into_iter() {
                 let selector = conf
@@ -513,7 +514,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 selector.inactivated = !selector.inactivated;
             }
         }
-        Subs::Tags(Tags { subcmd: None }) => {
+        Subs::Tags { subcmd: None } => {
             let repo = repo.init().await?;
             print!("known tags:\n  ");
             print_iter(main_util::known_tags_iter(repo), " ");
@@ -535,9 +536,9 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             print!("  {}", conf.main_tag_selector);
             println!();
         }
-        Subs::Tags(Tags {
-            subcmd: Some(TagsSubs::Set { content, name }),
-        }) => {
+        Subs::Tags {
+            subcmd: Some(Tags::Set { content, name }),
+        } => {
             let conf = conf_mut!();
             if let Some(name) = name {
                 log::debug!("處理選擇器 {:?}", name);

@@ -12,19 +12,8 @@ fn split_and_sort(s: &str) -> Vec<String> {
 }
 
 fn run_completion(cmd: &str) -> Result<String, Error> {
-    let home = get_home();
-    let completion_file = format!("{}/../completion/hs.fish", env!("CARGO_MANIFEST_DIR"));
-    let fish_cmd = format!(
-        "source {} && complete -C 'hs -H {} {}'",
-        completion_file,
-        home.to_string_lossy(),
-        cmd
-    );
-    run_cmd(
-        "fish",
-        &["--no-config", "-c", &fish_cmd],
-        Default::default(),
-    )
+    let trailing = if cmd.ends_with(" ") { "''" } else { "" };
+    run!(completion: true, "{cmd}{trailing}")
 }
 
 fn setup_scripts() {
@@ -38,8 +27,8 @@ fn setup_scripts() {
 #[test]
 fn test_reorder_name() {
     setup_scripts();
-    assert_eq!("test/1\ttest/1", run_completion("1test").unwrap());
-    assert_eq!("test/3\ttest/3", run_completion("3test").unwrap());
+    assert_eq!("test/1\t1test", run_completion("1test").unwrap());
+    assert_eq!("test/3\t3test", run_completion("3test").unwrap());
 }
 
 #[test]
@@ -51,8 +40,8 @@ fn test_time_order() {
         run_completion("ls ").unwrap()
     );
     assert_eq!(
-        "test/3\ttest/3\ntest/1\ttest/1",
-        run_completion("tes").unwrap()
+        "test/3\ttest\ntest/1\ttest",
+        run_completion("test").unwrap()
     );
 
     run!("cat test/1").unwrap();
@@ -62,41 +51,41 @@ fn test_time_order() {
         run_completion("ls ").unwrap()
     );
     assert_eq!(
-        "test/1\ttest/1\ntest/3\ttest/3",
-        run_completion("tes").unwrap()
+        "test/1\ttest\ntest/3\ttest",
+        run_completion("test").unwrap()
     );
 }
 
 #[test]
 fn test_bang() {
     setup_scripts();
-    const PARTIAL: &str = "test/3\ttest/3\ntest/1\ttest/1";
-    const ALL: &str = "test/3!\ttest/3!\ntest/2!\ttest/2!\ntest/1!\ttest/1!";
+    const PARTIAL: &str = "test/3\ttest\ntest/1\ttest";
+    const ALL: &str = "test/3!\ttest!\ntest/2!\ttest!\ntest/1!\ttest!";
 
-    assert_eq!(PARTIAL, run_completion("tes").unwrap());
-    assert_eq!(ALL, run_completion("tes!").unwrap());
+    assert_eq!(PARTIAL, run_completion("test").unwrap());
+    assert_eq!(ALL, run_completion("test!").unwrap());
 
-    assert_eq!(PARTIAL, run_completion("ls tes").unwrap());
-    assert_eq!(ALL, run_completion("ls tes!").unwrap());
+    assert_eq!(PARTIAL, run_completion("ls test").unwrap());
+    assert_eq!(ALL, run_completion("ls test!").unwrap());
 
     // test when alias
-    assert_eq!(PARTIAL, run_completion("e tes").unwrap());
-    assert_eq!(ALL, run_completion("e tes!").unwrap());
+    assert_eq!(PARTIAL, run_completion("e test").unwrap());
+    assert_eq!(ALL, run_completion("e test!").unwrap());
 
     // test when complex alias
     run!("alias c cat --with 'bat --paging=always'").unwrap();
-    assert_eq!(PARTIAL, run_completion("c tes").unwrap());
-    assert_eq!(ALL, run_completion("c tes!").unwrap());
+    assert_eq!(PARTIAL, run_completion("c test").unwrap());
+    assert_eq!(ALL, run_completion("c test!").unwrap());
 }
 
 #[test]
 fn test_tags_and_types() {
     setup_scripts();
 
-    const ALL_TAGS: &str = "+new-tag\t+new-tag\n+hide\t+hide\n+remove\t+remove\n+all\t+all";
+    const ALL_TAGS: &str = "+new-tag\ttags\n+hide\ttags\n+remove\ttags\n+all\ttags";
 
     assert_eq!(
-        split_and_sort("pin\nno-hidden\nno-removed"),
+        split_and_sort("pin\t+pin,util\nno-hidden\t+^hide!\nno-removed\t+^remove!"),
         split_and_sort(&run_completion("t set --name ").unwrap())
     );
     assert_eq!(

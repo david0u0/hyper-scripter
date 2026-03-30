@@ -36,6 +36,7 @@ pub struct RunEnv {
     pub silent: Option<bool>,
     pub allow_other_error: Option<bool>,
     pub custom_env: Option<Vec<(String, String)>>,
+    pub completion: Option<bool>,
 }
 
 macro_rules! run {
@@ -182,8 +183,15 @@ pub fn run_with_env<T: ToString>(env: RunEnv, args: T) -> Result<String> {
         None => get_home(),
     };
     let home = home.to_string_lossy();
-    let mut full_args: Vec<_> = ["-H", home.as_ref(), "--prompt-level", "never"]
-        .iter()
+    let full_args: &[_] = if env.completion == Some(true) {
+        &["completion-subsystem", "fish", "hs"]
+    } else {
+        &[]
+    };
+
+    let mut full_args: Vec<String> = full_args
+        .into_iter()
+        .chain(["-H", home.as_ref(), "--prompt-level", "never"].iter())
         .map(|s| s.to_string())
         .collect();
     let args = args.to_string();

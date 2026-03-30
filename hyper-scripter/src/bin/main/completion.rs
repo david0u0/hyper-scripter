@@ -133,15 +133,17 @@ fn get_root(ctx: ID, seen: &Seen) -> Result<Root> {
 }
 
 async fn complete_script_with_root(
-    mut value: &str,
+    og_value: &str,
     mut root: Root,
     repo: &mut Option<ScriptRepo>,
 ) -> Result<Vec<Completion>> {
-    let bang = value.ends_with("!");
+    let bang = og_value.ends_with("!");
     let bang_str = if bang { "!" } else { "" };
-    if bang {
-        value = &value[..value.len() - 1];
-    }
+    let mut value = if bang {
+        &og_value[..og_value.len() - 1]
+    } else {
+        og_value
+    };
 
     root.sanitize_flags(bang);
     *repo = Some(init_repo(root.root_args, false).await?);
@@ -177,7 +179,9 @@ async fn complete_script_with_root(
             .map(|s| {
                 let name = format!("{}{}{}", exact_str, s.name.key(), bang_str);
                 // `always_match` to mimic the "reorder fuzzy" behavior
-                Completion::new(name, value).group("scripts").always_match()
+                Completion::new(name, og_value)
+                    .group("scripts")
+                    .always_match()
             })
             .collect()
     };
@@ -229,6 +233,12 @@ macro_rules! id {
     };
 }
 
+pub fn known_tags_select_iter(repo: &mut ScriptRepo) -> impl Iterator<Item = String> + use<'_> {
+    main_util::known_tags_iter(repo)
+        .map(|s| s.to_string())
+        .chain(["remove".to_owned(), "all".to_owned()].into_iter())
+}
+
 async fn handle_comp(
     id: ID,
     history: Seen,
@@ -243,7 +253,6 @@ async fn handle_comp(
         | id!(subcmd Subs.LS List.format)
         | id!(subcmd Subs.Run.repeat)
         | id!(subcmd Subs.Cat.with)
-        | id!(subcmd Subs.Edit.content)
         | id!(subcmd Subs.Alias.after)
         | id!(subcmd Subs.History.subcmd History.Show.offset)
         | id!(subcmd Subs.History.subcmd History.Show.limit)
@@ -254,9 +263,11 @@ async fn handle_comp(
         | id!(subcmd Subs.History.subcmd History.Humble.event_id) => vec![],
 
         id!(root_args RootArgs.hs_home)
+        | id!(subcmd Subs.Edit.content)
         | id!(subcmd Subs.Run.dir)
         | id!(subcmd Subs.Run.args)
         | id!(subcmd Subs.History.subcmd History.Show.dir)
+        | id!(subcmd Subs.History.subcmd History.RM.dir)
         | id!(subcmd Subs.History.subcmd History.Amend.args) => std::process::exit(1),
 
         id!(subcmd Subs.Recent.recent_filter) => {
@@ -267,7 +278,7 @@ async fn handle_comp(
             // Not the first position
             std::process::exit(1)
         }
-        id!(subcmd Subs.Other(ctx)) => {
+        id!(subcmd Subs.Other) => {
             let root = get_root(id, &history)?;
             let no_alias = root.root_args.no_alias;
             let mut comps = complete_script_with_root(value, root, repo).await?;
@@ -289,7 +300,7 @@ async fn handle_comp(
             Config::get()
                 .tag_selectors
                 .iter()
-                .map(|s| empty(&s.name))
+                .map(|s| Completion::new(&s.name, &s.content))
                 .collect()
         }
         id!(root_args RootArgs.select) => {
@@ -297,19 +308,19 @@ async fn handle_comp(
             *repo = Some(init_repo(root.root_args, false).await?);
 
             let types = list_types_with_root(false)?.map(|c| c.value(|v| format!("@{v}!")));
-            let tags = main_util::known_tags_iter(repo.as_mut().unwrap())
+            let tags = known_tags_select_iter(repo.as_mut().unwrap())
                 .map(|ty| empty(format!("{ty}!")).group("tags"));
             let comps: Vec<_> = types.chain(tags).collect();
             prefix_plus(value, comps)
         }
-        id!(subcmd Subs.Other(ctx)) if ctx.values(&history).len() > 0 => {
+        id!(subcmd Subs.Tags.subcmd Tags.Other(ctx)) if ctx.values(&history).len() > 0 => {
             // Not the first position
             vec![]
         }
-        id!(subcmd Subs.Other) => {
+        id!(subcmd Subs.Tags.subcmd Tags.Set.content) | id!(subcmd Subs.Tags.subcmd Tags.Other) => {
             let root = get_root(id, &history)?;
             *repo = Some(init_repo(root.root_args, false).await?);
-            let tags = main_util::known_tags_iter(repo.as_mut().unwrap())
+            let tags = known_tags_select_iter(repo.as_mut().unwrap())
                 .map(|ty| empty(format!("+{ty}")).group("tags"));
             tags.collect()
         }
@@ -341,8 +352,6 @@ async fn handle_comp(
         id!(subcmd Subs.Edit.ty) | id!(subcmd Subs.Types Types.ty) => {
             list_types(id, &history, true)?.collect()
         }
-
-        _ => todo!(),
     };
 
     Ok(v)

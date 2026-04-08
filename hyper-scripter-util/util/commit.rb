@@ -8,11 +8,17 @@
 # [HS_HELP]: Consecutive auto-generated commit with same message will be merged (using --amend)
 # [HS_HELP]:
 # [HS_HELP]: USAGE:
-# [HS_HELP]:     hs commit [-d, --dump_history]
+# [HS_HELP]:     hs commit [-d, --dump-history]
 
 
 require_relative './common'
 require 'optparse'
+
+INFO_SQL = '.script_info.sql'
+
+def sys(cmd)
+  system(cmd, exception: true)
+end
 
 dump_history = false
 opt = OptionParser.new do |opts|
@@ -24,17 +30,22 @@ end
 opt.parse!
 
 def dump_db(dump_history)
-  require 'tempfile'
-  file = Tempfile.new('script_info')
-  system("cp .script_info.db #{file.path}")
-
   if dump_history
-    system("sqlite3 .script_history.db '.dump' > .script_history.sql")
+    sys("sqlite3 .script_history.db '.dump' > .script_history.sql")
+    sys("sqlite3 .script_info.db '.dump' > #{INFO_SQL}")
   else
-    system("sqlite3 #{file.path} 'DELETE FROM last_events'")
+    warn "cleaning history..."
+    require 'tempfile'
+    file = Tempfile.new('script_info')
+    sys("cp .script_info.db #{file.path}")
+    sys("sqlite3 #{file.path} 'DELETE FROM last_events'")
+    if File.exist?(INFO_SQL)
+      event_file = Tempfile.new('script_info')
+      sys("sqlite3 #{event_file.path} < #{INFO_SQL}")
+      sys("sqlite3 #{event_file.path} '.mode insert last_events' 'select * from last_events' | sqlite3 #{file.path}")
+    end
+    sys("sqlite3 #{file.path} '.dump' > #{INFO_SQL}")
   end
-
-  system("sqlite3 #{file.path} '.dump' > .script_info.sql")
 end
 
 REAL_HS_HOME = File.realpath(HS_ENV.home)
@@ -75,7 +86,7 @@ def get_branch_state
     :up_to_date
   end
 end
-system('git fetch --all', exception: true)
+sys('git fetch --all')
 branch_state = get_branch_state
 warn "branch state = #{branch_state}"
 
@@ -109,22 +120,22 @@ recur_check_dirty(GIT_HOME)
 
 if branch_state == :behind
   # Check if remote had changed
-  system('git add -A', exception: true)
-  system('git stash', exception: true)
+  sys('git add -A')
+  sys('git stash')
 
   if File.exist?(REAL_HS_HOME) # else: hs home was just created, no need to check
     diff = run_cmd("git diff --stat #{REMOTE}/#{BRANCH} #{REAL_HS_HOME}").chop
     unless diff.empty?
       warn 'remote home had changed!'
       warn diff
-      system('git stash pop', exception: true)
+      sys('git stash pop')
       exit 1
     end
   end
 
   # prepare the files
-  system('git pull', exception: true)
-  system('git stash pop', exception: true)
+  sys('git pull')
+  sys('git stash pop')
 end
 
 # create the commit
@@ -134,12 +145,12 @@ date = Time.now.utc
 date_str = date.strftime('%Y-%m-%d')
 msg = "[Auto Commit #{date_str} (#{File.basename(REAL_HS_HOME)})]"
 
-system('git add -A', exception: true)
+sys('git add -A')
 if last_commit_msg.start_with?(msg)
   warn 'Amend the last commit'
 else
   warn 'Create new commit'
-  system("git commit -m '#{msg}'", exception: true)
+  sys("git commit -m '#{msg}'")
 end
 
-system('git commit --amend', exception: true)
+sys('git commit --amend')

@@ -256,7 +256,7 @@ impl Display for ScriptFullType {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExecInfo {
     pub cmd: String,
-    ext: Option<String>,
+    pub ext: Option<String>,
     args: Vec<String>,
 }
 impl ExecInfo {

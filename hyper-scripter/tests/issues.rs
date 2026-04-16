@@ -11,9 +11,14 @@ fn test_mv_same_name() {
     println!("移動腳本時，若前後腳本的路徑相同（腳本分類所致），應順利改動");
     let _g = setup();
 
-    run!("e test1 | echo 1").unwrap();
-    run!("e test2 | echo 2").unwrap();
+    run!(
+        "e -T txt test1 | #!/usr/bin/env bash
+        echo 1"
+    )
+    .unwrap();
+    run!("e -T txt test2 | echo 2").unwrap();
 
+    assert_ne!(run!("test1").unwrap(), "1");
     run!("mv test1 -T tmux").unwrap();
     assert_eq!(run!("test1").unwrap(), "1");
 
@@ -370,11 +375,11 @@ fn test_existing_path() {
     let _g = setup();
 
     let _ = ScriptTest::new("dir/file", None, None);
-    run!("e =dir -T txt | echo 1").expect_err("與目錄撞路徑");
+    run!("e =dir -T txt | echo 1").expect("與目錄撞路徑不應出錯");
     run!("e =dir/file.sh -T txt | echo 1").expect_err("與既存腳本撞路徑");
     run!("e =dir/file.sh/file | echo 1").unwrap_err();
 
-    assert_ls_len(1, Some("all"), None);
+    assert_ls_len(2, Some("all"), None);
 }
 
 #[test]
@@ -386,7 +391,7 @@ fn test_unknown_type_strange_ext() {
     let name = "this-name";
     let mut conf = load_conf();
     let ty_conf = conf.types.get_mut(&ty).unwrap();
-    ty_conf.ext = Some("strange-ext".to_owned());
+    ty_conf.exec_info.as_mut().unwrap().ext = Some("strange-ext".to_owned());
     conf.store().unwrap();
 
     run!("e {} -T rb | puts 1", name).unwrap();

@@ -348,3 +348,20 @@ fn test_prev_option() {
     assert_eq!(run!("run --no-trace -p=env").unwrap(), ":A");
     assert_eq!(run!("run --no-trace -p=args").unwrap(), "arg:");
 }
+
+#[test]
+fn test_script_name_conflict_dir_name() {
+    let _g = setup();
+    let a = ScriptTest::new("a/b/c/d.sh/e", None, Some("echo $NAME"));
+    let b = ScriptTest::new("a/b/c/d", None, Some("echo $NAME"));
+
+    assert_eq!(a.run("").unwrap(), "a/b/c/d.sh/e");
+    assert_eq!(b.run("").unwrap(), "a/b/c/d");
+
+    let format = "{{name}}={{file}}";
+    let ls_file = run!("ls --format {} --grouping=none --plain", format).unwrap();
+    assert_eq!(
+        ls_file,
+        "a/b/c/d=a/b/c/d.sh/.cur.sh\na/b/c/d.sh/e=a/b/c/d.sh/e.sh"
+    );
+}

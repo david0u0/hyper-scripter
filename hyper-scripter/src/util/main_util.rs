@@ -256,12 +256,6 @@ fn run(
     let ty = &info.ty;
 
     let script_conf = conf.get_script_conf(ty)?;
-    let cmd_str = if let Some(cmd) = &script_conf.cmd {
-        cmd
-    } else {
-        return Err(Error::PermissionDenied(vec![script_path.to_path_buf()]));
-    };
-
     let env = conf.gen_env(hs_tmpl_val, true)?;
     let ty_env = script_conf.gen_env(hs_tmpl_val)?;
 
@@ -302,13 +296,26 @@ fn run(
         }
     }
 
-    let args = script_conf.args(hs_tmpl_val)?;
+    let mut tmp;
+    let (cmd, args) = match script_conf.exec_info.as_ref() {
+        None => {
+            // TODO: try to avoid this file read? It's done in the caller function
+            tmp = super::shebang_handle::handle(&script_path)?;
+            tmp.1.push(script_path.to_string_lossy().into_owned());
+            (&tmp.0, tmp.1)
+        }
+        Some(exec_info) => {
+            let cmd = &exec_info.cmd;
+            let args = exec_info.args(hs_tmpl_val)?;
+            (cmd, args)
+        }
+    };
+
     let full_args = args
         .iter()
         .map(|s| s.as_str())
         .chain(remaining.iter().map(|s| s.as_str()));
-
-    let mut cmd = super::create_cmd(&cmd_str, full_args);
+    let mut cmd = super::create_cmd(&cmd, full_args);
     set_cmd_envs(&mut cmd);
 
     let code = super::run_cmd(cmd)?;
@@ -452,6 +459,8 @@ pub async fn load_utils(
 
         // NOTE: 創建資料夾
         if let Some(parent) = p.parent() {
+            // TODO: Change this and other `create_dir_all`, to check if a script exist as dir name, and if so, change it to ".cur"
+            // TODO: or maybe not...?
             super::handle_fs_res(&[&p], create_dir_all(parent))?;
         }
 

@@ -5,6 +5,7 @@ use super::{
     SHORT_LATEST_TXT,
 };
 use crate::error::Result;
+use crate::path::get_home;
 use crate::query::{do_list_query, ListQuery};
 use crate::script::ScriptInfo;
 use crate::script_repo::{ScriptRepo, Visibility};
@@ -33,7 +34,7 @@ fn render_general_ident(
         file: Cow<'a, str>,
         ty: Cow<'a, str>,
     }
-    let file = script.file_path_fallback();
+    let file = script.file_path_fallback().rel(get_home());
     let tmpl_val = TmplVal {
         id: script.id,
         file: file.to_string_lossy(),
@@ -60,7 +61,11 @@ pub fn ident_string(
         IdentTemplate::General(t) => return render_general_ident(t, name, ty, script),
         IdentTemplate::Classic => format!("{}({})", name, ty.display()),
         IdentTemplate::Name => name.to_owned(),
-        IdentTemplate::File => script.file_path_fallback().to_string_lossy().to_string(),
+        IdentTemplate::File => script
+            .file_path_fallback()
+            .rel(get_home())
+            .to_string_lossy()
+            .to_string(),
         IdentTemplate::ID => script.id.to_string(),
     };
     Ok(res)

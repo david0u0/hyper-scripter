@@ -227,7 +227,7 @@ pub fn open_script(
     } else {
         name.to_file_path(ty)?
     };
-    let script_path = get_home().join(script_path);
+    let script_path = script_path.abs(get_home());
 
     if let Some(should_exist) = check_exist {
         if !script_path.exists() && should_exist {

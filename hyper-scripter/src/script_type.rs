@@ -1,4 +1,4 @@
-use crate::error::{DisplayError, DisplayResult, Error, FormatCode::ScriptType as TypeCode};
+use crate::error::{DisplayError, DisplayResult, FormatCode::ScriptType as TypeCode, Result};
 use crate::util::illegal_name;
 use crate::util::impl_ser_by_to_string;
 use fxhash::FxHashMap as HashMap;
@@ -43,7 +43,9 @@ writeFile('/dev/null', 'some content');
 {{#each content}}{{{this}}}
 {{/each}}";
 
-const TMUX_WELCOME_MSG: &str = r#"# [HS_HELP]: Help message goes here...
+const TMUX_WELCOME_MSG: &str = r#"#!/usr/bin/env bash
+
+# [HS_HELP]: Help message goes here...
 # [HS_ENV]: TMUX_NAME
 
 TMUX_NAME=${TMUX_NAME:-${NAME/./_}}
@@ -252,18 +254,14 @@ impl Display for ScriptFullType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ScriptTypeConfig {
-    pub ext: Option<String>,
-    pub color: String,
-    pub cmd: Option<String>,
+pub struct ExecInfo {
+    pub cmd: String,
+    ext: Option<String>,
     args: Vec<String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    env: HashMap<String, String>,
 }
-
-impl ScriptTypeConfig {
+impl ExecInfo {
     // XXX: extract
-    pub fn args(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<String>, Error> {
+    pub fn args(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<String>> {
         let reg = Handlebars::new();
         let mut args: Vec<String> = Vec::with_capacity(self.args.len());
         for c in self.args.iter() {
@@ -272,8 +270,24 @@ impl ScriptTypeConfig {
         }
         Ok(args)
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ScriptTypeConfig {
+    #[serde(flatten)]
+    pub exec_info: Option<ExecInfo>, // If this is None, it's shebang
+
+    pub color: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    env: HashMap<String, String>,
+}
+
+impl ScriptTypeConfig {
+    pub fn get_ext(&self) -> Option<&str> {
+        self.exec_info.as_ref()?.ext.as_ref().map(|s| s.as_ref())
+    }
     // XXX: extract
-    pub fn gen_env(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<(String, String)>, Error> {
+    pub fn gen_env(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<(String, String)>> {
         let reg = Handlebars::new();
         let mut env: Vec<(String, String)> = Vec::with_capacity(self.env.len());
         for (name, e) in self.env.iter() {
@@ -328,51 +342,59 @@ fn gen_map(arr: &[(&str, &str)]) -> HashMap<String, String> {
 
 create_default_types! {
     ("sh", SHELL_WELCOME_MSG, ScriptTypeConfig {
-        ext: Some("sh".to_owned()),
+        exec_info: Some(ExecInfo {
+            ext: Some("sh".to_owned()),
+            cmd: "bash".to_owned(),
+            args: vec!["{{path}}".to_owned()],
+        }),
         color: "bright magenta".to_owned(),
-        cmd: Some("bash".to_owned()),
-        args: vec!["{{path}}".to_owned()],
         env: Default::default()
     }, []),
     ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
-        ext: Some("sh".to_owned()),
+        exec_info: None,
         color: "white".to_owned(),
-        cmd: Some("bash".to_owned()),
-        args: vec!["{{path}}".to_owned()],
         env: Default::default(),
     }, []),
     ("js", JS_WELCOME_MSG, ScriptTypeConfig {
-        ext: Some("js".to_owned()),
+        exec_info: Some(ExecInfo {
+            ext: Some("js".to_owned()),
+            cmd: "node".to_owned(),
+            args: vec!["{{path}}".to_owned()],
+        }),
         color: "bright cyan".to_owned(),
-        cmd: Some("node".to_owned()),
-        args: vec!["{{path}}".to_owned()],
         env: gen_map(&[(
             "NODE_PATH",
             "{{{home}}}/node_modules",
         )]),
     }, []),
     ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
-        ext: Some("js".to_owned()),
+        exec_info: Some(ExecInfo {
+            ext: Some("js".to_owned()),
+            cmd: "node".to_owned(),
+            args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
+        }),
         color: "bright cyan".to_owned(),
-        cmd: Some("node".to_owned()),
-        args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
         env: gen_map(&[(
             "NODE_PATH",
             "{{{home}}}/node_modules",
         )]),
     }, []),
     ("rb", RB_WELCOME_MSG, ScriptTypeConfig {
-        ext: Some("rb".to_owned()),
+        exec_info: Some(ExecInfo {
+            ext: Some("rb".to_owned()),
+            cmd: "ruby".to_owned(),
+            args: vec!["{{path}}".to_owned()],
+        }),
         color: "bright red".to_owned(),
-        cmd: Some("ruby".to_owned()),
-        args: vec!["{{path}}".to_owned()],
         env: Default::default(),
     }, ["traverse": RB_TRAVERSE_WELCOME_MSG, "cd": RB_CD_WELCOME_MSG]),
     ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
-        ext: None,
+        exec_info: Some(ExecInfo {
+            ext: None,
+            cmd: "cat".to_owned(),
+            args: vec!["{{path}}".to_owned()],
+        }),
         color: "bright black".to_owned(),
-        cmd: Some("cat".to_owned()),
-        args: vec!["{{path}}".to_owned()],
         env: Default::default(),
     }, [])
 }

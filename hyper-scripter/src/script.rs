@@ -13,10 +13,11 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 pub const ANONYMOUS: &str = ".anonymous";
+pub const CUR: &str = ".cur";
 
 macro_rules! max {
     ($x:expr) => ( $x );
@@ -71,6 +72,40 @@ impl ConcreteScriptName {
     }
     pub fn join_id(&mut self, other: u32) {
         write!(&mut self.inner, "/{}", other).unwrap();
+    }
+}
+
+pub struct ScriptPath<'a>(PathBuf, bool, Option<&'a str>);
+impl ScriptPath<'_> {
+    fn get_cur_p(ext: Option<&str>) -> String {
+        if let Some(ext) = ext {
+            format!("{}.{}", CUR, ext)
+        } else {
+            format!("{}", CUR)
+        }
+    }
+    pub fn abs(self, home: &Path) -> PathBuf {
+        let mut abs_p = home.join(self.0);
+        if self.1 {
+            if abs_p.is_dir() {
+                let new_p = abs_p.join(Self::get_cur_p(self.2));
+                log::info!("{abs_p:?} 為資料夾，為避免衝突，改用 {new_p:?}");
+                abs_p = new_p;
+            }
+        }
+        abs_p
+    }
+    pub fn rel(self, home: &Path) -> PathBuf {
+        let mut p = self.0;
+        let abs_p = home.join(&p);
+        if self.1 {
+            if abs_p.is_dir() {
+                let new_p = p.join(Self::get_cur_p(self.2));
+                log::info!("{abs_p:?} 為資料夾，為避免衝突，改用 {new_p:?}");
+                p = new_p;
+            }
+        }
+        p
     }
 }
 
@@ -149,24 +184,24 @@ impl ScriptName {
         }
     }
     /// 回傳值是相對於 HS_HOME 的路徑
-    pub fn to_file_path(&self, ty: &ScriptType) -> Result<PathBuf> {
+    pub fn to_file_path<'a>(&self, ty: &'a ScriptType) -> Result<ScriptPath<'a>> {
         self.to_file_path_inner(ty, false).map(|t| t.0)
     }
     /// 回傳值是相對於 HS_HOME 的路徑，對未知的類別直接用類別名作擴展名
-    pub fn to_file_path_fallback(&self, ty: &ScriptType) -> (PathBuf, Option<Error>) {
+    pub fn to_file_path_fallback<'a>(&self, ty: &'a ScriptType) -> (ScriptPath<'a>, Option<Error>) {
         self.to_file_path_inner(ty, true).unwrap()
     }
-    fn to_file_path_inner(
+    fn to_file_path_inner<'a>(
         &self,
-        ty: &ScriptType,
+        ty: &'a ScriptType,
         fallback: bool,
-    ) -> Result<(PathBuf, Option<Error>)> {
-        fn add_ext(
+    ) -> Result<(ScriptPath<'a>, Option<Error>)> {
+        fn add_ext<'a>(
             name: &mut String,
-            ty: &ScriptType,
+            ty: &'a ScriptType,
             fallback: bool,
             err: &mut Option<Error>,
-        ) -> Result {
+        ) -> Result<Option<&'a str>> {
             let ext = match Config::get().get_script_conf(ty) {
                 Err(e) => {
                     if !fallback {
@@ -179,12 +214,12 @@ impl ScriptName {
                     *err = Some(e);
                     Some(ty.as_ref())
                 }
-                Ok(c) => c.ext.as_ref().map(|s| s.as_ref()),
+                Ok(c) => c.get_ext(),
             };
             if let Some(ext) = ext {
                 write!(name, ".{}", ext).unwrap();
             }
-            Ok(())
+            Ok(ext)
         }
         let mut err = None;
         match self {
@@ -192,12 +227,14 @@ impl ScriptName {
                 let mut file_name = id.to_string();
                 let dir: PathBuf = ANONYMOUS.into();
                 add_ext(&mut file_name, ty, fallback, &mut err)?;
-                Ok((dir.join(file_name), err))
+                let p = ScriptPath(dir.join(file_name), false, None);
+                Ok((p, err))
             }
             ScriptName::Named(name) => {
                 let mut file_name = name.to_string();
-                add_ext(&mut file_name, ty, fallback, &mut err)?;
-                Ok((file_name.into(), err))
+                let ext = add_ext(&mut file_name, ty, fallback, &mut err)?;
+                let p = ScriptPath(file_name.into(), true, ext);
+                Ok((p, err))
             }
         }
     }
@@ -306,7 +343,7 @@ impl ScriptInfo {
             map(&self.exec_done_time)
         )
     }
-    pub fn file_path_fallback(&self) -> PathBuf {
+    pub fn file_path_fallback(&self) -> ScriptPath<'_> {
         self.name.to_file_path_fallback(&self.ty).0
     }
     pub fn read(&mut self) {

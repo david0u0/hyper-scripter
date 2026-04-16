@@ -190,6 +190,13 @@ pub enum Subs {
     Config,
     #[command(about = "Run the script", disable_help_flag = true)]
     Run {
+        #[arg(
+            long,
+            short,
+            help = "Always run script with caution",
+            conflicts_with = "no_caution"
+        )]
+        caution: bool,
         #[arg(long, help = "Run caution scripts without warning")]
         no_caution: bool,
         #[arg(long, help = "Add a dummy run history instead of actually running it")]
@@ -694,6 +701,7 @@ mod test {
                 repeat: Some(42),
                 dir: None,
                 no_caution: false,
+                caution: false,
                 script_query,
                 args,
             }) => {

@@ -294,6 +294,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
         }
         Subs::Run {
             no_caution,
+            caution,
             script_query,
             dummy,
             args,
@@ -305,6 +306,14 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
             let repo = repo.init().await?;
             let dir = util::option_map_res(dir, |d| path::normalize_path(d))?;
             let mut entry = query::do_script_query_strict(&script_query, repo.stable()).await?;
+
+            let caution = match (caution, no_caution) {
+                (true, false) => Some(true),
+                (false, true) => Some(false),
+                (false, false) => None,
+                _ => unreachable!(),
+            };
+
             main_util::run_n_times(
                 repeat.unwrap_or(1),
                 dummy,
@@ -313,7 +322,7 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 &mut ret.errs,
                 previous,
                 error_no_previous,
-                !no_caution,
+                caution,
                 dir,
             )
             .await?;

@@ -250,6 +250,7 @@ fn run(
     remaining: &[String],
     hs_tmpl_val: &super::TmplVal<'_>,
     remaining_envs: &[EnvPair],
+    caution: bool,
 ) -> Result<()> {
     let conf = Config::get();
     let ty = &info.ty;
@@ -288,6 +289,19 @@ fn run(
         return Err(Error::PreRunError(code));
     }
 
+    if caution {
+        let ty = super::get_display_type(&info.ty);
+        let msg = format!(
+            "{} requires extra caution. Sure to run?",
+            info.name.key().stylize().color(ty.color()).bold()
+        );
+
+        let yes = super::prompt(msg, false)?;
+        if !yes {
+            return Err(Error::Caution);
+        }
+    }
+
     let args = script_conf.args(hs_tmpl_val)?;
     let full_args = args
         .iter()
@@ -313,7 +327,7 @@ pub async fn run_n_times(
     res: &mut Vec<Error>,
     previous: Option<HistoryDisplay>,
     error_no_previous: bool,
-    caution: bool,
+    caution: Option<bool>,
     dir: Option<PathBuf>,
 ) -> Result {
     log::info!("執行 {:?}", entry.name);
@@ -347,27 +361,12 @@ pub async fn run_n_times(
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file_lines(&script_path)?;
 
-    if caution
-        && Config::get()
+    let caution = caution.unwrap_or_else(|| {
+        Config::get()
             .caution_tags
             .select(&entry.tags, &entry.ty)
             .is_true()
-    {
-        let ty = super::get_display_type(&entry.ty);
-        let mut first_part = entry.name.to_string();
-        for arg in args.iter() {
-            first_part += " ";
-            first_part += arg;
-        }
-        let msg = format!(
-            "{} requires extra caution. Are you sure?",
-            first_part.stylize().color(ty.color()).bold()
-        );
-        let yes = super::prompt(msg, false)?;
-        if !yes {
-            return Err(Error::Caution);
-        }
-    }
+    });
 
     let mut hs_env_desc = vec![];
     for (need_save, line) in extract_env_from_content_help_aware(content) {
@@ -403,8 +402,16 @@ pub async fn run_n_times(
 
     let mut lock = ProcessLockWrite::new(run_id, entry.id, hs_name, &args)?;
     let guard = lock.try_write_info()?;
-    for _ in 0..repeat {
-        let run_res = run(&script_path, &*entry, &args, &hs_tmpl_val, &env_vec);
+    for i in 0..repeat {
+        let caution = if i == 0 { caution } else { false };
+        let run_res = run(
+            &script_path,
+            &*entry,
+            &args,
+            &hs_tmpl_val,
+            &env_vec,
+            caution,
+        );
         let ret_code: i32;
         match run_res {
             Err(Error::ScriptError(code)) => {

@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # [HS_HELP]: Interactively run script from history.
 # [HS_HELP]:
 # [HS_HELP]: e.g.:

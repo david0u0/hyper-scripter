@@ -33,7 +33,7 @@ impl<'a, I: Iterator<Item = String>> Iterator for Iter<'a, I> {
             return None;
         };
 
-        if content.trim().is_empty() {
+        if content.trim().is_empty() || content.trim().starts_with("#!") {
             return self.next();
         }
 
@@ -159,5 +159,30 @@ mod test {
                 (true, "env3"),
             ]
         );
+    }
+
+    #[test]
+    fn test_shbang() {
+        let content = "#!/usr/bin/env bash
+
+        [HS_HELP]: help msg
+        [HS_ENV_HELP]: env_help1
+
+        [HS_ENV]: env1
+        [HS_HELP]: help msg2
+
+        掰
+        [HS_ENV]: this is useless
+        ";
+        let mut envs: Vec<_> =
+            extract_env_from_content_help_aware(content.lines().map(str::to_string))
+                .map(|(x, y)| (x, y.to_string()))
+                .collect();
+        envs.sort();
+        let envs: Vec<_> = envs.iter().map(|(x, y)| (*x, y.as_str())).collect();
+        assert_eq!(envs, vec![(false, "env_help1"), (true, "env1"),]);
+
+        let helps = extract_help(content, true);
+        assert_eq!(helps, vec!["help msg", "help msg2"])
     }
 }

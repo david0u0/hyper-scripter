@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # [HS_HELP]: Switch to a temporary hs config based on the current config.
 
 require 'fileutils'

@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # [HS_HELP]: Import scripts from another hyper scripter home or git repo.
 # [HS_HELP]: If a namespace is given, scripts will all be in that namespace.
 # [HS_HELP]:

@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # [HS_HELP]: Collect scripts in hyper scripter home.
 # [HS_HELP]: Scripts not traced will be added, scripts without an actual file will be purged.
 # [HS_HELP]:

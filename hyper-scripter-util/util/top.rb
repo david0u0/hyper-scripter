@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # [HS_HELP]: Interactively manage all running hs processes.
 # [HS_HELP]:
 # [HS_HELP]: e.g.:

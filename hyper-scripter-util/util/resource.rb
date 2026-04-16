@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
-# frozen_string_literal: true
-
 # [HS_HELP]: Locate the resource files of a script
 # [HS_HELP]:
 # [HS_HELP]: e.g.:

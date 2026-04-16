@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-#
 # [HS_HELP]: Run the selector terminal UI.
 # [HS_HELP]:
 # [HS_HELP]: e.g.:

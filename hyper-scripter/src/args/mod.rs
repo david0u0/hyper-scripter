@@ -13,9 +13,8 @@ use clap::{CommandFactory, Error as ClapError, Parser, ValueEnum};
 use serde::Serialize;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use supplement::Supplement;
 
-mod completion;
-pub use completion::*;
 mod tags;
 pub use tags::*;
 mod help_str;
@@ -23,7 +22,7 @@ mod types;
 use help_str::*;
 pub use types::*;
 
-#[derive(Parser, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize, Supplement)]
 pub struct RootArgs {
     #[arg(short = 'H', long, help = "Path to hyper script home")]
     pub hs_home: Option<String>,
@@ -64,7 +63,7 @@ pub struct RootArgs {
         conflicts_with = "recent",
         help = "Shorthand for `-s=all,^remove --timeless`"
     )]
-    all: bool,
+    pub all: bool,
     #[arg(long, global = true, help = "Show scripts within recent days.")]
     pub recent: Option<u32>,
     #[arg(
@@ -74,11 +73,11 @@ pub struct RootArgs {
         conflicts_with = "recent"
     )]
     pub timeless: bool,
-    #[arg(long, help = "Prompt level of fuzzy finder.")]
+    #[arg(long, value_enum, help = "Prompt level of fuzzy finder.")]
     pub prompt_level: Option<PromptLevel>,
 }
 
-#[derive(Parser, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize, Supplement)]
 #[command(about, author, version)]
 pub struct Root {
     #[arg(skip)]
@@ -144,7 +143,7 @@ impl AliasRoot {
     }
 }
 
-#[derive(Parser, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize, Supplement)]
 #[command(disable_help_subcommand = true, args_override_self = true)]
 pub enum Subs {
     #[command(external_subcommand)]
@@ -204,6 +203,7 @@ pub enum Subs {
             default_value = None,
             default_missing_value = "all",
             require_equals = true,
+            value_enum,
             help = "Use arguments from last run")
         ]
         previous: Option<HistoryDisplay>,
@@ -273,7 +273,10 @@ pub enum Subs {
         new: Option<EditQuery<ScriptOrDirQuery>>,
     },
     #[command(about = "Manage script tags")]
-    Tags(Tags),
+    Tags {
+        #[command(subcommand)]
+        subcmd: Option<Tags>,
+    },
     #[command(about = "Manage script history")]
     History {
         #[command(subcommand)]
@@ -311,12 +314,12 @@ impl HistoryDisplay {
     }
 }
 
-#[derive(Parser, Debug, Serialize)]
+#[derive(Parser, Debug, Serialize, Supplement)]
 pub enum History {
     RM {
         #[arg(short, long)]
         dir: Option<PathBuf>, // FIXME: this flag isn't working...
-        #[arg(long, default_value = "args")]
+        #[arg(long, default_value = "args", value_enum)]
         display: HistoryDisplay,
         #[arg(long)]
         no_humble: bool,
@@ -350,7 +353,7 @@ pub enum History {
         offset: u32,
         #[arg(short, long)]
         dir: Option<PathBuf>,
-        #[arg(long, default_value = "args")]
+        #[arg(long, default_value = "args", value_enum)]
         display: HistoryDisplay,
     },
     Neglect {
@@ -373,13 +376,13 @@ pub enum History {
     Tidy,
 }
 
-#[derive(Parser, Debug, Serialize, Default)]
+#[derive(Parser, Debug, Serialize, Default, Supplement)]
 #[command(args_override_self = true)]
 pub struct List {
     // TODO: 滿滿的其它排序/篩選選項
     #[arg(short, long, help = "Show verbose information.")]
     pub long: bool,
-    #[arg(long, default_value = "tag", help = "Grouping style.")]
+    #[arg(long, default_value = "tag", value_enum, help = "Grouping style.")]
     pub grouping: Grouping,
     #[arg(long, help = "Limit the amount of scripts found.")]
     pub limit: Option<NonZeroUsize>,
@@ -473,6 +476,13 @@ impl Root {
         }
         Ok(())
     }
+    pub fn from_args(root_args: RootArgs) -> Self {
+        Root {
+            is_from_alias: false,
+            subcmd: None,
+            root_args,
+        }
+    }
     pub fn sanitize_flags(&mut self, bang: bool) {
         if bang {
             self.root_args.timeless = true;
@@ -494,11 +504,8 @@ impl Root {
             Some(Subs::Help { args }) => {
                 print_help(args.iter());
             }
-            Some(Subs::Tags(tags)) => {
+            Some(Subs::Tags { subcmd: Some(tags) }) => {
                 tags.sanitize()?;
-            }
-            Some(Subs::Types(types)) => {
-                types.sanitize()?;
             }
             None => {
                 log::info!("無參數模式");
@@ -520,14 +527,14 @@ impl Root {
 
 pub enum ArgsResult {
     Normal(Root),
-    Completion(Completion),
+    Completion(Vec<String>),
     Shell(Vec<String>),
     Err(ClapError),
 }
 
 pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
-    if let Some(completion) = Completion::from_args(&args) {
-        return Ok(ArgsResult::Completion(completion));
+    if args.get(1).map(String::as_str) == Some("completion-subsystem") {
+        return Ok(ArgsResult::Completion(args));
     }
     let mut root = handle_alias_args(args)?;
     if let ArgsResult::Normal(root) = &mut root {
@@ -707,9 +714,9 @@ mod test {
         assert_eq!(args.root_args.all, false);
         assert!(args.root_args.dump_args);
         match args.subcmd {
-            Some(Subs::Tags(Tags {
-                subcmd: Some(TagsSubs::Set { name, content }),
-            })) => {
+            Some(Subs::Tags {
+                subcmd: Some(Tags::Set { name, content }),
+            }) => {
                 assert_eq!(name, Some("myname".to_owned()));
                 assert_eq!(content, "+mytag".parse().unwrap());
             }
@@ -722,7 +729,6 @@ mod test {
             &build_args("--humble"),
             &build_args("--humble edit -")
         ));
-        assert!(is_args_eq(&build_args("tags"), &build_args("tags ls")));
     }
     #[test]
     fn test_disable_help() {

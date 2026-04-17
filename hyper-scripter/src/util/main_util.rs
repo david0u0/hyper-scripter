@@ -601,3 +601,27 @@ pub fn get_all_active_process_locks() -> Result<Vec<ProcessLockRead>> {
 
     Ok(ret)
 }
+
+pub fn known_tags_iter<'a>(repo: &'a mut ScriptRepo) -> impl Iterator<Item = &'a Tag> {
+    use std::collections::hash_map::Entry::*;
+
+    let mut map: HashMap<&Tag, _> = Default::default();
+    for script in repo.iter_mut(Visibility::All) {
+        let script = script.into_inner();
+        let date = script.last_major_time();
+        for tag in script.tags.iter() {
+            match map.entry(tag) {
+                Occupied(entry) => {
+                    let date_mut = entry.into_mut();
+                    *date_mut = std::cmp::max(date, *date_mut);
+                }
+                Vacant(entry) => {
+                    entry.insert(date);
+                }
+            }
+        }
+    }
+    let mut v: Vec<_> = map.into_iter().map(|(k, v)| (k, v)).collect();
+    v.sort_by_key(|(_, v)| std::cmp::Reverse(*v));
+    v.into_iter().map(|(k, _)| k)
+}

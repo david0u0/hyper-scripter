@@ -250,8 +250,9 @@ impl Historian {
                 main_event_id,
             } => {
                 let main_event = sqlx::query!(
-                    "SELECT ignored, humble FROM events WHERE type = ? AND id = ?",
+                    "SELECT ignored, humble FROM events WHERE (type = ? OR type = ?) AND id = ?",
                     EXEC_CODE,
+                    PRE_EXEC_CODE,
                     main_event_id
                 )
                 .fetch_optional(&*self.pool.read().unwrap())
@@ -264,6 +265,7 @@ impl Historian {
                     }
                 };
                 if main_event.ignored {
+                    log::debug!("執行事件被忽略了");
                     return Ok(ZERO);
                 } else if main_event.humble {
                     log::debug!("謙卑地執行完畢了");
@@ -625,18 +627,39 @@ impl Historian {
         Ok(())
     }
 
-    pub async fn upgrade_pre_exec(&self, run_id: i64) -> Result<(), DBError> {
+    pub async fn upgrade_pre_exec(&self, run_id: i64) -> Result<i64, DBError> {
+        log::debug!("升級執行事件 {}", run_id);
         let pool = self.pool.read().unwrap();
+
+        let main_event = sqlx::query!(
+            "SELECT ignored, humble FROM events WHERE type = ? AND id = ?",
+            PRE_EXEC_CODE,
+            run_id,
+        )
+        .fetch_optional(&*pool)
+        .await?;
+
         sqlx::query!(
-            "
-            UPDATE events SET type = ? WHERE type = ? AND id = ?",
+            "UPDATE events SET type = ? WHERE type = ? AND id = ?",
             EXEC_CODE,
             PRE_EXEC_CODE,
             run_id,
         )
         .execute(&*pool)
         .await?;
-        Ok(())
+
+        match main_event {
+            None => {
+                log::warn!("找不到主要事件，可能被 tidy 掉了");
+                Ok(ZERO)
+            }
+            Some(e) if e.humble || e.ignored => {
+                // XXX: 用很怪異的方式告訴外面的人不要記錄最新時間，醜死
+                log::warn!("升級執行事件時發現主事件已被忽略或謙卑 {:?}", e);
+                Ok(ZERO)
+            }
+            _ => Ok(run_id),
+        }
     }
 }
 

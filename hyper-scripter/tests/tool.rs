@@ -60,25 +60,21 @@ enum ErrorInner {
 }
 #[derive(Debug)]
 pub struct Error {
-    msg: Vec<String>,
+    pub msg: String,
     inner: ErrorInner,
 }
 impl Error {
-    pub fn exit_status(e: ExitStatus) -> Error {
+    pub fn exit_status(e: ExitStatus, msg: String) -> Error {
         Error {
-            msg: vec![],
+            msg,
             inner: ErrorInner::ExitStatus(e),
         }
     }
     pub fn other<T: ToString>(s: T) -> Error {
         Error {
-            msg: vec![s.to_string()],
+            msg: s.to_string(),
             inner: ErrorInner::Other,
         }
-    }
-    pub fn context<T: ToString>(mut self, s: T) -> Error {
-        self.msg.push(s.to_string());
-        self
     }
 }
 type Result<T = ()> = std::result::Result<T, Error>;
@@ -255,7 +251,7 @@ pub fn run_cmd(
     let res = if status.success() {
         Ok(out_str.join("\n"))
     } else if env.allow_other_error == Some(true) || status.code() == Some(EXIT_KNOWN_ERR.code()) {
-        Err(Error::exit_status(status).context(format!("執行 {:?} 失敗", args)))
+        Err(Error::exit_status(status, out_str.join("\n")))
     } else {
         panic!("執行 {:?} 遭未知的錯誤！", args);
     };

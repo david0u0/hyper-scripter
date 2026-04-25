@@ -49,13 +49,13 @@ impl<T> ScriptTime<T> {
             changed: None,
         }
     }
+    pub fn mark_updated(&mut self) -> Option<T> {
+        self.changed.take()
+    }
     pub fn data(&self) -> Option<&T> {
         self.changed.as_ref()
     }
-    pub fn data_mut(&mut self) -> Option<&mut T> {
-        self.changed.as_mut()
-    }
-    pub fn has_changed(&self) -> bool {
-        self.changed.is_some()
+    pub fn set_data(&mut self, data: T) {
+        self.changed = Some(data);
     }
 }

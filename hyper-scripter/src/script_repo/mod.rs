@@ -237,7 +237,7 @@ impl DBEnv {
         Ok(res.id)
     }
 
-    async fn handle_change(&self, info: &ScriptInfo) -> Result<i64> {
+    async fn handle_change(&self, info: &mut ScriptInfo) -> Result<i64> {
         log::debug!("開始修改資料庫 {:?}", info);
         if info.changed {
             assert!(self.modifies_script);
@@ -265,7 +265,7 @@ impl DBEnv {
         macro_rules! record_event {
             ($time:expr, $data:expr) => {
                 self.historian.record(&Event {
-                    script_id: info.id,
+                    script_id: info.timeless_info.id,
                     humble: matches!(self.trace_opt, TraceOption::Humble),
                     time: $time,
                     data: $data,
@@ -273,9 +273,9 @@ impl DBEnv {
             };
         }
 
-        if let Some(time) = info.exec_done_time.as_ref() {
-            if let Some(&(code, main_event_id)) = time.data() {
-                log::debug!("{:?} 的執行完畢事件", info.name);
+        if let Some(time) = info.exec_done_time.as_mut() {
+            if let Some((code, main_event_id)) = time.mark_updated() {
+                log::debug!("{:?} 的執行完畢事件", info.timeless_info.name);
                 last_event_id = record_event!(
                     **time,
                     EventData::ExecDone {
@@ -285,23 +285,21 @@ impl DBEnv {
                 )
                 .await?;
 
-                if last_event_id != 0 {
-                    self.update_last_time(info).await?;
-                } else {
+                if last_event_id == 0 {
                     log::info!("{:?} 的執行完畢事件被忽略了", info.name);
+                    return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
                 }
-                return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
             }
         }
 
-        if let Some(time) = info.exec_time.as_ref() {
-            if let Some((args, envs, dir, phase)) = time.data() {
-                log::debug!("{:?} 的執行事件", info.name);
-                match *phase {
-                    ExecPhase::Pre => {
+        if let Some(time) = info.exec_time.as_mut() {
+            if let Some(phase) = time.mark_updated() {
+                log::debug!("{:?} 的執行事件", info.timeless_info.name);
+                match &phase {
+                    ExecPhase::Pre { args, envs, dir } => {
                         last_event_id = record_event!(
                             **time,
-                            EventData::Exec {
+                            EventData::PreExec {
                                 args,
                                 envs,
                                 dir: dir.as_deref(),
@@ -310,7 +308,7 @@ impl DBEnv {
                         .await?;
                         return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
                     }
-                    ExecPhase::Dummy => {
+                    ExecPhase::Dummy { args, envs, dir } => {
                         last_event_id = record_event!(
                             **time,
                             EventData::Exec {
@@ -322,8 +320,12 @@ impl DBEnv {
                         .await?;
                     }
                     ExecPhase::Normal(run_id) => {
-                        last_event_id = run_id;
-                        self.historian.upgrade_pre_exec(run_id).await?;
+                        log::info!("升級執行事件 {}", run_id);
+                        last_event_id = self.historian.upgrade_pre_exec(*run_id).await?;
+                        if last_event_id == 0 {
+                            log::info!("{:?} 的執行事件被忽略了", info.name);
+                            return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
+                        }
                     }
                 }
             }
@@ -331,11 +333,11 @@ impl DBEnv {
 
         self.update_last_time(info).await?;
 
-        if info.read_time.has_changed() {
+        if info.read_time.mark_updated().is_some() {
             log::debug!("{:?} 的讀取事件", info.name);
             last_event_id = record_event!(*info.read_time, EventData::Read).await?;
         }
-        if info.write_time.has_changed() {
+        if info.write_time.mark_updated().is_some() {
             log::debug!("{:?} 的寫入事件", info.name);
             last_event_id = record_event!(*info.write_time, EventData::Write).await?;
         }

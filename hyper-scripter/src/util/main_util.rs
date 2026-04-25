@@ -17,7 +17,9 @@ use crate::tag::{Tag, TagSelector, TagSelectorGroup};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fs::{create_dir_all, read_dir};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tokio::process::Command as AsyncCommand;
+use tokio::sync::Mutex;
 
 pub struct EditTagArgs {
     pub content: TagSelector,
@@ -312,37 +314,65 @@ async fn run(
     set_cmd_envs(&mut main_cmd);
     // end prepare main cmd
 
-    info.update(|info| info.upgrade_pre_exec(run_id)).await?;
-
-    for i in 0..repeat {
-        let code = super::async_run_cmd(&mut pre_cmd).await?;
-        log::info!("預腳本執行結果：{:?}", code);
-        if let Some(code) = code {
-            // TODO: 根據返回值做不同表現
-            return Err(Error::PreRunError(code));
-        }
-
-        if i == 0 && caution {
-            let ty = super::get_display_type(&info.ty);
-            let msg = format!(
-                "{} requires extra caution. Sure to run?",
-                info.name.key().stylize().color(ty.color()).bold()
-            );
-
-            let yes = super::prompt(msg, false)?;
-            if !yes {
-                return Err(Error::Caution);
+    let caution_msg = {
+        let ty = super::get_display_type(&info.ty);
+        format!(
+            "{} requires extra caution. Sure to run?",
+            info.name.key().stylize().color(ty.color()).bold()
+        )
+    };
+    let info_mutex = Mutex::new(info);
+    let run_future = async {
+        for i in 0..repeat {
+            let code = super::async_run_cmd(&mut pre_cmd).await?;
+            log::info!("預腳本執行結果：{:?}", code);
+            if let Some(code) = code {
+                // TODO: 根據返回值做不同表現
+                return Err(Error::PreRunError(code));
             }
-        }
 
-        let code = super::async_run_cmd(&mut main_cmd).await?;
-        log::info!("程式執行結果：{:?}", code);
-        if let Some(code) = code {
-            res.push(Error::ScriptError(code));
+            if i == 0 && caution {
+                let yes = super::prompt(&caution_msg, false)?;
+                if !yes {
+                    return Err(Error::Caution);
+                }
+            }
+
+            let code = super::async_run_cmd(&mut main_cmd).await?;
+            log::info!("程式執行結果：{:?}", code);
+            if let Some(code) = code {
+                if code == 0 {
+                    log::warn!("腳本返回碼為0，應為 CTRL+C 所致");
+                    return Ok(true);
+                }
+                res.push(Error::ScriptError(code));
+            }
+            let mut info = info_mutex.lock().await;
+            info.update(|info| info.exec_done(code.unwrap_or_default(), run_id))
+                .await?;
         }
-        info.update(|info| info.exec_done(code.unwrap_or_default(), run_id))
-            .await?;
-    }
+        Ok(false)
+    };
+
+    let mut run_future = std::pin::pin!(run_future);
+    tokio::select! {
+        res = &mut run_future => {
+            if !matches!(res, Ok(true)) {
+                log::info!("腳本執行完畢，升級執行事件");
+                let mut info = info_mutex.lock().await;
+                info.update(|info| info.upgrade_pre_exec(run_id)).await?;
+            }
+            res?;
+        },
+        _ = tokio::time::sleep(Duration::from_secs(3)) => {
+            log::info!("腳本已執行一定時間，升級執行事件");
+            {
+                let mut info = info_mutex.lock().await;
+                info.update(|info| info.upgrade_pre_exec(run_id)).await?;
+            }
+            run_future.await?;
+        }
+    };
 
     ProcessLockWrite::mark_sucess(guard);
     Ok(())

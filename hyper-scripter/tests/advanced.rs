@@ -365,3 +365,37 @@ fn test_script_name_conflict_dir_name() {
         "a/b/c/d=a/b/c/d.sh/.cur.sh\na/b/c/d.sh/e=a/b/c/d.sh/e.sh"
     );
 }
+
+#[test]
+fn test_pre_exec() {
+    let _g = setup();
+    run!(
+        "e test |
+if [[ $1 =~ kill ]]; then
+    echo 弒親！
+    sleep $2
+    P=$(ps -o ppid= $$)
+    kill -9 $P
+else
+    $HS_EXE -H $HS_HOME history show =$NAME!
+fi"
+    )
+    .unwrap();
+
+    let out1 = run!("test arg1").unwrap();
+    let out_kill1 = run!(allow_other_error: true,"test kill1 0")
+        .unwrap_err()
+        .msg;
+    let out_kill2 = run!(allow_other_error: true,"test kill2 4")
+        .unwrap_err()
+        .msg;
+    let out2 = run!("test arg2").unwrap();
+    let out3 = run!("history show =test!").unwrap();
+
+    assert_eq!(out_kill1, "弒親！");
+    assert_eq!(out_kill2, "弒親！");
+
+    assert_eq!(out1, "", "history should stay in pre-exec state");
+    assert_eq!(out2, "kill2 4\narg1");
+    assert_eq!(out3, "arg2\nkill2 4\narg1");
+}

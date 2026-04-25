@@ -274,10 +274,18 @@ pub struct TimelessScriptInfo {
     pub created_time: ScriptTime,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ExecPhase {
-    Dummy,
-    Pre,
+    Dummy {
+        args: String,
+        envs: String,
+        dir: Option<PathBuf>,
+    },
+    Pre {
+        args: String,
+        envs: String,
+        dir: Option<PathBuf>,
+    },
     Normal(i64),
 }
 #[derive(Debug, Deref, Clone)]
@@ -286,14 +294,13 @@ pub struct ScriptInfo {
     pub read_time: ScriptTime,
     pub write_time: ScriptTime,
     pub neglect_time: Option<ScriptTime>,
-    /// (args, env_record, dir, is_pre)
-    pub exec_time: Option<ScriptTime<(String, String, Option<PathBuf>, ExecPhase)>>,
+    pub exec_time: Option<ScriptTime<ExecPhase>>,
     /// (return code, main event id)
     pub exec_done_time: Option<ScriptTime<(i32, i64)>>,
     pub exec_count: u64,
     #[deref]
     /// 用來區隔「時間資料」和「其它元資料」，並偵測其它元資料的修改
-    timeless_info: TimelessScriptInfo,
+    pub timeless_info: TimelessScriptInfo,
 }
 impl DerefMut for ScriptInfo {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -361,24 +368,22 @@ impl ScriptInfo {
         self.read_time = now.clone();
         self.write_time = now;
     }
-    pub fn exec(&mut self, args: &[String], env_record: String, dir: Option<PathBuf>, dummy: bool) {
-        let args_ser = serde_json::to_string(args).unwrap();
-        let phase = if dummy {
-            ExecPhase::Dummy
+    pub fn exec(&mut self, args: &[String], envs: String, dir: Option<PathBuf>, dummy: bool) {
+        let args = serde_json::to_string(args).unwrap();
+        let data = if dummy {
+            ExecPhase::Dummy { args, envs, dir }
         } else {
-            ExecPhase::Pre
+            ExecPhase::Pre { args, envs, dir }
         };
-        self.exec_time = Some(ScriptTime::now((args_ser, env_record, dir, phase)));
+        self.exec_time = Some(ScriptTime::now(data));
         // NOTE: no readtime, otherwise it will be hard to tell what event was caused by what operation.
         self.exec_count += 1;
     }
     pub fn upgrade_pre_exec(&mut self, run_id: i64) {
-        let mut inner = || -> Option<()> {
-            let exec_time = self.exec_time.as_mut()?;
-            exec_time.data_mut()?.3 = ExecPhase::Normal(run_id);
-            Some(())
+        let Some(time) = self.exec_time.as_mut() else {
+            return;
         };
-        inner();
+        time.set_data(ExecPhase::Normal(run_id));
     }
     pub fn exec_done(&mut self, code: i32, main_event_id: i64) {
         log::trace!("{:?} 執行結果為 {}", self, code);

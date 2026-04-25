@@ -391,7 +391,7 @@ fn test_unknown_type_strange_ext() {
     let name = "this-name";
     let mut conf = load_conf();
     let ty_conf = conf.types.get_mut(&ty).unwrap();
-    ty_conf.exec_info.as_mut().unwrap().ext = Some("strange-ext".to_owned());
+    ty_conf.ext = Some("strange-ext".to_owned());
     conf.store().unwrap();
 
     run!("e {} -T rb | puts 1", name).unwrap();

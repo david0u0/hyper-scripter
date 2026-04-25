@@ -59,6 +59,7 @@ impl Display for Error {
                 }
                 write!(f, " '{}'", s)?;
             }
+            CancelExecEvent => write!(f, "Execution event cancelled")?,
             ScriptError(code) => write!(f, "Script exited unexpectedly with {}", code)?,
             PreRunError(code) => write!(f, "Pre-run script exited unexpectedly with {}", code)?,
             EditorError(code, cmd) => {

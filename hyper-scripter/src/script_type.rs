@@ -256,7 +256,6 @@ impl Display for ScriptFullType {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExecInfo {
     pub cmd: String,
-    pub ext: Option<String>,
     args: Vec<String>,
 }
 impl ExecInfo {
@@ -276,6 +275,7 @@ impl ExecInfo {
 pub struct ScriptTypeConfig {
     #[serde(flatten)]
     pub exec_info: Option<ExecInfo>, // If this is None, it's shebang
+    pub ext: Option<String>,
 
     pub color: String,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -284,7 +284,7 @@ pub struct ScriptTypeConfig {
 
 impl ScriptTypeConfig {
     pub fn get_ext(&self) -> Option<&str> {
-        self.exec_info.as_ref()?.ext.as_ref().map(|s| s.as_ref())
+        self.ext.as_ref().map(|s| s.as_ref())
     }
     // XXX: extract
     pub fn gen_env(&self, info: &crate::util::TmplVal<'_>) -> Result<Vec<(String, String)>> {
@@ -343,24 +343,25 @@ fn gen_map(arr: &[(&str, &str)]) -> HashMap<String, String> {
 create_default_types! {
     ("sh", SHELL_WELCOME_MSG, ScriptTypeConfig {
         exec_info: Some(ExecInfo {
-            ext: Some("sh".to_owned()),
             cmd: "bash".to_owned(),
             args: vec!["{{path}}".to_owned()],
         }),
+        ext: Some("sh".to_owned()),
         color: "bright magenta".to_owned(),
         env: Default::default()
     }, []),
     ("tmux", TMUX_WELCOME_MSG, ScriptTypeConfig {
         exec_info: None,
+        ext: None,
         color: "white".to_owned(),
         env: Default::default(),
     }, []),
     ("js", JS_WELCOME_MSG, ScriptTypeConfig {
         exec_info: Some(ExecInfo {
-            ext: Some("js".to_owned()),
             cmd: "node".to_owned(),
             args: vec!["{{path}}".to_owned()],
         }),
+        ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
         env: gen_map(&[(
             "NODE_PATH",
@@ -369,10 +370,10 @@ create_default_types! {
     }, []),
     ("js-i", JS_WELCOME_MSG, ScriptTypeConfig {
         exec_info: Some(ExecInfo {
-            ext: Some("js".to_owned()),
             cmd: "node".to_owned(),
             args: vec!["-i".to_owned(), "-e".to_owned(), "{{{content}}}".to_owned()],
         }),
+        ext: Some("js".to_owned()),
         color: "bright cyan".to_owned(),
         env: gen_map(&[(
             "NODE_PATH",
@@ -381,19 +382,19 @@ create_default_types! {
     }, []),
     ("rb", RB_WELCOME_MSG, ScriptTypeConfig {
         exec_info: Some(ExecInfo {
-            ext: Some("rb".to_owned()),
             cmd: "ruby".to_owned(),
             args: vec!["{{path}}".to_owned()],
         }),
+        ext: Some("rb".to_owned()),
         color: "bright red".to_owned(),
         env: Default::default(),
     }, ["traverse": RB_TRAVERSE_WELCOME_MSG, "cd": RB_CD_WELCOME_MSG]),
     ("txt", DEFAULT_WELCOME_MSG, ScriptTypeConfig {
         exec_info: Some(ExecInfo {
-            ext: None,
             cmd: "cat".to_owned(),
             args: vec!["{{path}}".to_owned()],
         }),
+        ext: None,
         color: "bright black".to_owned(),
         env: Default::default(),
     }, [])

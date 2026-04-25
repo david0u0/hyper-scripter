@@ -79,6 +79,7 @@ pub enum Error {
     UnknownType(String),
     Format(FormatCode, String),
 
+    CancelExecEvent,
     ScriptError(i32),
     PreRunError(i32),
     EditorError(i32, Vec<String>),

@@ -88,7 +88,9 @@ class Selector
   end
 
   def pos_len(pos)
-    Math.log(pos + @display_offset + 1, 10).floor
+    pos += @display_offset
+    return 0 if pos == 0
+    Math.log(pos, 10).floor
   end
 
   def load(options)

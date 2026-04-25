@@ -341,8 +341,8 @@ async fn run(
             let code = super::async_run_cmd(&mut main_cmd).await?;
             log::info!("程式執行結果：{:?}", code);
             if let Some(code) = code {
-                if code == 0 {
-                    log::warn!("腳本返回碼為0，應為 CTRL+C 所致");
+                if code == 0 || code == 130 {
+                    log::warn!("腳本返回碼為{code}，應為 CTRL+C 所致");
                     return Ok(true);
                 }
                 res.push(Error::ScriptError(code));
@@ -357,11 +357,12 @@ async fn run(
     let mut run_future = std::pin::pin!(run_future);
     tokio::select! {
         res = &mut run_future => {
-            if !matches!(res, Ok(true)) {
-                log::info!("腳本執行完畢，升級執行事件");
-                let mut info = info_mutex.lock().await;
-                info.update(|info| info.upgrade_pre_exec(run_id)).await?;
+            if matches!(res, Ok(true)) {
+                return Err(Error::CancelExecEvent);
             }
+            log::info!("腳本執行完畢，升級執行事件");
+            let mut info = info_mutex.lock().await;
+            info.update(|info| info.upgrade_pre_exec(run_id)).await?;
             res?;
         },
         _ = tokio::time::sleep(Duration::from_secs(3)) => {

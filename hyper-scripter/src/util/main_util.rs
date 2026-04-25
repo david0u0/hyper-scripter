@@ -17,7 +17,7 @@ use crate::tag::{Tag, TagSelector, TagSelectorGroup};
 use fxhash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fs::{create_dir_all, read_dir};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use tokio::process::Command as AsyncCommand;
 
 pub struct EditTagArgs {
     pub content: TagSelector,
@@ -279,13 +279,13 @@ async fn run(
         .chain(std::iter::once(pre_run_script.as_os_str()))
         .chain(remaining.iter().map(|s| s.as_ref()));
 
-    let set_cmd_envs = |cmd: &mut Command| {
+    let set_cmd_envs = |cmd: &mut AsyncCommand| {
         cmd.envs(ty_env.iter().map(|(a, b)| (a, b)));
         cmd.envs(env.iter().map(|(a, b)| (a, b)));
         cmd.envs(remaining_envs.iter().map(|p| (&p.key, &p.val)));
     };
 
-    let mut pre_cmd = super::create_cmd(cmd, args);
+    let mut pre_cmd = super::async_create_cmd(cmd, args);
     set_cmd_envs(&mut pre_cmd);
 
     // prepare main cmd
@@ -308,14 +308,14 @@ async fn run(
         .iter()
         .map(|s| s.as_str())
         .chain(remaining.iter().map(|s| s.as_str()));
-    let mut main_cmd = super::create_cmd(&cmd, full_args);
+    let mut main_cmd = super::async_create_cmd(&cmd, full_args);
     set_cmd_envs(&mut main_cmd);
     // end prepare main cmd
 
     info.update(|info| info.upgrade_pre_exec(run_id)).await?;
 
     for i in 0..repeat {
-        let code = super::run_cmd(&mut pre_cmd)?;
+        let code = super::async_run_cmd(&mut pre_cmd).await?;
         log::info!("預腳本執行結果：{:?}", code);
         if let Some(code) = code {
             // TODO: 根據返回值做不同表現
@@ -335,7 +335,7 @@ async fn run(
             }
         }
 
-        let code = super::run_cmd(&mut main_cmd)?;
+        let code = super::async_run_cmd(&mut main_cmd).await?;
         log::info!("程式執行結果：{:?}", code);
         if let Some(code) = code {
             res.push(Error::ScriptError(code));

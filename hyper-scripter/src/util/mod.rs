@@ -15,6 +15,7 @@ use std::io::{self, BufRead};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tokio::process::Command as AsyncCommand;
 
 pub mod holder;
 pub mod main_util;
@@ -42,6 +43,28 @@ pub fn illegal_name(s: &str) -> bool {
         || s.contains('=')
         || s.contains('/')
         || s.is_empty()
+}
+
+pub async fn async_run_cmd(cmd: &mut AsyncCommand) -> Result<Option<i32>> {
+    log::debug!("執行命令 {:?}", cmd);
+    let res = cmd.spawn();
+    let mut child = handle_fs_res(&[""], res)?;
+    let stat = handle_fs_res(&[""], child.wait().await)?;
+    if stat.success() {
+        Ok(None)
+    } else {
+        Ok(Some(stat.code().unwrap_or_default()))
+    }
+}
+pub fn async_create_cmd<I, S1, S2>(cmd_str: S2, args: I) -> AsyncCommand
+where
+    I: IntoIterator<Item = S1>,
+    S1: AsRef<OsStr>,
+    S2: AsRef<OsStr>,
+{
+    let mut cmd = AsyncCommand::new(&cmd_str);
+    cmd.args(args);
+    cmd
 }
 
 pub fn run_cmd(cmd: &mut Command) -> Result<Option<i32>> {

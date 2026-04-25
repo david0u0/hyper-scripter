@@ -4,6 +4,7 @@ use std::path::Path;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EventType {
     Exec,
+    PreExec,
     ExecDone,
     Read,
     Write,
@@ -12,6 +13,11 @@ pub enum EventType {
 #[derive(Debug)]
 pub enum EventData<'a> {
     Exec {
+        args: &'a str,
+        envs: &'a str,
+        dir: Option<&'a Path>,
+    },
+    PreExec {
         args: &'a str,
         envs: &'a str,
         dir: Option<&'a Path>,
@@ -27,6 +33,7 @@ pub enum EventData<'a> {
 impl EventData<'_> {
     pub fn get_type(&self) -> EventType {
         match self {
+            EventData::PreExec { .. } => EventType::PreExec,
             EventData::Exec { .. } => EventType::Exec,
             EventData::ExecDone { .. } => EventType::ExecDone,
             EventData::Read => EventType::Read,
@@ -43,6 +50,7 @@ impl EventType {
             Write => 1,
             Exec => 3,
             ExecDone => 4,
+            PreExec => 5,
         }
     }
 }

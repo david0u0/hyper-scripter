@@ -354,8 +354,8 @@ async fn main_inner(root: Root, resource: &mut Resource, ret: &mut MainReturn<'_
                 }
                 create_read_event(entry).await?;
             }
-            if let Some(cmd) = cmd {
-                let code = util::run_cmd(cmd)?;
+            if let Some(mut cmd) = cmd {
+                let code = util::run_cmd(&mut cmd)?;
                 if let Some(code) = code {
                     return Err(Error::ScriptError(code));
                 }

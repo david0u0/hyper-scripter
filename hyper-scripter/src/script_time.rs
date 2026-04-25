@@ -52,6 +52,9 @@ impl<T> ScriptTime<T> {
     pub fn data(&self) -> Option<&T> {
         self.changed.as_ref()
     }
+    pub fn data_mut(&mut self) -> Option<&mut T> {
+        self.changed.as_mut()
+    }
     pub fn has_changed(&self) -> bool {
         self.changed.is_some()
     }

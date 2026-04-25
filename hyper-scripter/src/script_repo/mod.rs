@@ -1,6 +1,6 @@
 use crate::config::Recent;
 use crate::error::Result;
-use crate::script::{IntoScriptName, ScriptInfo, ScriptName};
+use crate::script::{ExecPhase, IntoScriptName, ScriptInfo, ScriptName};
 use crate::script_type::ScriptType;
 use crate::tag::{Tag, TagSelectorGroup};
 use chrono::{Duration, NaiveDateTime, Utc};
@@ -294,6 +294,41 @@ impl DBEnv {
             }
         }
 
+        if let Some(time) = info.exec_time.as_ref() {
+            if let Some((args, envs, dir, phase)) = time.data() {
+                log::debug!("{:?} 的執行事件", info.name);
+                match *phase {
+                    ExecPhase::Pre => {
+                        last_event_id = record_event!(
+                            **time,
+                            EventData::Exec {
+                                args,
+                                envs,
+                                dir: dir.as_deref(),
+                            }
+                        )
+                        .await?;
+                        return Ok(last_event_id); // XXX: 超級醜的作法，為了避免重復記錄其它的事件
+                    }
+                    ExecPhase::Dummy => {
+                        last_event_id = record_event!(
+                            **time,
+                            EventData::Exec {
+                                args,
+                                envs,
+                                dir: dir.as_deref(),
+                            }
+                        )
+                        .await?;
+                    }
+                    ExecPhase::Normal(run_id) => {
+                        last_event_id = run_id;
+                        self.historian.upgrade_pre_exec(run_id).await?;
+                    }
+                }
+            }
+        }
+
         self.update_last_time(info).await?;
 
         if info.read_time.has_changed() {
@@ -303,20 +338,6 @@ impl DBEnv {
         if info.write_time.has_changed() {
             log::debug!("{:?} 的寫入事件", info.name);
             last_event_id = record_event!(*info.write_time, EventData::Write).await?;
-        }
-        if let Some(time) = info.exec_time.as_ref() {
-            if let Some((args, envs, dir)) = time.data() {
-                log::debug!("{:?} 的執行事件", info.name);
-                last_event_id = record_event!(
-                    **time,
-                    EventData::Exec {
-                        args,
-                        envs,
-                        dir: dir.as_deref(),
-                    }
-                )
-                .await?;
-            }
         }
 
         Ok(last_event_id)

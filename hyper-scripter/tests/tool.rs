@@ -103,6 +103,10 @@ pub fn clean_and_set_home() {
     let (base, home) = get_test_home();
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
+        // SAFETY: This is in a ONCE cell
+        unsafe {
+            std::env::remove_var(CONFIG_FILE_ENV);
+        }
         match std::fs::remove_dir_all(&base) {
             Ok(_) => (),
             Err(e) => {
@@ -133,10 +137,6 @@ pub fn setup_with_utils() -> () {
     run!(silent: true, "ls").unwrap(); // create the home
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        // SAFETY: This is in a ONCE cell
-        unsafe {
-            std::env::remove_var(CONFIG_FILE_ENV);
-        }
         Config::init().unwrap();
         Config::set_runtime_conf(Some(PromptLevel::Never));
     });

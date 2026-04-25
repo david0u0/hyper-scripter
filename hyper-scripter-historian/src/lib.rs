@@ -13,6 +13,7 @@ pub use event::*;
 const ZERO: i64 = 0;
 const EMPTY_STR: &str = "";
 
+const PRE_EXEC_CODE: i8 = EventType::PreExec.get_code();
 const EXEC_CODE: i8 = EventType::Exec.get_code();
 const EXEC_DONE_CODE: i8 = EventType::ExecDone.get_code();
 
@@ -158,13 +159,14 @@ macro_rules! ignore_or_humble_arg {
             "
             UPDATE events SET " + $ignore_or_humble + " = true
             WHERE type = ? AND main_event_id IN (
-                SELECT id FROM events WHERE type = ? AND NOT ignored AND "
+                SELECT id FROM events WHERE (type = ? OR type = ?) AND NOT ignored AND "
                 + $cond $(+ $more_cond)*
                 + "
             )
             ",
             EXEC_DONE_CODE,
             EXEC_CODE,
+            PRE_EXEC_CODE,
             $($var),*
         )
         .execute(&*$pool)
@@ -173,10 +175,11 @@ macro_rules! ignore_or_humble_arg {
         sqlx::query!(
             "
             UPDATE events SET " + $ignore_or_humble + " = true
-            WHERE type = ? AND NOT ignored AND
+            WHERE (type = ? OR type = ?) AND NOT ignored AND
             "
                 + $cond $(+ $more_cond)*,
             EXEC_CODE,
+            PRE_EXEC_CODE,
             $($var),*
         )
         .execute(&*$pool)
@@ -237,7 +240,7 @@ impl Historian {
         let mut db_event = DBEvent::new(event.script_id, event.time, ty, &cmd, event.humble);
         let id = match &event.data {
             EventData::Write | EventData::Read => self.raw_record(db_event).await?,
-            EventData::Exec { args, envs, dir } => {
+            EventData::PreExec { args, envs, dir } | EventData::Exec { args, envs, dir } => {
                 let dir = dir.map(|p| p.to_string_lossy()).unwrap_or_default();
                 self.raw_record(db_event.envs(envs).dir(dir.as_ref()).args(args))
                     .await?
@@ -442,10 +445,11 @@ impl Historian {
         let latest_record = sqlx::query!(
             "
             SELECT id, script_id FROM events
-            WHERE type = ? AND script_id = (SELECT script_id FROM events WHERE id = ?)
+            WHERE (type = ? OR type = ?) AND script_id = (SELECT script_id FROM events WHERE id = ?)
             ORDER BY time DESC LIMIT 1
             ",
             EXEC_CODE,
+            PRE_EXEC_CODE,
             event_id,
         )
         .fetch_one(&*pool)
@@ -555,10 +559,11 @@ impl Historian {
                 sqlx::query!(
                     "UPDATE events SET ignored = false, args = ?"
                     + $( "," + $set + "=? " +)*
-                    "WHERE type = ? AND id = ? ",
+                    "WHERE (type = ? OR type = ?) AND id = ? ",
                     args,
                     $($var,)*
                     EXEC_CODE,
+                    PRE_EXEC_CODE,
                     event_id,
                 )
                 .execute(&*self.pool.read().unwrap())
@@ -617,6 +622,20 @@ impl Historian {
         .execute(&*pool)
         .await?;
 
+        Ok(())
+    }
+
+    pub async fn upgrade_pre_exec(&self, run_id: i64) -> Result<(), DBError> {
+        let pool = self.pool.read().unwrap();
+        sqlx::query!(
+            "
+            UPDATE events SET type = ? WHERE type = ? AND id = ?",
+            EXEC_CODE,
+            PRE_EXEC_CODE,
+            run_id,
+        )
+        .execute(&*pool)
+        .await?;
         Ok(())
     }
 }

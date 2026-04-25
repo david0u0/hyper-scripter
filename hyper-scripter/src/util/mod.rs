@@ -44,7 +44,7 @@ pub fn illegal_name(s: &str) -> bool {
         || s.is_empty()
 }
 
-pub fn run_cmd(mut cmd: Command) -> Result<Option<i32>> {
+pub fn run_cmd(cmd: &mut Command) -> Result<Option<i32>> {
     log::debug!("執行命令 {:?}", cmd);
     let res = cmd.spawn();
     let program = cmd.get_program();
@@ -92,15 +92,15 @@ pub fn run_shell(args: &[String]) -> Result<i32> {
     let mut cmd = create_cmd("sh", ["-c", &cmd]);
     let env = Config::get().gen_env(&TmplVal::new(), false)?;
     cmd.envs(env.iter().map(|(a, b)| (a, b)));
-    let code = run_cmd(cmd)?;
+    let code = run_cmd(&mut cmd)?;
     Ok(code.unwrap_or_default())
 }
 
 pub fn open_editor<'a>(path: impl IntoIterator<Item = &'a Path>) -> Result {
     let conf = Config::get();
     let editor = conf.editor.iter().map(|s| Cow::Borrowed(s.as_ref()));
-    let cmd = create_concat_cmd(editor, path);
-    let code = run_cmd(cmd)?;
+    let mut cmd = create_concat_cmd(editor, path);
+    let code = run_cmd(&mut cmd)?;
     if let Some(code) = code {
         return Err(Error::EditorError(code, conf.editor.clone()));
     }

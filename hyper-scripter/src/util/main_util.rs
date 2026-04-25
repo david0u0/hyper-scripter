@@ -244,20 +244,32 @@ pub async fn edit_or_create(
     }
 }
 
-fn run(
+async fn run(
     script_path: &Path,
-    info: &ScriptInfo,
+    info: &mut RepoEntry<'_>,
     remaining: &[String],
-    hs_tmpl_val: &super::TmplVal<'_>,
+    mut hs_tmpl_val: super::TmplVal<'_>,
     remaining_envs: &[EnvPair],
     caution: bool,
-) -> Result<()> {
+    repeat: u64,
+    res: &mut Vec<Error>,
+) -> Result {
+    let env_record = serde_json::to_string(&remaining_envs)?;
+    let here = path::normalize_path(".").ok();
+    let run_id = info
+        .update(|info| info.exec(remaining, env_record, here, false))
+        .await?;
+    hs_tmpl_val.run_id = Some(run_id);
+
+    let mut lock = ProcessLockWrite::new(run_id, info.id, hs_tmpl_val.name.unwrap(), remaining)?;
+    let guard = lock.try_write_info()?;
+
     let conf = Config::get();
     let ty = &info.ty;
 
     let script_conf = conf.get_script_conf(ty)?;
-    let env = conf.gen_env(hs_tmpl_val, true)?;
-    let ty_env = script_conf.gen_env(hs_tmpl_val)?;
+    let env = conf.gen_env(&hs_tmpl_val, true)?;
+    let ty_env = script_conf.gen_env(&hs_tmpl_val)?;
 
     let pre_run_script = prepare_pre_run(None)?;
     let (cmd, shebang) = super::shebang_handle::handle(&pre_run_script)?;
@@ -273,29 +285,10 @@ fn run(
         cmd.envs(remaining_envs.iter().map(|p| (&p.key, &p.val)));
     };
 
-    let mut cmd = super::create_cmd(cmd, args);
-    set_cmd_envs(&mut cmd);
+    let mut pre_cmd = super::create_cmd(cmd, args);
+    set_cmd_envs(&mut pre_cmd);
 
-    let code = super::run_cmd(cmd)?;
-    log::info!("預腳本執行結果：{:?}", code);
-    if let Some(code) = code {
-        // TODO: 根據返回值做不同表現
-        return Err(Error::PreRunError(code));
-    }
-
-    if caution {
-        let ty = super::get_display_type(&info.ty);
-        let msg = format!(
-            "{} requires extra caution. Sure to run?",
-            info.name.key().stylize().color(ty.color()).bold()
-        );
-
-        let yes = super::prompt(msg, false)?;
-        if !yes {
-            return Err(Error::Caution);
-        }
-    }
-
+    // prepare main cmd
     let mut tmp;
     let (cmd, args) = match script_conf.exec_info.as_ref() {
         None => {
@@ -306,7 +299,7 @@ fn run(
         }
         Some(exec_info) => {
             let cmd = &exec_info.cmd;
-            let args = exec_info.args(hs_tmpl_val)?;
+            let args = exec_info.args(&hs_tmpl_val)?;
             (cmd, args)
         }
     };
@@ -315,16 +308,44 @@ fn run(
         .iter()
         .map(|s| s.as_str())
         .chain(remaining.iter().map(|s| s.as_str()));
-    let mut cmd = super::create_cmd(&cmd, full_args);
-    set_cmd_envs(&mut cmd);
+    let mut main_cmd = super::create_cmd(&cmd, full_args);
+    set_cmd_envs(&mut main_cmd);
+    // end prepare main cmd
 
-    let code = super::run_cmd(cmd)?;
-    log::info!("程式執行結果：{:?}", code);
-    if let Some(code) = code {
-        Err(Error::ScriptError(code))
-    } else {
-        Ok(())
+    info.update(|info| info.upgrade_pre_exec(run_id)).await?;
+
+    for i in 0..repeat {
+        let code = super::run_cmd(&mut pre_cmd)?;
+        log::info!("預腳本執行結果：{:?}", code);
+        if let Some(code) = code {
+            // TODO: 根據返回值做不同表現
+            return Err(Error::PreRunError(code));
+        }
+
+        if i == 0 && caution {
+            let ty = super::get_display_type(&info.ty);
+            let msg = format!(
+                "{} requires extra caution. Sure to run?",
+                info.name.key().stylize().color(ty.color()).bold()
+            );
+
+            let yes = super::prompt(msg, false)?;
+            if !yes {
+                return Err(Error::Caution);
+            }
+        }
+
+        let code = super::run_cmd(&mut main_cmd)?;
+        log::info!("程式執行結果：{:?}", code);
+        if let Some(code) = code {
+            res.push(Error::ScriptError(code));
+        }
+        info.update(|info| info.exec_done(code.unwrap_or_default(), run_id))
+            .await?;
     }
+
+    ProcessLockWrite::mark_sucess(guard);
+    Ok(())
 }
 pub async fn run_n_times(
     repeat: u64,
@@ -364,7 +385,6 @@ pub async fn run_n_times(
         }
     }
 
-    let here = path::normalize_path(".").ok();
     let script_path = path::open_script(&entry.name, &entry.ty, Some(true))?;
     let content = super::read_file_lines(&script_path)?;
 
@@ -383,16 +403,17 @@ pub async fn run_n_times(
         hs_env_desc.push(line);
     }
     EnvPair::sort(&mut env_vec);
-    let env_record = serde_json::to_string(&env_vec)?;
-
-    let run_id = entry
-        .update(|info| info.exec(&args, env_record, here))
-        .await?;
 
     if dummy {
         log::info!("--dummy 不用真的執行，提早退出");
+        let env_record = serde_json::to_string(&env_vec)?;
+        let here = path::normalize_path(".").ok();
+        entry
+            .update(|info| info.exec(&args, env_record, here, true))
+            .await?;
         return Ok(());
     }
+
     // Start packing hs tmpl val
     // SAFETY: 底下所有對 `entry` 的借用，都不會被更後面的 `entry.update` 影響
     let mut hs_tmpl_val = super::TmplVal::new();
@@ -401,40 +422,23 @@ pub async fn run_n_times(
     let hs_name = unsafe { &*hs_name };
     let hs_tags = &entry.tags as *const HashSet<Tag>;
     hs_tmpl_val.path = Some(&script_path);
-    hs_tmpl_val.run_id = Some(run_id);
     hs_tmpl_val.tags = unsafe { &*hs_tags }.iter().map(|t| t.as_ref()).collect();
     hs_tmpl_val.env_desc = hs_env_desc;
     hs_tmpl_val.name = Some(hs_name);
     // End packing hs tmpl val
 
-    let mut lock = ProcessLockWrite::new(run_id, entry.id, hs_name, &args)?;
-    let guard = lock.try_write_info()?;
-    for i in 0..repeat {
-        let caution = if i == 0 { caution } else { false };
-        let run_res = run(
-            &script_path,
-            &*entry,
-            &args,
-            &hs_tmpl_val,
-            &env_vec,
-            caution,
-        );
-        let ret_code: i32;
-        match run_res {
-            Err(Error::ScriptError(code)) => {
-                ret_code = code;
-                res.push(run_res.unwrap_err());
-            }
-            Err(e) => return Err(e),
-            Ok(_) => ret_code = 0,
-        }
-        entry
-            .update(|info| info.exec_done(ret_code, run_id))
-            .await?;
-    }
-    if res.is_empty() {
-        ProcessLockWrite::mark_sucess(guard);
-    }
+    run(
+        &script_path,
+        entry,
+        &args,
+        hs_tmpl_val,
+        &env_vec,
+        caution,
+        repeat,
+        res,
+    )
+    .await?;
+
     Ok(())
 }
 

@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::path::get_home;
 use crate::query::{do_list_query, ListQuery};
 use crate::script::ScriptInfo;
-use crate::script_repo::{ScriptRepo, Visibility};
+use crate::script_repo::{RepoEntry, ScriptRepo, Visibility};
 use crate::tag::Tag;
 use crate::util::{get_display_type, DisplayType};
 use fxhash::FxHashMap as HashMap;
@@ -226,13 +226,56 @@ fn gen_title() -> Vec<Collumn> {
     ]
 }
 
+pub async fn do_list_query_with_time<'a>(
+    script_repo: &'a mut ScriptRepo,
+    queries: Vec<ListQuery>,
+    skip_time_cnt: bool,
+) -> Result<(Vec<RepoEntry<'a>>, usize)> {
+    let time_hidden_map = script_repo.time_hidden_map();
+    let mut time_hidden_cnt = time_hidden_map.len();
+    let time_hidden_ids: Option<Vec<i64>> = if queries.is_empty() || skip_time_cnt {
+        log::debug!("Special case. Use length of time_hidden_map as count");
+        None
+    } else {
+        let mut hidden_ids: Vec<i64> = vec![];
+        for (name, script) in time_hidden_map.iter() {
+            for query in queries.iter() {
+                let ListQuery::Pattern(re, _, false) = query else {
+                    log::debug!("query {query} is skipped for time hidden count");
+                    continue;
+                };
+                if re.is_match(name) {
+                    hidden_ids.push(script.id);
+                    break;
+                }
+            }
+        }
+        Some(hidden_ids)
+    };
+
+    let scripts = do_list_query(script_repo, queries).await?;
+    if let Some(time_hidden_ids) = time_hidden_ids {
+        let iter = time_hidden_ids.iter();
+        let iter = iter.filter(|&&id| !scripts.iter().any(|s| s.id == id));
+        time_hidden_cnt = iter.count();
+    }
+
+    Ok((scripts, time_hidden_cnt))
+}
+
 pub async fn fmt_list<W: Write>(
     w: &mut W,
     script_repo: &mut ScriptRepo,
     opt: ListOptions,
     queries: Vec<ListQuery>,
 ) -> Result<()> {
-    let (time_hidden_count, recent_filter) = script_repo.time_hidden_info();
+    let latest_script_id = script_repo
+        .latest_mut(1, Visibility::Normal)
+        .map_or(-1, |s| s.id);
+    let recent_filter = script_repo.recent_filter();
+
+    let (scripts, time_hidden_count) =
+        do_list_query_with_time(script_repo, queries, opt.plain).await?;
     if !opt.plain && time_hidden_count > 0 {
         write!(
             w,
@@ -241,14 +284,7 @@ pub async fn fmt_list<W: Write>(
         )?;
     }
 
-    let latest_script_id = script_repo
-        .latest_mut(1, Visibility::Normal)
-        .map_or(-1, |s| s.id);
-
-    let scripts_iter = do_list_query(script_repo, queries)
-        .await?
-        .into_iter()
-        .map(|e| &*e.into_inner());
+    let scripts_iter = scripts.into_iter().map(|e| &*e.into_inner());
     let scripts_either = ScriptsEither::new(scripts_iter, opt.limit.map(|l| l.get()));
     let sorted = scripts_either.sorted();
 

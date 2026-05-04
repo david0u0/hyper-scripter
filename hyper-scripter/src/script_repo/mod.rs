@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 pub mod helper;
 pub use helper::RepoEntry;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Copy)]
 pub struct RecentFilter {
     pub recent: Recent,
     pub archaeology: bool,
@@ -354,21 +354,44 @@ fn join_tags<'a, I: Iterator<Item = &'a Tag>>(tags: I) -> String {
 #[derive(Debug)]
 pub struct StableRepo {
     map: HashMap<String, ScriptInfo>,
-    hidden_map: HashMap<String, ScriptInfo>,
+    select_hidden_map: HashMap<String, ScriptInfo>,
+    time_hidden_map: HashMap<String, ScriptInfo>,
     db_env: DBEnv,
-    time_hidden_count: u32,
     recent_filter: RecentFilter,
 }
 
 macro_rules! iter_by_vis {
     ($self:expr, $vis:expr) => {{
-        let (iter, iter2) = match $vis {
-            Visibility::Normal => ($self.map.iter_mut(), None),
-            Visibility::All => ($self.map.iter_mut(), Some($self.hidden_map.iter_mut())),
-            Visibility::Inverse => ($self.hidden_map.iter_mut(), None),
+        let (normal, hidden) = (
+            $self.map.iter_mut(),
+            $self
+                .select_hidden_map
+                .iter_mut()
+                .chain($self.time_hidden_map.iter_mut()),
+        );
+        let (iter1, iter2) = match $vis {
+            Visibility::Normal => (Some(normal), None),
+            Visibility::Inverse => (None, Some(hidden)),
+            Visibility::All => (Some(normal), Some(hidden)),
         };
-        iter.chain(iter2.into_iter().flatten()).map(|(_, v)| v)
+        let iter = iter1
+            .into_iter()
+            .flatten()
+            .chain(iter2.into_iter().flatten());
+        iter.map(|(_, v)| v)
     }};
+}
+fn get_multi_maps<'a, const N: usize>(
+    key: &str,
+    maps: [&'a mut HashMap<String, ScriptInfo>; N],
+) -> Option<&'a mut ScriptInfo> {
+    for map in maps.into_iter() {
+        let info = map.get_mut(key);
+        if info.is_some() {
+            return info;
+        }
+    }
+    None
 }
 impl StableRepo {
     pub fn iter_mut(&mut self, visibility: Visibility) -> impl Iterator<Item = RepoEntry<'_>> {
@@ -385,22 +408,21 @@ impl StableRepo {
         }
     }
     pub fn get_mut(&mut self, name: &ScriptName, visibility: Visibility) -> Option<RepoEntry<'_>> {
-        // FIXME: 一旦 NLL 進化就修掉這個 unsafe
-        let map = &mut self.map as *mut HashMap<String, ScriptInfo>;
-        let map = unsafe { &mut *map };
         let key = name.key();
         let info = match visibility {
-            Visibility::Normal => map.get_mut(&*key),
-            Visibility::Inverse => self.hidden_map.get_mut(&*key),
-            Visibility::All => {
-                let info = map.get_mut(&*key);
-                // 用 Option::or 有一些生命週期的怪問題…
-                if info.is_some() {
-                    info
-                } else {
-                    self.hidden_map.get_mut(&*key)
-                }
-            }
+            Visibility::Normal => get_multi_maps(&*key, [&mut self.map]),
+            Visibility::Inverse => get_multi_maps(
+                &*key,
+                [&mut self.time_hidden_map, &mut self.select_hidden_map],
+            ),
+            Visibility::All => get_multi_maps(
+                &*key,
+                [
+                    &mut self.map,
+                    &mut self.time_hidden_map,
+                    &mut self.select_hidden_map,
+                ],
+            ),
         };
         let env = &self.db_env;
         info.map(move |info| RepoEntry::new(info, env))
@@ -428,7 +450,8 @@ impl ScriptRepo {
         db_env: DBEnv,
         selector: &TagSelectorGroup,
     ) -> Result<ScriptRepo> {
-        let mut hidden_map = HashMap::<String, ScriptInfo>::default();
+        let mut select_hidden_map = HashMap::<String, ScriptInfo>::default();
+        let mut time_hidden_map = HashMap::<String, ScriptInfo>::default();
         let mut map: HashMap<String, ScriptInfo> = Default::default();
         let time_bound = TimeBound::new(recent.recent);
 
@@ -437,7 +460,6 @@ impl ScriptRepo {
         )
         .fetch_all(&db_env.info_pool)
         .await?;
-        let mut time_hidden_count = 0;
         for record in scripts.into_iter() {
             let name = record.name;
             log::trace!("載入腳本：{} {} {}", name, record.ty, record.tags);
@@ -479,8 +501,16 @@ impl ScriptRepo {
             }
             let script = builder.build();
 
-            let mut hide = !selector.select(&script.tags, &script.ty);
-            if !hide {
+            enum HideReason {
+                Select,
+                Time,
+            }
+
+            let mut hide: Option<HideReason> = None;
+            if !selector.select(&script.tags, &script.ty) {
+                hide = Some(HideReason::Select);
+            }
+            if hide.is_none() {
                 if let Some(neglect) = record.neglect {
                     log::debug!("腳本 {} 曾於 {} 被忽略", script.name, neglect);
                 }
@@ -496,29 +526,33 @@ impl ScriptRepo {
                         }
                     }
                 };
-                hide = recent.archaeology ^ overtime;
-                if hide {
-                    time_hidden_count += 1;
+                if recent.archaeology ^ overtime {
+                    hide = Some(HideReason::Time);
                 }
             }
-
-            if hide {
-                hidden_map.insert(name, script);
-            } else {
-                log::trace!("腳本 {:?} 通過篩選", name);
-                map.insert(name, script);
-            }
+            match hide {
+                None => {
+                    log::trace!("腳本 {:?} 通過篩選", name);
+                    map.insert(name, script)
+                }
+                Some(HideReason::Select) => select_hidden_map.insert(name, script),
+                Some(HideReason::Time) => time_hidden_map.insert(name, script),
+            };
         }
+
         Ok(ScriptRepo(StableRepo {
             map,
-            hidden_map,
+            select_hidden_map,
+            time_hidden_map,
             recent_filter: recent,
-            time_hidden_count,
             db_env,
         }))
     }
-    pub fn time_hidden_info(&self) -> (u32, &RecentFilter) {
-        (self.0.time_hidden_count, &self.0.recent_filter)
+    pub fn time_hidden_map(&mut self) -> &mut HashMap<String, ScriptInfo> {
+        &mut self.0.time_hidden_map
+    }
+    pub fn recent_filter(&self) -> RecentFilter {
+        self.0.recent_filter
     }
     pub fn no_trace(&mut self) {
         self.0.db_env.trace_opt = TraceOption::NoTrace;
@@ -550,8 +584,8 @@ impl ScriptRepo {
             env: &self.0.db_env,
         }
     }
-    pub fn entry_hidden(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
-        let entry = self.0.hidden_map.entry(name.key().into_owned());
+    pub fn entry_hidden_select(&mut self, name: &ScriptName) -> RepoEntryOptional<'_> {
+        let entry = self.0.select_hidden_map.entry(name.key().into_owned());
         RepoEntryOptional {
             entry,
             env: &self.0.db_env,

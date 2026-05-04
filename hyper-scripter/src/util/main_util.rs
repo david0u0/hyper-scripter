@@ -515,7 +515,7 @@ pub async fn load_utils(
 
         let entry = if hide {
             script_repo
-                .entry_hidden(&script.name)
+                .entry_hidden_select(&script.name)
                 .or_insert(script)
                 .await?
         } else {

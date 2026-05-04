@@ -103,117 +103,112 @@ fn test_remove_history_in_script() {
     assert_eq!(run!("-").unwrap(), "1");
 }
 
-#[test]
-fn test_edit_existing_bang() {
+use hyper_scripter::script_repo::ScriptRepo;
+use hyper_scripter::tag::{Tag, TagSelector};
+use hyper_scripter::util::init_env;
+async fn init_repo() -> ScriptRepo {
+    let (env, _) = init_env(true).await.unwrap();
+    let group = "all,^hide".parse::<TagSelector>().unwrap().into();
+    ScriptRepo::new(Default::default(), env, &group)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn test_edit_existing_bang() {
     println!("用 BANG! 編輯已存在的腳本，不該出錯");
     let _g = setup();
 
     run!("e test -t hide | echo 躲貓貓").unwrap();
     run!("e -t gg non-hidden -T rb | puts '光明正大'").unwrap();
 
-    // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        use hyper_scripter::error::{Error, RedundantOpt};
-        use hyper_scripter::script_repo::ScriptRepo;
-        use hyper_scripter::tag::{Tag, TagSelector};
-        use hyper_scripter::util::{
-            init_env,
-            main_util::{edit_or_create, EditTagArgs},
+    use hyper_scripter::error::{Error, RedundantOpt};
+    use hyper_scripter::util::main_util::{edit_or_create, EditTagArgs};
+    let mut repo = init_repo().await;
+
+    fn assert_tags<'a>(expect: &[&str], actual: impl Iterator<Item = &'a Tag>) {
+        let expect: Vec<Tag> = expect.iter().map(|s| s.parse().unwrap()).collect();
+        let actual: Vec<Tag> = actual.map(|s| s.clone()).collect();
+        assert_eq!(expect, actual);
+    }
+    macro_rules! try_edit {
+        ($query:expr, $ty:expr, $tag:expr) => {
+            edit_or_create(
+                vec![$query.parse().unwrap()],
+                &mut repo,
+                $ty.map(|s: &str| s.parse().unwrap()),
+                EditTagArgs {
+                    content: $tag.parse().unwrap(),
+                    explicit_tag: false,
+                    explicit_select: false,
+                },
+            )
         };
+    }
 
-        let mut repo = {
-            let (env, _) = init_env(true).await.unwrap();
-            let group = "all,^hide".parse::<TagSelector>().unwrap().into();
-            ScriptRepo::new(Default::default(), env, &group)
-                .await
-                .unwrap()
-        };
+    let err = try_edit!("test", Some("rb"), "gg")
+        .await
+        .expect_err("沒有 BANG! 就找到編輯的腳本！？");
+    assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
-        fn assert_tags<'a>(expect: &[&str], actual: impl Iterator<Item = &'a Tag>) {
-            let expect: Vec<Tag> = expect.iter().map(|s| s.parse().unwrap()).collect();
-            let actual: Vec<Tag> = actual.map(|s| s.clone()).collect();
-            assert_eq!(expect, actual);
-        }
-        macro_rules! try_edit {
-            ($query:expr, $ty:expr, $tag:expr) => {
-                edit_or_create(
-                    vec![$query.parse().unwrap()],
-                    &mut repo,
-                    $ty.map(|s: &str| s.parse().unwrap()),
-                    EditTagArgs {
-                        content: $tag.parse().unwrap(),
-                        explicit_tag: false,
-                        explicit_select: false,
-                    },
-                )
-            };
-        }
+    let err = try_edit!("test", None, "gg").await.unwrap_err();
+    assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
 
-        let err = try_edit!("test", Some("rb"), "gg")
-            .await
-            .expect_err("沒有 BANG! 就找到編輯的腳本！？");
-        assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
+    let err = try_edit!("test!", Some("rb"), "gg").await.unwrap_err();
+    assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
-        let err = try_edit!("test", None, "gg").await.unwrap_err();
-        assert!(matches!(err, Error::ScriptIsFiltered(s) if s == "test"));
+    // name different from `test.rb`, so we can create it
+    let (edit, create) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
+    let create = create.unwrap();
+    assert!(edit.existing.is_empty());
+    assert_eq!(
+        vec![get_home().join("tes.rb")],
+        create.iter_path().collect::<Vec<_>>()
+    );
+    assert!(create.ty.sub.is_some());
 
-        let err = try_edit!("test!", Some("rb"), "gg").await.unwrap_err();
-        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
+    // edit_or_create 不會改變 repo 的狀態，所以重複創造也不會報錯
+    let (edit, create) = try_edit!("tes", Some("rb"), "+gg").await.unwrap();
+    assert!(create.is_some());
+    assert!(edit.existing.is_empty());
 
-        // name different from `test.rb`, so we can create it
-        let (edit, create) = try_edit!("tes", Some("rb/traverse"), "+gg").await.unwrap();
-        let create = create.unwrap();
-        assert!(edit.existing.is_empty());
-        assert_eq!(
-            vec![get_home().join("tes.rb")],
-            create.iter_path().collect::<Vec<_>>()
-        );
-        assert!(create.ty.sub.is_some());
+    // simple edit, should find existing script `non-hidden.rb`
+    let (edit, create) = try_edit!("non-hi", None, "+zzzz").await.unwrap();
+    assert!(create.is_none());
+    let entry = &edit.existing[0];
+    assert_tags(&["gg"], entry.tags.iter());
 
-        // edit_or_create 不會改變 repo 的狀態，所以重複創造也不會報錯
-        let (edit, create) = try_edit!("tes", Some("rb"), "+gg").await.unwrap();
-        assert!(create.is_some());
-        assert!(edit.existing.is_empty());
+    let err = try_edit!("non-hi", Some("rb/cd"), "+zzzz")
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
 
-        // simple edit, should find existing script `non-hidden.rb`
-        let (edit, create) = try_edit!("non-hi", None, "+zzzz").await.unwrap();
-        assert!(create.is_none());
-        let entry = &edit.existing[0];
-        assert_tags(&["gg"], entry.tags.iter());
+    // edit exact name, so create new script `non-hi.rb`
+    let (edit, create) = try_edit!("=non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
+    let create = create.unwrap();
+    assert!(edit.existing.is_empty());
+    assert_eq!(
+        vec![get_home().join("non-hi.rb")],
+        create.iter_path().collect::<Vec<_>>()
+    );
+    assert!(create.ty.sub.is_some());
+    assert_tags(&["zzzz"], create.tags.iter());
 
-        let err = try_edit!("non-hi", Some("rb/cd"), "+zzzz")
-            .await
-            .unwrap_err();
-        assert!(matches!(err, Error::RedundantOpt(RedundantOpt::Type)));
+    // simple edit and name is disjoint from others, create script `test2.sh`
+    let (edit, create) = try_edit!("test2", None, "+gg").await.unwrap();
+    let create = create.unwrap();
+    assert!(edit.existing.is_empty());
+    assert_eq!(
+        vec![get_home().join("test2.sh")],
+        create.iter_path().collect::<Vec<_>>()
+    );
+    assert!(create.ty.sub.is_none());
+    assert_tags(&["gg"], create.tags.iter());
 
-        // edit exact name, so create new script `non-hi.rb`
-        let (edit, create) = try_edit!("=non-hi", Some("rb/cd"), "+zzzz").await.unwrap();
-        let create = create.unwrap();
-        assert!(edit.existing.is_empty());
-        assert_eq!(
-            vec![get_home().join("non-hi.rb")],
-            create.iter_path().collect::<Vec<_>>()
-        );
-        assert!(create.ty.sub.is_some());
-        assert_tags(&["zzzz"], create.tags.iter());
-
-        // simple edit and name is disjoint from others, create script `test2.sh`
-        let (edit, create) = try_edit!("test2", None, "+gg").await.unwrap();
-        let create = create.unwrap();
-        assert!(edit.existing.is_empty());
-        assert_eq!(
-            vec![get_home().join("test2.sh")],
-            create.iter_path().collect::<Vec<_>>()
-        );
-        assert!(create.ty.sub.is_none());
-        assert_tags(&["gg"], create.tags.iter());
-
-        let (edit, create) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
-        assert!(create.is_none());
-        let entry = &edit.existing[0];
-        assert_tags(&["hide"], entry.tags.iter());
-    });
+    let (edit, create) = try_edit!("test!", None, "+a,^b,c").await.unwrap();
+    assert!(create.is_none());
+    let entry = &edit.existing[0];
+    assert_tags(&["hide"], entry.tags.iter());
 }
 
 // TODO: edit wild & edit phantom
@@ -266,8 +261,8 @@ fn test_edit_without_change() {
     );
 }
 
-#[test]
-fn test_multifuzz() {
+#[tokio::test]
+async fn test_multifuzz() {
     use hyper_scripter::{fuzzy::*, SEP};
 
     println!("模糊搜撞在一起時的特殊行為 1. 取最新者 2. 不可為「正解」的後綴");
@@ -276,18 +271,12 @@ fn test_multifuzz() {
     let t1 = ScriptTest::new("multifuzz/t1", None, None);
     let t2 = ScriptTest::new("multifuzz/t2", None, None);
 
-    // 當場變一個異步執行期出來。不要直接把測試函式寫成異步，否則 setup 中鎖的處理會出問題…
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let res = rt.block_on(async {
-        fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), SEP)
-            .await
-            .unwrap()
-            .unwrap()
-    });
-    {
-        let is_match = matches!(&res, FuzzResult::Multi{ans, others, ..} if ans.obj == pref.get_name() && others.len() == 2);
-        assert!(is_match, "{:?} 並非預期中結果，應更新測資", res);
-    }
+    let res = fuzz("mult", [&t1, &t2, &pref].iter().map(|t| t.get_name()), SEP)
+        .await
+        .unwrap()
+        .unwrap();
+    let is_match = matches!(&res, FuzzResult::Multi{ans, others, ..} if ans.obj == pref.get_name() && others.len() == 2);
+    assert!(is_match, "{:?} 並非預期中結果，應更新測資", res);
 
     t2.can_find("multifuzz/t").unwrap();
     t1.run("").unwrap();
@@ -478,4 +467,61 @@ fn test_alias_args() {
     assert_eq!(expected, normal_res);
     assert_eq!(expected, alias_res);
     assert_eq!(expected, alias_shell_res);
+}
+
+#[tokio::test]
+async fn test_time_hidden_cnt() {
+    let _g = setup();
+
+    run!("e a1 a2 -t hide").unwrap();
+    run!("e a3 a4 a5 a6").unwrap();
+    run!("e b1 b2 -t hide").unwrap();
+    run!("e b3 b4 b5 b6").unwrap();
+    run!("history neglect a4 b4 a6").unwrap();
+
+    let mut repo = init_repo().await;
+    use hyper_scripter::list::do_list_query_with_time;
+    let mut do_test = async |s: &str, skip_time_cnt: bool| -> (usize, usize) {
+        let it = s.split(' ').map(|s| s.parse().unwrap());
+        let (scripts, cnt) = do_list_query_with_time(&mut repo, it.collect(), skip_time_cnt)
+            .await
+            .unwrap();
+        (scripts.len(), cnt)
+    };
+
+    let cnt = do_test("a*!", false).await;
+    assert_eq!(cnt, (6, 0));
+    let cnt = do_test("a3", false).await;
+    assert_eq!(cnt, (1, 0));
+
+    let cnt = do_test("a*", false).await;
+    assert_eq!(cnt, (2, 2));
+    let cnt = do_test("a* a6!", false).await;
+    assert_eq!(cnt, (3, 1));
+
+    let cnt = do_test("b*", false).await;
+    assert_eq!(cnt, (3, 1));
+    let cnt = do_test("b* b6!", false).await;
+    assert_eq!(cnt, (3, 1));
+    let cnt = do_test("b* b4!", false).await;
+    assert_eq!(cnt, (4, 0));
+    let cnt = do_test("b* a4!", false).await;
+    assert_eq!(cnt, (4, 1));
+
+    let cnt = do_test("*", false).await;
+    assert_eq!(cnt, (5, 3));
+    let cnt = do_test("b* a*", false).await;
+    assert_eq!(cnt, (5, 3));
+    let cnt = do_test("b* a* *4!", false).await;
+    assert_eq!(cnt, (7, 1));
+    let cnt = do_test("b* a*!", false).await;
+    assert_eq!(cnt, (9, 1));
+
+    let cnt = do_test("*", true).await;
+    assert_eq!(cnt, (5, 3), "count calculation should be skipped");
+
+    let (_, cnt) = do_list_query_with_time(&mut repo, vec![], false)
+        .await
+        .unwrap();
+    assert_eq!(cnt, 3, "special case for empty array");
 }

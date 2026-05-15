@@ -120,7 +120,7 @@ impl Error {
     }
 }
 
-pub type Result<T = ()> = std::result::Result<T, Error>;
+pub type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 pub trait Contextable<T> {
     fn context<S: ToString>(self, s: S) -> Result<T>;

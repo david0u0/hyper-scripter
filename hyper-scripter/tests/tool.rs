@@ -107,7 +107,7 @@ pub fn clean_and_set_home() {
             Ok(_) => (),
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::NotFound {
-                    panic!("重整測試用資料夾 {:?} 失敗了……", base);
+                    panic!("重整測試用資料夾 {:?} 失敗了…… {e}", base);
                 }
             }
         }

@@ -148,7 +148,7 @@ fn test_resource() {
     let _g = setup_with_utils();
 
     run!("e og/test1 | echo $(ruby $HS_HOME/util/resource.rb -- res)").unwrap();
-    run!("e og/test2 | echo $($HS_EXE -H $HS_HOME =util/resource -- -- res)").unwrap();
+    run!("e og/test2 | echo $($HS_EXE -H $HS_HOME =util/resource -- res)").unwrap();
 
     let test1_res = run!("og/test1").unwrap();
     let test2_res = run!("og/test2").unwrap();

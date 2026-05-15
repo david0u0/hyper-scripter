@@ -38,7 +38,7 @@ class Option
   end
 
   def cmd_body
-    "=#{name}! -- #{content}"
+    "=#{name}! #{content}"
   end
 
   def clear

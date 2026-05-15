@@ -1,4 +1,4 @@
-use crate::config::{Alias, Config, PromptLevel, Recent};
+use crate::config::{Alias, Config, Iter as AliasArgIter, PromptLevel, Recent};
 use crate::env_pair::EnvPair;
 use crate::error::Result;
 use crate::list::Grouping;
@@ -8,7 +8,6 @@ use crate::script_type::{ScriptFullType, ScriptType};
 use crate::tag::TagSelector;
 use crate::to_display_args;
 use crate::Either;
-use crate::APP_NAME;
 use clap::{CommandFactory, Error as ClapError, Parser, ValueEnum};
 use serde::Serialize;
 use std::num::NonZeroUsize;
@@ -89,6 +88,84 @@ pub struct Root {
     pub subcmd: Option<Subs>,
 }
 
+pub struct ArgsIter<'a, T> {
+    base_args: &'a [T],
+    add_run: bool,
+    after_args: Option<AliasArgIter<'a>>,
+    remaining_args: &'a [String],
+}
+impl<'a, T> Clone for ArgsIter<'a, T> {
+    fn clone(&self) -> Self {
+        ArgsIter {
+            base_args: self.base_args,
+            after_args: self.after_args,
+            remaining_args: self.remaining_args,
+            add_run: self.add_run,
+        }
+    }
+}
+impl<'a, T> Copy for ArgsIter<'a, T> {}
+impl<'a, T: 'a + AsRef<str>> ArgsIter<'a, T> {
+    fn non_base_iter(&self) -> impl Iterator<Item = &'a str> {
+        let it1 = if self.add_run { Some("run") } else { None }.into_iter();
+        let it2 = self.after_args.into_iter().flatten();
+        let it3 = self.remaining_args.iter().map(|s| s.as_str());
+        it1.chain(it2).chain(it3)
+    }
+    fn non_base_iter_with_trailing(&self) -> impl Iterator<Item = &'a str> {
+        let enabled = self.non_base_iter().next() == Some("run");
+        let it = self.non_base_iter();
+        TrailingIter {
+            it,
+            enabled,
+            do_escape_next: false,
+            first: true,
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &'a str> {
+        let it1 = self.base_args.iter().map(AsRef::as_ref);
+        it1.chain(self.non_base_iter_with_trailing())
+    }
+}
+impl<'a, T: 'a + AsRef<str>> std::fmt::Debug for ArgsIter<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v: Vec<&str> = self.iter().collect();
+        write!(f, "{v:?}")
+    }
+}
+
+struct TrailingIter<I> {
+    it: I,
+    enabled: bool,
+    do_escape_next: bool,
+    first: bool,
+}
+impl<'a, I: Iterator<Item = &'a str>> Iterator for TrailingIter<I> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.enabled || self.first {
+            self.first = false;
+            return self.it.next();
+        }
+        if self.do_escape_next {
+            self.do_escape_next = false;
+            self.enabled = false;
+            return Some("--");
+        }
+
+        let next = self.it.next();
+        if let Some(next) = next {
+            if next == "--" {
+                self.enabled = false;
+            } else if next == "-" || !next.starts_with("-") {
+                // TODO: This breaks with `hs run -s hide -p`... Because "hide" will cause an escape
+                self.do_escape_next = true;
+            }
+        }
+        next
+    }
+}
+
 #[derive(Parser, Debug, Serialize)]
 #[command(disable_help_flag = true, disable_help_subcommand = true)]
 pub struct AliasRoot {
@@ -99,15 +176,18 @@ pub struct AliasRoot {
     pub subcmd: Vec<String>,
 }
 impl AliasRoot {
-    fn find_alias<'a>(&'a self, conf: &'a Config) -> Option<(&'a Alias, &'a [String])> {
+    fn find_alias<'a>(&'a self, conf: &'a Config) -> (Option<&'a Alias>, &'a [String]) {
+        if self.root_args.no_alias {
+            return (None, &self.subcmd);
+        }
         match self.subcmd.first() {
-            None => None,
+            None => (None, &[]),
             Some(first) => {
                 if let Some(alias) = conf.alias.get(first) {
                     log::info!("別名 {} => {:?}", first, alias);
-                    Some((alias, &self.subcmd[1..]))
+                    (Some(alias), &self.subcmd[1..])
                 } else {
-                    None
+                    (None, &self.subcmd)
                 }
             }
         }
@@ -116,30 +196,43 @@ impl AliasRoot {
         &'a self,
         args: &'a [T],
         conf: &'a Config,
-    ) -> Option<Either<impl Iterator<Item = &'a str>, Vec<String>>> {
-        if let Some((alias, remaining_args)) = self.find_alias(conf) {
+    ) -> Either<ArgsIter<'a, T>, Vec<String>> {
+        let (alias, remaining_args) = self.find_alias(conf);
+        let (after_args, alias_len) = if let Some(alias) = alias {
             let (is_shell, after_args) = alias.args();
-            let remaining_args = remaining_args.iter().map(String::as_str);
 
             if is_shell {
                 // shell 別名，完全無視開頭的參數（例如 `hs -s tag -H path/to/home`）
-                let remaining_args = remaining_args.map(|s| to_display_args(s).to_string());
+                let remaining_args = remaining_args
+                    .iter()
+                    .map(|s| to_display_args(s).to_string());
                 let ret: Vec<_> = after_args
                     .map(ToOwned::to_owned)
                     .chain(remaining_args)
                     .collect();
-                return Some(Either::Two(ret));
+                return Either::Two(ret);
             }
-
-            let base_len = args.len() - remaining_args.len() - 1;
-            let base_args = args.iter().take(base_len).map(AsRef::as_ref);
-            let new_args = base_args.chain(after_args).chain(remaining_args);
-
-            // log::trace!("新的參數為 {:?}", new_args);
-            Some(Either::One(new_args))
+            (Some(after_args), 1)
         } else {
-            None
+            (None, 0)
+        };
+
+        let mut add_run = false;
+        let mut base_len = args.len() - remaining_args.len() - alias_len;
+        if args[base_len - 1].as_ref() == "--" {
+            add_run = true;
+            base_len -= 1;
         }
+        let base_args = &args[..base_len];
+        let new_args = ArgsIter {
+            base_args,
+            after_args,
+            remaining_args,
+            add_run,
+        };
+
+        // log::trace!("新的參數為 {:?}", new_args);
+        Either::One(new_args)
     }
 }
 
@@ -434,31 +527,55 @@ fn print_help<S: AsRef<str>>(cmds: impl IntoIterator<Item = S>) {
     std::process::exit(0);
 }
 
+fn new_err(err: ClapError) -> ArgsResult {
+    ArgsResult::Err(err)
+}
+
 macro_rules! map_clap_res {
     ($res:expr) => {{
         match $res {
-            Err(err) => return Ok(ArgsResult::Err(err)),
+            Err(err) => return Ok(new_err(err)),
             Ok(t) => t,
         }
     }};
 }
+fn handle_maybe_run<'a, T>(mut iter: ArgsIter<'a, T>) -> Result<Root, ClapError>
+where
+    T: AsRef<str> + 'a,
+{
+    log::debug!("handle_maybe_run: {iter:?}");
+    match Root::try_parse_from(iter.iter()) {
+        Err(err) => {
+            let first_non_base = iter.non_base_iter().next();
+            if first_non_base.map(|x| x.starts_with("-")) != Some(true) {
+                return Err(err);
+            }
+            log::info!("參數解析失敗 {err}，加上 run 再解析一次");
+        }
+        Ok(Root {
+            subcmd: Some(Subs::Other(_)),
+            ..
+        }) => {
+            log::info!("External subcommand");
+        }
+        Ok(obj) => return Ok(obj),
+    }
+
+    iter.add_run = true;
+    log::debug!("After adding run: {iter:?}");
+    Root::try_parse_from(iter.iter())
+}
 
 fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
     match AliasRoot::try_parse_from(&args) {
-        Ok(alias_root) if alias_root.root_args.no_alias => {
-            log::debug!("不使用別名！");
-            let root = map_clap_res!(Root::try_parse_from(args));
-            return Ok(ArgsResult::Normal(root));
-        }
         Ok(alias_root) => {
             log::info!("別名命令行物件 {:?}", alias_root);
             set_home(&alias_root.root_args.hs_home, true, true)?;
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
-                Some(Either::One(new_args)) => map_clap_res!(Root::try_parse_from(new_args)),
-                Some(Either::Two(new_args)) => {
+                Either::One(new_args) => map_clap_res!(handle_maybe_run(new_args)),
+                Either::Two(new_args) => {
                     return Ok(ArgsResult::Shell(new_args));
                 }
-                None => map_clap_res!(Root::try_parse_from(&args)),
             };
             root.is_from_alias = true;
             Ok(ArgsResult::Normal(root))
@@ -501,13 +618,6 @@ impl Root {
     }
     pub fn sanitize(&mut self) -> std::result::Result<(), ClapError> {
         match &mut self.subcmd {
-            Some(Subs::Other(args)) => {
-                let args = [APP_NAME, "run"]
-                    .into_iter()
-                    .chain(args.iter().map(|s| s.as_str()));
-                self.subcmd = Some(Subs::try_parse_from(args)?);
-                log::info!("執行模式 {:?}", self.subcmd);
-            }
             Some(Subs::Help { args }) => {
                 print_help(args.iter());
             }
@@ -555,7 +665,7 @@ pub fn handle_args(args: Vec<String>) -> Result<ArgsResult> {
 mod test {
     use super::*;
     fn try_build_args(args: &str) -> std::result::Result<Root, ClapError> {
-        let v: Vec<_> = std::iter::once(APP_NAME)
+        let v: Vec<_> = std::iter::once("hs")
             .chain(args.split(' '))
             .map(|s| s.to_owned())
             .collect();
@@ -686,10 +796,10 @@ mod test {
     }
     #[test]
     fn test_external_run_tags() {
-        let args = build_args("-s test -- --dummy -r 42 =script -- -a --"); // TODO: `--dummy -a =script`
+        let args = build_args("-s test --dummy -r 42 =script -a --");
         assert!(is_args_eq(
             &args,
-            &build_args("-s test run --dummy -r 42 =script -- -a --")
+            &build_args("-s test run --dummy -r 42 =script -a --")
         ));
         assert_eq!(args.root_args.select, vec!["test".parse().unwrap()]);
         assert_eq!(args.root_args.all, false);
@@ -798,15 +908,6 @@ mod test {
         ));
 
         assert!(!is_args_eq(
-            &build_args("run s --repeat 1"),
-            &build_args("run s -- --repeat 1")
-        ));
-        assert!(is_args_eq(
-            &build_args("run s b --repeat 1"),
-            &build_args("run s -- b --repeat 1"),
-        ));
-
-        assert!(!is_args_eq(
             &build_args("history amend 0 --no-env"),
             &build_args("history amend 0 -- --no-env"),
         ));
@@ -814,5 +915,36 @@ mod test {
             &build_args("history amend 0 b --no-env"),
             &build_args("history amend 0 -- b --no-env"),
         ));
+    }
+
+    #[test]
+    fn test_run_trailing_args() {
+        fn extract_arg(s: &str) -> (ScriptQuery, Vec<String>) {
+            let arg = build_args(s);
+            match arg.subcmd {
+                Some(Subs::Run {
+                    script_query, args, ..
+                }) => (script_query, args),
+                _ => {
+                    panic!("{:?} should be run...", s);
+                }
+            }
+        }
+
+        let (s, a) = extract_arg("run x --repeat 1");
+        assert_eq!(s.to_string(), "x");
+        assert_eq!(&a, &["--repeat", "1"]);
+
+        let (s, a) = extract_arg("run x -- --repeat 1");
+        assert_eq!(s.to_string(), "x");
+        assert_eq!(&a, &["--", "--repeat", "1"]);
+
+        let (s, a) = extract_arg("run x -- --repeat 1 --");
+        assert_eq!(s.to_string(), "x");
+        assert_eq!(&a, &["--", "--repeat", "1", "--"]);
+
+        let arg = build_args("run x -- --repeat 1 --");
+        assert!(is_args_eq(&arg, &build_args("-- x -- --repeat 1 --")));
+        assert!(is_args_eq(&arg, &build_args("x -- --repeat 1 --")));
     }
 }

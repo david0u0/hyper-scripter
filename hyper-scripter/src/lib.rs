@@ -27,7 +27,6 @@ pub mod util;
 
 pub use std::borrow::Cow;
 
-pub const APP_NAME: &str = "hs";
 pub const SEP: &str = "/";
 #[derive(Debug)]
 pub enum Either<T, U> {

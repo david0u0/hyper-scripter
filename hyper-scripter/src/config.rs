@@ -68,6 +68,28 @@ impl From<Vec<String>> for Alias {
         Alias { after }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct Iter<'a> {
+    first_args: &'a str,
+    remaining: &'a [String],
+    is_first: bool,
+}
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_first {
+            self.is_first = false;
+            return Some(self.first_args);
+        }
+        let ret = self.remaining.first().map(|x| x.as_str());
+        if ret.is_some() {
+            self.remaining = &self.remaining[1..];
+        }
+        ret
+    }
+}
+
 impl Alias {
     /// ```rust
     /// use hyper_scripter::config::Alias;
@@ -95,10 +117,9 @@ impl Alias {
     /// let alias = Alias::from(vec!["!ls".to_owned(), "*".to_owned()]);
     /// assert_eq!((true, vec!["ls", "*"]), get_args(&alias));
     /// ```
-    pub fn args(&self) -> (bool, impl Iterator<Item = &'_ str>) {
+    pub fn args(&self) -> (bool, Iter<'_>) {
         let mut is_shell = false;
-        let mut iter = self.after.iter().map(String::as_str);
-        let mut first_args = iter.next().unwrap();
+        let mut first_args = self.after.first().unwrap().as_str();
         let mut chars = first_args.chars();
         if chars.next() == Some('!') {
             if first_args.len() > 1 {
@@ -109,7 +130,14 @@ impl Alias {
             }
         }
 
-        return (is_shell, std::iter::once(first_args).chain(iter));
+        (
+            is_shell,
+            Iter {
+                first_args,
+                remaining: &self.after[1..],
+                is_first: true,
+            },
+        )
     }
 }
 

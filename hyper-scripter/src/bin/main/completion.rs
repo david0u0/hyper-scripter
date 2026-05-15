@@ -78,8 +78,8 @@ pub async fn handle_completion(args: Vec<String>, repo: &mut Option<ScriptRepo>)
             let home = path::compute_home_path_optional(root.root_args.hs_home.as_ref(), false)?;
             // TODO: we can try to make this `load` reused further
             let conf = Config::load(&home)?;
-            if let Some(Either::One(new_args)) = root.expand_alias(args, &conf) {
-                let args_iter = new_args.map(String::from);
+            if let Either::One(new_args) = root.expand_alias(args, &conf) {
+                let args_iter = new_args.iter().map(String::from);
                 return handle_completion_no_alias(shell, args_iter, repo).await;
             };
         }

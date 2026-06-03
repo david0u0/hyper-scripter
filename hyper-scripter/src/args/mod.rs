@@ -574,7 +574,10 @@ fn handle_alias_args(args: Vec<String>) -> Result<ArgsResult> {
             let mut root = match alias_root.expand_alias(&args, Config::get()) {
                 Either::One(new_args) => map_clap_res!(handle_maybe_run(new_args)),
                 Either::Two(new_args) => {
-                    return Ok(ArgsResult::Shell(new_args));
+                    return Ok(ArgsResult::Shell {
+                        args: new_args,
+                        dump_args: alias_root.root_args.dump_args,
+                    });
                 }
             };
             root.is_from_alias = true;
@@ -645,7 +648,7 @@ impl Root {
 pub enum ArgsResult {
     Normal(Root),
     Completion(Vec<String>),
-    Shell(Vec<String>),
+    Shell { dump_args: bool, args: Vec<String> },
     Err(ClapError),
 }
 

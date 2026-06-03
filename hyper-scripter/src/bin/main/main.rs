@@ -48,7 +48,14 @@ async fn main_err_handle(errs: &mut Vec<Error>) -> Result {
     let root = args::handle_args(args)?;
     let root = match root {
         ArgsResult::Normal(root) => root,
-        ArgsResult::Shell(shell) => std::process::exit(util::run_shell(&shell)?),
+        ArgsResult::Shell {
+            args,
+            dump_args: false,
+        } => std::process::exit(util::run_shell(&args)?),
+        ArgsResult::Shell { args, .. } => {
+            print_iter(args.iter(), " ");
+            std::process::exit(0);
+        }
         ArgsResult::Completion(comp) => {
             let mut repo = None;
             let res = completion::handle_completion(comp, &mut repo).await;
